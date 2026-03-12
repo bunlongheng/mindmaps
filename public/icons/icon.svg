@@ -1,0 +1,13 @@
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'>
+  <rect width='512' height='512' rx='100' fill='#6366f1'/>
+  <rect x='196' y='216' width='120' height='80' rx='12' fill='white' opacity='0.95'/>
+  <line x1='196' y1='256' x2='130' y2='170' stroke='white' stroke-width='8' stroke-linecap='round' opacity='0.8'/>
+  <rect x='70' y='140' width='90' height='50' rx='8' fill='white' opacity='0.7'/>
+  <line x1='316' y1='256' x2='380' y2='170' stroke='white' stroke-width='8' stroke-linecap='round' opacity='0.8'/>
+  <rect x='350' y='140' width='90' height='50' rx='8' fill='white' opacity='0.7'/>
+  <line x1='196' y1='256' x2='130' y2='340' stroke='white' stroke-width='8' stroke-linecap='round' opacity='0.8'/>
+  <rect x='70' y='318' width='90' height='50' rx='8' fill='white' opacity='0.7'/>
+  <line x1='316' y1='256' x2='380' y2='340' stroke='white' stroke-width='8' stroke-linecap='round' opacity='0.8'/>
+  <rect x='350' y='318' width='90' height='50' rx='8' fill='white' opacity='0.7'/>
+  <text x='256' y='266' text-anchor='middle' font-family='system-ui' font-size='44' font-weight='700' fill='#6366f1'>M</text>
+</svg>
