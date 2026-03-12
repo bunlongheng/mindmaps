@@ -22,8 +22,10 @@ CREATE TABLE IF NOT EXISTS public.mindmap_nodes (
   y            real        NOT NULL DEFAULT 0,
   width        real        NOT NULL DEFAULT 160,
   height       real        NOT NULL DEFAULT 40,
-  sort_order   integer     NOT NULL DEFAULT 0,
-  created_at   timestamptz NOT NULL DEFAULT now()
+  sort_order           integer     NOT NULL DEFAULT 0,
+  manually_positioned  boolean     NOT NULL DEFAULT false,
+  font_size            integer     NOT NULL DEFAULT 13,
+  created_at           timestamptz NOT NULL DEFAULT now()
 );
 
 CREATE INDEX IF NOT EXISTS idx_mindmap_nodes_diagram_id ON public.mindmap_nodes(diagram_id);

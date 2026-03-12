@@ -38,7 +38,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, svg
     borderColor = isSelected ? '#6366f1' : node.color
   }
 
-  const fontSize = isRoot ? 15 : node.depth === 1 ? 13 : 12
+  const fontSize = node.fontSize ?? (isRoot ? 15 : node.depth === 1 ? 13 : 12)
   const fontWeight = isRoot ? '700' : node.depth === 1 ? '600' : '500'
 
   const dragStart = useRef<{ x: number; y: number; nodeX: number; nodeY: number } | null>(null)

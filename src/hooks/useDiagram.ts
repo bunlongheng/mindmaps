@@ -69,6 +69,8 @@ export function useDiagram() {
         parentId: n.parent_id, depth: n.depth,
         x: n.x, y: n.y, width: n.width, height: n.height,
         sortOrder: n.sort_order,
+        manuallyPositioned: n.manually_positioned ?? false,
+        fontSize: n.font_size ?? undefined,
       }))
     }
     setActiveDiagram(diagram)
@@ -90,6 +92,8 @@ export function useDiagram() {
       parent_id: n.parentId, title: n.title, color: n.color,
       depth: n.depth, x: n.x, y: n.y, width: n.width, height: n.height,
       sort_order: n.sortOrder ?? 0,
+      manually_positioned: n.manuallyPositioned ?? false,
+      font_size: n.fontSize ?? 13,
     }))
     const { data: existing } = await supabase
       .from('mindmap_nodes').select('id').eq('diagram_id', diagram.id)

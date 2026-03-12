@@ -13,6 +13,7 @@ export interface MindNode {
   height: number
   manuallyPositioned?: boolean
   sortOrder?: number
+  fontSize?: number
 }
 
 export interface Diagram {

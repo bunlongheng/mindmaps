@@ -98,18 +98,23 @@ export function NodeStylePanel({ nodeId, onClose }: NodeStylePanelProps) {
 
         {/* Text size */}
         <section style={{ marginBottom: 20 }}>
-          <label style={labelStyle}>Text</label>
+          <label style={labelStyle}>Font Size</label>
           <div style={{ display: 'flex', gap: 6 }}>
-            {[12, 13, 14, 16, 18].map(size => (
-              <button key={size} onClick={() => save({ height: Math.max(node.height, 36) })}
-                style={{
-                  flex: 1, padding: '5px 0', borderRadius: 7, border: '1px solid #e2e8f0',
-                  background: 'transparent', cursor: 'pointer', fontSize: 11, fontWeight: 500, color: '#64748b',
-                  fontFamily: 'inherit',
-                }}>
-                {size}
-              </button>
-            ))}
+            {[11, 12, 13, 14, 16].map(size => {
+              const active = (node.fontSize ?? (node.depth === 0 ? 15 : node.depth === 1 ? 13 : 12)) === size
+              return (
+                <button key={size} onClick={() => save({ fontSize: size })}
+                  style={{
+                    flex: 1, padding: '5px 0', borderRadius: 7,
+                    border: `1px solid ${active ? '#6366f1' : '#e2e8f0'}`,
+                    background: active ? '#eef2ff' : 'transparent',
+                    cursor: 'pointer', fontSize: 11, fontWeight: active ? 700 : 500,
+                    color: active ? '#6366f1' : '#64748b', fontFamily: 'inherit',
+                  }}>
+                  {size}
+                </button>
+              )
+            })}
           </div>
         </section>
 
