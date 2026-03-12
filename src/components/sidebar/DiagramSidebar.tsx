@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useDiagramStore } from '../../store/diagramStore'
 import { useDiagram } from '../../hooks/useDiagram'
-import { Plus, Trash2, Map } from 'lucide-react'
+import { Plus, Trash2, GitBranch } from 'lucide-react'
 import type { DiagramMeta } from '../../types'
 
 interface DiagramSidebarProps {
@@ -23,32 +23,69 @@ export function DiagramSidebar({ onSave }: DiagramSidebarProps) {
   }
 
   return (
-    <aside className="w-56 bg-white border-r border-slate-200 flex flex-col h-full">
-      <div className="p-3 border-b border-slate-100">
-        <div className="flex items-center gap-2 mb-3">
-          <div className="w-7 h-7 bg-indigo-600 rounded-lg flex items-center justify-center">
-            <Map size={14} className="text-white" />
+    <aside style={{
+      width: 220, background: '#fff', borderRight: '1px solid #f1f5f9',
+      display: 'flex', flexDirection: 'column', height: '100%', flexShrink: 0,
+    }}>
+
+      {/* Brand header */}
+      <div style={{
+        padding: '16px 14px 12px',
+        borderBottom: '1px solid #f1f5f9',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+          <div style={{
+            width: 32, height: 32, borderRadius: 9,
+            background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 2px 8px rgba(99,102,241,0.35)',
+            flexShrink: 0,
+          }}>
+            <GitBranch size={15} color="#fff" />
           </div>
-          <span className="font-semibold text-slate-800 text-sm">MindMap</span>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#1e293b', lineHeight: 1.2 }}>MindMap</div>
+            <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 1 }}>Visual diagrams</div>
+          </div>
         </div>
-        <div className="flex gap-1">
+
+        {/* New diagram input */}
+        <div style={{ display: 'flex', gap: 6 }}>
           <input
             value={newName}
             onChange={e => setNewName(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleCreate()}
-            placeholder="New diagram..."
-            className="flex-1 text-xs border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+            placeholder="New diagram…"
+            style={{
+              flex: 1, fontSize: 12, border: '1px solid #e2e8f0', borderRadius: 8,
+              padding: '7px 10px', outline: 'none', color: '#334155',
+              background: '#f8fafc', fontFamily: 'inherit',
+              transition: 'border-color 0.15s',
+            }}
+            onFocus={e => (e.target.style.borderColor = '#6366f1')}
+            onBlur={e => (e.target.style.borderColor = '#e2e8f0')}
           />
           <button onClick={handleCreate} disabled={creating}
-            className="p-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">
-            <Plus size={14} />
+            style={{
+              width: 32, height: 32, borderRadius: 8, border: 'none',
+              background: creating ? '#a5b4fc' : '#6366f1',
+              color: '#fff', cursor: creating ? 'not-allowed' : 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              flexShrink: 0, transition: 'background 0.15s',
+            }}>
+            <Plus size={15} />
           </button>
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-2">
+      {/* Diagram list */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '8px 8px 0' }}>
         {diagrams.length === 0 && (
-          <p className="text-xs text-slate-400 text-center mt-4">No diagrams yet</p>
+          <div style={{ textAlign: 'center', padding: '32px 16px', color: '#cbd5e1' }}>
+            <GitBranch size={28} style={{ margin: '0 auto 8px', display: 'block', opacity: 0.4 }} />
+            <p style={{ fontSize: 12 }}>No diagrams yet</p>
+            <p style={{ fontSize: 11, marginTop: 4, color: '#e2e8f0' }}>Type a name above and press Enter</p>
+          </div>
         )}
         {diagrams.map(d => (
           <DiagramItem
@@ -61,10 +98,17 @@ export function DiagramSidebar({ onSave }: DiagramSidebarProps) {
         ))}
       </div>
 
+      {/* Save indicator */}
       {isDirty && (
-        <div className="p-2 border-t border-slate-100">
-          <button onClick={onSave}
-            className="w-full py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-lg hover:bg-indigo-700 transition-colors">
+        <div style={{ padding: '8px 10px 10px', borderTop: '1px solid #f1f5f9' }}>
+          <button onClick={onSave} style={{
+            width: '100%', padding: '8px', background: '#6366f1', color: '#fff',
+            border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 600,
+            cursor: 'pointer', fontFamily: 'inherit', transition: 'background 0.15s',
+          }}
+            onMouseEnter={e => (e.currentTarget.style.background = '#4f46e5')}
+            onMouseLeave={e => (e.currentTarget.style.background = '#6366f1')}
+          >
             Save changes
           </button>
         </div>
@@ -77,18 +121,43 @@ function DiagramItem({ diagram, isActive, isDirty, onLoad, onDelete }: {
   diagram: DiagramMeta; isActive: boolean; isDirty: boolean
   onLoad: () => void; onDelete: () => void
 }) {
+  const [hovered, setHovered] = useState(false)
+
   return (
     <div
       onClick={onLoad}
-      className={`group flex items-center gap-2 px-2 py-2 rounded-lg cursor-pointer transition-colors mb-0.5 ${
-        isActive ? 'bg-indigo-50 text-indigo-700' : 'hover:bg-slate-50 text-slate-700'
-      }`}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 8,
+        padding: '8px 8px', borderRadius: 8, cursor: 'pointer',
+        marginBottom: 2, transition: 'background 0.12s',
+        background: isActive ? '#eef2ff' : hovered ? '#f8fafc' : 'transparent',
+      }}
     >
-      <Map size={13} className={isActive ? 'text-indigo-500' : 'text-slate-400'} />
-      <span className="flex-1 text-xs font-medium truncate">{diagram.name}{isDirty ? ' *' : ''}</span>
+      <div style={{
+        width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
+        background: isActive ? '#6366f1' : '#cbd5e1',
+        transition: 'background 0.15s',
+      }} />
+      <span style={{
+        flex: 1, fontSize: 13, fontWeight: isActive ? 600 : 400,
+        color: isActive ? '#4338ca' : '#475569',
+        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+      }}>
+        {diagram.name}{isDirty ? ' ●' : ''}
+      </span>
       <button
         onClick={e => { e.stopPropagation(); onDelete() }}
-        className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-red-100 hover:text-red-500 transition-all">
+        style={{
+          opacity: hovered ? 1 : 0, padding: 3, borderRadius: 5, border: 'none',
+          background: 'transparent', cursor: 'pointer', color: '#94a3b8',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          transition: 'all 0.12s',
+        }}
+        onMouseEnter={e => { e.currentTarget.style.background = '#fee2e2'; e.currentTarget.style.color = '#ef4444' }}
+        onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#94a3b8' }}
+      >
         <Trash2 size={12} />
       </button>
     </div>

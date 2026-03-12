@@ -11,10 +11,10 @@ interface NodeProps {
   onDoubleClick: (node: MindNode) => void
   onAddChild: (parentId: string) => void
   svgRef: React.RefObject<SVGSVGElement>
-  zoom?: number
+  _zoom?: number
 }
 
-export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onAddChild, svgRef, zoom: _zoom }: NodeProps) {
+export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onAddChild, svgRef }: NodeProps) {
   const bg = applyDepthBackground(node.color, node.depth)
   const border = darken(node.color, node.depth === 0 ? 0.1 : 0.15)
   const textColor = node.depth === 0 ? '#fff' : '#1e293b'

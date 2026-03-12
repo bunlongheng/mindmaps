@@ -14,6 +14,7 @@ export function DiagramCanvas({ onEditNode }: DiagramCanvasProps) {
   const svgRef = useRef<SVGSVGElement>(null!)
   const [pan, setPan] = useState({ x: 0, y: 0 })
   const [zoom, setZoom] = useState(1)
+  const [isPanning, setIsPanning] = useState(false)
   const panStart = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null)
 
   useKeyboard()
@@ -27,6 +28,7 @@ export function DiagramCanvas({ onEditNode }: DiagramCanvasProps) {
   const handleBgPointerDown = useCallback((e: React.PointerEvent) => {
     if (e.target !== e.currentTarget && (e.target as Element).tagName !== 'svg') return
     setSelectedNodeIds([])
+    setIsPanning(true)
     panStart.current = { x: e.clientX, y: e.clientY, panX: pan.x, panY: pan.y }
     ;(e.target as Element).setPointerCapture(e.pointerId)
   }, [pan, setSelectedNodeIds])
@@ -38,7 +40,10 @@ export function DiagramCanvas({ onEditNode }: DiagramCanvasProps) {
     setPan({ x: panStart.current.panX + dx, y: panStart.current.panY + dy })
   }, [])
 
-  const handleBgPointerUp = useCallback(() => { panStart.current = null }, [])
+  const handleBgPointerUp = useCallback(() => {
+    panStart.current = null
+    setIsPanning(false)
+  }, [])
 
   const handleSelect = useCallback((id: string, multi: boolean) => {
     if (multi) {
@@ -52,9 +57,7 @@ export function DiagramCanvas({ onEditNode }: DiagramCanvasProps) {
     }
   }, [selectedNodeIds, setSelectedNodeIds])
 
-  const handleDragEnd = useCallback((_id: string, _dx: number, _dy: number) => {
-    // drag already applied via updateNode in Node component
-  }, [])
+  const handleDragEnd = useCallback((_id: string, _dx: number, _dy: number) => {}, [])
 
   const handleDoubleClick = useCallback((node: MindNode) => {
     onEditNode(node.id)
@@ -66,22 +69,50 @@ export function DiagramCanvas({ onEditNode }: DiagramCanvasProps) {
 
   if (!activeDiagram) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-slate-50">
-        <div className="text-center text-slate-400">
-          <div className="text-6xl mb-4">🗺️</div>
-          <p className="text-lg font-medium">Select or create a diagram</p>
+      <div style={{
+        flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: '#fafbff',
+        backgroundImage: 'radial-gradient(circle, #d1d5db 1px, transparent 1px)',
+        backgroundSize: '24px 24px',
+      }}>
+        <div style={{ textAlign: 'center', color: '#94a3b8' }}>
+          <div style={{
+            width: 64, height: 64, borderRadius: 18,
+            background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            margin: '0 auto 16px',
+            boxShadow: '0 8px 32px rgba(99,102,241,0.25)',
+          }}>
+            <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+              <circle cx="16" cy="16" r="5" fill="white" opacity="0.9"/>
+              <line x1="16" y1="11" x2="16" y2="4" stroke="white" strokeWidth="2" strokeLinecap="round" opacity="0.7"/>
+              <line x1="16" y1="21" x2="16" y2="28" stroke="white" strokeWidth="2" strokeLinecap="round" opacity="0.7"/>
+              <line x1="11" y1="16" x2="4" y2="16" stroke="white" strokeWidth="2" strokeLinecap="round" opacity="0.7"/>
+              <line x1="21" y1="16" x2="28" y2="16" stroke="white" strokeWidth="2" strokeLinecap="round" opacity="0.7"/>
+              <circle cx="16" cy="4" r="2.5" fill="white" opacity="0.6"/>
+              <circle cx="16" cy="28" r="2.5" fill="white" opacity="0.6"/>
+              <circle cx="4" cy="16" r="2.5" fill="white" opacity="0.6"/>
+              <circle cx="28" cy="16" r="2.5" fill="white" opacity="0.6"/>
+            </svg>
+          </div>
+          <p style={{ fontSize: 16, fontWeight: 600, color: '#475569', marginBottom: 6 }}>Create your first diagram</p>
+          <p style={{ fontSize: 13, color: '#94a3b8' }}>Type a name in the sidebar and press Enter</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="flex-1 overflow-hidden relative" style={{ background: '#f8fafc' }}>
+    <div style={{
+      flex: 1, overflow: 'hidden', position: 'relative',
+      background: '#fafbff',
+      backgroundImage: 'radial-gradient(circle, #d1d5db 1px, transparent 1px)',
+      backgroundSize: '24px 24px',
+      cursor: isPanning ? 'grabbing' : 'default',
+    }}>
       <svg
         ref={svgRef}
-        width="100%"
-        height="100%"
-        style={{ cursor: panStart.current ? 'grabbing' : 'default' }}
+        width="100%" height="100%"
         onWheel={handleWheel}
         onPointerDown={handleBgPointerDown}
         onPointerMove={handleBgPointerMove}
@@ -99,22 +130,53 @@ export function DiagramCanvas({ onEditNode }: DiagramCanvasProps) {
               onDoubleClick={handleDoubleClick}
               onAddChild={handleAddChild}
               svgRef={svgRef}
-              zoom={zoom}
+              _zoom={zoom}
             />
           ))}
         </g>
       </svg>
 
       {/* Zoom controls */}
-      <div className="absolute bottom-4 right-4 flex flex-col gap-1">
-        <button onClick={() => setZoom(z => Math.min(3, z * 1.2))}
-          className="w-8 h-8 bg-white border border-slate-200 rounded shadow text-slate-600 hover:bg-slate-50 text-lg font-bold flex items-center justify-center">+</button>
-        <button onClick={() => setZoom(1)}
-          className="w-8 h-8 bg-white border border-slate-200 rounded shadow text-slate-500 text-xs flex items-center justify-center font-medium">
-          {Math.round(zoom * 100)}%
-        </button>
-        <button onClick={() => setZoom(z => Math.max(0.2, z * 0.8))}
-          className="w-8 h-8 bg-white border border-slate-200 rounded shadow text-slate-600 hover:bg-slate-50 text-lg font-bold flex items-center justify-center">−</button>
+      <div style={{
+        position: 'absolute', bottom: 20, right: 20,
+        display: 'flex', flexDirection: 'column',
+        background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12,
+        boxShadow: '0 2px 12px rgba(0,0,0,0.08)', overflow: 'hidden',
+      }}>
+        {[
+          { label: '+', onClick: () => setZoom(z => Math.min(3, z * 1.2)) },
+          { label: `${Math.round(zoom * 100)}%`, onClick: () => setZoom(1), small: true },
+          { label: '−', onClick: () => setZoom(z => Math.max(0.2, z * 0.8)) },
+        ].map((btn, i) => (
+          <button key={i} onClick={btn.onClick}
+            style={{
+              width: 36, height: btn.small ? 32 : 36, border: 'none',
+              borderBottom: i < 2 ? '1px solid #f1f5f9' : 'none',
+              background: 'transparent', cursor: 'pointer', color: '#64748b',
+              fontSize: btn.small ? 10 : 18, fontWeight: btn.small ? 600 : 400,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontFamily: 'inherit', transition: 'background 0.12s',
+            }}
+            onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+          >
+            {btn.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Keyboard hints */}
+      <div style={{
+        position: 'absolute', bottom: 20, left: '50%', transform: 'translateX(-50%)',
+        display: 'flex', gap: 12, alignItems: 'center',
+        background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(8px)',
+        border: '1px solid #f1f5f9', borderRadius: 20,
+        padding: '5px 14px',
+        fontSize: 11, color: '#94a3b8',
+      }}>
+        {[['Tab', 'Add child'], ['Double-click', 'Edit'], ['Del', 'Delete'], ['⌘Z', 'Undo']].map(([key, action]) => (
+          <span key={key}><kbd style={{ fontFamily: 'monospace', color: '#475569', fontWeight: 600 }}>{key}</kbd> {action}</span>
+        ))}
       </div>
     </div>
   )
