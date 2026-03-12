@@ -3,13 +3,11 @@ import { useDiagramStore } from '../../store/diagramStore'
 import { EdgeLayer } from './EdgeLayer'
 import { Node } from './Node'
 import { useKeyboard } from '../../hooks/useKeyboard'
-import type { MindNode } from '../../types'
-
 interface DiagramCanvasProps {
-  onEditNode: (nodeId: string) => void
+  onNodeSelect: (nodeId: string | null) => void
 }
 
-export function DiagramCanvas({ onEditNode }: DiagramCanvasProps) {
+export function DiagramCanvas({ onNodeSelect }: DiagramCanvasProps) {
   const { activeDiagram, selectedNodeIds, setSelectedNodeIds, diagramType, lineStyle, addNode } = useDiagramStore()
   const svgRef = useRef<SVGSVGElement>(null!)
   const [pan, setPan] = useState({ x: 0, y: 0 })
@@ -21,67 +19,45 @@ export function DiagramCanvas({ onEditNode }: DiagramCanvasProps) {
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault()
-    const delta = e.deltaY > 0 ? 0.9 : 1.1
-    setZoom(z => Math.min(3, Math.max(0.2, z * delta)))
+    setZoom(z => Math.min(3, Math.max(0.2, z * (e.deltaY > 0 ? 0.9 : 1.1))))
   }, [])
 
   const handleBgPointerDown = useCallback((e: React.PointerEvent) => {
     if (e.target !== e.currentTarget && (e.target as Element).tagName !== 'svg') return
     setSelectedNodeIds([])
+    onNodeSelect(null)
     setIsPanning(true)
     panStart.current = { x: e.clientX, y: e.clientY, panX: pan.x, panY: pan.y }
     ;(e.target as Element).setPointerCapture(e.pointerId)
-  }, [pan, setSelectedNodeIds])
+  }, [pan, setSelectedNodeIds, onNodeSelect])
 
   const handleBgPointerMove = useCallback((e: React.PointerEvent) => {
     if (!panStart.current) return
-    const dx = e.clientX - panStart.current.x
-    const dy = e.clientY - panStart.current.y
-    setPan({ x: panStart.current.panX + dx, y: panStart.current.panY + dy })
+    setPan({ x: panStart.current.panX + (e.clientX - panStart.current.x), y: panStart.current.panY + (e.clientY - panStart.current.y) })
   }, [])
 
-  const handleBgPointerUp = useCallback(() => {
-    panStart.current = null
-    setIsPanning(false)
-  }, [])
+  const handleBgPointerUp = useCallback(() => { panStart.current = null; setIsPanning(false) }, [])
 
   const handleSelect = useCallback((id: string, multi: boolean) => {
     if (multi) {
-      setSelectedNodeIds(
-        selectedNodeIds.includes(id)
-          ? selectedNodeIds.filter(n => n !== id)
-          : [...selectedNodeIds, id]
-      )
+      const next = selectedNodeIds.includes(id) ? selectedNodeIds.filter(n => n !== id) : [...selectedNodeIds, id]
+      setSelectedNodeIds(next)
+      onNodeSelect(next.length === 1 ? next[0] : null)
     } else {
       setSelectedNodeIds([id])
+      onNodeSelect(id)
     }
-  }, [selectedNodeIds, setSelectedNodeIds])
-
-  const handleDragEnd = useCallback((_id: string, _dx: number, _dy: number) => {}, [])
-
-  const handleDoubleClick = useCallback((node: MindNode) => {
-    onEditNode(node.id)
-  }, [onEditNode])
-
-  const handleAddChild = useCallback((parentId: string) => {
-    addNode(parentId)
-  }, [addNode])
+  }, [selectedNodeIds, setSelectedNodeIds, onNodeSelect])
 
   if (!activeDiagram) {
     return (
-      <div style={{
-        flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: '#fafbff',
-        backgroundImage: 'radial-gradient(circle, #d1d5db 1px, transparent 1px)',
-        backgroundSize: '24px 24px',
-      }}>
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fff' }}>
         <div style={{ textAlign: 'center', color: '#94a3b8' }}>
           <div style={{
             width: 64, height: 64, borderRadius: 18,
             background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            margin: '0 auto 16px',
-            boxShadow: '0 8px 32px rgba(99,102,241,0.25)',
+            margin: '0 auto 16px', boxShadow: '0 8px 32px rgba(99,102,241,0.25)',
           }}>
             <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
               <circle cx="16" cy="16" r="5" fill="white" opacity="0.9"/>
@@ -95,24 +71,16 @@ export function DiagramCanvas({ onEditNode }: DiagramCanvasProps) {
               <circle cx="28" cy="16" r="2.5" fill="white" opacity="0.6"/>
             </svg>
           </div>
-          <p style={{ fontSize: 16, fontWeight: 600, color: '#475569', marginBottom: 6 }}>Create your first diagram</p>
-          <p style={{ fontSize: 13, color: '#94a3b8' }}>Type a name in the sidebar and press Enter</p>
+          <p style={{ fontSize: 16, fontWeight: 600, color: '#475569', marginBottom: 6 }}>Open a map to start</p>
+          <p style={{ fontSize: 13, color: '#94a3b8' }}>Click ≡ to go back to your maps</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div style={{
-      flex: 1, overflow: 'hidden', position: 'relative',
-      background: '#fafbff',
-      backgroundImage: 'radial-gradient(circle, #d1d5db 1px, transparent 1px)',
-      backgroundSize: '24px 24px',
-      cursor: isPanning ? 'grabbing' : 'default',
-    }}>
-      <svg
-        ref={svgRef}
-        width="100%" height="100%"
+    <div style={{ flex: 1, overflow: 'hidden', position: 'relative', background: '#ffffff', cursor: isPanning ? 'grabbing' : 'default' }}>
+      <svg ref={svgRef} width="100%" height="100%"
         onWheel={handleWheel}
         onPointerDown={handleBgPointerDown}
         onPointerMove={handleBgPointerMove}
@@ -126,22 +94,21 @@ export function DiagramCanvas({ onEditNode }: DiagramCanvasProps) {
               node={node}
               isSelected={selectedNodeIds.includes(node.id)}
               onSelect={handleSelect}
-              onDragEnd={handleDragEnd}
-              onDoubleClick={handleDoubleClick}
-              onAddChild={handleAddChild}
+              onDragEnd={() => {}}
+              onDoubleClick={n => { setSelectedNodeIds([n.id]); onNodeSelect(n.id) }}
+              onAddChild={id => addNode(id)}
               svgRef={svgRef}
-              _zoom={zoom}
             />
           ))}
         </g>
       </svg>
 
-      {/* Zoom controls */}
+      {/* Zoom pill */}
       <div style={{
         position: 'absolute', bottom: 20, right: 20,
-        display: 'flex', flexDirection: 'column',
         background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12,
         boxShadow: '0 2px 12px rgba(0,0,0,0.08)', overflow: 'hidden',
+        display: 'flex', flexDirection: 'column',
       }}>
         {[
           { label: '+', onClick: () => setZoom(z => Math.min(3, z * 1.2)) },
@@ -150,15 +117,12 @@ export function DiagramCanvas({ onEditNode }: DiagramCanvasProps) {
         ].map((btn, i) => (
           <button key={i} onClick={btn.onClick}
             style={{
-              width: 36, height: btn.small ? 32 : 36, border: 'none',
+              width: 36, height: (btn as { small?: boolean }).small ? 30 : 36, border: 'none',
               borderBottom: i < 2 ? '1px solid #f1f5f9' : 'none',
               background: 'transparent', cursor: 'pointer', color: '#64748b',
-              fontSize: btn.small ? 10 : 18, fontWeight: btn.small ? 600 : 400,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontFamily: 'inherit', transition: 'background 0.12s',
+              fontSize: (btn as { small?: boolean }).small ? 10 : 18, fontWeight: (btn as { small?: boolean }).small ? 600 : 400,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'inherit',
             }}
-            onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
-            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
           >
             {btn.label}
           </button>
@@ -168,10 +132,9 @@ export function DiagramCanvas({ onEditNode }: DiagramCanvasProps) {
       {/* Keyboard hints */}
       <div style={{
         position: 'absolute', bottom: 20, left: '50%', transform: 'translateX(-50%)',
-        display: 'flex', gap: 12, alignItems: 'center',
-        background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(8px)',
-        border: '1px solid #f1f5f9', borderRadius: 20,
-        padding: '5px 14px',
+        display: 'flex', gap: 14, alignItems: 'center',
+        background: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(8px)',
+        border: '1px solid #f1f5f9', borderRadius: 20, padding: '5px 16px',
         fontSize: 11, color: '#94a3b8',
       }}>
         {[['Tab', 'Add child'], ['Double-click', 'Edit'], ['Del', 'Delete'], ['⌘Z', 'Undo']].map(([key, action]) => (

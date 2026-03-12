@@ -105,15 +105,26 @@ export function useDiagram() {
     const id = crypto.randomUUID()
     const rootId = crypto.randomUUID()
     const now = new Date().toISOString()
-    const diagram: Diagram = {
-      id, name, type: 'mindmap', lineStyle: 'curved',
-      createdAt: now, updatedAt: now,
-      nodes: [{
-        id: rootId, title: name, color: '#6366f1',
-        parentId: null, depth: 0,
-        x: 420, y: 310, width: 160, height: 40, sortOrder: 0,
-      }]
-    }
+    const TOPIC_COLORS = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#14b8a6']
+    const TOPIC_LABELS = ['Main Topic 1', 'Main Topic 2', 'Main Topic 3', 'Main Topic 4', 'Main Topic 5']
+    const topicNodes: import('../types').MindNode[] = TOPIC_LABELS.map((title, i) => ({
+      id: crypto.randomUUID(),
+      title,
+      color: TOPIC_COLORS[i],
+      parentId: rootId,
+      depth: 1,
+      x: 0, y: 0, width: 160, height: 40,
+      sortOrder: i,
+    }))
+    const allNodes: import('../types').MindNode[] = [
+      { id: rootId, title: name, color: '#6366f1', parentId: null, depth: 0, x: 0, y: 0, width: 160, height: 40, sortOrder: 0 },
+      ...topicNodes,
+    ]
+    // Run layout so nodes get proper positions
+    const { computeMindmapLayout } = await import('../lib/layout/mindmap')
+    const laid = computeMindmapLayout(allNodes)
+    const diagram: Diagram = { id, name, type: 'mindmap', lineStyle: 'curved', createdAt: now, updatedAt: now, nodes: laid }
+
     if (!hasSupabase || !supabase) {
       lsSaveDiagram(diagram)
       setActiveDiagram(diagram)
@@ -121,15 +132,15 @@ export function useDiagram() {
       setDiagrams(lsGetList())
       return
     }
-    const { error } = await supabase.from('mindmap_diagrams').insert({
-      id, name, type: 'mindmap', line_style: 'curved',
-    })
+    const { error } = await supabase.from('mindmap_diagrams').insert({ id, name, type: 'mindmap', line_style: 'curved' })
     if (error) { console.error(error); return }
-    await supabase.from('mindmap_nodes').insert({
-      id: rootId, diagram_id: id, parent_id: null,
-      title: name, color: '#6366f1', depth: 0,
-      x: 420, y: 310, width: 160, height: 40, sort_order: 0,
-    })
+    await supabase.from('mindmap_nodes').insert(
+      laid.map(n => ({
+        id: n.id, diagram_id: id, parent_id: n.parentId,
+        title: n.title, color: n.color, depth: n.depth,
+        x: n.x, y: n.y, width: n.width, height: n.height, sort_order: n.sortOrder ?? 0,
+      }))
+    )
     await loadDiagram(id)
     await loadDiagramList()
   }, [loadDiagram, loadDiagramList, setActiveDiagram, setDiagrams])
