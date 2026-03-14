@@ -7,7 +7,8 @@ import { HomePage } from './components/home/HomePage'
 import { useDiagram } from './hooks/useDiagram'
 import { useDiagramStore } from './store/diagramStore'
 import { decodeShareURL } from './lib/export/share'
-import { ArrowLeft, SlidersHorizontal } from 'lucide-react'
+import { exportDiagramAsPdf } from './lib/export/exportPdf'
+import { ArrowLeft, SlidersHorizontal, FileDown } from 'lucide-react'
 
 const DICE_ICONS = ['user','bot','server','database','zap','plug','git-branch','globe','brain','settings','folder','cloud','mail','lock','key','search','star','rocket','lightbulb','flame','check-circle','map-pin','trophy','message','phone','wrench','chart','eye','shield','flask','sparkles','smile','home','building','briefcase','clock','calendar','code','terminal','package','layers','bell','target','compass','map']
 const DICE_WORDS: Record<string, string[]> = {
@@ -198,6 +199,24 @@ export default function App() {
           onMouseLeave={e => (e.currentTarget.style.background = '#fff')}
         >
           🎲 Roll
+        </button>}
+
+        {/* Export PDF button */}
+        {activeDiagram && <button
+          onClick={() => exportDiagramAsPdf(activeDiagram.name)}
+          title="Export as PDF"
+          style={{
+            position: 'fixed', top: 14, left: 116, zIndex: 20,
+            height: 36, padding: '0 12px', borderRadius: 10,
+            background: '#fff', border: '1px solid #e2e8f0',
+            boxShadow: '0 2px 10px rgba(0,0,0,0.07)',
+            cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+            color: '#475569', fontSize: 13, fontWeight: 500, fontFamily: 'inherit',
+          }}
+          onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
+          onMouseLeave={e => (e.currentTarget.style.background = '#fff')}
+        >
+          <FileDown size={15} /> PDF
         </button>}
 
         {/* Format toggle button — top right, only when a diagram is loaded */}

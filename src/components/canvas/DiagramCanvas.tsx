@@ -217,7 +217,7 @@ export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
   }
 
   return (
-    <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', background: canvasBg, cursor: 'default' }}>
+    <div className="diagram-canvas-root" style={{ position: 'absolute', inset: 0, overflow: 'hidden', background: canvasBg, cursor: 'default' }}>
       <svg ref={svgRef} width="100%" height="100%"
         onWheel={handleWheel}
         onPointerDown={handleBgPointerDown}
