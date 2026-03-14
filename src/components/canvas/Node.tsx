@@ -67,10 +67,10 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
     strokeW = 3
   }
 
-  // Icon color: always use brand color against the white zone (all depths)
+  // Icon color: saturated brand color against the white zone (all depths)
   const iconColor = isRoot
     ? textColor
-    : (node.color.startsWith('#') ? darkenColor(node.color, 0.1) : node.color)
+    : (node.color.startsWith('#') ? darkenColor(node.color, 0.35) : node.color)
 
   // Node-level overrides from panel
   if (node.borderColor) { strokeColor = node.borderColor; strokeW = Math.max(strokeW, node.borderWidth ?? 1.5) }
@@ -294,7 +294,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
                   return (
                     <path
                       d={`M ${rx},${sw} L ${iconZoneW},${sw} L ${iconZoneW},${h - sw} L ${rx},${h - sw} Q ${sw},${h - sw} ${sw},${h - rx} L ${sw},${rx} Q ${sw},${sw} ${rx},${sw} Z`}
-                      fill="rgba(255,255,255,0.88)"
+                      fill="rgba(255,255,255,0.95)"
                       style={{ pointerEvents: 'none' }}
                     />
                   )
