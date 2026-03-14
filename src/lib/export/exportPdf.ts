@@ -1,14 +1,15 @@
 import jsPDF from 'jspdf'
+import html2canvas from 'html2canvas'
+import { showToast } from '../../components/CuteToast'
 
 export async function exportDiagramAsPdf(diagramName: string) {
   const svgEl = document.querySelector('.diagram-canvas-root svg') as SVGSVGElement | null
   if (!svgEl) return
 
-  // Get the inner <g> that holds all nodes/edges (has the pan+zoom transform)
   const innerG = svgEl.querySelector('g') as SVGGElement | null
   if (!innerG) return
 
-  // Compute actual bounding box of all content in SVG user space
+  // Content bounds in innerG local space
   const bbox = innerG.getBBox()
   const pad = 60
   const vx = bbox.x - pad
@@ -16,52 +17,55 @@ export async function exportDiagramAsPdf(diagramName: string) {
   const vw = bbox.width + pad * 2
   const vh = bbox.height + pad * 2
 
-  // Clone SVG and set viewBox to full content extent
+  // Get canvas background color
+  const canvasRoot = document.querySelector('.diagram-canvas-root') as HTMLElement
+  const bg = (canvasRoot ? getComputedStyle(canvasRoot).backgroundColor : '') || '#ffffff'
+
+  // Clone SVG, set viewBox to full content, remove pan/zoom transform
   const clone = svgEl.cloneNode(true) as SVGSVGElement
   clone.setAttribute('viewBox', `${vx} ${vy} ${vw} ${vh}`)
   clone.setAttribute('width', String(vw))
   clone.setAttribute('height', String(vh))
-  // Remove transform from inner g (viewBox already accounts for it via pan/zoom)
-  const cloneG = clone.querySelector('g') as SVGGElement
+  const cloneG = clone.querySelector('g') as SVGGElement | null
   if (cloneG) cloneG.removeAttribute('transform')
 
-  // Serialize and load as image
-  const svgStr = new XMLSerializer().serializeToString(clone)
-  const blob = new Blob([svgStr], { type: 'image/svg+xml' })
-  const url = URL.createObjectURL(blob)
+  // Wrap in an HTMLElement so html2canvas can capture it
+  const wrapper = document.createElement('div')
+  wrapper.style.cssText = `position:fixed;top:-9999px;left:-9999px;width:${vw}px;height:${vh}px;background:${bg};overflow:hidden;`
+  wrapper.appendChild(clone)
+  document.body.appendChild(wrapper)
 
-  const img = new Image()
-  img.src = url
-  await new Promise<void>((res, rej) => { img.onload = () => res(); img.onerror = rej })
+  try {
+    const canvas = await html2canvas(wrapper, {
+      scale: 1.2,
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: bg,
+      width: vw,
+      height: vh,
+      imageTimeout: 0,
+      logging: false,
+    })
 
-  // Draw on canvas at 2× for sharpness
-  const scale = 2
-  const offscreen = document.createElement('canvas')
-  offscreen.width = vw * scale
-  offscreen.height = vh * scale
-  const ctx = offscreen.getContext('2d')!
+    // JPEG at 85% quality — far smaller than PNG for diagram content
+    const imgData = canvas.toDataURL('image/jpeg', 0.72)
+    const landscape = vw > vh
+    const pdfW = landscape ? 297 : 210
+    const pdfH = landscape ? 210 : 297
+    const ratio = Math.min((pdfW - 10) / vw, (pdfH - 10) / vh)
+    const drawW = vw * ratio
+    const drawH = vh * ratio
+    const dx = (pdfW - drawW) / 2
+    const dy = (pdfH - drawH) / 2
 
-  // Fill background (use canvas bg color)
-  const canvasRoot = document.querySelector('.diagram-canvas-root') as HTMLElement
-  const bg = canvasRoot ? getComputedStyle(canvasRoot).backgroundColor : '#ffffff'
-  ctx.fillStyle = bg || '#ffffff'
-  ctx.fillRect(0, 0, offscreen.width, offscreen.height)
-  ctx.drawImage(img, 0, 0, offscreen.width, offscreen.height)
-  URL.revokeObjectURL(url)
-
-  const imgData = offscreen.toDataURL('image/png')
-
-  // A4 PDF — landscape if diagram is wider than tall
-  const landscape = vw > vh
-  const pdfW = landscape ? 297 : 210
-  const pdfH = landscape ? 210 : 297
-  const ratio = Math.min((pdfW - 10) / vw, (pdfH - 10) / vh)
-  const drawW = vw * ratio
-  const drawH = vh * ratio
-  const dx = (pdfW - drawW) / 2
-  const dy = (pdfH - drawH) / 2
-
-  const pdf = new jsPDF({ orientation: landscape ? 'landscape' : 'portrait', unit: 'mm', format: 'a4' })
-  pdf.addImage(imgData, 'PNG', dx, dy, drawW, drawH)
-  pdf.save(`${diagramName || 'diagram'}.pdf`)
+    const pdf = new jsPDF({ orientation: landscape ? 'landscape' : 'portrait', unit: 'mm', format: 'a4', compress: true })
+    pdf.addImage(imgData, 'JPEG', dx, dy, drawW, drawH, undefined, 'FAST')
+    pdf.save(`${diagramName || 'diagram'}.pdf`)
+    showToast('PDF exported!', { color: '#22c55e', confetti: true })
+  } catch (err) {
+    console.error('PDF export failed', err)
+    showToast('PDF export failed', { color: '#ef4444' })
+  } finally {
+    document.body.removeChild(wrapper)
+  }
 }

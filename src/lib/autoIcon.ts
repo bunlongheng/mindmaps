@@ -64,6 +64,75 @@ const RULES: [string, string[]][] = [
   ['database',     ['database','db','data','store','cache','storage']],
 ]
 
+/**
+ * Aliases: maps Lucide icon names (and common AI-generated variants) → our ICON_MAP keys.
+ * Covers kebab-case variants, plural forms, and names AIs commonly hallucinate.
+ */
+const ALIASES: Record<string, string> = {
+  // Calendar / time
+  'calendar-days': 'calendar', 'calendar-check': 'calendar', 'calendar-clock': 'calendar',
+  'alarm-clock': 'clock', 'alarm-clock-off': 'clock', 'timer': 'clock', 'hourglass': 'clock',
+  // Sun / moon / weather
+  'sunrise': 'activity', 'sunset': 'star', 'sun': 'activity', 'sun-medium': 'activity',
+  'moon': 'star', 'moon-star': 'star', 'cloud-sun': 'activity', 'cloud-moon': 'star',
+  // Bed / sleep
+  'bed': 'star', 'bed-double': 'star', 'bed-single': 'star', 'sofa': 'star',
+  // Bath / hygiene
+  'bath': 'sparkles', 'toilet': 'sparkles', 'shower-head': 'sparkles', 'shower': 'sparkles',
+  'toothbrush': 'sparkles', 'droplets': 'flask', 'droplet': 'flask', 'hand-washing': 'sparkles',
+  // Clothing
+  'shirt': 'gift', 'tshirt': 'gift', 't-shirt': 'gift', 'scissors': 'wrench',
+  'footprints': 'map-pin', 'shoe': 'map-pin', 'boot': 'map-pin',
+  // Food & drink
+  'utensils': 'gift', 'utensils-crossed': 'gift', 'fork': 'gift', 'spoon': 'gift',
+  'knife': 'gift', 'coffee': 'flask', 'tea': 'flask', 'milk': 'flask', 'cup-soda': 'flask',
+  'glass-water': 'flask', 'wine': 'flask', 'beer': 'flask', 'bottle': 'flask',
+  'apple': 'gift', 'banana': 'gift', 'carrot': 'gift', 'pizza': 'gift', 'sandwich': 'gift',
+  'chef-hat': 'gift', 'cooking-pot': 'gift', 'pot': 'gift', 'bowl': 'gift', 'sink': 'sparkles',
+  // School / learning
+  'school': 'graduate', 'graduation-cap': 'graduate', 'backpack': 'folder',
+  'pencil': 'paint', 'pen': 'paint', 'pen-tool': 'paint', 'pencil-line': 'paint',
+  'book': 'bookmark', 'book-open': 'bookmark', 'book-marked': 'bookmark', 'notebook': 'bookmark',
+  // Play / fun
+  'gamepad': 'smile', 'gamepad-2': 'smile', 'toy-brick': 'wrench', 'blocks': 'wrench',
+  'puzzle': 'wrench', 'dices': 'smile', 'dice': 'smile',
+  // Home
+  'door-open': 'home', 'door-closed': 'home', 'door': 'home',
+  // Cleaning
+  'broom': 'sparkles', 'trash': 'sparkles', 'trash-2': 'sparkles', 'recycle': 'refresh',
+  // Check
+  'check-square': 'check-circle', 'check': 'check-circle', 'circle-check': 'check-circle',
+  'square-check': 'check-circle', 'list-check': 'check-circle',
+  // Navigation / map
+  'navigation': 'compass', 'navigation-2': 'compass', 'route': 'compass',
+  // People
+  'users': 'user', 'user-circle': 'user', 'user-round': 'user', 'person': 'user',
+  'person-standing': 'user', 'baby': 'user', 'child': 'user',
+  // Misc
+  'package-2': 'package', 'box': 'package', 'boxes': 'package',
+  'wand': 'sparkles', 'wand-2': 'sparkles', 'wand-sparkles': 'sparkles',
+  'music-2': 'music', 'music-4': 'music',
+  'chart-bar': 'chart', 'chart-line': 'chart', 'bar-chart': 'chart', 'line-chart': 'chart',
+  'pie-chart': 'pie',
+  'cpu-chip': 'cpu', 'chip': 'cpu',
+  'laptop': 'monitor', 'laptop-2': 'monitor', 'pc': 'monitor', 'computer': 'monitor',
+  'hand': 'sparkles', 'hand-metal': 'sparkles',
+}
+
+/**
+ * Resolve an icon name: check ICON_MAP directly, then fall back to ALIASES.
+ * Returns undefined if no match found.
+ */
+export function resolveIcon(name: string | undefined): string | undefined {
+  if (!name) return undefined
+  // Direct match (caller checks ICON_MAP externally, but we return the key)
+  if (name in ALIASES) return ALIASES[name]
+  // Try stripping numeric suffix variants like "home-2" → "home"
+  const base = name.replace(/-\d+$/, '')
+  if (base !== name && base in ALIASES) return ALIASES[base]
+  return name // pass through — ICON_MAP check is done by caller
+}
+
 export function guessIcon(title: string): string | undefined {
   const lower = title.toLowerCase()
   for (const [icon, keywords] of RULES) {

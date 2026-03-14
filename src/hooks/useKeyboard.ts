@@ -8,15 +8,17 @@ export function useKeyboard() {
       const tag = (e.target as HTMLElement).tagName.toLowerCase()
       if (tag === 'input' || tag === 'textarea') return
 
-      const { deleteSelectedNodes, setSelectedNodeIds, undo, redo, activeDiagram, selectedNodeIds } = useDiagramStore.getState()
+      const { deleteSelectedNodes, dissolveNode, setSelectedNodeIds, undo, redo, activeDiagram, selectedNodeIds } = useDiagramStore.getState()
 
       if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key === 'v') {
         navigator.clipboard.readText().then(text => {
+          const trimmed = text.trim()
+          const isJson = trimmed.startsWith('{') || trimmed.startsWith('[')
           const lines = text.split('\n').filter(l => l.trim())
           const hasIndent = lines.some(l => /^(\s{4}|\t)/.test(l))
-          if (lines.length >= 2 && hasIndent) {
+          if (isJson || (lines.length >= 2 && hasIndent)) {
             useDiagramStore.getState().loadFromOutline(text)
-            showToast(`Loaded ${lines.length} nodes`, { color: '#22c55e', confetti: true })
+            showToast(`Loaded diagram`, { color: '#22c55e', confetti: true })
           }
         })
         return
@@ -41,6 +43,11 @@ export function useKeyboard() {
       if ((e.metaKey || e.ctrlKey) && e.key === 'a') {
         e.preventDefault()
         if (activeDiagram) setSelectedNodeIds(activeDiagram.nodes.map(n => n.id))
+        return
+      }
+      if ((e.metaKey || e.ctrlKey) && (e.key === 'Delete' || e.key === 'Backspace')) {
+        // Dissolve: remove node but keep children (re-parented up)
+        if (selectedNodeIds.length === 1) dissolveNode(selectedNodeIds[0])
         return
       }
       if (e.key === 'Delete' || e.key === 'Backspace') {

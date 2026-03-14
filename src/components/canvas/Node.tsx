@@ -1,8 +1,7 @@
 import { useRef, useState, useCallback } from 'react'
 import type { MindNode } from '../../types'
 import { useDiagramStore } from '../../store/diagramStore'
-import { NodeIcon } from './NodeIcon'
-import { ICON_MAP } from '../../lib/icons'
+import { NodeIcon, getLucideIcon } from './NodeIcon'
 
 interface NodeProps {
   node: MindNode
@@ -161,7 +160,13 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
     else onDoubleClick(node)
   }
 
-  const maxChars = isRoot ? 12 : 22
+  const resolvedIcon = isRoot ? undefined : node.icon
+  const hasIcon = !!resolvedIcon && !!getLucideIcon(resolvedIcon)
+  const iconZoneW = hasIcon ? node.width * 0.2 : 0
+  const textPad = 16
+  const availableW = node.width - iconZoneW - textPad
+  const charW = fontSize * 0.62
+  const maxChars = isRoot ? 12 : Math.max(6, Math.floor(availableW / charW))
   const label = node.title.length > maxChars ? node.title.slice(0, maxChars - 1) + '…' : node.title
   // All coordinates are relative to (node.x, node.y)
   const cx = node.width / 2
@@ -280,7 +285,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
         </foreignObject>
       ) : (
         <>
-          {node.icon && !isRoot && ICON_MAP[node.icon] && (() => {
+          {hasIcon && resolvedIcon && (() => {
             const iconZoneW = node.width * 0.2
             const iconSize = Math.min(fontSize + 4, iconZoneW * 0.65)
             const iconX = (iconZoneW - iconSize) / 2
@@ -300,7 +305,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
                     />
                   )
                 })()}
-                <NodeIcon icon={node.icon} x={iconX} y={iconY} size={iconSize} color={iconColor} strokeWidth={node.depth === 1 ? 2.8 : 1.8} />
+                <NodeIcon icon={resolvedIcon} x={iconX} y={iconY} size={iconSize} color={iconColor} strokeWidth={node.depth === 1 ? 2.8 : 1.8} />
                 <text
                   x={align === 'left' ? iconZoneW + 8 : align === 'right' ? node.width - 8 : textAreaX}
                   y={node.height / 2 + fontSize * 0.38}
@@ -313,7 +318,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
               </>
             )
           })()}
-          {(!node.icon || isRoot) && (
+          {(!hasIcon || isRoot) && (
             <text
               x={isRoot ? cx : align === 'left' ? 12 : align === 'right' ? node.width - 12 : node.width / 2}
               y={isRoot ? cy + fontSize * 0.38 : node.height / 2 + fontSize * 0.38}

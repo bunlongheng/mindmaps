@@ -8,6 +8,26 @@ import { computeTimelineLayout } from '../lib/layout/timeline'
 import { getTheme } from '../lib/themes'
 import { guessIcon } from '../lib/autoIcon'
 
+/** Compute a node width that fits its title text — font sizes must match Node.tsx */
+function computeNodeWidth(title: string, depth: number, hasIcon: boolean): number {
+  const fontSize = depth === 1 ? 22 : depth === 2 ? 16 : depth === 3 ? 13 : 11
+  const charW = fontSize * 0.58
+  const textPad = 24
+  const textW = Math.ceil(title.length * charW) + textPad
+  // icon zone takes ~20% of node width, so text zone = 80% of total
+  const total = hasIcon ? Math.ceil(textW / 0.8) : textW
+  return Math.max(140, Math.min(400, total))
+}
+
+/** Make all nodes at the same depth share the width of the widest node at that depth */
+function normalizeWidthsPerDepth(nodes: MindNode[]): MindNode[] {
+  const maxByDepth = new Map<number, number>()
+  for (const n of nodes) {
+    if (n.depth > 0) maxByDepth.set(n.depth, Math.max(maxByDepth.get(n.depth) ?? 0, n.width))
+  }
+  return nodes.map(n => n.depth > 0 ? { ...n, width: maxByDepth.get(n.depth) ?? n.width } : n)
+}
+
 /** Re-index sortOrder per parent group so numbers are always 0,1,2,... with no gaps */
 function reindexSortOrders(nodes: MindNode[]): MindNode[] {
   const groups = new Map<string | null, MindNode[]>()
@@ -99,6 +119,7 @@ interface DiagramStore {
   reorderNode: (nodeId: string, insertBeforeId: string | null) => void
   deleteNode: (id: string) => void
   deleteSelectedNodes: () => void
+  dissolveNode: (id: string) => void
   rerunLayout: () => void
   setShareEnabled: (enabled: boolean) => void
   setShowOrderNumbers: (v: boolean) => void
@@ -224,8 +245,8 @@ export const useDiagramStore = create<DiagramStore>()(
         depth,
         x: (parent?.x ?? 400) + 220,
         y: (parent?.y ?? 300) + siblings.length * 60,
-        width: 160,
-        height: 40,
+        width: depth === 0 ? 180 : computeNodeWidth(title, depth, false),
+        height: depth === 0 ? 180 : 40,
         sortOrder: siblings.length,
       }
       // Strip manuallyPositioned so the layout is always clean when adding nodes
@@ -242,7 +263,16 @@ export const useDiagramStore = create<DiagramStore>()(
     updateNode: (id, updates) => {
       const state = get()
       if (!state.activeDiagram) return
-      const nodes = state.activeDiagram.nodes.map(n => n.id === id ? { ...n, ...updates } : n)
+      const nodes = state.activeDiagram.nodes.map(n => {
+        if (n.id !== id) return n
+        const merged = { ...n, ...updates }
+        // Auto-resize width when title changes (non-root nodes only)
+        if (updates.title !== undefined && n.depth > 0) {
+          const hasIcon = !!merged.icon
+          merged.width = computeNodeWidth(updates.title, n.depth, hasIcon)
+        }
+        return merged
+      })
       // Keep diagram name in sync with root node title
       const isRoot = state.activeDiagram.nodes.find(n => n.id === id)?.parentId === null
       const name = isRoot && updates.title ? updates.title : state.activeDiagram.name
@@ -326,10 +356,47 @@ export const useDiagramStore = create<DiagramStore>()(
       set({ activeDiagram: { ...state.activeDiagram, nodes }, selectedNodeIds: [], isDirty: true })
     },
 
+    dissolveNode: (id) => {
+      const state = get()
+      if (!state.activeDiagram) return
+      const node = state.activeDiagram.nodes.find(n => n.id === id)
+      if (!node || node.parentId === null) return // never dissolve root
+      state.snapshotHistory()
+      // Re-parent direct children to this node's parent, inheriting depth-1
+      const children = state.activeDiagram.nodes.filter(n => n.parentId === id)
+      const siblingsOfNode = state.activeDiagram.nodes
+        .filter(n => n.parentId === node.parentId && n.id !== id)
+        .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+      const insertAt = node.sortOrder ?? siblingsOfNode.length
+      // Build updated nodes: remove dissolved node, re-parent its children
+      const updated = state.activeDiagram.nodes
+        .filter(n => n.id !== id)
+        .map(n => {
+          if (n.parentId === id) {
+            return { ...n, parentId: node.parentId, depth: node.depth, manuallyPositioned: false }
+          }
+          return n
+        })
+      // Fix sortOrders: slot children in where the dissolved node was
+      const newSiblings = [
+        ...siblingsOfNode.filter(n => (n.sortOrder ?? 0) < insertAt),
+        ...children.map((c, i) => ({ ...c, sortOrder: insertAt + i })),
+        ...siblingsOfNode.filter(n => (n.sortOrder ?? 0) >= insertAt).map((n, i) => ({
+          ...n, sortOrder: insertAt + children.length + i,
+        })),
+      ]
+      const orderMap = new Map(newSiblings.map(n => [n.id, n.sortOrder]))
+      const patched = updated.map(n => orderMap.has(n.id) ? { ...n, sortOrder: orderMap.get(n.id)! } : n)
+      const reindexed = reindexSortOrders(patched)
+      const laid = runLayout(reindexed.map(n => ({ ...n, manuallyPositioned: false })), state.diagramType)
+      const nodes = rebalanceColors(laid, getTheme(state.themeId).colors)
+      set({ activeDiagram: { ...state.activeDiagram, nodes }, selectedNodeIds: [], isDirty: true })
+    },
+
     rerunLayout: () => {
       const state = get()
       if (!state.activeDiagram) return
-      const nodes = state.activeDiagram.nodes.map(n => ({ ...n, manuallyPositioned: false }))
+      const nodes = normalizeWidthsPerDepth(state.activeDiagram.nodes.map(n => ({ ...n, manuallyPositioned: false })))
       const newNodes = runLayout(nodes, state.diagramType)
       set({ activeDiagram: { ...state.activeDiagram, nodes: newNodes }, isDirty: true })
     },
@@ -388,17 +455,43 @@ export const useDiagramStore = create<DiagramStore>()(
       if (!state.activeDiagram) return
       state.snapshotHistory()
 
-      const lines = text.split('\n').filter(l => l.trim())
-      if (lines.length === 0) return
+      // --- Flat item type used internally ---
+      type FlatItem = { title: string; indent: number; icon?: string }
+      let parsed: FlatItem[] = []
 
-      // Parse indent level per line (4 spaces or 1 tab = 1 level)
-      const parsed = lines.map(line => {
-        const raw = line.match(/^(\s*)(.+)$/)
-        if (!raw) return null
-        const ws = raw[1]
-        const indent = ws.includes('\t') ? (ws.match(/\t/g)?.length ?? 0) : Math.floor(ws.length / 4)
-        return { title: raw[2].trim(), indent }
-      }).filter(Boolean) as { title: string; indent: number }[]
+      // Try JSON first
+      const trimmed = text.trim()
+      if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+        try {
+          const json = JSON.parse(trimmed)
+          // Flatten recursive { title, icon?, children? } tree into indent list
+          function flattenJson(node: { title?: string; name?: string; icon?: string; children?: unknown[] }, depth: number) {
+            const title = (node.title ?? node.name ?? '').trim()
+            if (!title) return
+            parsed.push({ title, indent: depth, icon: node.icon })
+            if (Array.isArray(node.children)) {
+              for (const child of node.children) flattenJson(child as typeof node, depth + 1)
+            }
+          }
+          const roots = Array.isArray(json) ? json : [json]
+          for (const r of roots) flattenJson(r, 0)
+        } catch {
+          // not valid JSON, fall through to text parsing
+        }
+      }
+
+      // Fall back to indented text
+      if (parsed.length === 0) {
+        const lines = text.split('\n').filter(l => l.trim())
+        if (lines.length === 0) return
+        parsed = lines.map(line => {
+          const raw = line.match(/^(\s*)(.+)$/)
+          if (!raw) return null
+          const ws = raw[1]
+          const indent = ws.includes('\t') ? (ws.match(/\t/g)?.length ?? 0) : Math.floor(ws.length / 4)
+          return { title: raw[2].trim(), indent }
+        }).filter(Boolean) as FlatItem[]
+      }
 
       if (parsed.length === 0) return
 
@@ -409,7 +502,7 @@ export const useDiagramStore = create<DiagramStore>()(
       // If multiple items at indent 0, wrap them under a single root
       const rootCount = parsed.filter(p => p.indent === 0).length
       if (rootCount > 1) {
-        const rootTitle = parsed[0].title  // use first top-level as root name
+        const rootTitle = parsed[0].title
         parsed.forEach(p => { p.indent += 1 })
         parsed.unshift({ title: rootTitle, indent: 0 })
       }
@@ -419,7 +512,7 @@ export const useDiagramStore = create<DiagramStore>()(
       const depths: number[] = []
       const sortOrders: number[] = []
       const siblingCount = new Map<string | null, number>()
-      const parentStack: number[] = [] // stack of parsed[] indices
+      const parentStack: number[] = []
 
       for (let i = 0; i < parsed.length; i++) {
         const { indent } = parsed[i]
@@ -437,22 +530,27 @@ export const useDiagramStore = create<DiagramStore>()(
       }
 
       const palette = getTheme(state.themeId).colors
-      const rawNodes: MindNode[] = parsed.map((p, i) => ({
-        id: nodeIds[i],
-        title: p.title,
-        parentId: parentIds[i],
-        depth: depths[i],
-        sortOrder: sortOrders[i],
-        color: palette[0],
-        x: 0, y: 0,
-        width: depths[i] === 0 ? 180 : 160,
-        height: depths[i] === 0 ? 180 : 40,
-        manuallyPositioned: false,
-        icon: depths[i] > 0 ? guessIcon(p.title) : undefined,
-      }))
+      const rawNodes: MindNode[] = parsed.map((p, i) => {
+        const depth = depths[i]
+        // Use explicit icon from JSON as-is; fall back to auto-guess for text imports
+        const icon = depth > 0 ? (p.icon ?? guessIcon(p.title)) : undefined
+        return {
+          id: nodeIds[i],
+          title: p.title,
+          parentId: parentIds[i],
+          depth,
+          sortOrder: sortOrders[i],
+          color: palette[0],
+          x: 0, y: 0,
+          width: depth === 0 ? 180 : computeNodeWidth(p.title, depth, !!icon),
+          height: depth === 0 ? 180 : 40,
+          manuallyPositioned: false,
+          icon,
+        }
+      })
 
       set({ isImporting: true })
-      const laid = runLayout(rawNodes, state.diagramType)
+      const laid = runLayout(normalizeWidthsPerDepth(rawNodes), state.diagramType)
       const nodes = rebalanceColors(laid, palette)
       const name = parsed[0].title
 

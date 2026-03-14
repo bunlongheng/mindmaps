@@ -104,7 +104,7 @@ export function EdgeLayer({ nodes, lineStyle, diagramType }: EdgeLayerProps) {
     const trunk = l1Nodes.length > 0 && (
       <>
         <line x1={rootRightX} y1={rootCY} x2={barX} y2={rootCY}
-          stroke="#1a1d2e" strokeWidth={10} strokeLinecap="round" />
+          stroke="#1a1d2e" strokeWidth={4} strokeLinecap="round" />
         {l1Nodes.length > 1 && l1Nodes.map((l1, i) => {
           if (i === l1Nodes.length - 1) return null
           const nextL1 = l1Nodes[i + 1]
