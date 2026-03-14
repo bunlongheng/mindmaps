@@ -2,6 +2,7 @@ import { useRef, useState, useCallback } from 'react'
 import type { MindNode } from '../../types'
 import { useDiagramStore } from '../../store/diagramStore'
 import { NodeIcon } from './NodeIcon'
+import { ICON_MAP } from '../../lib/icons'
 
 interface NodeProps {
   node: MindNode
@@ -279,7 +280,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
         </foreignObject>
       ) : (
         <>
-          {node.icon && !isRoot && (() => {
+          {node.icon && !isRoot && ICON_MAP[node.icon] && (() => {
             const iconZoneW = node.width * 0.2
             const iconSize = Math.min(fontSize + 4, iconZoneW * 0.65)
             const iconX = (iconZoneW - iconSize) / 2

@@ -1,68 +1,69 @@
 /**
- * Keyword → icon mapping. Each entry is [icon-name, [...keywords]].
- * Keywords are matched case-insensitively against the node title.
+ * Keyword → icon mapping using only icons that exist in ICON_MAP.
  */
 const RULES: [string, string[]][] = [
-  // People & identity
-  ['user',        ['person','people','user','alice','bob','carol','dave','grace','hank','child','kid','baby','family','member','norden','student','team']],
-  ['home',        ['home','house','arrive','room','bed','bedroom','living','kitchen','bathroom']],
-  ['smile',       ['smile','happy','joy','delight','fun','enjoy','play','laugh','excited']],
+  // People
+  ['user',         ['person','people','user','alice','bob','carol','dave','grace','hank','child','kid','norden','student','member']],
+  ['heart',        ['family','love','hug','together','bond','talk with family','family time','care']],
+  ['smile',        ['smile','happy','joy','delight','fun','enjoy','laugh','excited','play']],
 
-  // Morning / daily routine
-  ['sun',         ['morning','wake','sunrise','early','dawn','day start','open curtain']],
-  ['moon',        ['night','sleep','bedtime','evening','quiet time','rest','lights off']],
-  ['bed',         ['bed','sleep','rest','pajama','nap','go to bed','get up','get out of bed']],
-  ['shower',      ['shower','bath','wash body','wash hair','dry','bathe','rinse']],
-  ['droplets',    ['water','drink water','milk','juice','hydrate','beverage']],
-  ['tooth',       ['brush teeth','teeth','dental','floss','toothbrush']],
-  ['wind',        ['hair','comb hair','blow dry','brush hair','style']],
-  ['shirt',       ['clothes','clothe','put on','dress','outfit','pajama','jacket','uniform','dirty clothes']],
+  // Home & routine
+  ['home',         ['home','house','room','bedroom','living','kitchen','arrive','arrive home']],
+  ['sparkles',     ['shower','bath','wash','clean','tidy','organize','wipe','brush teeth','teeth','dental','rinse','dry','blow dry','hygiene']],
+  ['activity',     ['morning','wake','wake up','get up','get out','rise','dawn','start','routine','daily']],
+  ['star',         ['night','sleep','rest','quiet','bedtime','calm','peaceful','lights off','good night']],
+  ['lightbulb',    ['idea','learn','study','homework','lesson','school','class','knowledge','education']],
 
-  // Food & meals
-  ['utensils',    ['eat','meal','dinner','lunch','breakfast','snack','food','sit at table','try all foods','bite']],
-  ['apple',       ['healthy snack','fruit','apple','nutrition','veggie','vegetable']],
-  ['cup',         ['drink','cup','glass','mug','beverage']],
+  // Food & drink
+  ['gift',         ['snack','healthy snack','food','eat','meal','dinner','lunch','breakfast','try all foods']],
+  ['flask',        ['drink','water','milk','juice','beverage','hydrate']],
+
+  // Actions & tasks
+  ['check-circle', ['done','complete','finish','check','verified','tick','confirmed','put away','put shoes','pack']],
+  ['sparkles',     ['trash','throw','garbage','clean up','bring plate','wipe mouth','mess','tidy']],
+  ['refresh',      ['retry','redo','reset','sync','update','reload']],
+  ['zap',          ['quick','fast','action','trigger','boost','power','energy']],
 
   // School & learning
-  ['book-open',   ['read','book','story','listen to story','library','chapter']],
-  ['backpack',    ['backpack','school','pack','bag','school bag']],
-  ['pencil',      ['draw','color','write','pencil','sketch','art','craft']],
-  ['blocks',      ['build','block','lego','construct','toy','play with toys']],
-  ['graduation',  ['school','class','learn','study','homework','lesson','before school','after school']],
-
-  // Hygiene & health
-  ['hand',        ['wash hands','hands','sanitize','clean hands','flush toilet']],
-  ['toilet',      ['toilet','bathroom','use toilet','flush','restroom','lavatory']],
-  ['trash',       ['trash','throw','waste','garbage','clean up','bring plate','wipe','mess']],
-  ['sparkles',    ['clean','tidy','organize','put away','wipe','mop','sweep']],
+  ['graduate',     ['school','before school','after school','backpack','class','homework','study','learn']],
+  ['paint',        ['draw','color','art','sketch','craft','create','build something','draw or']],
+  ['bookmark',     ['read','book','story','listen to story','quiet time','reading','library']],
+  ['wrench',       ['build','construct','fix','repair','tool','lego','blocks']],
 
   // Family & social
-  ['heart',       ['family','love','hug','together','bond','talk with family','family time']],
-  ['message',     ['talk','chat','discuss','conversation','speak','communicate']],
-  ['phone',       ['phone','call','mobile','contact','say bye','bye']],
+  ['message',      ['talk','chat','discuss','conversation','speak','communicate','say bye','bye']],
+  ['phone',        ['phone','call','mobile','contact']],
+  ['monitor',      ['screen','tv','tablet','device','no screens','video game']],
 
-  // Evening & bedtime
-  ['book',        ['quiet time','story time','no screens','bedtime story']],
-  ['screen',      ['screen','tv','tablet','device','video game']],
-  ['lamp',        ['light','lamp','turn off lights','dark','night light']],
+  // Settings & system
+  ['settings',     ['setting','config','preference','option','adjust','control']],
+  ['lock',         ['lock','secure','private','password','safe']],
+  ['key',          ['key','unlock','access','credential','open']],
+  ['shield',       ['security','protect','guard','safety','defence']],
 
-  // General tasks & actions
-  ['check-circle',['done','complete','finish','check','verify','confirmed','tick']],
-  ['clock',       ['time','schedule','routine','when','timer','reminder']],
-  ['star',        ['star','favorite','best','top','featured','highlight']],
-  ['flag',        ['goal','target','milestone','objective','aim']],
-  ['zap',         ['quick','fast','action','trigger','boost','power','energy']],
-  ['settings',    ['setting','config','preference','option','adjust','control']],
-  ['lock',        ['lock','safe','secure','private','password','key']],
-  ['key',         ['key','unlock','access','password','credential','open']],
-  ['map-pin',     ['location','place','where','address','spot','arrive','go']],
-  ['compass',     ['direction','strategy','plan','vision','roadmap']],
-  ['rocket',      ['launch','start','begin','kick off','ship','deploy']],
-  ['folder',      ['folder','file','documents','archive','storage']],
-  ['camera',      ['photo','picture','image','capture','snapshot']],
+  // Navigation
+  ['map-pin',      ['location','place','address','spot','arrive','go to','where']],
+  ['compass',      ['direction','strategy','plan','vision','roadmap','navigate']],
+  ['rocket',       ['launch','start','begin','kick off','ship','deploy','go live']],
+
+  // Files & data
+  ['folder',       ['folder','file','documents','archive','storage','pack backpack','backpack']],
+  ['camera',       ['photo','picture','image','capture','snapshot','camera']],
+  ['chart',        ['analytics','metrics','dashboard','report','kpi','data','stats']],
+
+  // Time
+  ['clock',        ['time','schedule','when','timer','reminder','deadline','morning routine','evening']],
+  ['calendar',     ['calendar','date','plan','sprint','release','milestone','week']],
+
+  // Other
+  ['flag',         ['goal','target','milestone','objective','aim','north star']],
+  ['trophy',       ['win','achievement','award','record','best','champion']],
+  ['brain',        ['ai','ml','think','idea','smart','decision','brain']],
+  ['globe',        ['web','internet','online','public','global','world']],
+  ['server',       ['server','api','backend','service','node','worker']],
+  ['database',     ['database','db','data','store','cache','storage']],
 ]
 
-/** Return the best-matching icon name for a given title, or undefined */
 export function guessIcon(title: string): string | undefined {
   const lower = title.toLowerCase()
   for (const [icon, keywords] of RULES) {
