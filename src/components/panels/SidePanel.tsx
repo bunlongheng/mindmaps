@@ -694,8 +694,8 @@ function ColorField({ color, onChange, allowNone, swatches }: {
           }}>✕</button>
         )}
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 5, maxHeight: 52, overflowY: 'auto' }}>
-        {(swatches ?? []).map(c => (
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 5 }}>
+        {(swatches ?? []).slice(0, 12).map(c => (
           <button key={c} onClick={() => onChange(c)} style={{
             width: 20, height: 20, borderRadius: 5, border: 'none',
             background: c, cursor: 'pointer', padding: 0,
