@@ -2,6 +2,7 @@ import type { MindNode } from '../../types'
 import type { LineStyle, DiagramType } from '../../types'
 import { Edge } from './Edge'
 import { FISHBONE_SLANT } from '../../lib/layout/fishbone'
+import { useDiagramStore } from '../../store/diagramStore'
 
 
 interface EdgeLayerProps {
@@ -29,7 +30,7 @@ function CurvedEdge({ parent, child, goRight = true }: { parent: MindNode; child
 }
 
 /** Bracket connector: vertical bar with horizontal branches to each child */
-function BracketConnector({ parent, children, goRight = true }: { parent: MindNode; children: MindNode[]; goRight?: boolean }) {
+function BracketConnector({ parent, children, goRight = true, showOrderNumbers = false }: { parent: MindNode; children: MindNode[]; goRight?: boolean; showOrderNumbers?: boolean }) {
   if (children.length === 0) return null
 
   const sorted = [...children].sort((a, b) => a.y - b.y)
@@ -41,22 +42,43 @@ function BracketConnector({ parent, children, goRight = true }: { parent: MindNo
   const px = goRight ? parent.x + parent.width : parent.x
   const py = parent.y + parent.height / 2
   const barX = goRight ? px + 28 : px - 28
-  const firstY = sorted[0].y + sorted[0].height / 2
-  const lastY = sorted[sorted.length - 1].y + sorted[sorted.length - 1].height / 2
 
   return (
     <g>
+      {/* Connector from parent to bar */}
       <path d={`M ${px} ${py} C ${px + (goRight ? 14 : -14)} ${py} ${barX} ${py} ${barX} ${py}`}
-        stroke="#cbd5e1" strokeWidth={1.8} fill="none" strokeLinecap="round" />
-      <line x1={barX} y1={firstY} x2={barX} y2={lastY}
-        stroke="#cbd5e1" strokeWidth={1.8} strokeLinecap="round" />
+        stroke={sorted[0].color} strokeWidth={1.8} fill="none" strokeLinecap="round" />
+      {/* Colored vertical bar — each segment uses upper child's color */}
+      {sorted.slice(0, -1).map((child, i) => {
+        const y1 = child.y + child.height / 2
+        const y2 = sorted[i + 1].y + sorted[i + 1].height / 2
+        return (
+          <line key={`seg-${child.id}`}
+            x1={barX} y1={y1} x2={barX} y2={y2}
+            stroke={child.color} strokeWidth={1.8} strokeLinecap="square" />
+        )
+      })}
       {sorted.map(child => {
         const cy = child.y + child.height / 2
         const cx2 = goRight ? child.x : child.x + child.width
+        const midX = (barX + cx2) / 2
         return (
-          <line key={child.id}
-            x1={barX} y1={cy} x2={cx2} y2={cy}
-            stroke={child.color} strokeWidth={2} strokeLinecap="round" />
+          <g key={child.id}>
+            <line
+              x1={barX} y1={cy} x2={cx2} y2={cy}
+              stroke={child.color} strokeWidth={2} strokeLinecap="round" />
+            {showOrderNumbers && parent.depth === 0 && (
+              <>
+                <circle cx={midX} cy={cy} r={13} fill={child.color} />
+                <text x={midX} y={cy + 5}
+                  textAnchor="middle" fontSize={13} fontWeight="700"
+                  fontFamily="Inter, system-ui, sans-serif" fill="#fff"
+                  style={{ pointerEvents: 'none' }}>
+                  {(child.sortOrder ?? 0) + 1}
+                </text>
+              </>
+            )}
+          </g>
         )
       })}
     </g>
@@ -64,6 +86,7 @@ function BracketConnector({ parent, children, goRight = true }: { parent: MindNo
 }
 
 export function EdgeLayer({ nodes, lineStyle, diagramType }: EdgeLayerProps) {
+  const showOrderNumbers = useDiagramStore(s => s.showOrderNumbers)
   const nodeMap = new Map(nodes.map(n => [n.id, n]))
 
   // ── Mindmap ───────────────────────────────────────────────────────────────
@@ -71,61 +94,68 @@ export function EdgeLayer({ nodes, lineStyle, diagramType }: EdgeLayerProps) {
     const root = nodes.find(n => n.parentId === null)
     if (!root) return null
 
+    const l1Nodes = nodes.filter(n => n.parentId === root.id)
+      .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+    const rootRightX = root.x + root.width
+    const rootCY = root.y + root.height / 2
+    const l1LeftX = l1Nodes.length > 0 ? l1Nodes[0].x : rootRightX + 120
+    const barX = (rootRightX + l1LeftX) / 2
+
+    const trunk = l1Nodes.length > 0 && (
+      <>
+        <line x1={rootRightX} y1={rootCY} x2={barX} y2={rootCY}
+          stroke="#1a1d2e" strokeWidth={10} strokeLinecap="round" />
+        {l1Nodes.length > 1 && l1Nodes.map((l1, i) => {
+          if (i === l1Nodes.length - 1) return null
+          const nextL1 = l1Nodes[i + 1]
+          return (
+            <line key={`vbar-${l1.id}`}
+              x1={barX} y1={l1.y + l1.height / 2}
+              x2={barX} y2={nextL1.y + nextL1.height / 2}
+              stroke={l1.color} strokeWidth={4} strokeLinecap="square" />
+          )
+        })}
+        {l1Nodes.map(l1 => {
+          const stubY = l1.y + l1.height / 2
+          const midX = (barX + l1.x) / 2
+          return (
+            <g key={l1.id}>
+              <line x1={barX} y1={stubY} x2={l1.x} y2={stubY}
+                stroke={l1.color} strokeWidth={4} strokeLinecap="round" />
+              {showOrderNumbers && (
+                <>
+                  <circle cx={midX} cy={stubY} r={13} fill={l1.color} />
+                  <text x={midX} y={stubY + 5}
+                    textAnchor="middle" fontSize={13} fontWeight="700"
+                    fontFamily="Inter, system-ui, sans-serif" fill="#fff"
+                    style={{ pointerEvents: 'none' }}>
+                    {(l1.sortOrder ?? 0) + 1}
+                  </text>
+                </>
+              )}
+            </g>
+          )
+        })}
+      </>
+    )
+
     if (lineStyle === 'curved') {
-      const l1 = nodes.filter(n => n.parentId === root.id)
+      // Brace: BracketConnector from root down through every level
+      const allParents = nodes.filter(n => nodes.some(c => c.parentId === n.id))
       return (
         <g>
-          {l1.map(child => (
-            <CurvedEdge key={child.id} parent={root} child={child} />
-          ))}
-          {l1.map(parent => {
+          {allParents.map(parent => {
             const children = nodes.filter(n => n.parentId === parent.id)
-            return <BracketConnector key={parent.id} parent={parent} children={children} />
-          })}
-          {nodes.filter(n => {
-            if (!n.parentId) return false
-            const p = nodeMap.get(n.parentId)
-            return p && p.parentId !== root.id && p.parentId !== null
-          }).map(child => {
-            const parent = nodeMap.get(child.parentId!)!
-            return <CurvedEdge key={child.id} parent={parent} child={child} />
+            return <BracketConnector key={parent.id} parent={parent} children={children} showOrderNumbers={showOrderNumbers} />
           })}
         </g>
       )
     }
 
     const deeperEdges = nodes.filter(n => n.parentId && n.parentId !== root.id && nodeMap.has(n.parentId))
-    const l1Nodes = nodes.filter(n => n.parentId === root.id)
-      .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
-
-    const rootRightX = root.x + root.width
-    const rootCY = root.y + root.height / 2
-    const l1LeftX = l1Nodes.length > 0 ? l1Nodes[0].x : rootRightX + 120
-    const barX = (rootRightX + l1LeftX) / 2
-    const l1CYs = l1Nodes.map(n => n.y + n.height / 2)
-    const minCY = Math.min(...l1CYs)
-    const maxCY = Math.max(...l1CYs)
-
     return (
       <g>
-        {/* Black trunk: root → barX */}
-        {l1Nodes.length > 0 && <>
-          <line x1={rootRightX} y1={rootCY} x2={barX} y2={rootCY}
-            stroke="#1a1d2e" strokeWidth={10} strokeLinecap="round" />
-          {/* Thin vertical connector at barX */}
-          {l1Nodes.length > 1 && (
-            <line x1={barX} y1={minCY} x2={barX} y2={maxCY}
-              stroke="#1a1d2e" strokeWidth={2} strokeLinecap="square" />
-          )}
-          {/* Colored branch stubs: barX → each L1 */}
-          {l1Nodes.map(l1 => (
-            <line key={l1.id}
-              x1={barX} y1={l1.y + l1.height / 2}
-              x2={l1.x} y2={l1.y + l1.height / 2}
-              stroke={l1.color} strokeWidth={4} strokeLinecap="round" />
-          ))}
-        </>}
-        {/* Deeper edges (L1 → L2+) */}
+        {trunk}
         {deeperEdges.map(n => (
           <Edge key={n.id} parent={nodeMap.get(n.parentId!)!} child={n} lineStyle={lineStyle} diagramType={diagramType} />
         ))}

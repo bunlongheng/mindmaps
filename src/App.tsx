@@ -35,6 +35,12 @@ const DICE_WORDS: Record<string, string[]> = {
   target:['OKR','Goal','KPI','North Star','Target Metric','Outcome'],compass:['Direction','Strategy','Vision','North Star','Roadmap','Charter'],
   map:['Journey Map','Architecture','Sitemap','Flow','Diagram','Canvas'],
 }
+const ROOT_TOPICS = [
+  'Velocity','Clarity','Vision','Scale','Launch',
+  'Security','Growth','Data','Platform','Strategy',
+  'Design','Resilience','Automation','Culture','Impact',
+  'Discovery','Delivery','Metrics','Identity','Ecosystem',
+]
 function pickRandom<T>(arr: T[]): T { return arr[Math.floor(Math.random() * arr.length)] }
 
 type View = 'home' | 'editor' | 'viewer'
@@ -119,6 +125,8 @@ export default function App() {
   const rollAllDice = useCallback(() => {
     const nodes = activeDiagram?.nodes
     if (!nodes) return
+    const root = nodes.find(n => n.parentId === null)
+    if (root) updateNode(root.id, { title: pickRandom(ROOT_TOPICS) })
     nodes.filter(n => n.parentId !== null).forEach(n => {
       const icon = pickRandom(DICE_ICONS)
       const words = DICE_WORDS[icon] ?? ['Node']

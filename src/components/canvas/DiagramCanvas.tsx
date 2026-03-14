@@ -239,6 +239,7 @@ export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
               onAddChild={id => addNode(id)}
               svgRef={svgRef}
               readOnly={readOnly}
+              l1Colors={node.depth === 0 ? activeDiagram.nodes.filter(n => n.depth === 1).map(n => n.color) : undefined}
             />
           ))}
           {/* Rubber-band selection box */}

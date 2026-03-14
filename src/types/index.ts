@@ -32,6 +32,7 @@ export interface Diagram {
   createdAt: string
   updatedAt: string
   sharingEnabled?: boolean
+  showOrderNumbers?: boolean
 }
 
 export interface DiagramMeta {

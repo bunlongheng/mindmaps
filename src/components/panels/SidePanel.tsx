@@ -123,7 +123,7 @@ export function SidePanel({ nodeId, onClose, onImport }: SidePanelProps) {
   const {
     activeDiagram, updateNode, batchUpdateNodes, selectedNodeIds,
     lineStyle, setLineStyle, diagramType, setDiagramType, rerunLayout, setShareEnabled,
-    themeId, setTheme,
+    themeId, setTheme, showOrderNumbers, setShowOrderNumbers,
   } = useDiagramStore()
   const themeColors = getTheme(themeId).colors
 
@@ -203,7 +203,7 @@ export function SidePanel({ nodeId, onClose, onImport }: SidePanelProps) {
 
       {/* ── Style tab ── */}
       {tab === 'style' && (
-        <div style={{ flex: 1, overflowY: 'auto' }}>
+        <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
           {!node ? (
             <div style={{ padding: 24, textAlign: 'center', color: '#9ca3af', fontSize: 12, marginTop: 40 }}>
               Select a node to style it
@@ -344,16 +344,71 @@ export function SidePanel({ nodeId, onClose, onImport }: SidePanelProps) {
               </SBlock>
               <HR />
 
-              {/* Branch */}
-              <SBlock title="Branch">
+              {/* Branch — root only */}
+              {node.depth === 0 && <SBlock title="Branch">
                 <PRow label="Line">
                   <div style={{ display: 'flex', gap: 6 }}>
                     {([
-                      { value: 'curved' as LineStyle,     label: 'Curved',   d: 'M1,8 C5,8 11,2 15,2' },
-                      { value: 'straight' as LineStyle,   label: 'Straight', d: 'M1,8 L15,2' },
-                      { value: 'orthogonal' as LineStyle, label: 'Square',   d: 'M1,8 L8,8 L8,2 L15,2' },
-                    ]).map(({ value, label, d }) => {
+                      {
+                        value: 'curved' as LineStyle, label: 'Brace',
+                        icon: (c: string) => (
+                          <svg width="32" height="22" viewBox="0 0 32 22" fill="none">
+                            {/* vertical bar */}
+                            <line x1="10" y1="4" x2="10" y2="18" stroke={c} strokeWidth="1.8" strokeLinecap="round"/>
+                            {/* stubs to nodes */}
+                            <line x1="10" y1="7" x2="20" y2="7" stroke={c} strokeWidth="1.8" strokeLinecap="round"/>
+                            <line x1="10" y1="11" x2="20" y2="11" stroke={c} strokeWidth="1.8" strokeLinecap="round"/>
+                            <line x1="10" y1="15" x2="20" y2="15" stroke={c} strokeWidth="1.8" strokeLinecap="round"/>
+                            {/* mini node rects */}
+                            <rect x="20" y="4.5" width="10" height="5" rx="1.5" fill={c} opacity="0.18"/>
+                            <rect x="20" y="8.5" width="10" height="5" rx="1.5" fill={c} opacity="0.18"/>
+                            <rect x="20" y="12.5" width="10" height="5" rx="1.5" fill={c} opacity="0.18"/>
+                            {/* connector from left */}
+                            <line x1="2" y1="11" x2="10" y2="11" stroke={c} strokeWidth="1.8" strokeLinecap="round"/>
+                          </svg>
+                        ),
+                      },
+                      {
+                        value: 'straight' as LineStyle, label: 'Straight',
+                        icon: (c: string) => (
+                          <svg width="32" height="22" viewBox="0 0 32 22" fill="none">
+                            {/* root dot */}
+                            <circle cx="5" cy="11" r="2.5" fill={c}/>
+                            {/* straight lines to nodes */}
+                            <line x1="5" y1="11" x2="20" y2="5" stroke={c} strokeWidth="1.8" strokeLinecap="round"/>
+                            <line x1="5" y1="11" x2="20" y2="11" stroke={c} strokeWidth="1.8" strokeLinecap="round"/>
+                            <line x1="5" y1="11" x2="20" y2="17" stroke={c} strokeWidth="1.8" strokeLinecap="round"/>
+                            {/* mini node rects */}
+                            <rect x="20" y="2" width="10" height="5" rx="1.5" fill={c} opacity="0.18"/>
+                            <rect x="20" y="8.5" width="10" height="5" rx="1.5" fill={c} opacity="0.18"/>
+                            <rect x="20" y="14.5" width="10" height="5" rx="1.5" fill={c} opacity="0.18"/>
+                          </svg>
+                        ),
+                      },
+                      {
+                        value: 'orthogonal' as LineStyle, label: 'Square',
+                        icon: (c: string) => (
+                          <svg width="32" height="22" viewBox="0 0 32 22" fill="none">
+                            {/* root dot */}
+                            <circle cx="5" cy="11" r="2.5" fill={c}/>
+                            {/* horizontal from root */}
+                            <line x1="5" y1="11" x2="13" y2="11" stroke={c} strokeWidth="1.8" strokeLinecap="round"/>
+                            {/* vertical bar */}
+                            <line x1="13" y1="5" x2="13" y2="17" stroke={c} strokeWidth="1.8" strokeLinecap="square"/>
+                            {/* right-angle stubs */}
+                            <line x1="13" y1="5" x2="20" y2="5" stroke={c} strokeWidth="1.8" strokeLinecap="round"/>
+                            <line x1="13" y1="11" x2="20" y2="11" stroke={c} strokeWidth="1.8" strokeLinecap="round"/>
+                            <line x1="13" y1="17" x2="20" y2="17" stroke={c} strokeWidth="1.8" strokeLinecap="round"/>
+                            {/* mini node rects */}
+                            <rect x="20" y="2" width="10" height="5" rx="1.5" fill={c} opacity="0.18"/>
+                            <rect x="20" y="8.5" width="10" height="5" rx="1.5" fill={c} opacity="0.18"/>
+                            <rect x="20" y="14.5" width="10" height="5" rx="1.5" fill={c} opacity="0.18"/>
+                          </svg>
+                        ),
+                      },
+                    ]).map(({ value, label, icon }) => {
                       const active = lineStyle === value
+                      const c = active ? '#3b82f6' : '#64748b'
                       return (
                         <button key={value} onClick={() => setLineStyle(value)}
                           style={{
@@ -362,17 +417,15 @@ export function SidePanel({ nodeId, onClose, onImport }: SidePanelProps) {
                             border: `1.5px solid ${active ? '#3b82f6' : '#e0e2e7'}`,
                             background: active ? '#eff6ff' : '#fff', fontFamily: 'inherit',
                           }}>
-                          <svg width="16" height="10" viewBox="0 0 16 10" fill="none">
-                            <path d={d} stroke={active ? '#3b82f6' : '#64748b'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                          </svg>
+                          {icon(c)}
                           <span style={{ fontSize: 9, fontWeight: active ? 600 : 500, color: active ? '#3b82f6' : '#64748b' }}>{label}</span>
                         </button>
                       )
                     })}
                   </div>
                 </PRow>
-              </SBlock>
-              <HR />
+              </SBlock>}
+              {node.depth === 0 && <HR />}
 
             </>
           )}
@@ -381,7 +434,7 @@ export function SidePanel({ nodeId, onClose, onImport }: SidePanelProps) {
 
       {/* ── Map tab ── */}
       {tab === 'map' && (
-        <div style={{ flex: 1, overflowY: 'auto' }}>
+        <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
           <SBlock title="Diagram Type">
             <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
               {DIAGRAM_TYPES.map(({ value, label }) => {
@@ -405,7 +458,7 @@ export function SidePanel({ nodeId, onClose, onImport }: SidePanelProps) {
           <SBlock title="Line Style">
             <div style={{ display: 'flex', gap: 6 }}>
               {([
-                { value: 'curved' as LineStyle,     label: 'Curved',   d: 'M1,8 C5,8 11,2 15,2' },
+                { value: 'curved' as LineStyle,     label: 'Brace',    d: 'M1,2 L5,2 M1,5 L5,5 M1,8 L5,8 M5,2 L5,8 L9,5' },
                 { value: 'straight' as LineStyle,   label: 'Straight', d: 'M1,8 L15,2' },
                 { value: 'orthogonal' as LineStyle, label: 'Square',   d: 'M1,8 L8,8 L8,2 L15,2' },
               ]).map(({ value, label, d }) => {
@@ -425,6 +478,26 @@ export function SidePanel({ nodeId, onClose, onImport }: SidePanelProps) {
                   </button>
                 )
               })}
+            </div>
+          </SBlock>
+          <HR />
+          <SBlock title="Display">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: 12, color: '#374151' }}>Show order #</span>
+              <button
+                onClick={() => setShowOrderNumbers(!showOrderNumbers)}
+                style={{
+                  width: 40, height: 22, borderRadius: 11, border: 'none', cursor: 'pointer', padding: 0,
+                  background: showOrderNumbers ? '#1a1d2e' : '#d1d5db',
+                  position: 'relative', transition: 'background 0.2s', flexShrink: 0,
+                }}
+              >
+                <span style={{
+                  position: 'absolute', top: 3, left: showOrderNumbers ? 20 : 3,
+                  width: 16, height: 16, borderRadius: '50%', background: '#fff',
+                  transition: 'left 0.2s', display: 'block',
+                }} />
+              </button>
             </div>
           </SBlock>
           <HR />
@@ -477,7 +550,7 @@ export function SidePanel({ nodeId, onClose, onImport }: SidePanelProps) {
 
       {/* ── Share tab ── */}
       {tab === 'share' && (
-        <div style={{ flex: 1, overflowY: 'auto' }}>
+        <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
           <SBlock title="Public Link">
             {/* Toggle row */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -609,7 +682,7 @@ function ColorField({ color, onChange, allowNone, swatches }: {
           }}>✕</button>
         )}
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 5 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 5, maxHeight: 52, overflowY: 'auto' }}>
         {(swatches ?? []).map(c => (
           <button key={c} onClick={() => onChange(c)} style={{
             width: 20, height: 20, borderRadius: 5, border: 'none',

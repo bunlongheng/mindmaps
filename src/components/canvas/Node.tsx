@@ -13,6 +13,7 @@ interface NodeProps {
   onDragMove?: (id: string, cx: number, cy: number) => void
   svgRef: React.RefObject<SVGSVGElement>
   readOnly?: boolean
+  l1Colors?: string[]
 }
 
 function hexToRgb(hex: string): [number, number, number] {
@@ -36,7 +37,7 @@ function darkenColor(hex: string, amount = 0.35): string {
   return `rgb(${nr},${ng},${nb})`
 }
 
-export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onDragMove, svgRef, readOnly }: NodeProps) {
+export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onDragMove, svgRef, readOnly, l1Colors = [] }: NodeProps) {
   const isRoot = node.depth === 0
   const isL2Plus = node.depth >= 2
   const rx = isRoot ? 10 : 8
@@ -189,19 +190,22 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
     >
       {isRoot ? (
         <>
-          {/* Glow halo — black/grey */}
-          <circle cx={cx} cy={cy} r={r * 2.2} fill="#1a1d2e" opacity={0.06} style={{ pointerEvents: 'none' }} />
-          <circle cx={cx} cy={cy} r={r * 1.5} fill="#374151" opacity={0.07} style={{ pointerEvents: 'none' }} />
+          {/* Siri-style animated wave glow */}
+          <SiriWave cx={cx} cy={cy} r={r} colors={l1Colors} />
 
-          {/* Rainbow animated stars — random roaming positions */}
-          <RainbowStars cx={cx} cy={cy} r={r} />
-
-          {/* Back ring — grey, spinning */}
+          {/* Back ring — horizontal orbit, spinning */}
           <ellipse cx={cx} cy={cy} rx={r * 2.0} ry={r * 0.32}
             stroke="#6b7280" strokeWidth={2} fill="none" opacity={0.25}
             style={{ pointerEvents: 'none' }}>
             <animateTransform attributeName="transform" type="rotate"
               from={`0 ${cx} ${cy}`} to={`360 ${cx} ${cy}`} dur="12s" repeatCount="indefinite" />
+          </ellipse>
+          {/* Second ring — vertical spine (90° to first), counter-spinning */}
+          <ellipse cx={cx} cy={cy} rx={r * 0.32} ry={r * 2.0}
+            stroke="#6b7280" strokeWidth={2} fill="none" opacity={0.25}
+            style={{ pointerEvents: 'none' }}>
+            <animateTransform attributeName="transform" type="rotate"
+              from={`0 ${cx} ${cy}`} to={`-360 ${cx} ${cy}`} dur="12s" repeatCount="indefinite" />
           </ellipse>
           <ellipse cx={cx} cy={cy} rx={r * 2.4} ry={r * 0.38}
             stroke="#9ca3af" strokeWidth={1.2} fill="none" opacity={0.14}
@@ -217,7 +221,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
             filter="drop-shadow(0 4px 16px rgba(0,0,0,0.35))"
           />
 
-          {/* Front ring glint — grey, spinning same speed as back ring */}
+          {/* Front ring glint — horizontal */}
           <ellipse cx={cx} cy={cy} rx={r * 2.0} ry={r * 0.32}
             stroke="#d1d5db" strokeWidth={2} fill="none" opacity={0.55}
             strokeDasharray={`${r * 3.14} ${r * 9.42}`}
@@ -225,6 +229,15 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
             style={{ pointerEvents: 'none' }}>
             <animateTransform attributeName="transform" type="rotate"
               from={`0 ${cx} ${cy}`} to={`360 ${cx} ${cy}`} dur="12s" repeatCount="indefinite" />
+          </ellipse>
+          {/* Front ring glint — vertical spine */}
+          <ellipse cx={cx} cy={cy} rx={r * 0.32} ry={r * 2.0}
+            stroke="#d1d5db" strokeWidth={2} fill="none" opacity={0.55}
+            strokeDasharray={`${r * 3.14} ${r * 9.42}`}
+            strokeDashoffset={`${r * 1.57}`}
+            style={{ pointerEvents: 'none' }}>
+            <animateTransform attributeName="transform" type="rotate"
+              from={`0 ${cx} ${cy}`} to={`-360 ${cx} ${cy}`} dur="12s" repeatCount="indefinite" />
           </ellipse>
         </>
       ) : (
@@ -273,12 +286,18 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
             const textAreaX = iconZoneW + (node.width - iconZoneW) / 2
             return (
               <>
-                {/* White icon zone — left-rounded only */}
-                <path
-                  d={`M ${rx},0 L ${iconZoneW},0 L ${iconZoneW},${node.height} L ${rx},${node.height} Q 0,${node.height} 0,${node.height - rx} L 0,${rx} Q 0,0 ${rx},0 Z`}
-                  fill="rgba(255,255,255,0.88)"
-                  style={{ pointerEvents: 'none' }}
-                />
+                {/* White icon zone — inset by half stroke so it never bleeds over the border */}
+                {(() => {
+                  const sw = strokeW / 2
+                  const h = node.height
+                  return (
+                    <path
+                      d={`M ${rx},${sw} L ${iconZoneW},${sw} L ${iconZoneW},${h - sw} L ${rx},${h - sw} Q ${sw},${h - sw} ${sw},${h - rx} L ${sw},${rx} Q ${sw},${sw} ${rx},${sw} Z`}
+                      fill="rgba(255,255,255,0.88)"
+                      style={{ pointerEvents: 'none' }}
+                    />
+                  )
+                })()}
                 <NodeIcon icon={node.icon} x={iconX} y={iconY} size={iconSize} color={iconColor} strokeWidth={node.depth === 1 ? 2.8 : 1.8} />
                 <text
                   x={textAreaX}
@@ -339,23 +358,32 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   )
 }
 
-const STAR_COLORS = ['#ff4d6d','#ff9f1c','#ffe066','#06d6a0','#4cc9f0','#a855f7','#f72585','#3a86ff','#fb5607','#8338ec']
+const BLOB_OFFSETS = [
+  { ox: 0.45, oy: -0.30, dur: '6s',   start: 0   },
+  { ox: -0.50, oy: 0.40, dur: '8s',   start: 90  },
+  { ox: 0.30,  oy: 0.50, dur: '7s',   start: 180 },
+  { ox: -0.40, oy: -0.45, dur: '9s',  start: 270 },
+  { ox: 0.55,  oy: 0.20, dur: '5.5s', start: 45  },
+  { ox: -0.30, oy: -0.20, dur: '6.5s', start: 135 },
+]
+const FALLBACK_COLORS = ['#0080FF','#BF5AF2','#FF375F','#34C8E8','#FF9F0A','#30D158']
 
 function randPos(cx: number, cy: number, r: number) {
   const angle = Math.random() * Math.PI * 2
   const dist = r * (1.4 + Math.random() * 1.4)
   return { x: cx + Math.cos(angle) * dist, y: cy + Math.sin(angle) * dist, size: 1.0 + Math.random() * 1.5 }
 }
-
 function randDrift(r: number) {
   return { dx: (Math.random() - 0.5) * r * 1.2, dy: (Math.random() - 0.5) * r * 1.2 }
 }
 
-function RainbowStars({ cx, cy, r }: { cx: number; cy: number; r: number }) {
+function RoamingStars({ cx, cy, r, colors }: { cx: number; cy: number; r: number; colors: string[] }) {
+  const palette = colors.length > 0 ? colors : FALLBACK_COLORS
   const [stars] = useState(() =>
-    STAR_COLORS.map((color, i) => ({
+    Array.from({ length: 12 }, (_, i) => ({
       ...randPos(cx, cy, r),
-      color, key: i,
+      color: palette[i % palette.length],
+      key: i,
       d1: randDrift(r),
       d2: randDrift(r),
       dur: 7 + Math.random() * 6,
@@ -363,12 +391,10 @@ function RainbowStars({ cx, cy, r }: { cx: number; cy: number; r: number }) {
       blinkBegin: Math.random() * 2,
     }))
   )
-
   return (
     <>
       {stars.map(st => (
         <g key={st.key} style={{ pointerEvents: 'none' }}>
-          {/* Glow halo */}
           <circle cx={st.x} cy={st.y} r={st.size * 3} fill={st.color}>
             <animate attributeName="opacity" values="0.08;0.3;0.08"
               dur={`${st.blinkDur}s`} repeatCount="indefinite" begin={`${st.blinkBegin}s`} />
@@ -378,7 +404,6 @@ function RainbowStars({ cx, cy, r }: { cx: number; cy: number; r: number }) {
               calcMode="spline" keyTimes="0;0.33;0.67;1"
               keySplines="0.45 0 0.55 1;0.45 0 0.55 1;0.45 0 0.55 1" />
           </circle>
-          {/* Star dot */}
           <circle cx={st.x} cy={st.y} r={st.size} fill={st.color}>
             <animate attributeName="opacity" values="0.5;1;0.5"
               dur={`${st.blinkDur}s`} repeatCount="indefinite" begin={`${st.blinkBegin}s`} />
@@ -391,6 +416,41 @@ function RainbowStars({ cx, cy, r }: { cx: number; cy: number; r: number }) {
         </g>
       ))}
     </>
+  )
+}
+
+function SiriWave({ cx, cy, r, colors }: { cx: number; cy: number; r: number; colors: string[] }) {
+  const palette = colors.length > 0 ? colors : FALLBACK_COLORS
+  const blobs = BLOB_OFFSETS.map((o, i) => ({
+    color: palette[i % palette.length],
+    ox: r * o.ox, oy: r * o.oy, dur: o.dur, start: o.start,
+  }))
+  const filterId = `siri-blur-${Math.round(cx)}`
+
+  return (
+    <g style={{ pointerEvents: 'none' }}>
+      <defs>
+        <filter id={filterId} x="-80%" y="-80%" width="260%" height="260%">
+          <feGaussianBlur stdDeviation={r * 0.30} />
+        </filter>
+      </defs>
+
+      {/* Rotating colorful blobs */}
+      <g filter={`url(#${filterId})`} opacity={0.72}>
+        {blobs.map((b, i) => (
+          <circle key={i} cx={cx + b.ox} cy={cy + b.oy} r={r * 0.88} fill={b.color}>
+            <animateTransform attributeName="transform" type="rotate"
+              from={`${b.start} ${cx} ${cy}`} to={`${b.start + 360} ${cx} ${cy}`}
+              dur={b.dur} repeatCount="indefinite" />
+            <animate attributeName="r" values={`${r * 0.8};${r * 1.0};${r * 0.8}`}
+              dur={b.dur} repeatCount="indefinite" />
+          </circle>
+        ))}
+      </g>
+
+      {/* Roaming star dots using L1 colors */}
+      <RoamingStars cx={cx} cy={cy} r={r} colors={colors} />
+    </g>
   )
 }
 

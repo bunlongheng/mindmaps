@@ -7,6 +7,55 @@ import { computeFishboneLayout } from '../lib/layout/fishbone'
 import { computeTimelineLayout } from '../lib/layout/timeline'
 import { getTheme } from '../lib/themes'
 
+/** Re-index sortOrder per parent group so numbers are always 0,1,2,... with no gaps */
+function reindexSortOrders(nodes: MindNode[]): MindNode[] {
+  const groups = new Map<string | null, MindNode[]>()
+  for (const n of nodes) {
+    const key = n.parentId ?? null
+    if (!groups.has(key)) groups.set(key, [])
+    groups.get(key)!.push(n)
+  }
+  const updated = new Map<string, number>()
+  for (const siblings of groups.values()) {
+    siblings.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+    siblings.forEach((n, i) => updated.set(n.id, i))
+  }
+  return nodes.map(n => ({ ...n, sortOrder: updated.get(n.id) ?? n.sortOrder }))
+}
+
+/** Return true if a hex color is too light to use as a node background */
+function isTooLight(hex: string): boolean {
+  const h = hex.replace('#', '')
+  if (h.length !== 6) return false
+  const r = parseInt(h.slice(0, 2), 16)
+  const g = parseInt(h.slice(2, 4), 16)
+  const b = parseInt(h.slice(4, 6), 16)
+  return (r + g + b) / 3 > 220
+}
+
+/** Spread L1 colors evenly across the 12-color palette, propagate to descendants */
+function rebalanceColors(nodes: MindNode[], palette: string[]): MindNode[] {
+  const usable = palette.filter(c => !isTooLight(c))
+  const effectivePalette = usable.length >= 2 ? usable : palette
+  const l1 = nodes.filter(n => n.depth === 1).sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+  const N = l1.length
+  if (N === 0) return nodes
+  const colorMap = new Map(l1.map((n, i) => [
+    n.id,
+    effectivePalette[Math.round(i * effectivePalette.length / N) % effectivePalette.length],
+  ]))
+  function inheritedColor(node: MindNode): string {
+    if (node.depth === 1) return colorMap.get(node.id) ?? node.color
+    const parent = nodes.find(p => p.id === node.parentId)
+    return parent ? inheritedColor(parent) : node.color
+  }
+  return nodes.map(n => {
+    if (n.depth === 1) return { ...n, color: colorMap.get(n.id)! }
+    if (n.depth > 1) return { ...n, color: inheritedColor(n) }
+    return n
+  })
+}
+
 function runLayout(nodes: MindNode[], type: DiagramType): MindNode[] {
   switch (type) {
     case 'mindmap': return computeMindmapLayout(nodes)
@@ -29,6 +78,7 @@ interface DiagramStore {
   diagramType: DiagramType
   lineStyle: LineStyle
   themeId: string
+  showOrderNumbers: boolean
   // History
   past: HistoryState[]
   future: HistoryState[]
@@ -48,6 +98,7 @@ interface DiagramStore {
   deleteSelectedNodes: () => void
   rerunLayout: () => void
   setShareEnabled: (enabled: boolean) => void
+  setShowOrderNumbers: (v: boolean) => void
   undo: () => void
   redo: () => void
   snapshotHistory: () => void
@@ -71,6 +122,7 @@ export const useDiagramStore = create<DiagramStore>()(
     diagramType: 'mindmap',
     lineStyle: 'orthogonal',
     themeId: localStorage.getItem('mindmap:themeId') ?? 'default',
+    showOrderNumbers: true,
     past: [],
     future: [],
 
@@ -78,6 +130,7 @@ export const useDiagramStore = create<DiagramStore>()(
       activeDiagram: d,
       diagramType: d.type,
       lineStyle: d.lineStyle,
+      showOrderNumbers: d.showOrderNumbers ?? true,
       past: [],
       future: [],
       isDirty: false,
@@ -170,7 +223,8 @@ export const useDiagramStore = create<DiagramStore>()(
       }
       // Strip manuallyPositioned so the layout is always clean when adding nodes
       const reset = [...state.activeDiagram.nodes, newNode].map(n => ({ ...n, manuallyPositioned: false }))
-      const newNodes = runLayout(reset, state.diagramType)
+      const laid = runLayout(reset, state.diagramType)
+      const newNodes = rebalanceColors(laid, palette)
       set({
         activeDiagram: { ...state.activeDiagram, nodes: newNodes },
         isDirty: true,
@@ -220,26 +274,7 @@ export const useDiagramStore = create<DiagramStore>()(
         .map(n => idToOrder.has(n.id) ? { ...n, sortOrder: idToOrder.get(n.id)!, manuallyPositioned: false } : n)
       const laid = runLayout(nodes, state.diagramType)
 
-      // Rebalance L1 colors evenly across the 12-color palette
-      const palette = getTheme(state.themeId).colors
-      const l1Nodes = laid.filter(n => n.depth === 1).sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
-      const N = l1Nodes.length
-      const l1ColorMap = new Map(l1Nodes.map((n, i) => [
-        n.id,
-        palette[Math.round(i * palette.length / Math.max(N, 1)) % palette.length],
-      ]))
-      function getL1Color(node: MindNode): string {
-        if (node.depth === 1) return l1ColorMap.get(node.id) ?? node.color
-        const parent = laid.find(p => p.id === node.parentId)
-        if (!parent) return node.color
-        return getL1Color(parent)
-      }
-      const recolored = laid.map(n => {
-        if (n.depth === 1) return { ...n, color: l1ColorMap.get(n.id)! }
-        if (n.depth > 1) return { ...n, color: getL1Color(n) }
-        return n
-      })
-
+      const recolored = rebalanceColors(laid, getTheme(state.themeId).colors)
       set({ activeDiagram: { ...state.activeDiagram, nodes: recolored }, isDirty: true })
     },
 
@@ -254,7 +289,9 @@ export const useDiagramStore = create<DiagramStore>()(
       }
       const toDelete = new Set(getDescendants(id))
       const remaining = state.activeDiagram.nodes.filter(n => !toDelete.has(n.id))
-      const nodes = runLayout(remaining.map(n => ({ ...n, manuallyPositioned: false })), state.diagramType)
+      const reindexed = reindexSortOrders(remaining)
+      const laid = runLayout(reindexed.map(n => ({ ...n, manuallyPositioned: false })), state.diagramType)
+      const nodes = rebalanceColors(laid, getTheme(state.themeId).colors)
       set({
         activeDiagram: { ...state.activeDiagram, nodes },
         selectedNodeIds: state.selectedNodeIds.filter(nid => !toDelete.has(nid)),
@@ -276,7 +313,9 @@ export const useDiagramStore = create<DiagramStore>()(
       }
       const toDelete = new Set(idsToDelete.flatMap(id => getDescendants(id)))
       const remaining = state.activeDiagram.nodes.filter(n => !toDelete.has(n.id))
-      const nodes = runLayout(remaining.map(n => ({ ...n, manuallyPositioned: false })), state.diagramType)
+      const reindexed = reindexSortOrders(remaining)
+      const laid = runLayout(reindexed.map(n => ({ ...n, manuallyPositioned: false })), state.diagramType)
+      const nodes = rebalanceColors(laid, getTheme(state.themeId).colors)
       set({ activeDiagram: { ...state.activeDiagram, nodes }, selectedNodeIds: [], isDirty: true })
     },
 
@@ -292,6 +331,12 @@ export const useDiagramStore = create<DiagramStore>()(
       const state = get()
       if (!state.activeDiagram) return
       set({ activeDiagram: { ...state.activeDiagram, sharingEnabled: enabled }, isDirty: true })
+    },
+
+    setShowOrderNumbers: (v) => {
+      const state = get()
+      if (!state.activeDiagram) return
+      set({ showOrderNumbers: v, activeDiagram: { ...state.activeDiagram, showOrderNumbers: v }, isDirty: true })
     },
 
     undo: () => {
