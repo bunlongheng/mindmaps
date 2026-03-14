@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useDiagramStore } from '../store/diagramStore'
+import { showToast } from '../components/CuteToast'
 
 export function useKeyboard() {
   useEffect(() => {
@@ -8,6 +9,18 @@ export function useKeyboard() {
       if (tag === 'input' || tag === 'textarea') return
 
       const { deleteSelectedNodes, setSelectedNodeIds, undo, redo, activeDiagram, selectedNodeIds } = useDiagramStore.getState()
+
+      if ((e.metaKey || e.ctrlKey) && e.key === 'v') {
+        navigator.clipboard.readText().then(text => {
+          const lines = text.split('\n').filter(l => l.trim())
+          const hasIndent = lines.some(l => /^(\s{4}|\t)/.test(l))
+          if (lines.length >= 2 && hasIndent) {
+            useDiagramStore.getState().loadFromOutline(text)
+            showToast(`Loaded ${lines.length} nodes`, { color: '#22c55e', confetti: true })
+          }
+        })
+        return
+      }
 
       if ((e.metaKey || e.ctrlKey) && e.key === 'c') {
         if (!activeDiagram) return

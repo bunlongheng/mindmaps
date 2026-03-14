@@ -104,6 +104,7 @@ interface DiagramStore {
   redo: () => void
   snapshotHistory: () => void
   clearDiagram: () => void
+  loadFromOutline: (text: string) => void
 }
 
 function pushHistory(state: DiagramStore): Pick<DiagramStore, 'past' | 'future'> {
@@ -365,5 +366,71 @@ export const useDiagramStore = create<DiagramStore>()(
     },
 
     clearDiagram: () => set({ activeDiagram: null, selectedNodeIds: [], past: [], future: [], isDirty: false }),
+
+    loadFromOutline: (text: string) => {
+      const state = get()
+      if (!state.activeDiagram) return
+      state.snapshotHistory()
+
+      const lines = text.split('\n').filter(l => l.trim())
+      if (lines.length === 0) return
+
+      // Parse indent level per line (4 spaces or 1 tab = 1 level)
+      const parsed = lines.map(line => {
+        const raw = line.match(/^(\s*)(.+)$/)
+        if (!raw) return null
+        const ws = raw[1]
+        const indent = ws.includes('\t') ? (ws.match(/\t/g)?.length ?? 0) : Math.floor(ws.length / 4)
+        return { title: raw[2].trim(), indent }
+      }).filter(Boolean) as { title: string; indent: number }[]
+
+      if (parsed.length === 0) return
+
+      const nodeIds = parsed.map(() => crypto.randomUUID())
+      const parentIds: (string | null)[] = []
+      const depths: number[] = []
+      const sortOrders: number[] = []
+      const siblingCount = new Map<string | null, number>()
+      const parentStack: number[] = [] // stack of parsed[] indices
+
+      for (let i = 0; i < parsed.length; i++) {
+        const { indent } = parsed[i]
+        while (parentStack.length > 0 && parsed[parentStack[parentStack.length - 1]].indent >= indent) {
+          parentStack.pop()
+        }
+        const parentIdx = parentStack.length > 0 ? parentStack[parentStack.length - 1] : null
+        const parentId = parentIdx !== null ? nodeIds[parentIdx] : null
+        const order = siblingCount.get(parentId) ?? 0
+        siblingCount.set(parentId, order + 1)
+        sortOrders.push(order)
+        parentIds.push(parentId)
+        depths.push(indent)
+        parentStack.push(i)
+      }
+
+      const palette = getTheme(state.themeId).colors
+      const rawNodes: MindNode[] = parsed.map((p, i) => ({
+        id: nodeIds[i],
+        title: p.title,
+        parentId: parentIds[i],
+        depth: depths[i],
+        sortOrder: sortOrders[i],
+        color: palette[0],
+        x: 0, y: 0,
+        width: depths[i] === 0 ? 180 : 160,
+        height: depths[i] === 0 ? 180 : 40,
+        manuallyPositioned: false,
+      }))
+
+      const laid = runLayout(rawNodes, state.diagramType)
+      const nodes = rebalanceColors(laid, palette)
+      const name = parsed[0].title
+
+      set({
+        activeDiagram: { ...state.activeDiagram, name, nodes },
+        selectedNodeIds: [],
+        isDirty: true,
+      })
+    },
   }))
 )
