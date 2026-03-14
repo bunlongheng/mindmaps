@@ -11,7 +11,7 @@ interface DiagramCanvasProps {
 }
 
 export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
-  const { activeDiagram, selectedNodeIds, setSelectedNodeIds, diagramType, lineStyle, themeId, addNode, reorderNode } = useDiagramStore()
+  const { activeDiagram, selectedNodeIds, setSelectedNodeIds, diagramType, lineStyle, themeId, addNode, reorderNode, isImporting } = useDiagramStore()
   const canvasBg = getTheme(themeId).canvasBg
   const svgRef = useRef<SVGSVGElement>(null!)
   const gRef = useRef<SVGGElement>(null!)
@@ -257,6 +257,57 @@ export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
           )}
         </g>
       </svg>
+
+      {/* Import overlay */}
+      {isImporting && (
+        <div style={{
+          position: 'absolute', inset: 0, zIndex: 200,
+          background: 'rgba(10,12,28,0.82)',
+          backdropFilter: 'blur(6px)',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          gap: 18,
+          animation: 'importFadeIn 0.22s ease',
+        }}>
+          <style>{`
+            @keyframes importFadeIn { from { opacity: 0 } to { opacity: 1 } }
+            @keyframes importPulse {
+              0%,100% { transform: scale(1); opacity: 0.7; }
+              50% { transform: scale(1.18); opacity: 1; }
+            }
+            @keyframes importOrbit {
+              from { transform: rotate(0deg) translateX(38px) rotate(0deg); }
+              to   { transform: rotate(360deg) translateX(38px) rotate(-360deg); }
+            }
+          `}</style>
+          {/* Glowing blobs */}
+          <div style={{ position: 'relative', width: 90, height: 90 }}>
+            {['#22c55e','#3b82f6','#8b5cf6','#f59e0b','#ec4899','#06b6d4'].map((c, i) => (
+              <div key={i} style={{
+                position: 'absolute', top: '50%', left: '50%',
+                width: 10, height: 10, borderRadius: '50%',
+                background: c,
+                boxShadow: `0 0 12px 4px ${c}99`,
+                animation: `importOrbit ${1.4 + i * 0.22}s linear infinite`,
+                animationDelay: `${i * -0.22}s`,
+                marginTop: -5, marginLeft: -5,
+              }} />
+            ))}
+            <div style={{
+              position: 'absolute', top: '50%', left: '50%',
+              width: 28, height: 28, borderRadius: '50%',
+              background: 'radial-gradient(circle, #22c55e88, #3b82f644)',
+              boxShadow: '0 0 28px 8px #22c55e55',
+              transform: 'translate(-50%,-50%)',
+              animation: 'importPulse 1s ease-in-out infinite',
+            }} />
+          </div>
+          <span style={{
+            color: '#e2e8f0', fontFamily: 'Inter, system-ui, sans-serif',
+            fontSize: 13, fontWeight: 600, letterSpacing: '0.08em',
+            textTransform: 'uppercase',
+          }}>Loading diagram…</span>
+        </div>
+      )}
 
       {/* Bottom bar */}
       <div style={{

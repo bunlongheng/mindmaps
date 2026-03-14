@@ -80,6 +80,7 @@ interface DiagramStore {
   lineStyle: LineStyle
   themeId: string
   showOrderNumbers: boolean
+  isImporting: boolean
   // History
   past: HistoryState[]
   future: HistoryState[]
@@ -100,6 +101,7 @@ interface DiagramStore {
   rerunLayout: () => void
   setShareEnabled: (enabled: boolean) => void
   setShowOrderNumbers: (v: boolean) => void
+  setIsImporting: (v: boolean) => void
   undo: () => void
   redo: () => void
   snapshotHistory: () => void
@@ -125,6 +127,7 @@ export const useDiagramStore = create<DiagramStore>()(
     lineStyle: 'orthogonal',
     themeId: localStorage.getItem('mindmap:themeId') ?? 'default',
     showOrderNumbers: true,
+    isImporting: false,
     past: [],
     future: [],
 
@@ -341,6 +344,8 @@ export const useDiagramStore = create<DiagramStore>()(
       set({ showOrderNumbers: v, activeDiagram: { ...state.activeDiagram, showOrderNumbers: v }, isDirty: true })
     },
 
+    setIsImporting: (v) => set({ isImporting: v }),
+
     undo: () => {
       const state = get()
       if (state.past.length === 0 || !state.activeDiagram) return
@@ -386,6 +391,10 @@ export const useDiagramStore = create<DiagramStore>()(
 
       if (parsed.length === 0) return
 
+      // Normalize: shift all indents so minimum is 0 (prevents multiple roots)
+      const minIndent = Math.min(...parsed.map(p => p.indent))
+      if (minIndent > 0) parsed.forEach(p => { p.indent -= minIndent })
+
       const nodeIds = parsed.map(() => crypto.randomUUID())
       const parentIds: (string | null)[] = []
       const depths: number[] = []
@@ -422,6 +431,7 @@ export const useDiagramStore = create<DiagramStore>()(
         manuallyPositioned: false,
       }))
 
+      set({ isImporting: true })
       const laid = runLayout(rawNodes, state.diagramType)
       const nodes = rebalanceColors(laid, palette)
       const name = parsed[0].title
@@ -431,6 +441,7 @@ export const useDiagramStore = create<DiagramStore>()(
         selectedNodeIds: [],
         isDirty: true,
       })
+      setTimeout(() => set({ isImporting: false }), 900)
     },
   }))
 )
