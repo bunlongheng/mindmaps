@@ -94,7 +94,7 @@ export function computeMindmapLayout(nodes: MindNode[]): MindNode[] {
     result.push(root)
   }
 
-  const anchorX = ROOT_X + rw + H_GAPS[0]
+  const anchorX = ROOT_X + rw + (root.branchGap ?? H_GAPS[0])
   const totalH = l1s.reduce((s, l) => s + subtreeH(l.id, 1, nodes), 0) + Math.max(0, l1s.length - 1) * V_GAP
   let curY = centerY - totalH / 2
   for (const l1 of l1s) {

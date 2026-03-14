@@ -219,7 +219,28 @@ export const useDiagramStore = create<DiagramStore>()(
       const nodes = state.activeDiagram.nodes
         .map(n => idToOrder.has(n.id) ? { ...n, sortOrder: idToOrder.get(n.id)!, manuallyPositioned: false } : n)
       const laid = runLayout(nodes, state.diagramType)
-      set({ activeDiagram: { ...state.activeDiagram, nodes: laid }, isDirty: true })
+
+      // Rebalance L1 colors evenly across the 12-color palette
+      const palette = getTheme(state.themeId).colors
+      const l1Nodes = laid.filter(n => n.depth === 1).sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+      const N = l1Nodes.length
+      const l1ColorMap = new Map(l1Nodes.map((n, i) => [
+        n.id,
+        palette[Math.round(i * palette.length / Math.max(N, 1)) % palette.length],
+      ]))
+      function getL1Color(node: MindNode): string {
+        if (node.depth === 1) return l1ColorMap.get(node.id) ?? node.color
+        const parent = laid.find(p => p.id === node.parentId)
+        if (!parent) return node.color
+        return getL1Color(parent)
+      }
+      const recolored = laid.map(n => {
+        if (n.depth === 1) return { ...n, color: l1ColorMap.get(n.id)! }
+        if (n.depth > 1) return { ...n, color: getL1Color(n) }
+        return n
+      })
+
+      set({ activeDiagram: { ...state.activeDiagram, nodes: recolored }, isDirty: true })
     },
 
     deleteNode: (id) => {
@@ -232,7 +253,8 @@ export const useDiagramStore = create<DiagramStore>()(
         return [nodeId, ...children.flatMap(c => getDescendants(c.id))]
       }
       const toDelete = new Set(getDescendants(id))
-      const nodes = state.activeDiagram.nodes.filter(n => !toDelete.has(n.id))
+      const remaining = state.activeDiagram.nodes.filter(n => !toDelete.has(n.id))
+      const nodes = runLayout(remaining.map(n => ({ ...n, manuallyPositioned: false })), state.diagramType)
       set({
         activeDiagram: { ...state.activeDiagram, nodes },
         selectedNodeIds: state.selectedNodeIds.filter(nid => !toDelete.has(nid)),
@@ -253,7 +275,8 @@ export const useDiagramStore = create<DiagramStore>()(
         return [nodeId, ...children.flatMap(c => getDescendants(c.id))]
       }
       const toDelete = new Set(idsToDelete.flatMap(id => getDescendants(id)))
-      const nodes = state.activeDiagram.nodes.filter(n => !toDelete.has(n.id))
+      const remaining = state.activeDiagram.nodes.filter(n => !toDelete.has(n.id))
+      const nodes = runLayout(remaining.map(n => ({ ...n, manuallyPositioned: false })), state.diagramType)
       set({ activeDiagram: { ...state.activeDiagram, nodes }, selectedNodeIds: [], isDirty: true })
     },
 

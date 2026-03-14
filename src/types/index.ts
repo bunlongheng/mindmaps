@@ -20,6 +20,7 @@ export interface MindNode {
   borderColor?: string
   borderWidth?: number
   icon?: string
+  branchGap?: number
 }
 
 export interface Diagram {

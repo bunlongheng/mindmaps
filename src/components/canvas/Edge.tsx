@@ -48,7 +48,7 @@ export function Edge({ parent, child, lineStyle, diagramType }: EdgeProps) {
     <path
       d={d}
       stroke={stroke}
-      strokeWidth={child.depth === 1 ? 2.5 : 1.5}
+      strokeWidth={1.5}
       fill="none"
       strokeLinecap="round"
     />

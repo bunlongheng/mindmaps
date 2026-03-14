@@ -94,12 +94,40 @@ export function EdgeLayer({ nodes, lineStyle, diagramType }: EdgeLayerProps) {
       )
     }
 
-    const edges = nodes.filter(n => n.parentId && nodeMap.has(n.parentId))
-      .map(n => ({ parent: nodeMap.get(n.parentId!)!, child: n }))
+    const deeperEdges = nodes.filter(n => n.parentId && n.parentId !== root.id && nodeMap.has(n.parentId))
+    const l1Nodes = nodes.filter(n => n.parentId === root.id)
+      .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+
+    const rootRightX = root.x + root.width
+    const rootCY = root.y + root.height / 2
+    const l1LeftX = l1Nodes.length > 0 ? l1Nodes[0].x : rootRightX + 120
+    const barX = (rootRightX + l1LeftX) / 2
+    const l1CYs = l1Nodes.map(n => n.y + n.height / 2)
+    const minCY = Math.min(...l1CYs)
+    const maxCY = Math.max(...l1CYs)
+
     return (
       <g>
-        {edges.map(({ parent, child }) => (
-          <Edge key={child.id} parent={parent} child={child} lineStyle={lineStyle} diagramType={diagramType} />
+        {/* Black trunk: root → barX */}
+        {l1Nodes.length > 0 && <>
+          <line x1={rootRightX} y1={rootCY} x2={barX} y2={rootCY}
+            stroke="#1a1d2e" strokeWidth={10} strokeLinecap="round" />
+          {/* Thin vertical connector at barX */}
+          {l1Nodes.length > 1 && (
+            <line x1={barX} y1={minCY} x2={barX} y2={maxCY}
+              stroke="#1a1d2e" strokeWidth={2} strokeLinecap="square" />
+          )}
+          {/* Colored branch stubs: barX → each L1 */}
+          {l1Nodes.map(l1 => (
+            <line key={l1.id}
+              x1={barX} y1={l1.y + l1.height / 2}
+              x2={l1.x} y2={l1.y + l1.height / 2}
+              stroke={l1.color} strokeWidth={4} strokeLinecap="round" />
+          ))}
+        </>}
+        {/* Deeper edges (L1 → L2+) */}
+        {deeperEdges.map(n => (
+          <Edge key={n.id} parent={nodeMap.get(n.parentId!)!} child={n} lineStyle={lineStyle} diagramType={diagramType} />
         ))}
       </g>
     )

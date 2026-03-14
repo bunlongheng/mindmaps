@@ -27,26 +27,49 @@ export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
     }
   }, [activeDiagram?.id])
 
-  // Center on root whenever the root node first appears (covers both normal load & auto-recovery)
-  const rootNodeId = activeDiagram?.nodes.find(n => n.parentId === null)?.id
+  const [showZoomMenu, setShowZoomMenu] = useState(false)
+
+  const fitView = useCallback(() => {
+    const svg = svgRef.current
+    if (!svg || !activeDiagram?.nodes.length) return
+    const { width: svgW, height: svgH } = svg.getBoundingClientRect()
+    if (svgW === 0 || svgH === 0) return
+    const nodes = activeDiagram.nodes
+    const minX = Math.min(...nodes.map(n => n.x))
+    const minY = Math.min(...nodes.map(n => n.y))
+    const maxX = Math.max(...nodes.map(n => n.x + n.width))
+    const maxY = Math.max(...nodes.map(n => n.y + n.height))
+    const pad = 80
+    const newZoom = Math.min((svgW - pad * 2) / (maxX - minX), (svgH - pad * 2) / (maxY - minY), 1)
+    const cx = (minX + maxX) / 2
+    const cy = (minY + maxY) / 2
+    setZoom(newZoom)
+    zoomCurrentRef.current = newZoom
+    zoomTargetRef.current = newZoom
+    setPan({ x: svgW / 2 - cx * newZoom, y: svgH / 2 - cy * newZoom })
+  }, [activeDiagram])
+
+  const setZoomLevel = useCallback((level: number) => {
+    const svg = svgRef.current
+    if (!svg) return
+    const { width: svgW, height: svgH } = svg.getBoundingClientRect()
+    setZoom(level)
+    zoomCurrentRef.current = level
+    zoomTargetRef.current = level
+    setPan(p => {
+      const cx = (svgW / 2 - p.x) / zoom
+      const cy = (svgH / 2 - p.y) / zoom
+      return { x: svgW / 2 - cx * level, y: svgH / 2 - cy * level }
+    })
+  }, [zoom])
+
+  // Auto-fit on initial diagram load
   useEffect(() => {
-    if (!rootNodeId || !activeDiagram) return
-    const root = activeDiagram.nodes.find(n => n.id === rootNodeId)
-    if (!root) return
-    const centerRoot = () => {
-      const svg = svgRef.current
-      if (!svg) return
-      const { width, height } = svg.getBoundingClientRect()
-      if (width === 0 || height === 0) return
-      const rootCX = root.x + root.width / 2
-      const rootCY = root.y + root.height / 2
-      setPan({ x: width / 2 - rootCX, y: height / 2 - rootCY })
-    }
-    // Use rAF so the SVG is fully laid out before we read its dimensions
-    const raf = requestAnimationFrame(centerRoot)
+    if (!activeDiagram) return
+    const raf = requestAnimationFrame(fitView)
     return () => cancelAnimationFrame(raf)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rootNodeId])
+  }, [activeDiagram?.id])
 
   // Smooth zoom via lerp animation
   const zoomCurrentRef = useRef(1)
@@ -234,6 +257,61 @@ export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
         </g>
       </svg>
 
+      {/* Bottom bar */}
+      <div style={{
+        position: 'absolute', bottom: 0, left: 0, right: 0, height: 28,
+        background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(8px)',
+        borderTop: '1px solid #e8eaed',
+        display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
+        padding: '0 8px',
+      }}>
+        {/* Zoom button */}
+        <div style={{ position: 'relative' }}>
+          <button
+            onClick={() => setShowZoomMenu(m => !m)}
+            style={{
+              height: 20, padding: '0 8px', border: '1px solid #e2e8f0', borderRadius: 5,
+              background: showZoomMenu ? '#f1f5f9' : 'transparent',
+              cursor: 'pointer', fontSize: 11, fontWeight: 500, color: '#64748b',
+              fontFamily: 'Inter, system-ui, sans-serif', display: 'flex', alignItems: 'center', gap: 4,
+            }}
+          >
+            {Math.round(zoom * 100)}% ▾
+          </button>
+
+          {showZoomMenu && (
+            <div
+              style={{
+                position: 'absolute', bottom: 26, right: 0,
+                background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8,
+                boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
+                padding: '4px 0', minWidth: 110, zIndex: 50,
+              }}
+              onMouseLeave={() => setShowZoomMenu(false)}
+            >
+              {([
+                { label: 'Fit', action: () => { fitView(); setShowZoomMenu(false) }, isFit: true },
+                { label: '200%', action: () => { setZoomLevel(2); setShowZoomMenu(false) } },
+                { label: '150%', action: () => { setZoomLevel(1.5); setShowZoomMenu(false) } },
+                { label: '100%', action: () => { setZoomLevel(1); setShowZoomMenu(false) } },
+                { label: '75%',  action: () => { setZoomLevel(0.75); setShowZoomMenu(false) } },
+                { label: '50%',  action: () => { setZoomLevel(0.5); setShowZoomMenu(false) } },
+                { label: '25%',  action: () => { setZoomLevel(0.25); setShowZoomMenu(false) } },
+              ] as { label: string; action: () => void; isFit?: boolean }[]).map(({ label, action, isFit }) => (
+                <button key={label} onClick={action} style={{
+                  display: 'block', width: '100%', padding: '6px 12px',
+                  border: 'none', background: 'transparent', cursor: 'pointer',
+                  fontSize: 12, textAlign: 'left', fontFamily: 'inherit',
+                  color: isFit ? '#3b82f6' : '#374151', fontWeight: isFit ? 600 : 400,
+                }}
+                  onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                >{label}</button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   )
 }

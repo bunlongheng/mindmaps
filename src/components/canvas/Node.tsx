@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useRef, useState, useCallback } from 'react'
 import type { MindNode } from '../../types'
 import { useDiagramStore } from '../../store/diagramStore'
 import { NodeIcon } from './NodeIcon'
@@ -53,8 +53,9 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
     strokeColor = '#1a1d2e'
     strokeW = 5
   } else if (isL2Plus) {
-    bg = node.color.startsWith('#') ? lighten(node.color, 0.82) : '#f8fafc'
-    textColor = node.color.startsWith('#') ? darkenColor(node.color, 0.35) : node.color
+    const lightenAmt = node.depth === 2 ? 0.58 : node.depth === 3 ? 0.68 : 0.76
+    bg = node.color.startsWith('#') ? lighten(node.color, lightenAmt) : '#f8fafc'
+    textColor = node.color.startsWith('#') ? darkenColor(node.color, 0.55) : node.color
     strokeColor = node.color
     strokeW = 2
   } else {
@@ -65,6 +66,11 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
     strokeW = 3
   }
 
+  // Icon color: in white zone so always use the node's brand color (not white)
+  const iconColor = node.depth === 1
+    ? (node.color.startsWith('#') ? darkenColor(node.color, 0.1) : node.color)
+    : textColor
+
   // Node-level overrides from panel
   if (node.borderColor) { strokeColor = node.borderColor; strokeW = Math.max(strokeW, node.borderWidth ?? 1.5) }
 
@@ -74,12 +80,12 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   const fontWeight = node.bold ? '700' : (isRoot ? '500' : node.depth === 1 ? '500' : '400')
 
   // Depth-based bg opacity only (text stays fully opaque)
-  const bgOpacity = node.depth >= 3 ? Math.max(0.35, 1 - (node.depth - 2) * 0.22) : 1
+  const bgOpacity = node.depth === 2 ? 0.9 : node.depth === 3 ? 0.8 : node.depth >= 4 ? 0.7 : 1
   const fontStyle = node.italic ? 'italic' : 'normal'
-  const align = node.textAlign ?? 'center'
-  const textAnchor = align === 'left' ? 'start' : align === 'right' ? 'end' : 'middle'
-  const textX = align === 'left' ? node.x + 10 : align === 'right' ? node.x + node.width - 10 : node.x + node.width / 2
+  // Relative coords (origin = node.x, node.y) — always center
+  const textX = node.width / 2
 
+  const [isDragging, setIsDragging] = useState(false)
   const dragStart = useRef<{ x: number; y: number; nodeX: number; nodeY: number } | null>(null)
   const didDrag = useRef(false)
 
@@ -154,15 +160,30 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
 
   const maxChars = isRoot ? 12 : 22
   const label = node.title.length > maxChars ? node.title.slice(0, maxChars - 1) + '…' : node.title
-  const cx = node.x + node.width / 2
-  const cy = node.y + node.height / 2
+  // All coordinates are relative to (node.x, node.y)
+  const cx = node.width / 2
+  const cy = node.height / 2
   const r = node.width / 2
 
+  const handlePointerDown = useCallback((e: React.PointerEvent) => {
+    setIsDragging(true)
+    onPointerDown(e)
+  }, [onPointerDown])
+
+  const handlePointerUp = useCallback((e: React.PointerEvent) => {
+    setIsDragging(false)
+    onPointerUp(e)
+  }, [onPointerUp])
+
   return (
+    <g style={{
+      transform: `translate(${node.x}px, ${node.y}px)`,
+      transition: isDragging ? 'none' : 'transform 0.22s cubic-bezier(0.4,0,0.2,1)',
+    }}>
     <g
-      onPointerDown={onPointerDown}
+      onPointerDown={handlePointerDown}
       onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
+      onPointerUp={handlePointerUp}
       onDoubleClick={handleDoubleClick}
       style={{ cursor: editing ? 'default' : 'grab', userSelect: 'none' }}
     >
@@ -208,7 +229,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
         </>
       ) : (
         <rect
-          x={node.x} y={node.y} width={node.width} height={node.height}
+          x={0} y={0} width={node.width} height={node.height}
           rx={rx} ry={rx} fill={bg} fillOpacity={bgOpacity}
           stroke={strokeColor} strokeWidth={strokeW}
           filter="drop-shadow(0 1px 4px rgba(0,0,0,0.1))"
@@ -217,8 +238,8 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
 
       {editing ? (
         <foreignObject
-          x={isRoot ? cx - r * 0.75 : node.x + 2}
-          y={isRoot ? cy - fontSize * 0.7 : node.y + 2}
+          x={isRoot ? cx - r * 0.75 : 2}
+          y={isRoot ? cy - fontSize * 0.7 : 2}
           width={isRoot ? r * 1.5 : node.width - 4}
           height={isRoot ? fontSize * 1.6 : node.height - 4}
         >
@@ -245,16 +266,24 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
       ) : (
         <>
           {node.icon && !isRoot && (() => {
-            const iconSize = fontSize + 4
-            const totalW = iconSize + 6 + node.width * 0.55
-            const startX = node.x + (node.width - totalW) / 2
+            const iconZoneW = node.width * 0.2
+            const iconSize = Math.min(fontSize + 4, iconZoneW * 0.65)
+            const iconX = (iconZoneW - iconSize) / 2
+            const iconY = (node.height - iconSize) / 2
+            const textAreaX = iconZoneW + (node.width - iconZoneW) / 2
             return (
               <>
-                <NodeIcon icon={node.icon} x={startX} y={node.y + (node.height - iconSize) / 2} size={iconSize} color={textColor} />
+                {/* White icon zone — left-rounded only */}
+                <path
+                  d={`M ${rx},0 L ${iconZoneW},0 L ${iconZoneW},${node.height} L ${rx},${node.height} Q 0,${node.height} 0,${node.height - rx} L 0,${rx} Q 0,0 ${rx},0 Z`}
+                  fill="rgba(255,255,255,0.88)"
+                  style={{ pointerEvents: 'none' }}
+                />
+                <NodeIcon icon={node.icon} x={iconX} y={iconY} size={iconSize} color={iconColor} strokeWidth={node.depth === 1 ? 2.8 : 1.8} />
                 <text
-                  x={startX + iconSize + 6}
-                  y={node.y + node.height / 2 + fontSize * 0.38}
-                  textAnchor="start"
+                  x={textAreaX}
+                  y={node.height / 2 + fontSize * 0.38}
+                  textAnchor="middle"
                   fontSize={fontSize} fontWeight={fontWeight} fontStyle={fontStyle}
                   fontFamily="Inter, system-ui, sans-serif"
                   fill={textColor}
@@ -266,8 +295,8 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
           {(!node.icon || isRoot) && (
             <text
               x={isRoot ? cx : textX}
-              y={isRoot ? cy + fontSize * 0.38 : node.y + node.height / 2 + fontSize * 0.38}
-              textAnchor={isRoot ? 'middle' : textAnchor}
+              y={isRoot ? cy + fontSize * 0.38 : node.height / 2 + fontSize * 0.38}
+              textAnchor="middle"
               fontSize={fontSize} fontWeight={fontWeight} fontStyle={fontStyle}
               fontFamily="Inter, system-ui, sans-serif"
               fill={textColor}
@@ -279,19 +308,33 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
 
       {/* Selection ring — always on top */}
       {isSelected && (isRoot ? (
-        <circle cx={cx} cy={cy} r={r + 3}
-          fill="none" stroke="#3b82f6" strokeWidth={2.5}
-          filter="drop-shadow(0 0 6px rgba(59,130,246,0.5))"
-          style={{ pointerEvents: 'none' }} />
+        <>
+          <circle cx={cx} cy={cy} r={r + 5}
+            fill="none" stroke="rgba(59,130,246,0.18)" strokeWidth={6}
+            style={{ pointerEvents: 'none' }} />
+          <circle cx={cx} cy={cy} r={r + 3}
+            fill="none" stroke="#3b82f6" strokeWidth={3.5}
+            filter="drop-shadow(0 0 8px rgba(59,130,246,0.7))"
+            style={{ pointerEvents: 'none' }} />
+        </>
       ) : (
-        <rect
-          x={node.x - 2} y={node.y - 2}
-          width={node.width + 4} height={node.height + 4}
-          rx={rx + 2} ry={rx + 2}
-          fill="none" stroke="#3b82f6" strokeWidth={2.5}
-          filter="drop-shadow(0 0 6px rgba(59,130,246,0.5))"
-          style={{ pointerEvents: 'none' }} />
+        <>
+          <rect
+            x={-5} y={-5}
+            width={node.width + 10} height={node.height + 10}
+            rx={rx + 4} ry={rx + 4}
+            fill="none" stroke="rgba(59,130,246,0.18)" strokeWidth={6}
+            style={{ pointerEvents: 'none' }} />
+          <rect
+            x={-2} y={-2}
+            width={node.width + 4} height={node.height + 4}
+            rx={rx + 2} ry={rx + 2}
+            fill="none" stroke="#3b82f6" strokeWidth={3.5}
+            filter="drop-shadow(0 0 8px rgba(59,130,246,0.7))"
+            style={{ pointerEvents: 'none' }} />
+        </>
       ))}
+    </g>
     </g>
   )
 }

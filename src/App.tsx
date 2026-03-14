@@ -41,7 +41,7 @@ type View = 'home' | 'editor' | 'viewer'
 
 export default function App() {
   const { loadDiagramList, loadDiagram, saveDiagram } = useDiagram()
-  const { activeDiagram, isDirty, setActiveDiagram, addNode, selectedNodeIds, setSelectedNodeIds, updateNode, batchUpdateNodes } = useDiagramStore()
+  const { activeDiagram, isDirty, setActiveDiagram, addNode, selectedNodeIds, setSelectedNodeIds, updateNode } = useDiagramStore()
   const [view, setView] = useState<View>(() => {
     if (decodeShareURL()) return 'viewer'
     const params = new URLSearchParams(window.location.search)
@@ -87,7 +87,11 @@ export default function App() {
       if (e.key === 'Tab' && view === 'editor') {
         e.preventDefault()
         const parentId = selectedNodeIds[0] ?? activeDiagram?.nodes.find(n => n.parentId === null)?.id ?? null
-        if (parentId) addNode(parentId)
+        if (parentId) {
+          const newNode = addNode(parentId)
+          setSelectedNodeIds([newNode.id])
+          setSelectedPanelNodeId(newNode.id)
+        }
       }
     }
     window.addEventListener('keydown', onKeyDown)
@@ -115,15 +119,12 @@ export default function App() {
   const rollAllDice = useCallback(() => {
     const nodes = activeDiagram?.nodes
     if (!nodes) return
-    const targets = selectedNodeIds.length > 0
-      ? nodes.filter(n => selectedNodeIds.includes(n.id) && n.parentId !== null)
-      : nodes.filter(n => n.parentId !== null)
-    targets.forEach(n => {
+    nodes.filter(n => n.parentId !== null).forEach(n => {
       const icon = pickRandom(DICE_ICONS)
       const words = DICE_WORDS[icon] ?? ['Node']
       updateNode(n.id, { title: pickRandom(words), icon })
     })
-  }, [activeDiagram, selectedNodeIds, updateNode, batchUpdateNodes])
+  }, [activeDiagram, updateNode])
 
   if (view === 'home') return (
     <>
@@ -176,7 +177,7 @@ export default function App() {
         {/* Roll Dice button — top left, next to back button */}
         {activeDiagram && <button
           onClick={rollAllDice}
-          title={selectedNodeIds.length > 0 ? `Roll dice on ${selectedNodeIds.length} selected node(s)` : 'Roll dice on all nodes'}
+          title="Roll dice — fill all nodes with random test data"
           style={{
             position: 'fixed', top: 14, left: 58, zIndex: 20,
             height: 36, padding: '0 12px', borderRadius: 10,

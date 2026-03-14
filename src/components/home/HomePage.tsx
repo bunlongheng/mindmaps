@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react'
 import { useDiagramStore } from '../../store/diagramStore'
 import { useDiagram } from '../../hooks/useDiagram'
 import type { DiagramMeta } from '../../types'
-import { Plus, Search, GitBranch, Clock, Trash2 } from 'lucide-react'
+import { Plus, Search, Clock, Trash2 } from 'lucide-react'
+import { ThinkLogo } from '../ThinkLogo'
 
 interface HomePageProps {
   onOpen: (id: string) => void
@@ -62,9 +63,9 @@ export function HomePage({ onOpen }: HomePageProps) {
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             boxShadow: '0 2px 8px rgba(99,102,241,0.3)',
           }}>
-            <GitBranch size={15} color="#fff" />
+            <ThinkLogo size={18} />
           </div>
-          <span style={{ fontSize: 15, fontWeight: 700, color: '#1e293b' }}>MindMap</span>
+          <span style={{ fontSize: 15, fontWeight: 700, color: '#1e293b' }}>Think</span>
         </div>
 
         <div style={{ flex: 1 }} />
@@ -106,10 +107,14 @@ export function HomePage({ onOpen }: HomePageProps) {
         </h2>
 
         {filtered.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '80px 0', color: '#cbd5e1' }}>
-            <GitBranch size={40} style={{ margin: '0 auto 16px', display: 'block', opacity: 0.3 }} />
-            <p style={{ fontSize: 15, color: '#94a3b8', fontWeight: 500 }}>No maps yet</p>
-            <p style={{ fontSize: 13, marginTop: 6 }}>Click "New Map" to get started</p>
+          <div style={{
+            position: 'fixed', inset: 0, top: 56,
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            pointerEvents: 'none',
+          }}>
+            <div style={{ opacity: 0.25, marginBottom: 16 }}><ThinkLogo size={40} color="#64748b" /></div>
+            <p style={{ fontSize: 15, color: '#94a3b8', fontWeight: 600, margin: 0 }}>No maps yet</p>
+            <p style={{ fontSize: 13, color: '#cbd5e1', marginTop: 6 }}>Click "New Map" to get started</p>
           </div>
         )}
 
@@ -124,7 +129,7 @@ export function HomePage({ onOpen }: HomePageProps) {
               diagram={d}
               timeAgo={timeAgo(d.updatedAt)}
               onOpen={() => onOpen(d.id)}
-              onDelete={() => deleteDiagram(d.id)}
+              onDelete={() => deleteDiagram(d.id, d.name)}
             />
           ))}
         </div>
@@ -140,7 +145,7 @@ export function HomePage({ onOpen }: HomePageProps) {
             background: '#fff', borderRadius: 16, padding: 24, width: 360,
             boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
           }} onClick={e => e.stopPropagation()}>
-            <h3 style={{ fontSize: 16, fontWeight: 700, color: '#1e293b', marginBottom: 16 }}>New Mind Map</h3>
+            <h3 style={{ fontSize: 16, fontWeight: 700, color: '#1e293b', marginBottom: 16 }}>New Map</h3>
             <input
               autoFocus
               value={newName}
@@ -183,7 +188,7 @@ function DiagramCard({ diagram, timeAgo, onOpen, onDelete }: {
       onMouseLeave={() => setHovered(false)}
       style={{
         background: '#fff',
-        border: `1px solid ${hovered ? '#6366f1' : '#e2e8f0'}`,
+        border: `${hovered ? '2.5px' : '1px'} solid ${hovered ? '#6366f1' : '#e2e8f0'}`,
         borderRadius: 14, overflow: 'hidden', cursor: 'pointer',
         transition: 'all 0.15s',
         boxShadow: hovered ? '0 4px 20px rgba(99,102,241,0.12)' : '0 1px 4px rgba(0,0,0,0.04)',

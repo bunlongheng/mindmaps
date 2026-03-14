@@ -129,7 +129,8 @@ export function SidePanel({ nodeId, onClose, onImport }: SidePanelProps) {
 
   const [tab, setTab] = useState<Tab>('style')
   const [copied, setCopied] = useState(false)
-  const node = nodeId ? activeDiagram?.nodes.find(n => n.id === nodeId) : null
+  const rootNode = activeDiagram?.nodes.find(n => n.parentId === null)
+  const node = (nodeId ? activeDiagram?.nodes.find(n => n.id === nodeId) : null) ?? rootNode ?? null
   const [title, setTitle] = useState(node?.title ?? '')
 
   useEffect(() => { setTitle(node?.title ?? '') }, [nodeId, node?.title])
@@ -209,6 +210,42 @@ export function SidePanel({ nodeId, onClose, onImport }: SidePanelProps) {
             </div>
           ) : (
             <>
+
+              {/* Root circle controls */}
+              {node.depth === 0 && diagramType === 'mindmap' && (
+                <>
+                  <SBlock title="Circle">
+                    <PRow label="Radius">
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <input type="range" min={60} max={260} step={4}
+                          value={Math.round(node.width / 2)}
+                          onChange={e => {
+                            const d = parseInt(e.target.value) * 2
+                            updateNode(node.id, { width: d, height: d, manuallyPositioned: false })
+                            rerunLayout()
+                          }}
+                          style={{ flex: 1, accentColor: '#3b82f6' }}
+                        />
+                        <span style={{ fontSize: 11, color: '#6b7280', minWidth: 26, textAlign: 'right' }}>{Math.round(node.width / 2)}</span>
+                      </div>
+                    </PRow>
+                    <PRow label="Gap">
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <input type="range" min={40} max={999} step={10}
+                          value={node.branchGap ?? 120}
+                          onChange={e => {
+                            updateNode(node.id, { branchGap: parseInt(e.target.value) })
+                            rerunLayout()
+                          }}
+                          style={{ flex: 1, accentColor: '#3b82f6' }}
+                        />
+                        <span style={{ fontSize: 11, color: '#6b7280', minWidth: 26, textAlign: 'right' }}>{node.branchGap ?? 120}</span>
+                      </div>
+                    </PRow>
+                  </SBlock>
+                  <HR />
+                </>
+              )}
 
               {/* Shape */}
               <SBlock title="Shape">

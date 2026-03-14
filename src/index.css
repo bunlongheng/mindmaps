@@ -1,4 +1,4 @@
 @import "tailwindcss";
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: 'Inter', system-ui, sans-serif; background: #f8fafc; color: #1e293b; overflow: hidden; }
+body { font-family: 'Inter', system-ui, sans-serif; background: #ffffff; color: #1e293b; overflow: hidden; }

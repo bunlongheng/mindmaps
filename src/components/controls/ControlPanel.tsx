@@ -1,22 +1,9 @@
+import { useState, useRef, useEffect } from 'react'
 import { useDiagramStore } from '../../store/diagramStore'
-import { ROOT_COLORS } from '../../lib/color'
-import type { DiagramType, LineStyle } from '../../types'
-import { Share2, Download, Upload, RefreshCw, Plus, GitBranch, Network, Fish, TreePine, Menu } from 'lucide-react'
+import { Share2, Download, Upload, RefreshCw, Plus, Menu, Undo2, Redo2, MoreHorizontal } from 'lucide-react'
 import { downloadJSON } from '../../lib/export/json'
 import { encodeShareURL } from '../../lib/export/share'
-
-const DIAGRAM_TYPES: { value: DiagramType; label: string; Icon: React.ElementType }[] = [
-  { value: 'mindmap',         label: 'Mind Map',  Icon: Network   },
-  { value: 'tree-vertical',   label: 'Tree ↓',    Icon: TreePine  },
-  { value: 'tree-horizontal', label: 'Tree →',     Icon: GitBranch },
-  { value: 'fishbone',        label: 'Fishbone',  Icon: Fish      },
-]
-
-const LINE_STYLES: { value: LineStyle; label: string; symbol: string }[] = [
-  { value: 'curved',     label: 'Curved',     symbol: '⌒' },
-  { value: 'straight',   label: 'Straight',   symbol: '—' },
-  { value: 'orthogonal', label: 'Orthogonal', symbol: '⌐' },
-]
+import type { DiagramType, LineStyle } from '../../types'
 
 interface ControlPanelProps {
   onAddNode: () => void
@@ -25,106 +12,161 @@ interface ControlPanelProps {
   onBack: () => void
 }
 
-const Sep = () => <div style={{ width: 1, height: 22, background: '#e2e8f0', flexShrink: 0 }} />
+const DIAGRAM_TYPES: { value: DiagramType; label: string }[] = [
+  { value: 'mindmap',         label: 'Mind' },
+  { value: 'tree-vertical',   label: 'Tree ↓' },
+  { value: 'tree-horizontal', label: 'Tree →' },
+  { value: 'fishbone',        label: 'Fishbone' },
+]
+
+const LINE_STYLES: { value: LineStyle; symbol: string; title: string }[] = [
+  { value: 'curved',     symbol: '⌒', title: 'Curved' },
+  { value: 'straight',   symbol: '—', title: 'Straight' },
+  { value: 'orthogonal', symbol: '⌐', title: 'Orthogonal' },
+]
+
+const Sep = () => <div style={{ width: 1, height: 20, background: '#e2e8f0', flexShrink: 0 }} />
 
 export function ControlPanel({ onAddNode, onImport, onShare, onBack }: ControlPanelProps) {
-  const { diagramType, lineStyle, setDiagramType, setLineStyle, activeDiagram, rerunLayout, selectedNodeIds, updateNode } = useDiagramStore()
-  const selectedNode = activeDiagram?.nodes.find(n => selectedNodeIds[0] === n.id)
+  const { activeDiagram, rerunLayout, undo, redo, past, future, diagramType, lineStyle, setDiagramType, setLineStyle } = useDiagramStore()
+  const [showMore, setShowMore] = useState(false)
+  const moreRef = useRef<HTMLDivElement>(null)
 
-  const btnBase: React.CSSProperties = {
-    display: 'flex', alignItems: 'center', gap: 5,
-    padding: '5px 10px', borderRadius: 8, border: 'none', cursor: 'pointer',
-    fontSize: 12, fontWeight: 500, fontFamily: 'inherit', transition: 'all 0.12s',
-    background: 'transparent', color: '#64748b',
+  const canUndo = past.length > 0
+  const canRedo = future.length > 0
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    if (!showMore) return
+    function handler(e: MouseEvent) {
+      if (moreRef.current && !moreRef.current.contains(e.target as Node)) setShowMore(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [showMore])
+
+  const btn: React.CSSProperties = {
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    width: 30, height: 30, borderRadius: 7, border: 'none', cursor: 'pointer',
+    fontSize: 12, fontWeight: 500, fontFamily: 'inherit', transition: 'background 0.1s',
+    background: 'transparent', color: '#64748b', flexShrink: 0,
   }
+  const hov = (e: React.MouseEvent, on: boolean) =>
+    (e.currentTarget as HTMLElement).style.background = on ? '#f1f5f9' : 'transparent'
 
   return (
     <div style={{
-      position: 'absolute', top: 14, left: '50%', transform: 'translateX(-50%)',
-      zIndex: 20, display: 'flex', alignItems: 'center', gap: 4,
+      position: 'fixed', top: 14, left: '50%', transform: 'translateX(-50%)',
+      zIndex: 20, display: 'flex', alignItems: 'center', gap: 2,
       background: '#fff', border: '1px solid #e2e8f0',
       borderRadius: 14, boxShadow: '0 4px 24px rgba(0,0,0,0.08)',
-      padding: '5px 10px', userSelect: 'none',
+      padding: '4px 8px', userSelect: 'none',
     }}>
 
-      {/* Back to home */}
-      <button onClick={onBack} title="All maps"
-        style={{ ...btnBase, padding: '5px 8px', marginRight: 2 }}
-        onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f1f5f9' }}
-        onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}>
+      {/* Back */}
+      <button onClick={onBack} title="All maps" style={btn}
+        onMouseEnter={e => hov(e, true)} onMouseLeave={e => hov(e, false)}>
         <Menu size={16} />
       </button>
 
       <Sep />
 
-      {/* Diagram types */}
-      <div style={{ display: 'flex', gap: 2 }}>
-        {DIAGRAM_TYPES.map(({ value, label, Icon }) => {
-          const active = diagramType === value
-          return (
-            <button key={value} onClick={() => setDiagramType(value)} title={label}
-              style={{ ...btnBase, fontWeight: active ? 600 : 500, background: active ? '#6366f1' : 'transparent', color: active ? '#fff' : '#64748b' }}
-              onMouseEnter={e => { if (!active) (e.currentTarget as HTMLButtonElement).style.background = '#f1f5f9' }}
-              onMouseLeave={e => { if (!active) (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}>
-              <Icon size={13} />{label}
-            </button>
-          )
-        })}
-      </div>
+      {/* Undo / Redo */}
+      <button onClick={canUndo ? undo : undefined} title="Undo (⌘Z)"
+        style={{ ...btn, opacity: canUndo ? 1 : 0.28, cursor: canUndo ? 'pointer' : 'default' }}
+        onMouseEnter={e => { if (canUndo) hov(e, true) }} onMouseLeave={e => hov(e, false)}>
+        <Undo2 size={14} />
+      </button>
+      <button onClick={canRedo ? redo : undefined} title="Redo (⌘⇧Z)"
+        style={{ ...btn, opacity: canRedo ? 1 : 0.28, cursor: canRedo ? 'pointer' : 'default' }}
+        onMouseEnter={e => { if (canRedo) hov(e, true) }} onMouseLeave={e => hov(e, false)}>
+        <Redo2 size={14} />
+      </button>
 
       <Sep />
 
-      {/* Line styles */}
-      <div style={{ display: 'flex', gap: 2 }}>
-        {LINE_STYLES.map(({ value, label, symbol }) => {
-          const active = lineStyle === value
-          return (
-            <button key={value} onClick={() => setLineStyle(value)} title={label}
-              style={{ ...btnBase, background: active ? '#f0f0ff' : 'transparent', color: active ? '#6366f1' : '#64748b', fontWeight: active ? 600 : 500 }}
-              onMouseEnter={e => { if (!active) (e.currentTarget as HTMLButtonElement).style.background = '#f1f5f9' }}
-              onMouseLeave={e => { if (!active) (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}>
-              <span style={{ fontSize: 14 }}>{symbol}</span>{label}
-            </button>
-          )
-        })}
-      </div>
+      {/* Add node */}
+      <button onClick={onAddNode} title="Add node (Tab)" style={btn}
+        onMouseEnter={e => hov(e, true)} onMouseLeave={e => hov(e, false)}>
+        <Plus size={15} />
+      </button>
 
-      {/* Color swatches for selected node */}
-      {selectedNode && (
-        <>
-          <Sep />
-          <div style={{ display: 'flex', gap: 4, alignItems: 'center', padding: '0 2px' }}>
-            {ROOT_COLORS.map(c => (
-              <button key={c} onClick={() => updateNode(selectedNode.id, { color: c })} title={c}
+      <Sep />
+
+      {/* More dropdown */}
+      <div ref={moreRef} style={{ position: 'relative' }}>
+        <button onClick={() => setShowMore(v => !v)} title="More options"
+          style={{ ...btn, background: showMore ? '#f1f5f9' : 'transparent', color: showMore ? '#1e293b' : '#64748b' }}
+          onMouseEnter={e => hov(e, true)} onMouseLeave={e => { if (!showMore) hov(e, false) }}>
+          <MoreHorizontal size={15} />
+        </button>
+
+        {showMore && (
+          <div style={{
+            position: 'absolute', top: 'calc(100% + 8px)', right: 0,
+            background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12,
+            boxShadow: '0 8px 32px rgba(0,0,0,0.1)', padding: '8px',
+            minWidth: 200, zIndex: 50,
+          }}>
+            {/* Diagram type */}
+            <p style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.07em', padding: '2px 6px 6px' }}>Diagram</p>
+            <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
+              {DIAGRAM_TYPES.map(({ value, label }) => {
+                const active = diagramType === value
+                return (
+                  <button key={value} onClick={() => { setDiagramType(value); setShowMore(false) }}
+                    style={{
+                      flex: 1, padding: '5px 4px', borderRadius: 7, border: `1px solid ${active ? '#6366f1' : '#e2e8f0'}`,
+                      background: active ? '#eef2ff' : 'transparent', cursor: 'pointer',
+                      fontSize: 11, fontWeight: active ? 700 : 500, color: active ? '#6366f1' : '#475569', fontFamily: 'inherit',
+                    }}>
+                    {label}
+                  </button>
+                )
+              })}
+            </div>
+
+            {/* Line style */}
+            <p style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.07em', padding: '2px 6px 6px' }}>Line</p>
+            <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
+              {LINE_STYLES.map(({ value, symbol, title }) => {
+                const active = lineStyle === value
+                return (
+                  <button key={value} onClick={() => { setLineStyle(value); setShowMore(false) }}
+                    style={{
+                      flex: 1, padding: '5px 4px', borderRadius: 7, border: `1px solid ${active ? '#6366f1' : '#e2e8f0'}`,
+                      background: active ? '#eef2ff' : 'transparent', cursor: 'pointer',
+                      fontSize: 14, fontWeight: active ? 700 : 400, color: active ? '#6366f1' : '#64748b', fontFamily: 'inherit',
+                    }}
+                    title={title}>
+                    {symbol}
+                  </button>
+                )
+              })}
+            </div>
+
+            <div style={{ height: 1, background: '#f1f5f9', margin: '4px 0 8px' }} />
+
+            {/* Actions */}
+            {[
+              { icon: <RefreshCw size={13}/>, label: 'Re-run layout', onClick: () => { rerunLayout(); setShowMore(false) } },
+              { icon: <Download size={13}/>, label: 'Export JSON', onClick: () => { activeDiagram && downloadJSON(activeDiagram); setShowMore(false) } },
+              { icon: <Upload size={13}/>, label: 'Import JSON', onClick: () => { onImport(); setShowMore(false) } },
+              { icon: <Share2 size={13}/>, label: 'Share link', onClick: () => { activeDiagram && onShare(encodeShareURL(activeDiagram)); setShowMore(false) } },
+            ].map(({ icon, label, onClick }) => (
+              <button key={label} onClick={onClick}
                 style={{
-                  width: 18, height: 18, borderRadius: '50%', border: 'none', cursor: 'pointer',
-                  background: c, flexShrink: 0, transition: 'all 0.12s',
-                  boxShadow: selectedNode.color === c ? `0 0 0 2px #fff, 0 0 0 3.5px ${c}` : '0 1px 3px rgba(0,0,0,0.2)',
-                  transform: selectedNode.color === c ? 'scale(1.2)' : 'scale(1)',
-                }} />
+                  display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+                  padding: '7px 8px', borderRadius: 8, border: 'none', background: 'transparent',
+                  cursor: 'pointer', fontSize: 12, color: '#475569', fontFamily: 'inherit', textAlign: 'left',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                {icon} {label}
+              </button>
             ))}
           </div>
-        </>
-      )}
-
-      <Sep />
-
-      {/* Actions */}
-      <div style={{ display: 'flex', gap: 2 }}>
-        {[
-          { icon: <Plus size={15}/>, title: 'Add node (Tab)', onClick: onAddNode },
-          { icon: <RefreshCw size={14}/>, title: 'Re-run layout', onClick: rerunLayout },
-          { icon: <Download size={14}/>, title: 'Export JSON', onClick: () => activeDiagram && downloadJSON(activeDiagram) },
-          { icon: <Upload size={14}/>, title: 'Import JSON', onClick: onImport },
-          { icon: <Share2 size={14}/>, title: 'Share link', onClick: () => activeDiagram && onShare(encodeShareURL(activeDiagram)) },
-        ].map((btn, i) => (
-          <button key={i} onClick={btn.onClick} title={btn.title}
-            style={{ ...btnBase, width: 30, height: 30, padding: 0, justifyContent: 'center' }}
-            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f1f5f9' }}
-            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}>
-            {btn.icon}
-          </button>
-        ))}
+        )}
       </div>
     </div>
   )

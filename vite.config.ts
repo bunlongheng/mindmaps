@@ -8,8 +8,8 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       manifest: {
-        name: 'MindMap',
-        short_name: 'MindMap',
+        name: 'Think',
+        short_name: 'Think',
         description: 'Visual mind mapping and diagram tool',
         start_url: '/',
         scope: '/',

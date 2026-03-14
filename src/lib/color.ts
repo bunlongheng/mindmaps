@@ -32,7 +32,9 @@ export function darken(hex: string, amount = 0.3): string {
 }
 
 export const ROOT_COLORS = [
+  '#ef4444', '#f97316', '#f59e0b', '#eab308',
+  '#22c55e', '#14b8a6', '#06b6d4', '#3b82f6',
   '#6366f1', '#8b5cf6', '#ec4899', '#f43f5e',
-  '#f97316', '#eab308', '#22c55e', '#14b8a6',
-  '#3b82f6', '#06b6d4',
+  '#ffffff', '#f1f5f9', '#94a3b8', '#475569',
+  '#1e293b', '#1a1d2e', '#000000', '#fde68a',
 ]
