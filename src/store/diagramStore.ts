@@ -6,6 +6,7 @@ import { computeMindmapLayout } from '../lib/layout/mindmap'
 import { computeFishboneLayout } from '../lib/layout/fishbone'
 import { computeTimelineLayout } from '../lib/layout/timeline'
 import { getTheme } from '../lib/themes'
+import { guessIcon } from '../lib/autoIcon'
 
 /** Re-index sortOrder per parent group so numbers are always 0,1,2,... with no gaps */
 function reindexSortOrders(nodes: MindNode[]): MindNode[] {
@@ -107,6 +108,7 @@ interface DiagramStore {
   snapshotHistory: () => void
   clearDiagram: () => void
   loadFromOutline: (text: string) => void
+  autoAssignIcons: () => void
 }
 
 function pushHistory(state: DiagramStore): Pick<DiagramStore, 'past' | 'future'> {
@@ -370,6 +372,15 @@ export const useDiagramStore = create<DiagramStore>()(
       })
     },
 
+    autoAssignIcons: () => {
+      const state = get()
+      if (!state.activeDiagram) return
+      const nodes = state.activeDiagram.nodes.map(n =>
+        n.depth > 0 ? { ...n, icon: n.icon ?? guessIcon(n.title) } : n
+      )
+      set({ activeDiagram: { ...state.activeDiagram, nodes }, isDirty: true })
+    },
+
     clearDiagram: () => set({ activeDiagram: null, selectedNodeIds: [], past: [], future: [], isDirty: false }),
 
     loadFromOutline: (text: string) => {
@@ -437,6 +448,7 @@ export const useDiagramStore = create<DiagramStore>()(
         width: depths[i] === 0 ? 180 : 160,
         height: depths[i] === 0 ? 180 : 40,
         manuallyPositioned: false,
+        icon: depths[i] > 0 ? guessIcon(p.title) : undefined,
       }))
 
       set({ isImporting: true })

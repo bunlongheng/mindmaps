@@ -190,7 +190,7 @@ export function SidePanel({ nodeId, onClose, onImport }: SidePanelProps) {
   const {
     activeDiagram, updateNode, batchUpdateNodes, selectedNodeIds,
     lineStyle, setLineStyle, diagramType, setDiagramType, rerunLayout, setShareEnabled,
-    themeId, setTheme, showOrderNumbers, setShowOrderNumbers,
+    themeId, setTheme, showOrderNumbers, setShowOrderNumbers, autoAssignIcons,
   } = useDiagramStore()
   const themeColors = getTheme(themeId).colors
 
@@ -575,7 +575,7 @@ export function SidePanel({ nodeId, onClose, onImport }: SidePanelProps) {
           <HR />
           <SBlock title="Layout">
             <button onClick={rerunLayout} style={{
-              width: '100%', padding: '9px 12px', borderRadius: 8,
+              width: '100%', padding: '9px 12px', borderRadius: 8, marginBottom: 6,
               border: '1px solid #e0e2e7', background: '#fff',
               cursor: 'pointer', fontSize: 12, fontWeight: 500,
               color: '#374151', fontFamily: 'inherit',
@@ -584,6 +584,17 @@ export function SidePanel({ nodeId, onClose, onImport }: SidePanelProps) {
               onMouseEnter={e => (e.currentTarget.style.background = '#f3f4f6')}
               onMouseLeave={e => (e.currentTarget.style.background = '#fff')}>
               <RefreshCw size={13} /> Re-run Layout
+            </button>
+            <button onClick={autoAssignIcons} style={{
+              width: '100%', padding: '9px 12px', borderRadius: 8,
+              border: '1px solid #e0e2e7', background: '#fff',
+              cursor: 'pointer', fontSize: 12, fontWeight: 500,
+              color: '#374151', fontFamily: 'inherit',
+              display: 'flex', alignItems: 'center', gap: 8,
+            }}
+              onMouseEnter={e => (e.currentTarget.style.background = '#f3f4f6')}
+              onMouseLeave={e => (e.currentTarget.style.background = '#fff')}>
+              ✦ Auto Icons
             </button>
           </SBlock>
           <HR />
