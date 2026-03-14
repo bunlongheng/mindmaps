@@ -83,8 +83,9 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   // Depth-based bg opacity only (text stays fully opaque)
   const bgOpacity = node.depth === 2 ? 0.9 : node.depth === 3 ? 0.8 : node.depth >= 4 ? 0.7 : 1
   const fontStyle = node.italic ? 'italic' : 'normal'
-  // Relative coords (origin = node.x, node.y) — always center
-  const textX = node.width / 2
+  // Text alignment — default left for non-root nodes
+  const align = isRoot ? 'center' : (node.textAlign ?? 'left')
+  const textAnchor = align === 'left' ? 'start' : align === 'right' ? 'end' : 'middle'
 
   const [isDragging, setIsDragging] = useState(false)
   const dragStart = useRef<{ x: number; y: number; nodeX: number; nodeY: number } | null>(null)
@@ -300,9 +301,9 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
                 })()}
                 <NodeIcon icon={node.icon} x={iconX} y={iconY} size={iconSize} color={iconColor} strokeWidth={node.depth === 1 ? 2.8 : 1.8} />
                 <text
-                  x={textAreaX}
+                  x={align === 'left' ? iconZoneW + 8 : align === 'right' ? node.width - 8 : textAreaX}
                   y={node.height / 2 + fontSize * 0.38}
-                  textAnchor="middle"
+                  textAnchor={textAnchor}
                   fontSize={fontSize} fontWeight={fontWeight} fontStyle={fontStyle}
                   fontFamily="Inter, system-ui, sans-serif"
                   fill={textColor}
@@ -313,9 +314,9 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
           })()}
           {(!node.icon || isRoot) && (
             <text
-              x={isRoot ? cx : textX}
+              x={isRoot ? cx : align === 'left' ? 12 : align === 'right' ? node.width - 12 : node.width / 2}
               y={isRoot ? cy + fontSize * 0.38 : node.height / 2 + fontSize * 0.38}
-              textAnchor="middle"
+              textAnchor={isRoot ? 'middle' : textAnchor}
               fontSize={fontSize} fontWeight={fontWeight} fontStyle={fontStyle}
               fontFamily="Inter, system-ui, sans-serif"
               fill={textColor}

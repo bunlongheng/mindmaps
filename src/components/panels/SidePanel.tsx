@@ -404,7 +404,7 @@ export function SidePanel({ nodeId, onClose, onImport }: SidePanelProps) {
                       { v: 'right' as const,  icon: <AlignRight size={12}/>  },
                     ] as const).map(({ v, icon }) => (
                       <button key={v} onClick={() => save({ textAlign: v })}
-                        style={{ ...chip((node.textAlign ?? 'center') === v), flex: 1, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        style={{ ...chip((node.textAlign ?? 'left') === v), flex: 1, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         {icon}
                       </button>
                     ))}
