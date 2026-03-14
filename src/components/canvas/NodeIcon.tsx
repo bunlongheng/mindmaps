@@ -14,7 +14,7 @@ export function NodeIcon({ icon, x, y, size, color, strokeWidth = 1.8 }: NodeIco
   if (!Icon) return null
   return (
     <foreignObject x={x} y={y} width={size} height={size} style={{ pointerEvents: 'none', overflow: 'visible' }}>
-      <Icon style={{ width: size, height: size, color, display: 'block', strokeWidth }} />
+      <Icon color={color} size={size} strokeWidth={strokeWidth} style={{ display: 'block' }} />
     </foreignObject>
   )
 }
