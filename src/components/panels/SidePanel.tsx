@@ -2,11 +2,12 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import { NODE_ICONS } from '../../lib/icons'
 import { useDiagramStore } from '../../store/diagramStore'
 import { getTheme, THEMES } from '../../lib/themes'
-import { X, AlignLeft, AlignCenter, AlignRight, Copy, Check, RefreshCw, Download, Upload } from 'lucide-react'
+import { X, AlignLeft, AlignCenter, AlignRight, Copy, Check, RefreshCw, Download, Upload, FileDown } from 'lucide-react'
 import type { LineStyle, DiagramType } from '../../types'
 import { encodeShareURL } from '../../lib/export/share'
 import { QRCodeSVG } from 'qrcode.react'
 import { downloadJSON } from '../../lib/export/json'
+import { exportDiagramAsPdf } from '../../lib/export/exportPdf'
 
 interface SidePanelProps {
   nodeId: string | null
@@ -611,7 +612,7 @@ export function SidePanel({ nodeId, onClose, onImport }: SidePanelProps) {
               <Download size={13} /> Export JSON
             </button>
             <button onClick={onImport} style={{
-              width: '100%', padding: '9px 12px', borderRadius: 8,
+              width: '100%', padding: '9px 12px', borderRadius: 8, marginBottom: 6,
               border: '1px solid #e0e2e7', background: '#fff',
               cursor: 'pointer', fontSize: 12, fontWeight: 500,
               color: '#374151', fontFamily: 'inherit',
@@ -620,6 +621,17 @@ export function SidePanel({ nodeId, onClose, onImport }: SidePanelProps) {
               onMouseEnter={e => (e.currentTarget.style.background = '#f3f4f6')}
               onMouseLeave={e => (e.currentTarget.style.background = '#fff')}>
               <Upload size={13} /> Import JSON
+            </button>
+            <button onClick={() => activeDiagram && exportDiagramAsPdf(activeDiagram.name)} style={{
+              width: '100%', padding: '9px 12px', borderRadius: 8,
+              border: '1px solid #e0e2e7', background: '#fff',
+              cursor: 'pointer', fontSize: 12, fontWeight: 500,
+              color: '#374151', fontFamily: 'inherit',
+              display: 'flex', alignItems: 'center', gap: 8,
+            }}
+              onMouseEnter={e => (e.currentTarget.style.background = '#f3f4f6')}
+              onMouseLeave={e => (e.currentTarget.style.background = '#fff')}>
+              <FileDown size={13} /> Export PDF
             </button>
           </SBlock>
         </div>
