@@ -23,6 +23,72 @@ const DIAGRAM_TYPES: { value: DiagramType; label: string }[] = [
   { value: 'timeline',        label: 'Timeline' },
 ]
 
+function DiagramTypeIcon({ value, color }: { value: string; color: string }) {
+  if (value === 'mindmap') return (
+    <svg width="36" height="26" viewBox="0 0 36 26" fill="none">
+      <circle cx="7" cy="13" r="5" fill={color} opacity="0.9"/>
+      <line x1="12" y1="13" x2="17" y2="13" stroke={color} strokeWidth="1.8" strokeLinecap="round"/>
+      <line x1="17" y1="6" x2="17" y2="20" stroke={color} strokeWidth="1.8" strokeLinecap="round"/>
+      <line x1="17" y1="6"  x2="25" y2="6"  stroke={color} strokeWidth="1.8" strokeLinecap="round"/>
+      <line x1="17" y1="13" x2="25" y2="13" stroke={color} strokeWidth="1.8" strokeLinecap="round"/>
+      <line x1="17" y1="20" x2="25" y2="20" stroke={color} strokeWidth="1.8" strokeLinecap="round"/>
+      <rect x="25" y="3"  width="10" height="5" rx="1.5" fill={color} opacity="0.3"/>
+      <rect x="25" y="10" width="10" height="5" rx="1.5" fill={color} opacity="0.3"/>
+      <rect x="25" y="17" width="10" height="5" rx="1.5" fill={color} opacity="0.3"/>
+    </svg>
+  )
+  if (value === 'tree-vertical') return (
+    <svg width="36" height="26" viewBox="0 0 36 26" fill="none">
+      <rect x="13" y="1" width="10" height="6" rx="1.5" fill={color} opacity="0.9"/>
+      <line x1="18" y1="7" x2="18" y2="12" stroke={color} strokeWidth="1.8" strokeLinecap="round"/>
+      <line x1="8" y1="12" x2="28" y2="12" stroke={color} strokeWidth="1.8" strokeLinecap="round"/>
+      <line x1="8"  y1="12" x2="8"  y2="16" stroke={color} strokeWidth="1.8" strokeLinecap="round"/>
+      <line x1="18" y1="12" x2="18" y2="16" stroke={color} strokeWidth="1.8" strokeLinecap="round"/>
+      <line x1="28" y1="12" x2="28" y2="16" stroke={color} strokeWidth="1.8" strokeLinecap="round"/>
+      <rect x="3"  y="16" width="10" height="6" rx="1.5" fill={color} opacity="0.3"/>
+      <rect x="13" y="16" width="10" height="6" rx="1.5" fill={color} opacity="0.3"/>
+      <rect x="23" y="16" width="10" height="6" rx="1.5" fill={color} opacity="0.3"/>
+    </svg>
+  )
+  if (value === 'tree-horizontal') return (
+    <svg width="36" height="26" viewBox="0 0 36 26" fill="none">
+      <rect x="1" y="10" width="9" height="6" rx="1.5" fill={color} opacity="0.9"/>
+      <line x1="10" y1="13" x2="15" y2="13" stroke={color} strokeWidth="1.8" strokeLinecap="round"/>
+      <line x1="15" y1="6" x2="15" y2="20" stroke={color} strokeWidth="1.8" strokeLinecap="round"/>
+      <line x1="15" y1="6"  x2="20" y2="6"  stroke={color} strokeWidth="1.8" strokeLinecap="round"/>
+      <line x1="15" y1="13" x2="20" y2="13" stroke={color} strokeWidth="1.8" strokeLinecap="round"/>
+      <line x1="15" y1="20" x2="20" y2="20" stroke={color} strokeWidth="1.8" strokeLinecap="round"/>
+      <rect x="20" y="3"  width="10" height="6" rx="1.5" fill={color} opacity="0.3"/>
+      <rect x="20" y="10" width="10" height="6" rx="1.5" fill={color} opacity="0.3"/>
+      <rect x="20" y="17" width="10" height="6" rx="1.5" fill={color} opacity="0.3"/>
+    </svg>
+  )
+  if (value === 'fishbone') return (
+    <svg width="36" height="26" viewBox="0 0 36 26" fill="none">
+      <line x1="3" y1="13" x2="30" y2="13" stroke={color} strokeWidth="2" strokeLinecap="round"/>
+      <line x1="10" y1="13" x2="15" y2="7"  stroke={color} strokeWidth="1.6" strokeLinecap="round"/>
+      <line x1="20" y1="13" x2="25" y2="7"  stroke={color} strokeWidth="1.6" strokeLinecap="round"/>
+      <line x1="10" y1="13" x2="15" y2="19" stroke={color} strokeWidth="1.6" strokeLinecap="round"/>
+      <line x1="20" y1="13" x2="25" y2="19" stroke={color} strokeWidth="1.6" strokeLinecap="round"/>
+      <rect x="28" y="9" width="7" height="8" rx="2" fill={color} opacity="0.9"/>
+      <line x1="15" y1="7"  x2="22" y2="7"  stroke={color} strokeWidth="1.4" strokeLinecap="round" opacity="0.45"/>
+      <line x1="15" y1="19" x2="22" y2="19" stroke={color} strokeWidth="1.4" strokeLinecap="round" opacity="0.45"/>
+    </svg>
+  )
+  return (
+    <svg width="36" height="26" viewBox="0 0 36 26" fill="none">
+      <line x1="2" y1="13" x2="34" y2="13" stroke={color} strokeWidth="2" strokeLinecap="round"/>
+      {([8, 18, 28] as number[]).map((x, i) => (
+        <g key={x}>
+          <line x1={x} y1="13" x2={x} y2={i % 2 === 0 ? 7 : 19} stroke={color} strokeWidth="1.6" strokeLinecap="round"/>
+          <rect x={x - 5} y={i % 2 === 0 ? 2 : 19} width="10" height="5" rx="1.5" fill={color} opacity="0.3"/>
+        </g>
+      ))}
+      <polyline points="31,10 34,13 31,16" stroke={color} strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  )
+}
+
 type Tab = 'style' | 'map' | 'share'
 
 // ── Dice word banks ─────────────────────────────────────────────────────────────
@@ -146,7 +212,9 @@ export function SidePanel({ nodeId, onClose, onImport }: SidePanelProps) {
   }
 
 
-  const shareUrl = activeDiagram ? encodeShareURL(activeDiagram) : ''
+  const shareUrl = activeDiagram
+    ? `${window.location.origin}${window.location.pathname}?map=${activeDiagram.id}`
+    : ''
 
   function rollDice() {
     const store = useDiagramStore.getState()
@@ -437,19 +505,22 @@ export function SidePanel({ nodeId, onClose, onImport }: SidePanelProps) {
       {tab === 'map' && (
         <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
           <SBlock title="Diagram Type">
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
               {DIAGRAM_TYPES.map(({ value, label }) => {
                 const active = diagramType === value
+                const c = active ? '#3b82f6' : '#94a3b8'
                 return (
                   <button key={value} onClick={() => setDiagramType(value)}
                     style={{
-                      width: '100%', padding: '9px 12px', borderRadius: 8, textAlign: 'left',
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5,
+                      padding: '10px 6px 8px', borderRadius: 10,
                       border: `1.5px solid ${active ? '#3b82f6' : '#e0e2e7'}`,
-                      background: active ? '#eff6ff' : '#fff', cursor: 'pointer',
-                      fontSize: 12, fontWeight: active ? 600 : 400,
-                      color: active ? '#3b82f6' : '#374151', fontFamily: 'inherit',
+                      background: active ? '#eff6ff' : '#fff', cursor: 'pointer', fontFamily: 'inherit',
                     }}>
-                    {label}
+                    <DiagramTypeIcon value={value} color={c} />
+                    <span style={{ fontSize: 10, fontWeight: active ? 700 : 500, color: active ? '#3b82f6' : '#64748b' }}>
+                      {label}
+                    </span>
                   </button>
                 )
               })}
