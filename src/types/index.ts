@@ -1,4 +1,4 @@
-export type DiagramType = 'mindmap' | 'fishbone' | 'tree-vertical' | 'tree-horizontal'
+export type DiagramType = 'mindmap' | 'fishbone' | 'tree-vertical' | 'tree-horizontal' | 'timeline'
 export type LineStyle = 'straight' | 'curved' | 'orthogonal'
 
 export interface MindNode {
@@ -14,6 +14,12 @@ export interface MindNode {
   manuallyPositioned?: boolean
   sortOrder?: number
   fontSize?: number
+  bold?: boolean
+  italic?: boolean
+  textAlign?: 'left' | 'center' | 'right'
+  borderColor?: string
+  borderWidth?: number
+  icon?: string
 }
 
 export interface Diagram {
@@ -24,6 +30,7 @@ export interface Diagram {
   nodes: MindNode[]
   createdAt: string
   updatedAt: string
+  sharingEnabled?: boolean
 }
 
 export interface DiagramMeta {

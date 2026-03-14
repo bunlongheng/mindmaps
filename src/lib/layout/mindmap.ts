@@ -1,63 +1,112 @@
 import type { MindNode } from '../../types'
 
-const ROOT_W = 200
-const ROOT_H = 52
-const CHILD_W = 160
-const CHILD_H = 40
-const GRAND_W = 140
-const GRAND_H = 36
-const H_GAP = 90
+const SIZES: Record<number, { w: number; h: number }> = {
+  0: { w: 180, h: 180 },  // circle: w === h
+  1: { w: 320, h: 54 },
+}
+const DEFAULT_SIZE = { w: 170, h: 38 }
+const H_GAPS: Record<number, number> = { 0: 120, 1: 60 }
+const DEFAULT_H_GAP = 50
 const V_GAP = 22
+
+function getSize(depth: number) { return SIZES[depth] ?? DEFAULT_SIZE }
+function getHGap(depth: number) { return H_GAPS[depth] ?? DEFAULT_H_GAP }
+
+/** Effective size: root uses stored size only when square (dynamic resize) */
+function nodeSize(node: MindNode, depth: number) {
+  const { w, h } = getSize(depth)
+  if (depth === 0 && node.width > 0 && node.width === node.height) return { w: node.width, h: node.height }
+  return { w, h }
+}
+
+function subtreeH(nodeId: string, depth: number, nodes: MindNode[]): number {
+  const node = nodes.find(n => n.id === nodeId)
+  const children = nodes.filter(n => n.parentId === nodeId)
+  const h = node ? nodeSize(node, depth).h : getSize(depth).h
+  if (children.length === 0) return h
+  const childDepth = depth + 1
+  const childrenTotal = children.reduce((sum, c) => sum + subtreeH(c.id, childDepth, nodes), 0)
+  return Math.max(h, childrenTotal + (children.length - 1) * V_GAP)
+}
+
+/**
+ * Place a node and its subtree.
+ * goRight=true:  x is the LEFT edge;  children go to the right.
+ * goRight=false: x is the RIGHT edge; children go to the left.
+ */
+function place(
+  nodeId: string,
+  depth: number,
+  x: number,
+  centerY: number,
+  nodes: MindNode[],
+  result: MindNode[],
+  goRight = true,
+) {
+  const node = nodes.find(n => n.id === nodeId)
+  if (!node) return
+
+  const { w, h } = nodeSize(node, depth)
+  const nodeX = goRight ? x : x - w
+
+  if (!node.manuallyPositioned) {
+    result.push({ ...node, x: nodeX, y: centerY - h / 2, width: w, height: h })
+  } else {
+    result.push(node)
+  }
+
+  const children = nodes
+    .filter(n => n.parentId === nodeId)
+    .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+  if (children.length === 0) return
+
+  // For goRight: childAnchorX is the left edge of the child column
+  // For goLeft:  childAnchorX is the right edge of the child column
+  const childAnchorX = goRight ? nodeX + w + getHGap(depth) : nodeX - getHGap(depth)
+  const childDepth = depth + 1
+  const totalH =
+    children.reduce((sum, c) => sum + subtreeH(c.id, childDepth, nodes), 0) +
+    (children.length - 1) * V_GAP
+
+  let curY = centerY - totalH / 2
+  for (const child of children) {
+    const ch = subtreeH(child.id, childDepth, nodes)
+    place(child.id, childDepth, childAnchorX, curY + ch / 2, nodes, result, goRight)
+    curY += ch + V_GAP
+  }
+}
 
 export function computeMindmapLayout(nodes: MindNode[]): MindNode[] {
   const root = nodes.find(n => n.parentId === null)
   if (!root) return nodes
 
-  const children = nodes
-    .filter(n => n.parentId === root.id)
+  const l1s = nodes.filter(n => n.parentId === root.id)
     .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
 
-  const result: MindNode[] = []
+  const ROOT_X = 200
   const centerY = 340
-  const rootX = 280
+  const { w: rw, h: rh } = nodeSize(root, 0)
 
-  result.push({ ...root, x: rootX, y: centerY - ROOT_H / 2, width: ROOT_W, height: ROOT_H, manuallyPositioned: false })
+  const result: MindNode[] = []
+  if (!root.manuallyPositioned) {
+    result.push({ ...root, x: ROOT_X, y: centerY - rh / 2, width: rw, height: rh })
+  } else {
+    result.push(root)
+  }
 
-  const childX = rootX + ROOT_W + H_GAP
-  const totalH = children.length * CHILD_H + Math.max(0, children.length - 1) * V_GAP
-  const childStartY = centerY - totalH / 2
+  const anchorX = ROOT_X + rw + H_GAPS[0]
+  const totalH = l1s.reduce((s, l) => s + subtreeH(l.id, 1, nodes), 0) + Math.max(0, l1s.length - 1) * V_GAP
+  let curY = centerY - totalH / 2
+  for (const l1 of l1s) {
+    const h = subtreeH(l1.id, 1, nodes)
+    place(l1.id, 1, anchorX, curY + h / 2, nodes, result)
+    curY += h + V_GAP
+  }
 
-  children.forEach((child, i) => {
-    const cy = childStartY + i * (CHILD_H + V_GAP)
-    if (!child.manuallyPositioned) {
-      result.push({ ...child, x: childX, y: cy, width: CHILD_W, height: CHILD_H })
-    } else {
-      result.push(child)
-    }
-
-    const grandchildren = nodes
-      .filter(n => n.parentId === child.id)
-      .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
-
-    if (grandchildren.length > 0) {
-      const gcX = childX + CHILD_W + 60
-      const childCY = cy + CHILD_H / 2
-      const gcTotalH = grandchildren.length * GRAND_H + Math.max(0, grandchildren.length - 1) * 12
-      const gcStartY = childCY - gcTotalH / 2
-
-      grandchildren.forEach((gc, j) => {
-        if (!gc.manuallyPositioned) {
-          result.push({ ...gc, x: gcX, y: gcStartY + j * (GRAND_H + 12), width: GRAND_W, height: GRAND_H })
-        } else {
-          result.push(gc)
-        }
-        const deeper = nodes.filter(n => n.parentId === gc.id)
-        deeper.forEach((d, k) => {
-          result.push({ ...d, x: gcX, y: gcStartY + j * (GRAND_H + 12) + (k + 1) * (GRAND_H + 8), width: GRAND_W, height: GRAND_H })
-        })
-      })
-    }
-  })
+  const placed = new Set(result.map(n => n.id))
+  for (const n of nodes) {
+    if (!placed.has(n.id)) result.push(n)
+  }
 
   return result
 }
