@@ -35,8 +35,9 @@ function isTooLight(hex: string): boolean {
 
 /** Spread L1 colors evenly across the 12-color palette, propagate to descendants */
 function rebalanceColors(nodes: MindNode[], palette: string[]): MindNode[] {
-  const usable = palette.filter(c => !isTooLight(c))
-  const effectivePalette = usable.length >= 2 ? usable : palette
+  // Only use first 12 — the vibrant wheel colors; the rest are utility (darks, grays, whites)
+  const vibrant = palette.slice(0, 12).filter(c => !isTooLight(c))
+  const effectivePalette = vibrant.length >= 2 ? vibrant : palette.slice(0, 12)
   const l1 = nodes.filter(n => n.depth === 1).sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
   const N = l1.length
   if (N === 0) return nodes
