@@ -391,9 +391,17 @@ export const useDiagramStore = create<DiagramStore>()(
 
       if (parsed.length === 0) return
 
-      // Normalize: shift all indents so minimum is 0 (prevents multiple roots)
+      // Normalize: shift all indents so minimum is 0
       const minIndent = Math.min(...parsed.map(p => p.indent))
       if (minIndent > 0) parsed.forEach(p => { p.indent -= minIndent })
+
+      // If multiple items at indent 0, wrap them under a single root
+      const rootCount = parsed.filter(p => p.indent === 0).length
+      if (rootCount > 1) {
+        const rootTitle = parsed[0].title  // use first top-level as root name
+        parsed.forEach(p => { p.indent += 1 })
+        parsed.unshift({ title: rootTitle, indent: 0 })
+      }
 
       const nodeIds = parsed.map(() => crypto.randomUUID())
       const parentIds: (string | null)[] = []

@@ -10,8 +10,7 @@ export function useKeyboard() {
 
       const { deleteSelectedNodes, setSelectedNodeIds, undo, redo, activeDiagram, selectedNodeIds } = useDiagramStore.getState()
 
-      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'V') {
-        e.preventDefault()
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key === 'v') {
         navigator.clipboard.readText().then(text => {
           const lines = text.split('\n').filter(l => l.trim())
           const hasIndent = lines.some(l => /^(\s{4}|\t)/.test(l))
