@@ -31,18 +31,6 @@ export const THEMES: Theme[] = [
     ],
   },
   {
-    id: 'lego',
-    label: 'Lego Vibrant',
-    canvasBg: '#fff9e6',
-    colors: [
-      '#e3000b', '#ff6914', '#ffd700', '#00a551',
-      '#006db7', '#9b59b6', '#ffffff', '#ffe100',
-      '#00bfff', '#ff1493', '#32cd32', '#ff4500',
-      '#8b0000', '#006400', '#00008b', '#8b008b',
-      '#1a1a1a', '#333333', '#f5f5f5', '#ffa500',
-    ],
-  },
-  {
     id: 'cyberpunk',
     label: 'Cyberpunk Neon',
     canvasBg: '#080b1a',

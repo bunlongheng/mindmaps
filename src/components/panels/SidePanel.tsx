@@ -605,11 +605,12 @@ export function SidePanel({ nodeId, onClose, onImport }: SidePanelProps) {
                 return (
                   <button key={theme.id} onClick={() => setTheme(theme.id)}
                     style={{
-                      width: '100%', padding: '9px 12px', borderRadius: 8, textAlign: 'left',
+                      width: '100%', padding: '8px 10px', borderRadius: 8, textAlign: 'left',
                       border: `1.5px solid ${active ? '#3b82f6' : '#e0e2e7'}`,
-                      background: active ? '#eff6ff' : '#fff', cursor: 'pointer',
+                      background: theme.canvasBg, cursor: 'pointer',
                       fontFamily: 'inherit',
                       display: 'flex', alignItems: 'center', gap: 10,
+                      boxShadow: active ? `0 0 0 2px #3b82f6` : 'none',
                     }}>
                     {/* mini palette preview */}
                     <div style={{ display: 'flex', gap: 2, flexShrink: 0 }}>
@@ -620,7 +621,7 @@ export function SidePanel({ nodeId, onClose, onImport }: SidePanelProps) {
                         }} />
                       ))}
                     </div>
-                    <span style={{ fontSize: 12, fontWeight: active ? 600 : 400, color: active ? '#3b82f6' : '#374151' }}>
+                    <span style={{ fontSize: 12, fontWeight: active ? 700 : 400, color: active ? '#3b82f6' : '#374151' }}>
                       {theme.label}
                     </span>
                   </button>

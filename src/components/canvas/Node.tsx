@@ -67,10 +67,10 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
     strokeW = 3
   }
 
-  // Icon color: in white zone so always use the node's brand color (not white)
-  const iconColor = node.depth === 1
-    ? (node.color.startsWith('#') ? darkenColor(node.color, 0.1) : node.color)
-    : textColor
+  // Icon color: always use brand color against the white zone (all depths)
+  const iconColor = isRoot
+    ? textColor
+    : (node.color.startsWith('#') ? darkenColor(node.color, 0.1) : node.color)
 
   // Node-level overrides from panel
   if (node.borderColor) { strokeColor = node.borderColor; strokeW = Math.max(strokeW, node.borderWidth ?? 1.5) }
