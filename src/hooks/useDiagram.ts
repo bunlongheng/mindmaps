@@ -3,7 +3,7 @@ import { showToast } from '../components/CuteToast'
 import { supabase, hasSupabase } from '../lib/supabase'
 import { useDiagramStore } from '../store/diagramStore'
 import { ROOT_COLORS } from '../lib/color'
-import type { Diagram, DiagramMeta } from '../types'
+import type { Diagram, DiagramMeta, MindNode } from '../types'
 
 // ── localStorage helpers ────────────────────────────────────────────────────
 
@@ -32,6 +32,42 @@ function lsDeleteDiagram(id: string) {
   lsSaveList(lsGetList().filter(m => m.id !== id))
 }
 
+// ── DB row → Diagram ─────────────────────────────────────────────────────────
+
+function rowToDiagram(row: Record<string, unknown>): Diagram {
+  const rawNodes = (row.nodes ?? []) as Record<string, unknown>[]
+  const nodes: MindNode[] = rawNodes.map(n => ({
+    id:                 n.id as string,
+    title:              n.title as string,
+    color:              n.color as string,
+    parentId:           (n.parentId ?? null) as string | null,
+    depth:              n.depth as number,
+    x:                  n.x as number,
+    y:                  n.y as number,
+    width:              n.width as number,
+    height:             n.height as number,
+    sortOrder:          n.sortOrder as number,
+    manuallyPositioned: (n.manuallyPositioned ?? false) as boolean,
+    fontSize:           (n.fontSize && n.fontSize !== 13) ? n.fontSize as number : undefined,
+    bold:               (n.bold ?? undefined) as boolean | undefined,
+    italic:             (n.italic ?? undefined) as boolean | undefined,
+    textAlign:          (n.textAlign ?? undefined) as string | undefined,
+    borderColor:        (n.borderColor ?? undefined) as string | undefined,
+    borderWidth:        (n.borderWidth ?? undefined) as number | undefined,
+    icon:               (n.icon ?? undefined) as string | undefined,
+  }))
+  return {
+    id:             row.id as string,
+    name:           row.name as string,
+    type:           row.type as Diagram['type'],
+    lineStyle:      row.line_style as Diagram['lineStyle'],
+    createdAt:      row.created_at as string,
+    updatedAt:      row.updated_at as string,
+    sharingEnabled: (row.sharing_enabled ?? false) as boolean,
+    nodes,
+  }
+}
+
 // ── hook ────────────────────────────────────────────────────────────────────
 
 export function useDiagram() {
@@ -48,7 +84,7 @@ export function useDiagram() {
       .order('updated_at', { ascending: false })
     if (error) { console.error(error); setDiagrams(lsGetList()); return }
     setDiagrams((data ?? []).map(d => ({
-      id: d.id, name: d.name, type: d.type, updatedAt: d.updated_at
+      id: d.id, name: d.name, type: d.type, updatedAt: d.updated_at,
     })))
   }, [setDiagrams])
 
@@ -58,32 +94,13 @@ export function useDiagram() {
       if (d) { setActiveDiagram(d); localStorage.setItem('activeDiagramId', id) }
       return
     }
-    const [{ data: diag, error: e1 }, { data: nodesData, error: e2 }] = await Promise.all([
-      supabase.from('mindmap_diagrams').select('*').eq('id', id).single(),
-      supabase.from('mindmap_nodes').select('*').eq('diagram_id', id).order('sort_order'),
-    ])
-    if (e1 || e2) { console.error(e1 || e2); return }
-    const diagram: Diagram = {
-      id: diag.id, name: diag.name, type: diag.type, lineStyle: diag.line_style,
-      createdAt: diag.created_at, updatedAt: diag.updated_at,
-      sharingEnabled: diag.sharing_enabled ?? false,
-      nodes: (nodesData ?? []).map(n => ({
-        id: n.id, title: n.title, color: n.color,
-        parentId: n.parent_id, depth: n.depth,
-        x: n.x, y: n.y, width: n.width, height: n.height,
-        sortOrder: n.sort_order,
-        manuallyPositioned: n.manually_positioned ?? false,
-        // Treat legacy default (13) and null as "no explicit override"
-        fontSize: (n.font_size && n.font_size !== 13) ? n.font_size : undefined,
-        bold: n.bold ?? undefined,
-        italic: n.italic ?? undefined,
-        textAlign: n.text_align ?? undefined,
-        borderColor: n.border_color ?? undefined,
-        borderWidth: n.border_width ?? undefined,
-        icon: n.icon ?? undefined,
-      }))
-    }
-    setActiveDiagram(diagram)
+    const { data, error } = await supabase
+      .from('mindmap_diagrams')
+      .select('*')
+      .eq('id', id)
+      .single()
+    if (error) { console.error(error); return }
+    setActiveDiagram(rowToDiagram(data))
     localStorage.setItem('activeDiagramId', id)
   }, [setActiveDiagram])
 
@@ -93,35 +110,15 @@ export function useDiagram() {
       setIsDirty(false)
       return
     }
-    const { error: e1 } = await supabase.from('mindmap_diagrams').upsert({
-      id: diagram.id, name: diagram.name, type: diagram.type, line_style: diagram.lineStyle,
+    const { error } = await supabase.from('mindmap_diagrams').upsert({
+      id:              diagram.id,
+      name:            diagram.name,
+      type:            diagram.type,
+      line_style:      diagram.lineStyle,
       sharing_enabled: diagram.sharingEnabled ?? false,
+      nodes:           diagram.nodes,
     })
-    if (e1) { console.error(e1); return }
-    const nodeRows = diagram.nodes.map(n => ({
-      id: n.id, diagram_id: diagram.id,
-      parent_id: n.parentId, title: n.title, color: n.color,
-      depth: n.depth, x: n.x, y: n.y, width: n.width, height: n.height,
-      sort_order: n.sortOrder ?? 0,
-      manually_positioned: n.manuallyPositioned ?? false,
-      font_size: n.fontSize ?? null,
-      bold: n.bold ?? null,
-      italic: n.italic ?? null,
-      text_align: n.textAlign ?? null,
-      border_color: n.borderColor ?? null,
-      border_width: n.borderWidth ?? null,
-      icon: n.icon ?? null,
-    }))
-    const { data: existing } = await supabase
-      .from('mindmap_nodes').select('id').eq('diagram_id', diagram.id)
-    const existingIds = new Set((existing ?? []).map((r: { id: string }) => r.id))
-    const currentIds = new Set(diagram.nodes.map(n => n.id))
-    const toDelete = [...existingIds].filter(id => !currentIds.has(id))
-    if (toDelete.length > 0) await supabase.from('mindmap_nodes').delete().in('id', toDelete)
-    if (nodeRows.length > 0) {
-      const { error: e2 } = await supabase.from('mindmap_nodes').upsert(nodeRows)
-      if (e2) { console.error('save nodes error:', e2); showToast('Failed to save nodes', { color: '#ef4444' }); return }
-    }
+    if (error) { console.error('save error:', error); showToast('Failed to save', { color: '#ef4444' }); return }
     setIsDirty(false)
   }, [setIsDirty])
 
@@ -130,16 +127,13 @@ export function useDiagram() {
     const rootId = crypto.randomUUID()
     const now = new Date().toISOString()
     const TOPIC_LABELS = ['Main Topic 1', 'Main Topic 2', 'Main Topic 3', 'Main Topic 4', 'Main Topic 5']
-    const topicNodes: import('../types').MindNode[] = TOPIC_LABELS.map((title, i) => ({
-      id: crypto.randomUUID(),
-      title,
+    const topicNodes: MindNode[] = TOPIC_LABELS.map((title, i) => ({
+      id: crypto.randomUUID(), title,
       color: ROOT_COLORS[i % ROOT_COLORS.length],
-      parentId: rootId,
-      depth: 1,
-      x: 0, y: 0, width: 160, height: 40,
-      sortOrder: i,
+      parentId: rootId, depth: 1,
+      x: 0, y: 0, width: 160, height: 40, sortOrder: i,
     }))
-    const allNodes: import('../types').MindNode[] = [
+    const allNodes: MindNode[] = [
       { id: rootId, title: name, color: '#6366f1', parentId: null, depth: 0, x: 0, y: 0, width: 140, height: 140, sortOrder: 0 },
       ...topicNodes,
     ]
@@ -155,19 +149,11 @@ export function useDiagram() {
       showToast(`✦ "${name}" created`, { color: '#6366f1', confetti: true })
       return
     }
-    const { error } = await supabase.from('mindmap_diagrams').insert({ id, name, type: 'mindmap', line_style: 'orthogonal' })
+    const { error } = await supabase.from('mindmap_diagrams').insert({
+      id, name, type: 'mindmap', line_style: 'orthogonal',
+      sharing_enabled: false, nodes: laid,
+    })
     if (error) { console.error(error); showToast('Failed to create map', { color: '#ef4444' }); return }
-    const { error: nodeErr } = await supabase.from('mindmap_nodes').insert(
-      laid.map(n => ({
-        id: n.id, diagram_id: id, parent_id: n.parentId,
-        title: n.title, color: n.color, depth: n.depth,
-        x: n.x, y: n.y, width: n.width, height: n.height,
-        sort_order: n.sortOrder ?? 0,
-        font_size: null,
-        bold: null, italic: null, text_align: null, border_color: null, border_width: null,
-      }))
-    )
-    if (nodeErr) { console.error(nodeErr); showToast('Failed to save nodes', { color: '#ef4444' }); return }
     await loadDiagram(id)
     await loadDiagramList()
     showToast(`✦ "${name}" created`, { color: '#6366f1', confetti: true })

@@ -8,7 +8,7 @@ export function useKeyboard() {
       const tag = (e.target as HTMLElement).tagName.toLowerCase()
       if (tag === 'input' || tag === 'textarea') return
 
-      const { deleteSelectedNodes, dissolveNode, setSelectedNodeIds, undo, redo, activeDiagram, selectedNodeIds } = useDiagramStore.getState()
+      const { deleteSelectedNodes, dissolveNode, dissolveSelectedNodes, setSelectedNodeIds, undo, redo, activeDiagram, selectedNodeIds } = useDiagramStore.getState()
 
       if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key === 'v') {
         navigator.clipboard.readText().then(text => {
@@ -46,13 +46,9 @@ export function useKeyboard() {
         return
       }
       if ((e.metaKey || e.ctrlKey) && (e.key === 'Delete' || e.key === 'Backspace')) {
-        if (selectedNodeIds.length === 1) {
-          // Single node: dissolve (remove node, keep children re-parented up)
-          dissolveNode(selectedNodeIds[0])
-        } else if (selectedNodeIds.length > 1) {
-          // Multiple nodes: delete all selected + their descendants
-          deleteSelectedNodes()
-        }
+        // Always dissolve: remove node(s) but keep children re-parented up
+        if (selectedNodeIds.length === 1) dissolveNode(selectedNodeIds[0])
+        else if (selectedNodeIds.length > 1) dissolveSelectedNodes()
         return
       }
       if (e.key === 'Delete' || e.key === 'Backspace') {

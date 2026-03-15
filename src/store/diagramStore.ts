@@ -121,6 +121,7 @@ interface DiagramStore {
   deleteNode: (id: string) => void
   deleteSelectedNodes: () => void
   dissolveNode: (id: string) => void
+  dissolveSelectedNodes: () => void
   resizeNodeDepth: (depth: number, width: number) => void
   rerunLayout: () => void
   setShareEnabled: (enabled: boolean) => void
@@ -395,6 +396,47 @@ export const useDiagramStore = create<DiagramStore>()(
       const laid = runLayout(reindexed.map(n => ({ ...n, manuallyPositioned: false })), state.diagramType)
       const nodes = rebalanceColors(laid, getTheme(state.themeId).colors)
       set({ activeDiagram: { ...state.activeDiagram, nodes }, selectedNodeIds: [], isDirty: true })
+    },
+
+    dissolveSelectedNodes: () => {
+      const state = get()
+      if (!state.activeDiagram || state.selectedNodeIds.length === 0) return
+      const rootId = state.activeDiagram.nodes.find(n => n.parentId === null)?.id
+      // Process shallowest first so re-parenting cascades correctly
+      const toDissolve = state.selectedNodeIds
+        .filter(id => id !== rootId)
+        .map(id => state.activeDiagram!.nodes.find(n => n.id === id)!)
+        .filter(Boolean)
+        .sort((a, b) => a.depth - b.depth)
+      if (toDissolve.length === 0) return
+      state.snapshotHistory()
+      let nodes = state.activeDiagram.nodes
+      for (const target of toDissolve) {
+        const node = nodes.find(n => n.id === target.id)
+        if (!node || node.parentId === null) continue
+        const children = nodes.filter(n => n.parentId === node.id)
+        const siblings = nodes.filter(n => n.parentId === node.parentId && n.id !== node.id)
+          .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+        const insertAt = node.sortOrder ?? siblings.length
+        nodes = nodes
+          .filter(n => n.id !== node.id)
+          .map(n => n.parentId === node.id
+            ? { ...n, parentId: node.parentId, depth: node.depth, manuallyPositioned: false }
+            : n)
+        const newSiblings = [
+          ...siblings.filter(n => (n.sortOrder ?? 0) < insertAt),
+          ...children.map((c, i) => ({ ...c, sortOrder: insertAt + i })),
+          ...siblings.filter(n => (n.sortOrder ?? 0) >= insertAt).map((n, i) => ({
+            ...n, sortOrder: insertAt + children.length + i,
+          })),
+        ]
+        const orderMap = new Map(newSiblings.map(n => [n.id, n.sortOrder]))
+        nodes = nodes.map(n => orderMap.has(n.id) ? { ...n, sortOrder: orderMap.get(n.id)! } : n)
+      }
+      const reindexed = reindexSortOrders(nodes)
+      const laid = runLayout(reindexed.map(n => ({ ...n, manuallyPositioned: false })), state.diagramType)
+      const result = rebalanceColors(laid, getTheme(state.themeId).colors)
+      set({ activeDiagram: { ...state.activeDiagram, nodes: result }, selectedNodeIds: [], isDirty: true })
     },
 
     resizeNodeDepth: (depth, width) => {
