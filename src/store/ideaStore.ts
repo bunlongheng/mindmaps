@@ -590,8 +590,8 @@ export const useIdeaStore = create<IdeaStore>()(
       const palette = getTheme(state.themeId).colors
       const rawNodes: IdeaNode[] = parsed.map((p, i) => {
         const depth = depths[i]
-        // Use explicit icon from JSON as-is; fall back to auto-guess for text imports
-        const icon = depth > 0 ? (p.icon ?? guessIcon(p.title)) : undefined
+        
+        const icon = depth > 0 ? p.icon : undefined
         return {
           id: nodeIds[i],
           title: p.title,
