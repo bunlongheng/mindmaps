@@ -79,7 +79,7 @@ export function useDiagram() {
       return
     }
     const { data, error } = await supabase
-      .from('mindmap_diagrams')
+      .from('ideas')
       .select('id, name, type, updated_at')
       .order('updated_at', { ascending: false })
     if (error) { console.error(error); setDiagrams(lsGetList()); return }
@@ -95,7 +95,7 @@ export function useDiagram() {
       return
     }
     const { data, error } = await supabase
-      .from('mindmap_diagrams')
+      .from('ideas')
       .select('*')
       .eq('id', id)
       .single()
@@ -110,7 +110,7 @@ export function useDiagram() {
       setIsDirty(false)
       return
     }
-    const { error } = await supabase.from('mindmap_diagrams').upsert({
+    const { error } = await supabase.from('ideas').upsert({
       id:              diagram.id,
       name:            diagram.name,
       type:            diagram.type,
@@ -149,7 +149,7 @@ export function useDiagram() {
       showToast(`✦ "${name}" created`, { color: '#6366f1', confetti: true })
       return
     }
-    const { error } = await supabase.from('mindmap_diagrams').insert({
+    const { error } = await supabase.from('ideas').insert({
       id, name, type: 'mindmap', line_style: 'orthogonal',
       sharing_enabled: false, nodes: laid,
     })
@@ -166,7 +166,7 @@ export function useDiagram() {
       showToast(`"${name ?? 'Map'}" deleted`, { color: '#1a1d2e' })
       return
     }
-    await supabase.from('mindmap_diagrams').delete().eq('id', id)
+    await supabase.from('ideas').delete().eq('id', id)
     await loadDiagramList()
     showToast(`"${name ?? 'Map'}" deleted`, { color: '#1a1d2e' })
   }, [loadDiagramList, setDiagrams])
