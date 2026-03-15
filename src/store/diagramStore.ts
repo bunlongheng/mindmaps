@@ -152,7 +152,7 @@ export const useDiagramStore = create<DiagramStore>()(
     isDirty: false,
     diagramType: 'mindmap',
     lineStyle: 'orthogonal',
-    themeId: localStorage.getItem('mindmap:themeId') ?? 'default',
+    themeId: localStorage.getItem('ideas:themeId') ?? 'default',
     showOrderNumbers: true,
     isImporting: false,
     resizePreview: null,
@@ -195,7 +195,7 @@ export const useDiagramStore = create<DiagramStore>()(
     setIsDirty: (v) => set({ isDirty: v }),
 
     setTheme: (id) => {
-      localStorage.setItem('mindmap:themeId', id)
+      localStorage.setItem('ideas:themeId', id)
       const state = get()
       const palette = getTheme(id).colors
       // Re-color all L1 nodes (depth === 1) using the new theme palette

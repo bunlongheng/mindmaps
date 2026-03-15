@@ -7,8 +7,8 @@ import type { Diagram, DiagramMeta, MindNode } from '../types'
 
 // ── localStorage helpers ────────────────────────────────────────────────────
 
-const LS_LIST = 'mindmap:list'
-const lsKey = (id: string) => `mindmap:diagram:${id}`
+const LS_LIST = 'ideas:list'
+const lsKey = (id: string) => `ideas:diagram:${id}`
 
 function lsGetList(): DiagramMeta[] {
   try { return JSON.parse(localStorage.getItem(LS_LIST) ?? '[]') } catch { return [] }

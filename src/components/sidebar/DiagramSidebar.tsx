@@ -44,7 +44,7 @@ export function DiagramSidebar({ onSave }: DiagramSidebarProps) {
             <GitBranch size={15} color="#fff" />
           </div>
           <div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: '#1e293b', lineHeight: 1.2 }}>MindMap</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#1e293b', lineHeight: 1.2 }}>Ideas</div>
             <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 1 }}>Visual diagrams</div>
           </div>
         </div>
