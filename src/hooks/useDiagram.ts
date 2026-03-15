@@ -51,7 +51,7 @@ function rowToDiagram(row: Record<string, unknown>): Diagram {
     fontSize:           (n.fontSize && n.fontSize !== 13) ? n.fontSize as number : undefined,
     bold:               (n.bold ?? undefined) as boolean | undefined,
     italic:             (n.italic ?? undefined) as boolean | undefined,
-    textAlign:          (n.textAlign ?? undefined) as string | undefined,
+    textAlign:          (n.textAlign ?? undefined) as 'left' | 'center' | 'right' | undefined,
     borderColor:        (n.borderColor ?? undefined) as string | undefined,
     borderWidth:        (n.borderWidth ?? undefined) as number | undefined,
     icon:               (n.icon ?? undefined) as string | undefined,
