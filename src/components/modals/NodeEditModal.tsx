@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useDiagramStore } from '../../store/diagramStore'
+import { useIdeaStore } from '../../store/ideaStore'
 import { ROOT_COLORS } from '../../lib/color'
 import { X } from 'lucide-react'
 
@@ -9,8 +9,8 @@ interface NodeEditModalProps {
 }
 
 export function NodeEditModal({ nodeId, onClose }: NodeEditModalProps) {
-  const { activeDiagram, updateNode, addNode } = useDiagramStore()
-  const node = nodeId ? activeDiagram?.nodes.find(n => n.id === nodeId) : null
+  const { activeIdea, updateNode, addNode } = useIdeaStore()
+  const node = nodeId ? activeIdea?.nodes.find(n => n.id === nodeId) : null
   const [title, setTitle] = useState('')
   const [color, setColor] = useState('#6366f1')
 

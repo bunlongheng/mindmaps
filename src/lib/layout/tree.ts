@@ -1,4 +1,4 @@
-import type { MindNode } from '../../types'
+import type { IdeaNode } from '../../types'
 
 const NODE_W = 160
 const NODE_H = 40
@@ -6,14 +6,14 @@ const H_GAP = 60
 const V_GAP = 24
 
 interface TreeNode {
-  node: MindNode
+  node: IdeaNode
   children: TreeNode[]
   width: number
   x: number
   y: number
 }
 
-function buildTree(nodes: MindNode[], parentId: string | null): TreeNode[] {
+function buildTree(nodes: IdeaNode[], parentId: string | null): TreeNode[] {
   return nodes
     .filter(n => n.parentId === parentId)
     .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
@@ -43,7 +43,7 @@ function assignPositions(t: TreeNode, x: number, y: number) {
   }
 }
 
-function flattenTree(t: TreeNode, result: MindNode[]) {
+function flattenTree(t: TreeNode, result: IdeaNode[]) {
   if (!t.node.manuallyPositioned) {
     result.push({ ...t.node, x: t.x, y: t.y, width: t.node.width > 0 ? t.node.width : NODE_W, height: t.node.height > 0 ? t.node.height : NODE_H })
   } else {
@@ -52,7 +52,7 @@ function flattenTree(t: TreeNode, result: MindNode[]) {
   for (const c of t.children) flattenTree(c, result)
 }
 
-export function computeTreeLayout(nodes: MindNode[], _direction: 'vertical' | 'horizontal' = 'vertical'): MindNode[] {
+export function computeTreeLayout(nodes: IdeaNode[], _direction: 'vertical' | 'horizontal' = 'vertical'): IdeaNode[] {
   const root = nodes.find(n => n.parentId === null)
   if (!root) return nodes
   const tree = buildTree(nodes, null)
@@ -61,7 +61,7 @@ export function computeTreeLayout(nodes: MindNode[], _direction: 'vertical' | 'h
   computeWidth(rootTree)
   const startX = 400 - rootTree.width / 2
   assignPositions(rootTree, startX, 60)
-  const result: MindNode[] = []
+  const result: IdeaNode[] = []
   flattenTree(rootTree, result)
   if (_direction === 'horizontal') {
     return result.map(n => ({ ...n, x: n.y, y: n.x }))

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useDiagramStore } from '../../store/diagramStore'
+import { useIdeaStore } from '../../store/ideaStore'
 import { useDiagram } from '../../hooks/useDiagram'
 import { Plus, Trash2, GitBranch } from 'lucide-react'
 import type { DiagramMeta } from '../../types'
@@ -9,7 +9,7 @@ interface DiagramSidebarProps {
 }
 
 export function DiagramSidebar({ onSave }: DiagramSidebarProps) {
-  const { diagrams, activeDiagram, isDirty } = useDiagramStore()
+  const { diagrams, activeIdea, isDirty } = useIdeaStore()
   const { loadDiagram, createDiagram, deleteDiagram } = useDiagram()
   const [newName, setNewName] = useState('')
   const [creating, setCreating] = useState(false)
@@ -90,8 +90,8 @@ export function DiagramSidebar({ onSave }: DiagramSidebarProps) {
         {diagrams.map(d => (
           <DiagramItem
             key={d.id} diagram={d}
-            isActive={activeDiagram?.id === d.id}
-            isDirty={isDirty && activeDiagram?.id === d.id}
+            isActive={activeIdea?.id === d.id}
+            isDirty={isDirty && activeIdea?.id === d.id}
             onLoad={() => { if (isDirty) onSave(); loadDiagram(d.id) }}
             onDelete={() => deleteDiagram(d.id)}
           />

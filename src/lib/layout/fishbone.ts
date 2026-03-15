@@ -1,4 +1,4 @@
-import type { MindNode } from '../../types'
+import type { IdeaNode } from '../../types'
 
 export const FISHBONE_SLANT = 90  // horizontal offset from attachment to L1 tip
 
@@ -11,14 +11,14 @@ const L3_W = 100, L3_H = 30
 const SPINE_SEG = 280
 const BONE_HEIGHT = 200
 
-export function computeFishboneLayout(nodes: MindNode[]): MindNode[] {
+export function computeFishboneLayout(nodes: IdeaNode[]): IdeaNode[] {
   const root = nodes.find(n => n.parentId === null)
   if (!root) return nodes
 
   const l1s = nodes.filter(n => n.parentId === root.id)
     .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
 
-  const result: MindNode[] = []
+  const result: IdeaNode[] = []
   result.push({ ...root, x: ROOT_X, y: SPINE_Y - ROOT_H / 2, width: ROOT_W, height: ROOT_H, manuallyPositioned: false })
 
   const spineOriginX = ROOT_X + ROOT_W

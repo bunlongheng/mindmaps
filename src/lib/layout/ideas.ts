@@ -1,4 +1,4 @@
-import type { MindNode } from '../../types'
+import type { IdeaNode } from '../../types'
 
 const SIZES: Record<number, { w: number; h: number }> = {
   0: { w: 180, h: 180 },  // circle: w === h
@@ -13,14 +13,14 @@ function getSize(depth: number) { return SIZES[depth] ?? DEFAULT_SIZE }
 function getHGap(depth: number) { return H_GAPS[depth] ?? DEFAULT_H_GAP }
 
 /** Effective size: always respect stored node dimensions if set */
-function nodeSize(node: MindNode, depth: number) {
+function nodeSize(node: IdeaNode, depth: number) {
   const { w, h } = getSize(depth)
   if (depth === 0 && node.width > 0 && node.width === node.height) return { w: node.width, h: node.height }
   if (depth > 0 && node.width > 0) return { w: node.width, h: node.height > 0 ? node.height : h }
   return { w, h }
 }
 
-function subtreeH(nodeId: string, depth: number, nodes: MindNode[]): number {
+function subtreeH(nodeId: string, depth: number, nodes: IdeaNode[]): number {
   const node = nodes.find(n => n.id === nodeId)
   const children = nodes.filter(n => n.parentId === nodeId)
   const h = node ? nodeSize(node, depth).h : getSize(depth).h
@@ -40,8 +40,8 @@ function place(
   depth: number,
   x: number,
   centerY: number,
-  nodes: MindNode[],
-  result: MindNode[],
+  nodes: IdeaNode[],
+  result: IdeaNode[],
   goRight = true,
 ) {
   const node = nodes.find(n => n.id === nodeId)
@@ -77,7 +77,7 @@ function place(
   }
 }
 
-export function computeMindmapLayout(nodes: MindNode[]): MindNode[] {
+export function computeIdeasLayout(nodes: IdeaNode[]): IdeaNode[] {
   const root = nodes.find(n => n.parentId === null)
   if (!root) return nodes
 
@@ -88,7 +88,7 @@ export function computeMindmapLayout(nodes: MindNode[]): MindNode[] {
   const centerY = 340
   const { w: rw, h: rh } = nodeSize(root, 0)
 
-  const result: MindNode[] = []
+  const result: IdeaNode[] = []
   if (!root.manuallyPositioned) {
     result.push({ ...root, x: ROOT_X, y: centerY - rh / 2, width: rw, height: rh })
   } else {

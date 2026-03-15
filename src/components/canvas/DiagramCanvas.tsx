@@ -1,5 +1,5 @@
 import { useRef, useState, useCallback, useEffect } from 'react'
-import { useDiagramStore } from '../../store/diagramStore'
+import { useIdeaStore } from '../../store/ideaStore'
 import { getTheme } from '../../lib/themes'
 import { EdgeLayer } from './EdgeLayer'
 import { Node } from './Node'
@@ -11,7 +11,7 @@ interface DiagramCanvasProps {
 }
 
 export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
-  const { activeDiagram, selectedNodeIds, setSelectedNodeIds, diagramType, lineStyle, themeId, addNode, reorderNode, isImporting } = useDiagramStore()
+  const { activeIdea, selectedNodeIds, setSelectedNodeIds, diagramType, lineStyle, themeId, addNode, reorderNode, isImporting } = useIdeaStore()
   const canvasBg = getTheme(themeId).canvasBg
   const svgRef = useRef<SVGSVGElement>(null!)
   const gRef = useRef<SVGGElement>(null!)
@@ -21,20 +21,20 @@ export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
   // Auto-recover: if diagram has no nodes, add a root
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (!activeDiagram) return
-    if (activeDiagram.nodes.length === 0) {
-      addNode(null, activeDiagram.name || 'Root')
+    if (!activeIdea) return
+    if (activeIdea.nodes.length === 0) {
+      addNode(null, activeIdea.name || 'Root')
     }
-  }, [activeDiagram?.id])
+  }, [activeIdea?.id])
 
   const [showZoomMenu, setShowZoomMenu] = useState(false)
 
   const fitView = useCallback(() => {
     const svg = svgRef.current
-    if (!svg || !activeDiagram?.nodes.length) return
+    if (!svg || !activeIdea?.nodes.length) return
     const { width: svgW, height: svgH } = svg.getBoundingClientRect()
     if (svgW === 0 || svgH === 0) return
-    const nodes = activeDiagram.nodes
+    const nodes = activeIdea.nodes
     const minX = Math.min(...nodes.map(n => n.x))
     const minY = Math.min(...nodes.map(n => n.y))
     const maxX = Math.max(...nodes.map(n => n.x + n.width))
@@ -47,7 +47,7 @@ export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
     zoomCurrentRef.current = newZoom
     zoomTargetRef.current = newZoom
     setPan({ x: svgW / 2 - cx * newZoom, y: svgH / 2 - cy * newZoom })
-  }, [activeDiagram])
+  }, [activeIdea])
 
   const setZoomLevel = useCallback((level: number) => {
     const svg = svgRef.current
@@ -65,11 +65,11 @@ export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
 
   // Auto-fit on initial diagram load
   useEffect(() => {
-    if (!activeDiagram) return
+    if (!activeIdea) return
     const raf = requestAnimationFrame(fitView)
     return () => cancelAnimationFrame(raf)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeDiagram?.id])
+  }, [activeIdea?.id])
 
   // Smooth zoom via lerp animation
   const zoomCurrentRef = useRef(1)
@@ -135,7 +135,7 @@ export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
   }, [])
 
   const handleBgPointerMove = useCallback((e: React.PointerEvent) => {
-    if (!selStart.current || !activeDiagram) return
+    if (!selStart.current || !activeIdea) return
     const { x, y } = screenToCanvas(e.clientX, e.clientY)
     const sx = selStart.current.cx
     const sy = selStart.current.cy
@@ -146,14 +146,14 @@ export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
     if (box.w > 4 || box.h > 4) {
       isDragging.current = true
       setSelBox(box)
-      const hits = activeDiagram.nodes.filter(n =>
+      const hits = activeIdea.nodes.filter(n =>
         n.x < box.x + box.w && n.x + n.width > box.x &&
         n.y < box.y + box.h && n.y + n.height > box.y
       )
       setSelectedNodeIds(hits.map(n => n.id))
       onNodeSelect(hits.length === 1 ? hits[0].id : null)
     }
-  }, [activeDiagram, setSelectedNodeIds, onNodeSelect])
+  }, [activeIdea, setSelectedNodeIds, onNodeSelect])
 
   const handleBgPointerUp = useCallback(() => {
     // Only act if the drag started on the background (selStart was set)
@@ -167,11 +167,11 @@ export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
   }, [setSelectedNodeIds, onNodeSelect])
 
   const handleDragMove = useCallback((id: string, _cx: number, cy: number) => {
-    if (!activeDiagram) return
-    const node = activeDiagram.nodes.find(n => n.id === id)
+    if (!activeIdea) return
+    const node = activeIdea.nodes.find(n => n.id === id)
     if (!node) return
     // Find siblings (same parent), sorted by Y
-    const siblings = activeDiagram.nodes
+    const siblings = activeIdea.nodes
       .filter(n => n.parentId === node.parentId && n.id !== id)
       .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
     if (siblings.length === 0) { setSnapLine(null); snapTargetRef.current = null; return }
@@ -191,7 +191,7 @@ export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
     const maxX = Math.max(...siblings.map(s => s.x + s.width))
     snapTargetRef.current = { insertBeforeId: insertBefore }
     setSnapLine({ x1: minX - 6, x2: maxX + 6, y: snapY })
-  }, [activeDiagram])
+  }, [activeIdea])
 
   const handleDragEnd = useCallback((id: string) => {
     const snap = snapTargetRef.current
@@ -212,7 +212,7 @@ export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
     }
   }, [selectedNodeIds, setSelectedNodeIds, onNodeSelect])
 
-  if (!activeDiagram) {
+  if (!activeIdea) {
     return <div style={{ position: 'absolute', inset: 0, background: canvasBg }} />
   }
 
@@ -226,8 +226,8 @@ export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
         style={{ userSelect: 'none' }}
       >
         <g ref={gRef} transform={`translate(${pan.x},${pan.y}) scale(${zoom})`}>
-          <EdgeLayer nodes={activeDiagram.nodes} lineStyle={lineStyle} diagramType={diagramType} />
-          {activeDiagram.nodes.map(node => (
+          <EdgeLayer nodes={activeIdea.nodes} lineStyle={lineStyle} diagramType={diagramType} />
+          {activeIdea.nodes.map(node => (
             <Node
               key={node.id}
               node={node}
@@ -239,7 +239,7 @@ export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
               onAddChild={id => addNode(id)}
               svgRef={svgRef}
               readOnly={readOnly}
-              l1Colors={node.depth === 0 ? activeDiagram.nodes.filter(n => n.depth === 1).map(n => n.color) : undefined}
+              l1Colors={node.depth === 0 ? activeIdea.nodes.filter(n => n.depth === 1).map(n => n.color) : undefined}
             />
           ))}
           {/* Rubber-band selection box */}

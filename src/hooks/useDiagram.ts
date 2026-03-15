@@ -1,9 +1,9 @@
 import { useCallback } from 'react'
 import { showToast } from '../components/CuteToast'
 import { supabase, hasSupabase } from '../lib/supabase'
-import { useDiagramStore } from '../store/diagramStore'
+import { useIdeaStore } from '../store/ideaStore'
 import { ROOT_COLORS } from '../lib/color'
-import type { Diagram, DiagramMeta, MindNode } from '../types'
+import type { Diagram, DiagramMeta, IdeaNode } from '../types'
 
 // ── localStorage helpers ────────────────────────────────────────────────────
 
@@ -36,7 +36,7 @@ function lsDeleteDiagram(id: string) {
 
 function rowToDiagram(row: Record<string, unknown>): Diagram {
   const rawNodes = (row.nodes ?? []) as Record<string, unknown>[]
-  const nodes: MindNode[] = rawNodes.map(n => ({
+  const nodes: IdeaNode[] = rawNodes.map(n => ({
     id:                 n.id as string,
     title:              n.title as string,
     color:              n.color as string,
@@ -71,7 +71,7 @@ function rowToDiagram(row: Record<string, unknown>): Diagram {
 // ── hook ────────────────────────────────────────────────────────────────────
 
 export function useDiagram() {
-  const { setActiveDiagram, setDiagrams, setIsDirty } = useDiagramStore()
+  const { setActiveIdea, setDiagrams, setIsDirty } = useIdeaStore()
 
   const loadDiagramList = useCallback(async () => {
     if (!hasSupabase || !supabase) {
@@ -91,7 +91,7 @@ export function useDiagram() {
   const loadDiagram = useCallback(async (id: string) => {
     if (!hasSupabase || !supabase) {
       const d = lsGetDiagram(id)
-      if (d) { setActiveDiagram(d); localStorage.setItem('activeDiagramId', id) }
+      if (d) { setActiveIdea(d); localStorage.setItem('activeIdeaId', id) }
       return
     }
     const { data, error } = await supabase
@@ -100,9 +100,9 @@ export function useDiagram() {
       .eq('id', id)
       .single()
     if (error) { console.error(error); return }
-    setActiveDiagram(rowToDiagram(data))
-    localStorage.setItem('activeDiagramId', id)
-  }, [setActiveDiagram])
+    setActiveIdea(rowToDiagram(data))
+    localStorage.setItem('activeIdeaId', id)
+  }, [setActiveIdea])
 
   const saveDiagram = useCallback(async (diagram: Diagram) => {
     if (!hasSupabase || !supabase) {
@@ -127,24 +127,24 @@ export function useDiagram() {
     const rootId = crypto.randomUUID()
     const now = new Date().toISOString()
     const TOPIC_LABELS = ['Main Topic 1', 'Main Topic 2', 'Main Topic 3', 'Main Topic 4', 'Main Topic 5']
-    const topicNodes: MindNode[] = TOPIC_LABELS.map((title, i) => ({
+    const topicNodes: IdeaNode[] = TOPIC_LABELS.map((title, i) => ({
       id: crypto.randomUUID(), title,
       color: ROOT_COLORS[i % ROOT_COLORS.length],
       parentId: rootId, depth: 1,
       x: 0, y: 0, width: 160, height: 40, sortOrder: i,
     }))
-    const allNodes: MindNode[] = [
+    const allNodes: IdeaNode[] = [
       { id: rootId, title: name, color: '#6366f1', parentId: null, depth: 0, x: 0, y: 0, width: 140, height: 140, sortOrder: 0 },
       ...topicNodes,
     ]
-    const { computeMindmapLayout } = await import('../lib/layout/mindmap')
-    const laid = computeMindmapLayout(allNodes)
+    const { computeIdeasLayout } = await import('../lib/layout/ideas')
+    const laid = computeIdeasLayout(allNodes)
     const diagram: Diagram = { id, name, type: 'mindmap', lineStyle: 'orthogonal', createdAt: now, updatedAt: now, nodes: laid }
 
     if (!hasSupabase || !supabase) {
       lsSaveDiagram(diagram)
-      setActiveDiagram(diagram)
-      localStorage.setItem('activeDiagramId', id)
+      setActiveIdea(diagram)
+      localStorage.setItem('activeIdeaId', id)
       setDiagrams(lsGetList())
       showToast(`✦ "${name}" created`, { color: '#6366f1', confetti: true })
       return
@@ -157,7 +157,7 @@ export function useDiagram() {
     await loadDiagram(id)
     await loadDiagramList()
     showToast(`✦ "${name}" created`, { color: '#6366f1', confetti: true })
-  }, [loadDiagram, loadDiagramList, setActiveDiagram, setDiagrams])
+  }, [loadDiagram, loadDiagramList, setActiveIdea, setDiagrams])
 
   const deleteDiagram = useCallback(async (id: string, name?: string) => {
     if (!hasSupabase || !supabase) {

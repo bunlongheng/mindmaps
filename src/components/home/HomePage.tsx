@@ -1,16 +1,16 @@
 import { useState, useEffect } from 'react'
-import { useDiagramStore } from '../../store/diagramStore'
+import { useIdeaStore } from '../../store/ideaStore'
 import { useDiagram } from '../../hooks/useDiagram'
 import type { DiagramMeta } from '../../types'
 import { Plus, Search, Clock, Trash2 } from 'lucide-react'
-import { ThinkLogo } from '../ThinkLogo'
+import { IdeasLogo } from '../IdeasLogo'
 
 interface HomePageProps {
   onOpen: (id: string) => void
 }
 
 export function HomePage({ onOpen }: HomePageProps) {
-  const { diagrams } = useDiagramStore()
+  const { diagrams } = useIdeaStore()
   const { loadDiagramList, createDiagram, deleteDiagram } = useDiagram()
   const [search, setSearch] = useState('')
   const [creating, setCreating] = useState(false)
@@ -30,7 +30,7 @@ export function HomePage({ onOpen }: HomePageProps) {
     setNewName('')
     setShowCreate(false)
     setCreating(false)
-    const fresh = useDiagramStore.getState().diagrams[0]
+    const fresh = useIdeaStore.getState().diagrams[0]
     if (fresh) onOpen(fresh.id)
   }
 
@@ -63,7 +63,7 @@ export function HomePage({ onOpen }: HomePageProps) {
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             boxShadow: '0 2px 8px rgba(99,102,241,0.3)',
           }}>
-            <ThinkLogo size={18} />
+            <IdeasLogo size={18} />
           </div>
           <span style={{ fontSize: 15, fontWeight: 700, color: '#1e293b' }}>Think</span>
         </div>
@@ -112,7 +112,7 @@ export function HomePage({ onOpen }: HomePageProps) {
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
             pointerEvents: 'none',
           }}>
-            <div style={{ opacity: 0.25, marginBottom: 16 }}><ThinkLogo size={40} color="#64748b" /></div>
+            <div style={{ opacity: 0.25, marginBottom: 16 }}><IdeasLogo size={40} color="#64748b" /></div>
             <p style={{ fontSize: 15, color: '#94a3b8', fontWeight: 600, margin: 0 }}>No maps yet</p>
             <p style={{ fontSize: 13, color: '#cbd5e1', marginTop: 6 }}>Click "New Map" to get started</p>
           </div>

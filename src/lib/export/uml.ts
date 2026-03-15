@@ -1,8 +1,8 @@
-import type { Diagram, MindNode } from '../../types'
+import type { Diagram, IdeaNode } from '../../types'
 
 function sanitize(s: string) { return s.replace(/[^a-zA-Z0-9 _-]/g, '') }
 
-function walkUML(nodes: MindNode[], parentId: string | null, lines: string[]) {
+function walkUML(nodes: IdeaNode[], parentId: string | null, lines: string[]) {
   nodes.filter(n => n.parentId === parentId).forEach(n => {
     const parent = nodes.find(p => p.id === parentId)
     if (parent) {

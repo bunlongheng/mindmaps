@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { useDiagramStore } from '../../store/diagramStore'
+import { useIdeaStore } from '../../store/ideaStore'
 import { Share2, Download, Upload, RefreshCw, Plus, Menu, Undo2, Redo2, MoreHorizontal } from 'lucide-react'
 import { downloadJSON } from '../../lib/export/json'
 import { encodeShareURL } from '../../lib/export/share'
@@ -28,7 +28,7 @@ const LINE_STYLES: { value: LineStyle; symbol: string; title: string }[] = [
 const Sep = () => <div style={{ width: 1, height: 20, background: '#e2e8f0', flexShrink: 0 }} />
 
 export function ControlPanel({ onAddNode, onImport, onShare, onBack }: ControlPanelProps) {
-  const { activeDiagram, rerunLayout, undo, redo, past, future, diagramType, lineStyle, setDiagramType, setLineStyle } = useDiagramStore()
+  const { activeIdea, rerunLayout, undo, redo, past, future, diagramType, lineStyle, setDiagramType, setLineStyle } = useIdeaStore()
   const [showMore, setShowMore] = useState(false)
   const moreRef = useRef<HTMLDivElement>(null)
 
@@ -150,9 +150,9 @@ export function ControlPanel({ onAddNode, onImport, onShare, onBack }: ControlPa
             {/* Actions */}
             {[
               { icon: <RefreshCw size={13}/>, label: 'Re-run layout', onClick: () => { rerunLayout(); setShowMore(false) } },
-              { icon: <Download size={13}/>, label: 'Export JSON', onClick: () => { activeDiagram && downloadJSON(activeDiagram); setShowMore(false) } },
+              { icon: <Download size={13}/>, label: 'Export JSON', onClick: () => { activeIdea && downloadJSON(activeIdea); setShowMore(false) } },
               { icon: <Upload size={13}/>, label: 'Import JSON', onClick: () => { onImport(); setShowMore(false) } },
-              { icon: <Share2 size={13}/>, label: 'Share link', onClick: () => { activeDiagram && onShare(encodeShareURL(activeDiagram)); setShowMore(false) } },
+              { icon: <Share2 size={13}/>, label: 'Share link', onClick: () => { activeIdea && onShare(encodeShareURL(activeIdea)); setShowMore(false) } },
             ].map(({ icon, label, onClick }) => (
               <button key={label} onClick={onClick}
                 style={{

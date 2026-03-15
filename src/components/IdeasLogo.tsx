@@ -1,13 +1,13 @@
-interface ThinkLogoProps {
+interface IdeasLogoProps {
   size?: number
   color?: string
 }
 
 /**
- * Think logo — a central node with 5 curved branches radiating out,
+ * Ideas logo — a central node with 5 curved branches radiating out,
  * evoking a mind map / neural thought pattern.
  */
-export function ThinkLogo({ size = 32, color = 'white' }: ThinkLogoProps) {
+export function IdeasLogo({ size = 32, color = 'white' }: IdeasLogoProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
       {/* Center node */}

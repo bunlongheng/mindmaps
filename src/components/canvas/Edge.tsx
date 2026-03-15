@@ -1,11 +1,11 @@
-import type { MindNode } from '../../types'
+import type { IdeaNode } from '../../types'
 import type { LineStyle } from '../../types'
 import { nodeCenterRight, nodeCenterLeft, nodeCenterBottom, nodeCenterTop, nodeCenter, buildStraightPath, buildCurvedPath, buildOrthogonalPath } from '../../lib/geometry'
 import { applyDepthTransparency } from '../../lib/color'
 
 interface EdgeProps {
-  parent: MindNode
-  child: MindNode
+  parent: IdeaNode
+  child: IdeaNode
   lineStyle: LineStyle
   diagramType: string
 }
@@ -22,7 +22,7 @@ export function Edge({ parent, child, lineStyle, diagramType }: EdgeProps) {
     src = nodeCenter(parent)
     tgt = nodeCenter(child)
   } else {
-    // mindmap — connect center of parent to center of child
+    // ideas — connect center of parent to center of child
     const pc = nodeCenter(parent)
     const cc = nodeCenter(child)
     // exit from the side of parent facing the child

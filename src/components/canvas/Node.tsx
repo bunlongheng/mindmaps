@@ -1,14 +1,14 @@
 import { useRef, useState, useCallback } from 'react'
-import type { MindNode } from '../../types'
-import { useDiagramStore } from '../../store/diagramStore'
+import type { IdeaNode } from '../../types'
+import { useIdeaStore } from '../../store/ideaStore'
 import { NodeIcon, getLucideIcon } from './NodeIcon'
 
 interface NodeProps {
-  node: MindNode
+  node: IdeaNode
   isSelected: boolean
   onSelect: (id: string, multi: boolean) => void
   onDragEnd: (id: string, dx: number, dy: number) => void
-  onDoubleClick: (node: MindNode) => void
+  onDoubleClick: (node: IdeaNode) => void
   onAddChild?: (parentId: string) => void
   onDragMove?: (id: string, cx: number, cy: number) => void
   svgRef: React.RefObject<SVGSVGElement>
@@ -44,7 +44,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
-  const resizePreview = useDiagramStore(s => s.resizePreview)
+  const resizePreview = useIdeaStore(s => s.resizePreview)
   const previewW = (!isRoot && resizePreview?.depth === node.depth) ? resizePreview.width : null
 
   // Styling per depth
@@ -111,15 +111,15 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
     setEditing(false)
     const val = draft.trim()
     if (!val || val === node.title) return
-    const updates: Partial<MindNode> = { title: val }
+    const updates: Partial<IdeaNode> = { title: val }
     if (isRoot) {
       const textW = val.length * fontSize * 0.55
       const diameter = Math.max(180, Math.round(textW + 56))
       updates.width = diameter
       updates.height = diameter
     }
-    useDiagramStore.getState().updateNode(node.id, updates)
-    if (isRoot) setTimeout(() => useDiagramStore.getState().rerunLayout(), 0)
+    useIdeaStore.getState().updateNode(node.id, updates)
+    if (isRoot) setTimeout(() => useIdeaStore.getState().rerunLayout(), 0)
   }
 
   function onPointerDown(e: React.PointerEvent) {
@@ -143,7 +143,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
     if (Math.abs(dx) > 3 || Math.abs(dy) > 3) didDrag.current = true
     const newX = dragStart.current.nodeX + dx
     const newY = dragStart.current.nodeY + dy
-    useDiagramStore.getState().updateNode(node.id, {
+    useIdeaStore.getState().updateNode(node.id, {
       x: newX, y: newY, manuallyPositioned: true,
     })
     onDragMove?.(node.id, newX + node.width / 2, newY + node.height / 2)
@@ -194,7 +194,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
     const pt = getSVGPoint(e)
     if (!pt) return
     resizeStart.current = { startX: pt.x, startW: node.width }
-    useDiagramStore.getState().setResizePreview({ depth: node.depth, width: node.width })
+    useIdeaStore.getState().setResizePreview({ depth: node.depth, width: node.width })
     ;(e.currentTarget as Element).setPointerCapture(e.pointerId)
   }
   function onResizePointerMove(e: React.PointerEvent) {
@@ -203,16 +203,16 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
     const pt = getSVGPoint(e)
     if (!pt) return
     const newW = Math.max(100, Math.min(500, resizeStart.current.startW + (pt.x - resizeStart.current.startX)))
-    useDiagramStore.getState().setResizePreview({ depth: node.depth, width: newW })
+    useIdeaStore.getState().setResizePreview({ depth: node.depth, width: newW })
   }
   function onResizePointerUp(e: React.PointerEvent) {
     e.stopPropagation()
-    const preview = useDiagramStore.getState().resizePreview
+    const preview = useIdeaStore.getState().resizePreview
     if (resizeStart.current && preview) {
-      useDiagramStore.getState().resizeNodeDepth(node.depth, preview.width)
+      useIdeaStore.getState().resizeNodeDepth(node.depth, preview.width)
     }
     resizeStart.current = null
-    useDiagramStore.getState().setResizePreview(null)
+    useIdeaStore.getState().setResizePreview(null)
   }
 
   return (

@@ -1,4 +1,4 @@
-import type { MindNode } from '../../types'
+import type { IdeaNode } from '../../types'
 
 const SPINE_Y = 380
 const ROOT_X = 120
@@ -9,14 +9,14 @@ const L3_W = 100, L3_H = 30
 const L1_SEG = 60   // horizontal gap between consecutive L1 nodes
 const L2_GAP = 10   // vertical gap between L2 siblings
 
-export function computeTimelineLayout(nodes: MindNode[]): MindNode[] {
+export function computeTimelineLayout(nodes: IdeaNode[]): IdeaNode[] {
   const root = nodes.find(n => n.parentId === null)
   if (!root) return nodes
 
   const l1s = nodes.filter(n => n.parentId === root.id)
     .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
 
-  const result: MindNode[] = []
+  const result: IdeaNode[] = []
   result.push({ ...root, x: ROOT_X, y: SPINE_Y - ROOT_H / 2, width: ROOT_W, height: ROOT_H, manuallyPositioned: false })
 
   l1s.forEach((l1, i) => {

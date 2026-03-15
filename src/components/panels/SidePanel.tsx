@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { NODE_ICONS } from '../../lib/icons'
-import { useDiagramStore } from '../../store/diagramStore'
+import { useIdeaStore } from '../../store/ideaStore'
 import { getTheme, THEMES } from '../../lib/themes'
 import { X, AlignLeft, AlignCenter, AlignRight, Copy, Check, RefreshCw, Download, Upload, FileDown } from 'lucide-react'
 import type { LineStyle, DiagramType } from '../../types'
@@ -188,16 +188,16 @@ function pickRandom(arr: string[]) { return arr[Math.floor(Math.random() * arr.l
 
 export function SidePanel({ nodeId, onClose, onImport }: SidePanelProps) {
   const {
-    activeDiagram, updateNode, batchUpdateNodes, selectedNodeIds,
+    activeIdea, updateNode, batchUpdateNodes, selectedNodeIds,
     lineStyle, setLineStyle, diagramType, setDiagramType, rerunLayout, setShareEnabled,
     themeId, setTheme, showOrderNumbers, setShowOrderNumbers, autoAssignIcons,
-  } = useDiagramStore()
+  } = useIdeaStore()
   const themeColors = getTheme(themeId).colors
 
   const [tab, setTab] = useState<Tab>('style')
   const [copied, setCopied] = useState(false)
-  const rootNode = activeDiagram?.nodes.find(n => n.parentId === null)
-  const node = (nodeId ? activeDiagram?.nodes.find(n => n.id === nodeId) : null) ?? rootNode ?? null
+  const rootNode = activeIdea?.nodes.find(n => n.parentId === null)
+  const node = (nodeId ? activeIdea?.nodes.find(n => n.id === nodeId) : null) ?? rootNode ?? null
   const [title, setTitle] = useState(node?.title ?? '')
 
   useEffect(() => { setTitle(node?.title ?? '') }, [nodeId, node?.title])
@@ -212,14 +212,14 @@ export function SidePanel({ nodeId, onClose, onImport }: SidePanelProps) {
   }
 
 
-  const shareUrl = activeDiagram
-    ? `${window.location.origin}${window.location.pathname}?map=${activeDiagram.id}`
+  const shareUrl = activeIdea
+    ? `${window.location.origin}${window.location.pathname}?map=${activeIdea.id}`
     : ''
 
   function rollDice() {
-    const store = useDiagramStore.getState()
+    const store = useIdeaStore.getState()
     const ids = selectedNodeIds.length > 1 ? selectedNodeIds : (nodeId ? [nodeId] : [])
-    const allNodes = activeDiagram?.nodes ?? []
+    const allNodes = activeIdea?.nodes ?? []
     ids.forEach(id => {
       const n = allNodes.find(nd => nd.id === id)
       if (!n) return
@@ -639,18 +639,18 @@ export function SidePanel({ nodeId, onClose, onImport }: SidePanelProps) {
             {/* Toggle row */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <span style={{ fontSize: 12, color: '#374151' }}>
-                {activeDiagram?.sharingEnabled ? 'Link active' : 'Link disabled'}
+                {activeIdea?.sharingEnabled ? 'Link active' : 'Link disabled'}
               </span>
               <button
-                onClick={() => setShareEnabled(!activeDiagram?.sharingEnabled)}
+                onClick={() => setShareEnabled(!activeIdea?.sharingEnabled)}
                 style={{
                   width: 40, height: 22, borderRadius: 11, border: 'none', cursor: 'pointer', padding: 0,
-                  background: activeDiagram?.sharingEnabled ? '#1a1d2e' : '#d1d5db',
+                  background: activeIdea?.sharingEnabled ? '#1a1d2e' : '#d1d5db',
                   position: 'relative', transition: 'background 0.2s', flexShrink: 0,
                 }}
               >
                 <span style={{
-                  position: 'absolute', top: 3, left: activeDiagram?.sharingEnabled ? 20 : 3,
+                  position: 'absolute', top: 3, left: activeIdea?.sharingEnabled ? 20 : 3,
                   width: 16, height: 16, borderRadius: '50%', background: '#fff',
                   transition: 'left 0.2s', display: 'block',
                 }} />
@@ -658,7 +658,7 @@ export function SidePanel({ nodeId, onClose, onImport }: SidePanelProps) {
             </div>
 
             {/* QR + copy — only when enabled */}
-            {activeDiagram?.sharingEnabled && (
+            {activeIdea?.sharingEnabled && (
               <>
                 <div style={{ display: 'flex', justifyContent: 'center', margin: '10px 0 8px' }}>
                   <QRCodeSVG value={shareUrl} size={160} bgColor="#ffffff" fgColor="#1a1d2e" level="M" />
@@ -683,7 +683,7 @@ export function SidePanel({ nodeId, onClose, onImport }: SidePanelProps) {
           </SBlock>
           <HR />
           <SBlock title="File">
-            <button onClick={() => activeDiagram && downloadJSON(activeDiagram)} style={{
+            <button onClick={() => activeIdea && downloadJSON(activeIdea)} style={{
               width: '100%', padding: '9px 12px', borderRadius: 8, marginBottom: 6,
               border: '1px solid #e0e2e7', background: '#fff',
               cursor: 'pointer', fontSize: 12, fontWeight: 500,
@@ -705,7 +705,7 @@ export function SidePanel({ nodeId, onClose, onImport }: SidePanelProps) {
               onMouseLeave={e => (e.currentTarget.style.background = '#fff')}>
               <Upload size={13} /> Import JSON
             </button>
-            <button onClick={() => activeDiagram && exportDiagramAsPdf(activeDiagram.name)} style={{
+            <button onClick={() => activeIdea && exportDiagramAsPdf(activeIdea.name)} style={{
               width: '100%', padding: '9px 12px', borderRadius: 8,
               border: '1px solid #e0e2e7', background: '#fff',
               cursor: 'pointer', fontSize: 12, fontWeight: 500,

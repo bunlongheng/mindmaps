@@ -5,7 +5,7 @@ import { SidePanel } from './components/panels/SidePanel'
 import { ImportModal } from './components/modals/ImportModal'
 import { HomePage } from './components/home/HomePage'
 import { useDiagram } from './hooks/useDiagram'
-import { useDiagramStore } from './store/diagramStore'
+import { useIdeaStore } from './store/ideaStore'
 import { decodeShareURL } from './lib/export/share'
 import { ArrowLeft, SlidersHorizontal } from 'lucide-react'
 
@@ -47,11 +47,11 @@ type View = 'home' | 'editor' | 'viewer'
 
 export default function App() {
   const { loadDiagramList, loadDiagram, saveDiagram } = useDiagram()
-  const { activeDiagram, isDirty, setActiveDiagram, addNode, selectedNodeIds, setSelectedNodeIds, updateNode } = useDiagramStore()
+  const { activeIdea, isDirty, setActiveIdea, addNode, selectedNodeIds, setSelectedNodeIds, updateNode } = useIdeaStore()
   const [view, setView] = useState<View>(() => {
     if (decodeShareURL()) return 'viewer'
     const params = new URLSearchParams(window.location.search)
-    if (params.get('map') || localStorage.getItem('activeDiagramId')) return 'editor'
+    if (params.get('map') || localStorage.getItem('activeIdeaId')) return 'editor'
     return 'home'
   })
   const [selectedPanelNodeId, setSelectedPanelNodeId] = useState<string | null>(null)
@@ -61,9 +61,9 @@ export default function App() {
 
   useEffect(() => {
     const shared = decodeShareURL()
-    if (shared) { setActiveDiagram(shared); return }
+    if (shared) { setActiveIdea(shared); return }
     const params = new URLSearchParams(window.location.search)
-    const mapId = params.get('map') || localStorage.getItem('activeDiagramId')
+    const mapId = params.get('map') || localStorage.getItem('activeIdeaId')
     if (mapId) {
       loadDiagram(mapId)
     } else {
@@ -72,11 +72,11 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    if (!isDirty || !activeDiagram) return
+    if (!isDirty || !activeIdea) return
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
-    saveTimerRef.current = setTimeout(() => saveDiagram(activeDiagram), 1500)
+    saveTimerRef.current = setTimeout(() => saveDiagram(activeIdea), 1500)
     return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current) }
-  }, [isDirty, activeDiagram])
+  }, [isDirty, activeIdea])
 
   // Block macOS swipe-back/forward gesture in editor
   useEffect(() => {
@@ -92,7 +92,7 @@ export default function App() {
       if (tag === 'input' || tag === 'textarea') return
       if (e.key === 'Tab' && view === 'editor') {
         e.preventDefault()
-        const parentId = selectedNodeIds[0] ?? activeDiagram?.nodes.find(n => n.parentId === null)?.id ?? null
+        const parentId = selectedNodeIds[0] ?? activeIdea?.nodes.find(n => n.parentId === null)?.id ?? null
         if (parentId) {
           const newNode = addNode(parentId)
           setSelectedNodeIds([newNode.id])
@@ -102,7 +102,7 @@ export default function App() {
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [selectedNodeIds, activeDiagram, addNode, view])
+  }, [selectedNodeIds, activeIdea, addNode, view])
 
   const handleOpenDiagram = useCallback(async (id: string) => {
     setShowPanel(false); setSelectedPanelNodeId(null)
@@ -123,7 +123,7 @@ export default function App() {
   }, [])
 
   const rollAllDice = useCallback(() => {
-    const nodes = activeDiagram?.nodes
+    const nodes = activeIdea?.nodes
     if (!nodes) return
     const root = nodes.find(n => n.parentId === null)
     if (root) updateNode(root.id, { title: pickRandom(ROOT_TOPICS) })
@@ -132,7 +132,7 @@ export default function App() {
       const words = DICE_WORDS[icon] ?? ['Node']
       updateNode(n.id, { title: pickRandom(words), icon })
     })
-  }, [activeDiagram, updateNode])
+  }, [activeIdea, updateNode])
 
   if (view === 'home') return (
     <>
@@ -183,7 +183,7 @@ export default function App() {
         </button>
 
         {/* Roll Dice button — top left, next to back button */}
-        {activeDiagram && <button
+        {activeIdea && <button
           onClick={rollAllDice}
           title="Roll dice — fill all nodes with random test data"
           style={{
@@ -201,7 +201,7 @@ export default function App() {
         </button>}
 
         {/* Format toggle button — top right, only when a diagram is loaded */}
-        {activeDiagram && <button
+        {activeIdea && <button
           onClick={() => setShowPanel(p => !p)}
           title="Format"
           style={{

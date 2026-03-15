@@ -1,8 +1,8 @@
 import { create } from 'zustand'
 import { subscribeWithSelector } from 'zustand/middleware'
-import type { Diagram, DiagramMeta, DiagramType, LineStyle, MindNode } from '../types'
+import type { Diagram, DiagramMeta, DiagramType, LineStyle, IdeaNode } from '../types'
 import { computeTreeLayout } from '../lib/layout/tree'
-import { computeMindmapLayout } from '../lib/layout/mindmap'
+import { computeIdeasLayout } from '../lib/layout/ideas'
 import { computeFishboneLayout } from '../lib/layout/fishbone'
 import { computeTimelineLayout } from '../lib/layout/timeline'
 import { getTheme } from '../lib/themes'
@@ -20,7 +20,7 @@ function computeNodeWidth(title: string, depth: number, hasIcon: boolean): numbe
 }
 
 /** Make all nodes at the same depth share the width of the widest node at that depth */
-function normalizeWidthsPerDepth(nodes: MindNode[]): MindNode[] {
+function normalizeWidthsPerDepth(nodes: IdeaNode[]): IdeaNode[] {
   const maxByDepth = new Map<number, number>()
   for (const n of nodes) {
     if (n.depth > 0) maxByDepth.set(n.depth, Math.max(maxByDepth.get(n.depth) ?? 0, n.width))
@@ -29,8 +29,8 @@ function normalizeWidthsPerDepth(nodes: MindNode[]): MindNode[] {
 }
 
 /** Re-index sortOrder per parent group so numbers are always 0,1,2,... with no gaps */
-function reindexSortOrders(nodes: MindNode[]): MindNode[] {
-  const groups = new Map<string | null, MindNode[]>()
+function reindexSortOrders(nodes: IdeaNode[]): IdeaNode[] {
+  const groups = new Map<string | null, IdeaNode[]>()
   for (const n of nodes) {
     const key = n.parentId ?? null
     if (!groups.has(key)) groups.set(key, [])
@@ -55,7 +55,7 @@ function isTooLight(hex: string): boolean {
 }
 
 /** Spread L1 colors evenly across the 12-color palette, propagate to descendants */
-function rebalanceColors(nodes: MindNode[], palette: string[]): MindNode[] {
+function rebalanceColors(nodes: IdeaNode[], palette: string[]): IdeaNode[] {
   // Only use first 12 — the vibrant wheel colors; the rest are utility (darks, grays, whites)
   const vibrant = palette.slice(0, 12).filter(c => !isTooLight(c))
   const effectivePalette = vibrant.length >= 2 ? vibrant : palette.slice(0, 12)
@@ -66,7 +66,7 @@ function rebalanceColors(nodes: MindNode[], palette: string[]): MindNode[] {
     n.id,
     effectivePalette[Math.round(i * effectivePalette.length / N) % effectivePalette.length],
   ]))
-  function inheritedColor(node: MindNode): string {
+  function inheritedColor(node: IdeaNode): string {
     if (node.depth === 1) return colorMap.get(node.id) ?? node.color
     const parent = nodes.find(p => p.id === node.parentId)
     return parent ? inheritedColor(parent) : node.color
@@ -78,9 +78,9 @@ function rebalanceColors(nodes: MindNode[], palette: string[]): MindNode[] {
   })
 }
 
-function runLayout(nodes: MindNode[], type: DiagramType): MindNode[] {
+function runLayout(nodes: IdeaNode[], type: DiagramType): IdeaNode[] {
   switch (type) {
-    case 'mindmap': return computeMindmapLayout(nodes)
+    case 'mindmap': return computeIdeasLayout(nodes)
     case 'fishbone': return computeFishboneLayout(nodes)
     case 'tree-vertical': return computeTreeLayout(nodes, 'vertical')
     case 'tree-horizontal': return computeTreeLayout(nodes, 'horizontal')
@@ -88,11 +88,11 @@ function runLayout(nodes: MindNode[], type: DiagramType): MindNode[] {
   }
 }
 
-interface HistoryState { nodes: MindNode[] }
+interface HistoryState { nodes: IdeaNode[] }
 
-interface DiagramStore {
+interface IdeaStore {
   // Data
-  activeDiagram: Diagram | null
+  activeIdea: Diagram | null
   diagrams: DiagramMeta[]
   selectedNodeIds: string[]
   isDirty: boolean
@@ -107,16 +107,16 @@ interface DiagramStore {
   past: HistoryState[]
   future: HistoryState[]
   // Actions
-  setActiveDiagram: (d: Diagram) => void
+  setActiveIdea: (d: Diagram) => void
   setDiagrams: (ds: DiagramMeta[]) => void
   setSelectedNodeIds: (ids: string[]) => void
   setDiagramType: (t: DiagramType) => void
   setLineStyle: (s: LineStyle) => void
   setTheme: (id: string) => void
   setIsDirty: (v: boolean) => void
-  addNode: (parentId: string | null, title?: string) => MindNode
-  updateNode: (id: string, updates: Partial<MindNode>) => void
-  batchUpdateNodes: (ids: string[], updates: Partial<MindNode>) => void
+  addNode: (parentId: string | null, title?: string) => IdeaNode
+  updateNode: (id: string, updates: Partial<IdeaNode>) => void
+  batchUpdateNodes: (ids: string[], updates: Partial<IdeaNode>) => void
   reorderNode: (nodeId: string, insertBeforeId: string | null) => void
   deleteNode: (id: string) => void
   deleteSelectedNodes: () => void
@@ -136,17 +136,17 @@ interface DiagramStore {
   autoAssignIcons: () => void
 }
 
-function pushHistory(state: DiagramStore): Pick<DiagramStore, 'past' | 'future'> {
-  const current = state.activeDiagram?.nodes ?? []
+function pushHistory(state: IdeaStore): Pick<IdeaStore, 'past' | 'future'> {
+  const current = state.activeIdea?.nodes ?? []
   return {
     past: [...state.past.slice(-30), { nodes: current }],
     future: [],
   }
 }
 
-export const useDiagramStore = create<DiagramStore>()(
+export const useIdeaStore = create<IdeaStore>()(
   subscribeWithSelector((set, get) => ({
-    activeDiagram: null,
+    activeIdea: null,
     diagrams: [],
     selectedNodeIds: [],
     isDirty: false,
@@ -159,8 +159,8 @@ export const useDiagramStore = create<DiagramStore>()(
     past: [],
     future: [],
 
-    setActiveDiagram: (d) => set({
-      activeDiagram: d,
+    setActiveIdea: (d) => set({
+      activeIdea: d,
       diagramType: d.type,
       lineStyle: d.lineStyle,
       showOrderNumbers: d.showOrderNumbers ?? true,
@@ -173,22 +173,22 @@ export const useDiagramStore = create<DiagramStore>()(
     setSelectedNodeIds: (ids) => set({ selectedNodeIds: ids }),
     setDiagramType: (t) => {
       const state = get()
-      if (!state.activeDiagram) return
+      if (!state.activeIdea) return
       // Clear manual positions so every layout starts fresh
-      const resetNodes = state.activeDiagram.nodes.map(n => ({ ...n, manuallyPositioned: false }))
+      const resetNodes = state.activeIdea.nodes.map(n => ({ ...n, manuallyPositioned: false }))
       const newNodes = runLayout(resetNodes, t)
       set({
         diagramType: t,
-        activeDiagram: { ...state.activeDiagram, type: t, nodes: newNodes },
+        activeIdea: { ...state.activeIdea, type: t, nodes: newNodes },
         isDirty: true,
       })
     },
     setLineStyle: (s) => {
       const state = get()
-      if (!state.activeDiagram) return
+      if (!state.activeIdea) return
       set({
         lineStyle: s,
-        activeDiagram: { ...state.activeDiagram, lineStyle: s },
+        activeIdea: { ...state.activeIdea, lineStyle: s },
         isDirty: true,
       })
     },
@@ -199,10 +199,10 @@ export const useDiagramStore = create<DiagramStore>()(
       const state = get()
       const palette = getTheme(id).colors
       // Re-color all L1 nodes (depth === 1) using the new theme palette
-      if (state.activeDiagram) {
-        const l1s = state.activeDiagram.nodes.filter(n => n.depth === 1)
+      if (state.activeIdea) {
+        const l1s = state.activeIdea.nodes.filter(n => n.depth === 1)
           .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
-        const nodes = state.activeDiagram.nodes.map(n => {
+        const nodes = state.activeIdea.nodes.map(n => {
           if (n.depth !== 1) return n
           const idx = l1s.findIndex(l => l.id === n.id)
           const newColor = palette[idx % palette.length]
@@ -211,14 +211,14 @@ export const useDiagramStore = create<DiagramStore>()(
         })
         // Propagate L1 color down to descendants
         const colorMap = new Map(nodes.filter(n => n.depth === 1).map(n => [n.id, n.color]))
-        function getInheritedColor(node: MindNode): string {
+        function getInheritedColor(node: IdeaNode): string {
           if (node.depth === 1) return colorMap.get(node.id) ?? node.color
           const parent = nodes.find(p => p.id === node.parentId)
           if (!parent) return node.color
           return getInheritedColor(parent)
         }
         const recolored = nodes.map(n => n.depth > 1 ? { ...n, color: getInheritedColor(n) } : n)
-        set({ themeId: id, activeDiagram: { ...state.activeDiagram, nodes: recolored }, isDirty: true })
+        set({ themeId: id, activeIdea: { ...state.activeIdea, nodes: recolored }, isDirty: true })
       } else {
         set({ themeId: id })
       }
@@ -231,18 +231,18 @@ export const useDiagramStore = create<DiagramStore>()(
 
     addNode: (parentId, title = 'New Node') => {
       const state = get()
-      if (!state.activeDiagram) throw new Error('No active diagram')
+      if (!state.activeIdea) throw new Error('No active diagram')
       state.snapshotHistory()
 
-      const parent = parentId ? state.activeDiagram.nodes.find(n => n.id === parentId) : null
+      const parent = parentId ? state.activeIdea.nodes.find(n => n.id === parentId) : null
       const depth = parent ? parent.depth + 1 : 0
-      const siblings = state.activeDiagram.nodes.filter(n => n.parentId === parentId)
+      const siblings = state.activeIdea.nodes.filter(n => n.parentId === parentId)
       // Depth-1 nodes (direct children of root) each get a unique palette color
       const palette = getTheme(get().themeId).colors
       const color = parent?.depth === 0
         ? palette[siblings.length % palette.length]
         : (parent ? parent.color : palette[8] ?? '#6366f1')
-      const newNode: MindNode = {
+      const newNode: IdeaNode = {
         id: crypto.randomUUID(),
         title,
         color,
@@ -255,11 +255,11 @@ export const useDiagramStore = create<DiagramStore>()(
         sortOrder: siblings.length,
       }
       // Strip manuallyPositioned so the layout is always clean when adding nodes
-      const reset = [...state.activeDiagram.nodes, newNode].map(n => ({ ...n, manuallyPositioned: false }))
+      const reset = [...state.activeIdea.nodes, newNode].map(n => ({ ...n, manuallyPositioned: false }))
       const laid = runLayout(reset, state.diagramType)
       const newNodes = rebalanceColors(laid, palette)
       set({
-        activeDiagram: { ...state.activeDiagram, nodes: newNodes },
+        activeIdea: { ...state.activeIdea, nodes: newNodes },
         isDirty: true,
       })
       return newNode
@@ -267,8 +267,8 @@ export const useDiagramStore = create<DiagramStore>()(
 
     updateNode: (id, updates) => {
       const state = get()
-      if (!state.activeDiagram) return
-      const nodes = state.activeDiagram.nodes.map(n => {
+      if (!state.activeIdea) return
+      const nodes = state.activeIdea.nodes.map(n => {
         if (n.id !== id) return n
         const merged = { ...n, ...updates }
         // Auto-resize width when title changes (non-root nodes only)
@@ -279,28 +279,28 @@ export const useDiagramStore = create<DiagramStore>()(
         return merged
       })
       // Keep diagram name in sync with root node title
-      const isRoot = state.activeDiagram.nodes.find(n => n.id === id)?.parentId === null
-      const name = isRoot && updates.title ? updates.title : state.activeDiagram.name
+      const isRoot = state.activeIdea.nodes.find(n => n.id === id)?.parentId === null
+      const name = isRoot && updates.title ? updates.title : state.activeIdea.name
       set({
-        activeDiagram: { ...state.activeDiagram, name, nodes },
+        activeIdea: { ...state.activeIdea, name, nodes },
         isDirty: true,
       })
     },
 
     batchUpdateNodes: (ids, updates) => {
       const state = get()
-      if (!state.activeDiagram || ids.length === 0) return
+      if (!state.activeIdea || ids.length === 0) return
       const idSet = new Set(ids)
-      const nodes = state.activeDiagram.nodes.map(n => idSet.has(n.id) ? { ...n, ...updates } : n)
-      set({ activeDiagram: { ...state.activeDiagram, nodes }, isDirty: true })
+      const nodes = state.activeIdea.nodes.map(n => idSet.has(n.id) ? { ...n, ...updates } : n)
+      set({ activeIdea: { ...state.activeIdea, nodes }, isDirty: true })
     },
 
     reorderNode: (nodeId, insertBeforeId) => {
       const state = get()
-      if (!state.activeDiagram) return
-      const moving = state.activeDiagram.nodes.find(n => n.id === nodeId)
+      if (!state.activeIdea) return
+      const moving = state.activeIdea.nodes.find(n => n.id === nodeId)
       if (!moving) return
-      const siblings = state.activeDiagram.nodes
+      const siblings = state.activeIdea.nodes
         .filter(n => n.parentId === moving.parentId && n.id !== nodeId)
         .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
       const insertIdx = insertBeforeId
@@ -312,30 +312,30 @@ export const useDiagramStore = create<DiagramStore>()(
         ...siblings.slice(insertIdx),
       ]
       const idToOrder = new Map(reordered.map((n, i) => [n.id, i]))
-      const nodes = state.activeDiagram.nodes
+      const nodes = state.activeIdea.nodes
         .map(n => idToOrder.has(n.id) ? { ...n, sortOrder: idToOrder.get(n.id)!, manuallyPositioned: false } : n)
       const laid = runLayout(nodes, state.diagramType)
 
       const recolored = rebalanceColors(laid, getTheme(state.themeId).colors)
-      set({ activeDiagram: { ...state.activeDiagram, nodes: recolored }, isDirty: true })
+      set({ activeIdea: { ...state.activeIdea, nodes: recolored }, isDirty: true })
     },
 
     deleteNode: (id) => {
       const state = get()
-      if (!state.activeDiagram) return
+      if (!state.activeIdea) return
       state.snapshotHistory()
       // Delete node and all descendants
       function getDescendants(nodeId: string): string[] {
-        const children = state.activeDiagram!.nodes.filter(n => n.parentId === nodeId)
+        const children = state.activeIdea!.nodes.filter(n => n.parentId === nodeId)
         return [nodeId, ...children.flatMap(c => getDescendants(c.id))]
       }
       const toDelete = new Set(getDescendants(id))
-      const remaining = state.activeDiagram.nodes.filter(n => !toDelete.has(n.id))
+      const remaining = state.activeIdea.nodes.filter(n => !toDelete.has(n.id))
       const reindexed = reindexSortOrders(remaining)
       const laid = runLayout(reindexed.map(n => ({ ...n, manuallyPositioned: false })), state.diagramType)
       const nodes = rebalanceColors(laid, getTheme(state.themeId).colors)
       set({
-        activeDiagram: { ...state.activeDiagram, nodes },
+        activeIdea: { ...state.activeIdea, nodes },
         selectedNodeIds: state.selectedNodeIds.filter(nid => !toDelete.has(nid)),
         isDirty: true,
       })
@@ -343,38 +343,38 @@ export const useDiagramStore = create<DiagramStore>()(
 
     deleteSelectedNodes: () => {
       const state = get()
-      if (!state.activeDiagram || state.selectedNodeIds.length === 0) return
+      if (!state.activeIdea || state.selectedNodeIds.length === 0) return
       // Never delete the root node
-      const rootId = state.activeDiagram.nodes.find(n => n.parentId === null)?.id
+      const rootId = state.activeIdea.nodes.find(n => n.parentId === null)?.id
       const idsToDelete = state.selectedNodeIds.filter(id => id !== rootId)
       if (idsToDelete.length === 0) return
       state.snapshotHistory()
       function getDescendants(nodeId: string): string[] {
-        const children = state.activeDiagram!.nodes.filter(n => n.parentId === nodeId)
+        const children = state.activeIdea!.nodes.filter(n => n.parentId === nodeId)
         return [nodeId, ...children.flatMap(c => getDescendants(c.id))]
       }
       const toDelete = new Set(idsToDelete.flatMap(id => getDescendants(id)))
-      const remaining = state.activeDiagram.nodes.filter(n => !toDelete.has(n.id))
+      const remaining = state.activeIdea.nodes.filter(n => !toDelete.has(n.id))
       const reindexed = reindexSortOrders(remaining)
       const laid = runLayout(reindexed.map(n => ({ ...n, manuallyPositioned: false })), state.diagramType)
       const nodes = rebalanceColors(laid, getTheme(state.themeId).colors)
-      set({ activeDiagram: { ...state.activeDiagram, nodes }, selectedNodeIds: [], isDirty: true })
+      set({ activeIdea: { ...state.activeIdea, nodes }, selectedNodeIds: [], isDirty: true })
     },
 
     dissolveNode: (id) => {
       const state = get()
-      if (!state.activeDiagram) return
-      const node = state.activeDiagram.nodes.find(n => n.id === id)
+      if (!state.activeIdea) return
+      const node = state.activeIdea.nodes.find(n => n.id === id)
       if (!node || node.parentId === null) return // never dissolve root
       state.snapshotHistory()
       // Re-parent direct children to this node's parent, inheriting depth-1
-      const children = state.activeDiagram.nodes.filter(n => n.parentId === id)
-      const siblingsOfNode = state.activeDiagram.nodes
+      const children = state.activeIdea.nodes.filter(n => n.parentId === id)
+      const siblingsOfNode = state.activeIdea.nodes
         .filter(n => n.parentId === node.parentId && n.id !== id)
         .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
       const insertAt = node.sortOrder ?? siblingsOfNode.length
       // Build updated nodes: remove dissolved node, re-parent its children
-      const updated = state.activeDiagram.nodes
+      const updated = state.activeIdea.nodes
         .filter(n => n.id !== id)
         .map(n => {
           if (n.parentId === id) {
@@ -395,22 +395,22 @@ export const useDiagramStore = create<DiagramStore>()(
       const reindexed = reindexSortOrders(patched)
       const laid = runLayout(reindexed.map(n => ({ ...n, manuallyPositioned: false })), state.diagramType)
       const nodes = rebalanceColors(laid, getTheme(state.themeId).colors)
-      set({ activeDiagram: { ...state.activeDiagram, nodes }, selectedNodeIds: [], isDirty: true })
+      set({ activeIdea: { ...state.activeIdea, nodes }, selectedNodeIds: [], isDirty: true })
     },
 
     dissolveSelectedNodes: () => {
       const state = get()
-      if (!state.activeDiagram || state.selectedNodeIds.length === 0) return
-      const rootId = state.activeDiagram.nodes.find(n => n.parentId === null)?.id
+      if (!state.activeIdea || state.selectedNodeIds.length === 0) return
+      const rootId = state.activeIdea.nodes.find(n => n.parentId === null)?.id
       // Process shallowest first so re-parenting cascades correctly
       const toDissolve = state.selectedNodeIds
         .filter(id => id !== rootId)
-        .map(id => state.activeDiagram!.nodes.find(n => n.id === id)!)
+        .map(id => state.activeIdea!.nodes.find(n => n.id === id)!)
         .filter(Boolean)
         .sort((a, b) => a.depth - b.depth)
       if (toDissolve.length === 0) return
       state.snapshotHistory()
-      let nodes = state.activeDiagram.nodes
+      let nodes = state.activeIdea.nodes
       for (const target of toDissolve) {
         const node = nodes.find(n => n.id === target.id)
         if (!node || node.parentId === null) continue
@@ -436,38 +436,38 @@ export const useDiagramStore = create<DiagramStore>()(
       const reindexed = reindexSortOrders(nodes)
       const laid = runLayout(reindexed.map(n => ({ ...n, manuallyPositioned: false })), state.diagramType)
       const result = rebalanceColors(laid, getTheme(state.themeId).colors)
-      set({ activeDiagram: { ...state.activeDiagram, nodes: result }, selectedNodeIds: [], isDirty: true })
+      set({ activeIdea: { ...state.activeIdea, nodes: result }, selectedNodeIds: [], isDirty: true })
     },
 
     resizeNodeDepth: (depth, width) => {
       const state = get()
-      if (!state.activeDiagram) return
+      if (!state.activeIdea) return
       const clamped = Math.max(100, Math.min(500, width))
-      const nodes = state.activeDiagram.nodes.map(n =>
+      const nodes = state.activeIdea.nodes.map(n =>
         n.depth === depth ? { ...n, width: clamped, manuallyPositioned: false } : n
       )
       const laid = runLayout(nodes, state.diagramType)
-      set({ activeDiagram: { ...state.activeDiagram, nodes: laid }, isDirty: true })
+      set({ activeIdea: { ...state.activeIdea, nodes: laid }, isDirty: true })
     },
 
     rerunLayout: () => {
       const state = get()
-      if (!state.activeDiagram) return
-      const nodes = normalizeWidthsPerDepth(state.activeDiagram.nodes.map(n => ({ ...n, manuallyPositioned: false })))
+      if (!state.activeIdea) return
+      const nodes = normalizeWidthsPerDepth(state.activeIdea.nodes.map(n => ({ ...n, manuallyPositioned: false })))
       const newNodes = runLayout(nodes, state.diagramType)
-      set({ activeDiagram: { ...state.activeDiagram, nodes: newNodes }, isDirty: true })
+      set({ activeIdea: { ...state.activeIdea, nodes: newNodes }, isDirty: true })
     },
 
     setShareEnabled: (enabled) => {
       const state = get()
-      if (!state.activeDiagram) return
-      set({ activeDiagram: { ...state.activeDiagram, sharingEnabled: enabled }, isDirty: true })
+      if (!state.activeIdea) return
+      set({ activeIdea: { ...state.activeIdea, sharingEnabled: enabled }, isDirty: true })
     },
 
     setShowOrderNumbers: (v) => {
       const state = get()
-      if (!state.activeDiagram) return
-      set({ showOrderNumbers: v, activeDiagram: { ...state.activeDiagram, showOrderNumbers: v }, isDirty: true })
+      if (!state.activeIdea) return
+      set({ showOrderNumbers: v, activeIdea: { ...state.activeIdea, showOrderNumbers: v }, isDirty: true })
     },
 
     setIsImporting: (v) => set({ isImporting: v }),
@@ -475,42 +475,42 @@ export const useDiagramStore = create<DiagramStore>()(
 
     undo: () => {
       const state = get()
-      if (state.past.length === 0 || !state.activeDiagram) return
+      if (state.past.length === 0 || !state.activeIdea) return
       const prev = state.past[state.past.length - 1]
       set({
         past: state.past.slice(0, -1),
-        future: [{ nodes: state.activeDiagram.nodes }, ...state.future],
-        activeDiagram: { ...state.activeDiagram, nodes: prev.nodes },
+        future: [{ nodes: state.activeIdea.nodes }, ...state.future],
+        activeIdea: { ...state.activeIdea, nodes: prev.nodes },
         isDirty: true,
       })
     },
 
     redo: () => {
       const state = get()
-      if (state.future.length === 0 || !state.activeDiagram) return
+      if (state.future.length === 0 || !state.activeIdea) return
       const next = state.future[0]
       set({
-        past: [...state.past, { nodes: state.activeDiagram.nodes }],
+        past: [...state.past, { nodes: state.activeIdea.nodes }],
         future: state.future.slice(1),
-        activeDiagram: { ...state.activeDiagram, nodes: next.nodes },
+        activeIdea: { ...state.activeIdea, nodes: next.nodes },
         isDirty: true,
       })
     },
 
     autoAssignIcons: () => {
       const state = get()
-      if (!state.activeDiagram) return
-      const nodes = state.activeDiagram.nodes.map(n =>
+      if (!state.activeIdea) return
+      const nodes = state.activeIdea.nodes.map(n =>
         n.depth > 0 ? { ...n, icon: n.icon ?? guessIcon(n.title) } : n
       )
-      set({ activeDiagram: { ...state.activeDiagram, nodes }, isDirty: true })
+      set({ activeIdea: { ...state.activeIdea, nodes }, isDirty: true })
     },
 
-    clearDiagram: () => set({ activeDiagram: null, selectedNodeIds: [], past: [], future: [], isDirty: false }),
+    clearDiagram: () => set({ activeIdea: null, selectedNodeIds: [], past: [], future: [], isDirty: false }),
 
     loadFromOutline: (text: string) => {
       const state = get()
-      if (!state.activeDiagram) return
+      if (!state.activeIdea) return
       state.snapshotHistory()
 
       // --- Flat item type used internally ---
@@ -588,7 +588,7 @@ export const useDiagramStore = create<DiagramStore>()(
       }
 
       const palette = getTheme(state.themeId).colors
-      const rawNodes: MindNode[] = parsed.map((p, i) => {
+      const rawNodes: IdeaNode[] = parsed.map((p, i) => {
         const depth = depths[i]
         // Use explicit icon from JSON as-is; fall back to auto-guess for text imports
         const icon = depth > 0 ? (p.icon ?? guessIcon(p.title)) : undefined
@@ -613,7 +613,7 @@ export const useDiagramStore = create<DiagramStore>()(
       const name = parsed[0].title
 
       set({
-        activeDiagram: { ...state.activeDiagram, name, nodes },
+        activeIdea: { ...state.activeIdea, name, nodes },
         selectedNodeIds: [],
         isDirty: true,
       })
