@@ -12,10 +12,11 @@ const V_GAP = 22
 function getSize(depth: number) { return SIZES[depth] ?? DEFAULT_SIZE }
 function getHGap(depth: number) { return H_GAPS[depth] ?? DEFAULT_H_GAP }
 
-/** Effective size: root uses stored size only when square (dynamic resize) */
+/** Effective size: always respect stored node dimensions if set */
 function nodeSize(node: MindNode, depth: number) {
   const { w, h } = getSize(depth)
   if (depth === 0 && node.width > 0 && node.width === node.height) return { w: node.width, h: node.height }
+  if (depth > 0 && node.width > 0) return { w: node.width, h: node.height > 0 ? node.height : h }
   return { w, h }
 }
 

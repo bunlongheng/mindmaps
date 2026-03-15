@@ -44,6 +44,8 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
+  const resizePreview = useDiagramStore(s => s.resizePreview)
+  const previewW = (!isRoot && resizePreview?.depth === node.depth) ? resizePreview.width : null
 
   // Styling per depth
   let bg: string, textColor: string, strokeColor: string, strokeW: number
@@ -162,16 +164,18 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
 
   const resolvedIcon = isRoot ? undefined : node.icon
   const hasIcon = !!resolvedIcon && !!getLucideIcon(resolvedIcon)
-  const iconZoneW = hasIcon ? node.width * 0.2 : 0
+  // Use live preview width during resize drag, otherwise committed node width
+  const displayW = previewW ?? node.width
+  const iconZoneW = hasIcon ? displayW * 0.2 : 0
   const textPad = 16
-  const availableW = node.width - iconZoneW - textPad
+  const availableW = displayW - iconZoneW - textPad
   const charW = fontSize * 0.62
   const maxChars = isRoot ? 12 : Math.max(6, Math.floor(availableW / charW))
   const label = node.title.length > maxChars ? node.title.slice(0, maxChars - 1) + '…' : node.title
   // All coordinates are relative to (node.x, node.y)
-  const cx = node.width / 2
+  const cx = displayW / 2
   const cy = node.height / 2
-  const r = node.width / 2
+  const r = displayW / 2
 
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
     setIsDragging(true)
@@ -182,6 +186,34 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
     setIsDragging(false)
     onPointerUp(e)
   }, [onPointerUp])
+
+  // Resize handle drag
+  const resizeStart = useRef<{ startX: number; startW: number } | null>(null)
+  function onResizePointerDown(e: React.PointerEvent) {
+    e.stopPropagation()
+    const pt = getSVGPoint(e)
+    if (!pt) return
+    resizeStart.current = { startX: pt.x, startW: node.width }
+    useDiagramStore.getState().setResizePreview({ depth: node.depth, width: node.width })
+    ;(e.currentTarget as Element).setPointerCapture(e.pointerId)
+  }
+  function onResizePointerMove(e: React.PointerEvent) {
+    if (!resizeStart.current) return
+    e.stopPropagation()
+    const pt = getSVGPoint(e)
+    if (!pt) return
+    const newW = Math.max(100, Math.min(500, resizeStart.current.startW + (pt.x - resizeStart.current.startX)))
+    useDiagramStore.getState().setResizePreview({ depth: node.depth, width: newW })
+  }
+  function onResizePointerUp(e: React.PointerEvent) {
+    e.stopPropagation()
+    const preview = useDiagramStore.getState().resizePreview
+    if (resizeStart.current && preview) {
+      useDiagramStore.getState().resizeNodeDepth(node.depth, preview.width)
+    }
+    resizeStart.current = null
+    useDiagramStore.getState().setResizePreview(null)
+  }
 
   return (
     <g style={{
@@ -249,10 +281,10 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
         </>
       ) : (
         <rect
-          x={0} y={0} width={node.width} height={node.height}
+          x={0} y={0} width={displayW} height={node.height}
           rx={rx} ry={rx} fill={bg} fillOpacity={bgOpacity}
-          stroke={strokeColor} strokeWidth={strokeW}
-          filter="drop-shadow(0 1px 4px rgba(0,0,0,0.1))"
+          stroke={previewW !== null ? '#3b82f6' : strokeColor} strokeWidth={previewW !== null ? 3.5 : strokeW}
+          filter={previewW !== null ? 'drop-shadow(0 0 8px rgba(59,130,246,0.7))' : 'drop-shadow(0 1px 4px rgba(0,0,0,0.1))'}
         />
       )}
 
@@ -260,7 +292,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
         <foreignObject
           x={isRoot ? cx - r * 0.75 : 2}
           y={isRoot ? cy - fontSize * 0.7 : 2}
-          width={isRoot ? r * 1.5 : node.width - 4}
+          width={isRoot ? r * 1.5 : displayW - 4}
           height={isRoot ? fontSize * 1.6 : node.height - 4}
         >
           <input
@@ -286,11 +318,11 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
       ) : (
         <>
           {hasIcon && resolvedIcon && (() => {
-            const iconZoneW = node.width * 0.2
+            const iconZoneW = displayW * 0.2
             const iconSize = Math.min(fontSize + 4, iconZoneW * 0.65)
             const iconX = (iconZoneW - iconSize) / 2
             const iconY = (node.height - iconSize) / 2
-            const textAreaX = iconZoneW + (node.width - iconZoneW) / 2
+            const textAreaX = iconZoneW + (displayW - iconZoneW) / 2
             return (
               <>
                 {/* White icon zone — inset by half stroke so it never bleeds over the border */}
@@ -307,7 +339,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
                 })()}
                 <NodeIcon icon={resolvedIcon} x={iconX} y={iconY} size={iconSize} color={iconColor} strokeWidth={node.depth === 1 ? 2.8 : 1.8} />
                 <text
-                  x={align === 'left' ? iconZoneW + 8 : align === 'right' ? node.width - 8 : textAreaX}
+                  x={align === 'left' ? iconZoneW + 8 : align === 'right' ? displayW - 8 : textAreaX}
                   y={node.height / 2 + fontSize * 0.38}
                   textAnchor={textAnchor}
                   fontSize={fontSize} fontWeight={fontWeight} fontStyle={fontStyle}
@@ -320,7 +352,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
           })()}
           {(!hasIcon || isRoot) && (
             <text
-              x={isRoot ? cx : align === 'left' ? 12 : align === 'right' ? node.width - 12 : node.width / 2}
+              x={isRoot ? cx : align === 'left' ? 12 : align === 'right' ? displayW - 12 : displayW / 2}
               y={isRoot ? cy + fontSize * 0.38 : node.height / 2 + fontSize * 0.38}
               textAnchor={isRoot ? 'middle' : textAnchor}
               fontSize={fontSize} fontWeight={fontWeight} fontStyle={fontStyle}
@@ -330,6 +362,25 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
             >{label}</text>
           )}
         </>
+      )}
+
+      {/* Resize handle — right edge, non-root only */}
+      {!isRoot && !readOnly && (
+        <g style={{ cursor: 'ew-resize', userSelect: 'none' }}>
+          {/* Hit area — all pointer events on this rect so capture works */}
+          <rect
+            x={displayW - 6} y={0} width={14} height={node.height}
+            fill="transparent"
+            onPointerDown={onResizePointerDown}
+            onPointerMove={onResizePointerMove}
+            onPointerUp={onResizePointerUp}
+          />
+          {/* Visible grip dots */}
+          {[0.35, 0.5, 0.65].map(t => (
+            <circle key={t} cx={displayW + 1} cy={node.height * t} r={2}
+              fill={strokeColor} opacity={0.5} style={{ pointerEvents: 'none' }} />
+          ))}
+        </g>
       )}
 
       {/* Selection ring — always on top */}
@@ -347,13 +398,13 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
         <>
           <rect
             x={-5} y={-5}
-            width={node.width + 10} height={node.height + 10}
+            width={displayW + 10} height={node.height + 10}
             rx={rx + 4} ry={rx + 4}
             fill="none" stroke="rgba(59,130,246,0.18)" strokeWidth={6}
             style={{ pointerEvents: 'none' }} />
           <rect
             x={-2} y={-2}
-            width={node.width + 4} height={node.height + 4}
+            width={displayW + 4} height={node.height + 4}
             rx={rx + 2} ry={rx + 2}
             fill="none" stroke="#3b82f6" strokeWidth={3.5}
             filter="drop-shadow(0 0 8px rgba(59,130,246,0.7))"

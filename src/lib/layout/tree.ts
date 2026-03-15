@@ -45,7 +45,7 @@ function assignPositions(t: TreeNode, x: number, y: number) {
 
 function flattenTree(t: TreeNode, result: MindNode[]) {
   if (!t.node.manuallyPositioned) {
-    result.push({ ...t.node, x: t.x, y: t.y, width: NODE_W, height: NODE_H })
+    result.push({ ...t.node, x: t.x, y: t.y, width: t.node.width > 0 ? t.node.width : NODE_W, height: t.node.height > 0 ? t.node.height : NODE_H })
   } else {
     result.push(t.node)
   }

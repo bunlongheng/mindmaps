@@ -102,6 +102,7 @@ interface DiagramStore {
   themeId: string
   showOrderNumbers: boolean
   isImporting: boolean
+  resizePreview: { depth: number; width: number } | null
   // History
   past: HistoryState[]
   future: HistoryState[]
@@ -120,10 +121,12 @@ interface DiagramStore {
   deleteNode: (id: string) => void
   deleteSelectedNodes: () => void
   dissolveNode: (id: string) => void
+  resizeNodeDepth: (depth: number, width: number) => void
   rerunLayout: () => void
   setShareEnabled: (enabled: boolean) => void
   setShowOrderNumbers: (v: boolean) => void
   setIsImporting: (v: boolean) => void
+  setResizePreview: (v: { depth: number; width: number } | null) => void
   undo: () => void
   redo: () => void
   snapshotHistory: () => void
@@ -151,6 +154,7 @@ export const useDiagramStore = create<DiagramStore>()(
     themeId: localStorage.getItem('mindmap:themeId') ?? 'default',
     showOrderNumbers: true,
     isImporting: false,
+    resizePreview: null,
     past: [],
     future: [],
 
@@ -393,6 +397,17 @@ export const useDiagramStore = create<DiagramStore>()(
       set({ activeDiagram: { ...state.activeDiagram, nodes }, selectedNodeIds: [], isDirty: true })
     },
 
+    resizeNodeDepth: (depth, width) => {
+      const state = get()
+      if (!state.activeDiagram) return
+      const clamped = Math.max(100, Math.min(500, width))
+      const nodes = state.activeDiagram.nodes.map(n =>
+        n.depth === depth ? { ...n, width: clamped, manuallyPositioned: false } : n
+      )
+      const laid = runLayout(nodes, state.diagramType)
+      set({ activeDiagram: { ...state.activeDiagram, nodes: laid }, isDirty: true })
+    },
+
     rerunLayout: () => {
       const state = get()
       if (!state.activeDiagram) return
@@ -414,6 +429,7 @@ export const useDiagramStore = create<DiagramStore>()(
     },
 
     setIsImporting: (v) => set({ isImporting: v }),
+    setResizePreview: (v) => set({ resizePreview: v }),
 
     undo: () => {
       const state = get()

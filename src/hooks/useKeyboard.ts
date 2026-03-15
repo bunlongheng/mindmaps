@@ -46,8 +46,13 @@ export function useKeyboard() {
         return
       }
       if ((e.metaKey || e.ctrlKey) && (e.key === 'Delete' || e.key === 'Backspace')) {
-        // Dissolve: remove node but keep children (re-parented up)
-        if (selectedNodeIds.length === 1) dissolveNode(selectedNodeIds[0])
+        if (selectedNodeIds.length === 1) {
+          // Single node: dissolve (remove node, keep children re-parented up)
+          dissolveNode(selectedNodeIds[0])
+        } else if (selectedNodeIds.length > 1) {
+          // Multiple nodes: delete all selected + their descendants
+          deleteSelectedNodes()
+        }
         return
       }
       if (e.key === 'Delete' || e.key === 'Backspace') {
