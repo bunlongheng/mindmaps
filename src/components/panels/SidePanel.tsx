@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import { NODE_ICONS } from '../../lib/icons'
 import { useIdeaStore } from '../../store/ideaStore'
 import { getTheme, THEMES } from '../../lib/themes'
-import { X, AlignLeft, AlignCenter, AlignRight, Copy, Check, RefreshCw, Download, Upload, FileDown } from 'lucide-react'
+import { X, AlignLeft, AlignCenter, AlignRight, Copy, Check, RefreshCw, Download, Upload, FileDown, Dice5 } from 'lucide-react'
 import type { LineStyle, DiagramType } from '../../types'
 import { QRCodeSVG } from 'qrcode.react'
 import { downloadJSON } from '../../lib/export/json'
@@ -501,7 +501,7 @@ export function SidePanel({ nodeId, onClose, onImport }: SidePanelProps) {
               }}
               onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
               onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-            >Roll the Dice</button>
+            ><Dice5 size={14} />Roll the Dice</button>
           </SBlock>
         </div>
       )}
