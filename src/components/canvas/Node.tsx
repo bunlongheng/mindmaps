@@ -130,10 +130,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
     onSelect(node.id, e.metaKey || e.ctrlKey || e.shiftKey)
     const pt = getSVGPoint(e)
     if (!pt) return
-    const allSnap = isRoot
-      ? (useIdeaStore.getState().activeIdea?.nodes ?? []).map(n => ({ id: n.id, x: n.x, y: n.y }))
-      : undefined
-    dragStart.current = { x: pt.x, y: pt.y, nodeX: node.x, nodeY: node.y, allSnap }
+    dragStart.current = { x: pt.x, y: pt.y, nodeX: node.x, nodeY: node.y }
     ;(e.target as Element).setPointerCapture(e.pointerId)
   }
 
@@ -147,15 +144,9 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
     if (Math.abs(dx) > 3 || Math.abs(dy) > 3) didDrag.current = true
     const newX = dragStart.current.nodeX + dx
     const newY = dragStart.current.nodeY + dy
-    if (isRoot && dragStart.current.allSnap) {
-      useIdeaStore.getState().setNodePositions(
-        dragStart.current.allSnap.map(s => ({ id: s.id, x: s.x + dx, y: s.y + dy }))
-      )
-      onRootDragOffset?.({ dx: Math.round(dx), dy: Math.round(dy) })
-    } else {
-      useIdeaStore.getState().updateNode(node.id, { x: newX, y: newY, manuallyPositioned: true })
-      onDragMove?.(node.id, newX + node.width / 2, newY + node.height / 2)
-    }
+    useIdeaStore.getState().updateNode(node.id, { x: newX, y: newY, manuallyPositioned: true })
+    if (isRoot) onRootDragOffset?.({ dx: Math.round(dx), dy: Math.round(dy) })
+    onDragMove?.(node.id, newX + node.width / 2, newY + node.height / 2)
   }
 
   function onPointerUp(_e: React.PointerEvent) {
