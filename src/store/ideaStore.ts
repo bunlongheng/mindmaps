@@ -679,7 +679,7 @@ export const useIdeaStore = create<IdeaStore>()(
       const rawNodes: IdeaNode[] = parsed.map((p, i) => {
         const depth = depths[i]
         
-        const icon = depth > 0 ? (p.icon ?? guessIcon(p.title) ?? 'sparkles') : undefined
+        const icon = depth === 1 ? p.icon : undefined
         return {
           id: nodeIds[i],
           title: p.title,
