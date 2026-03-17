@@ -20,6 +20,7 @@ export interface IdeaNode {
   borderColor?: string
   borderWidth?: number
   icon?: string
+  emoji?: string
   branchGap?: number
 }
 

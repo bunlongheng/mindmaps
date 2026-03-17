@@ -524,7 +524,7 @@ export const useIdeaStore = create<IdeaStore>()(
       state.snapshotHistory()
 
       // --- Flat item type used internally ---
-      type FlatItem = { title: string; indent: number; icon?: string }
+      type FlatItem = { title: string; indent: number; icon?: string; emoji?: string }
       let parsed: FlatItem[] = []
 
       // Normalize icon names from any source (HeroIcons, etc.) to our Lucide names
@@ -600,21 +600,21 @@ export const useIdeaStore = create<IdeaStore>()(
         try {
           const json = JSON.parse(trimmed)
           // Flatten recursive { title, icon?, children? } tree into indent list
-          const META_KEYS = new Set(['icon', 'bold', 'italic', 'fontSize', 'textAlign', 'title', 'name', 'children', 'type', 'lineStyle'])
+          const META_KEYS = new Set(['icon', 'emoji', 'bold', 'italic', 'fontSize', 'textAlign', 'title', 'name', 'children', 'type', 'lineStyle'])
           function flattenJson(node: Record<string, unknown> | string, depth: number) {
             if (typeof node === 'string') { parsed.push({ title: node.trim(), indent: depth }); return }
             // New format: title is the non-metadata key, its value is children array
             const titleKey = Object.keys(node).find(k => !META_KEYS.has(k))
             if (titleKey) {
-              parsed.push({ title: titleKey, indent: depth, icon: normalizeIcon(node.icon as string | undefined) })
+              parsed.push({ title: titleKey, indent: depth, icon: normalizeIcon(node.icon as string | undefined), emoji: node.emoji as string | undefined })
               const kids = node[titleKey]
               if (Array.isArray(kids)) for (const child of kids) flattenJson(child as Record<string, unknown> | string, depth + 1)
               return
             }
-            // Legacy format: { title/name, icon, children }
+            // Legacy format: { title/name, icon, emoji, children }
             const title = ((node.title ?? node.name) as string | undefined ?? '').trim()
             if (!title) return
-            parsed.push({ title, indent: depth, icon: normalizeIcon(node.icon as string | undefined) })
+            parsed.push({ title, indent: depth, icon: normalizeIcon(node.icon as string | undefined), emoji: node.emoji as string | undefined })
             if (Array.isArray(node.children)) {
               for (const child of node.children) flattenJson(child as Record<string, unknown> | string, depth + 1)
             }
@@ -680,6 +680,8 @@ export const useIdeaStore = create<IdeaStore>()(
         const depth = depths[i]
         
         const icon = depth <= 2 ? p.icon : undefined
+        const emoji = depth <= 2 ? p.emoji : undefined
+        const hasVisualZone = !!(icon || emoji)
         return {
           id: nodeIds[i],
           title: p.title,
@@ -688,10 +690,11 @@ export const useIdeaStore = create<IdeaStore>()(
           sortOrder: sortOrders[i],
           color: palette[0],
           x: 0, y: 0,
-          width: depth === 0 ? 180 : computeNodeWidth(p.title, depth, !!icon),
-          height: depth === 0 ? 180 : 40,
+          width: depth === 0 ? 180 : computeNodeWidth(p.title, depth, hasVisualZone),
+          height: depth === 0 ? 180 : (emoji ? 48 : 40),
           manuallyPositioned: false,
           icon,
+          emoji,
         }
       })
 

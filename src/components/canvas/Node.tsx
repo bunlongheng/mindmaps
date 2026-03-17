@@ -162,11 +162,13 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
     else onDoubleClick(node)
   }
 
-  const resolvedIcon = isRoot ? undefined : node.icon
+  const resolvedEmoji = isRoot ? undefined : node.emoji
+  const hasEmoji = !!resolvedEmoji
+  const resolvedIcon = isRoot ? undefined : (!hasEmoji ? node.icon : undefined)
   const hasIcon = !!resolvedIcon && !!getLucideIcon(resolvedIcon)
   // Use live preview width during resize drag, otherwise committed node width
   const displayW = previewW ?? node.width
-  const iconZoneW = hasIcon ? displayW * 0.2 : 0
+  const iconZoneW = (hasIcon || hasEmoji) ? displayW * 0.2 : 0
   const label = node.title
   // All coordinates are relative to (node.x, node.y)
   const cx = displayW / 2
@@ -313,12 +315,42 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
         </foreignObject>
       ) : (
         <>
+          {hasEmoji && resolvedEmoji && (() => {
+            const zoneW = displayW * 0.2
+            const emojiSize = Math.min(node.height * 0.52, 22)
+            const textAreaX = zoneW + (displayW - zoneW) / 2
+            const sw = strokeW / 2
+            const h = node.height
+            return (
+              <>
+                <path
+                  d={`M ${rx},${sw} L ${zoneW},${sw} L ${zoneW},${h - sw} L ${rx},${h - sw} Q ${sw},${h - sw} ${sw},${h - rx} L ${sw},${rx} Q ${sw},${sw} ${rx},${sw} Z`}
+                  fill="rgba(255,255,255,0.95)"
+                  style={{ pointerEvents: 'none' }}
+                />
+                <text
+                  x={zoneW / 2} y={h / 2 + emojiSize * 0.36}
+                  textAnchor="middle" fontSize={emojiSize}
+                  style={{ pointerEvents: 'none', userSelect: 'none' }}
+                >{resolvedEmoji}</text>
+                <text
+                  x={align === 'left' ? zoneW + 8 : align === 'right' ? displayW - 8 : textAreaX}
+                  y={h / 2 + fontSize * 0.38}
+                  textAnchor={textAnchor}
+                  fontSize={fontSize} fontWeight={fontWeight} fontStyle={fontStyle}
+                  fontFamily="Inter, system-ui, sans-serif"
+                  fill={textColor}
+                  style={{ pointerEvents: 'none' }}
+                >{label}</text>
+              </>
+            )
+          })()}
           {hasIcon && resolvedIcon && (() => {
-            const iconZoneW = displayW * 0.2
-            const iconSize = Math.min(fontSize + 4, iconZoneW * 0.65)
-            const iconX = (iconZoneW - iconSize) / 2
+            const zoneW = displayW * 0.2
+            const iconSize = Math.min(fontSize + 4, zoneW * 0.65)
+            const iconX = (zoneW - iconSize) / 2
             const iconY = (node.height - iconSize) / 2
-            const textAreaX = iconZoneW + (displayW - iconZoneW) / 2
+            const textAreaX = zoneW + (displayW - zoneW) / 2
             return (
               <>
                 {/* White icon zone — inset by half stroke so it never bleeds over the border */}
@@ -327,7 +359,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
                   const h = node.height
                   return (
                     <path
-                      d={`M ${rx},${sw} L ${iconZoneW},${sw} L ${iconZoneW},${h - sw} L ${rx},${h - sw} Q ${sw},${h - sw} ${sw},${h - rx} L ${sw},${rx} Q ${sw},${sw} ${rx},${sw} Z`}
+                      d={`M ${rx},${sw} L ${zoneW},${sw} L ${zoneW},${h - sw} L ${rx},${h - sw} Q ${sw},${h - sw} ${sw},${h - rx} L ${sw},${rx} Q ${sw},${sw} ${rx},${sw} Z`}
                       fill="rgba(255,255,255,0.95)"
                       style={{ pointerEvents: 'none' }}
                     />
@@ -335,7 +367,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
                 })()}
                 <NodeIcon icon={resolvedIcon} x={iconX} y={iconY} size={iconSize} color={iconColor} strokeWidth={node.depth === 1 ? 2.8 : 1.8} />
                 <text
-                  x={align === 'left' ? iconZoneW + 8 : align === 'right' ? displayW - 8 : textAreaX}
+                  x={align === 'left' ? zoneW + 8 : align === 'right' ? displayW - 8 : textAreaX}
                   y={node.height / 2 + fontSize * 0.38}
                   textAnchor={textAnchor}
                   fontSize={fontSize} fontWeight={fontWeight} fontStyle={fontStyle}
@@ -346,7 +378,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
               </>
             )
           })()}
-          {(!hasIcon || isRoot) && (
+          {(!hasIcon && !hasEmoji || isRoot) && (
             <text
               x={isRoot ? cx : align === 'left' ? 12 : align === 'right' ? displayW - 12 : displayW / 2}
               y={isRoot ? cy + fontSize * 0.38 : node.height / 2 + fontSize * 0.38}

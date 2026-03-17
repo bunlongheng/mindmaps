@@ -9,10 +9,11 @@ export function exportToJSON(diagram: Diagram): string {
       .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
       .map(n => {
         const children = buildTree(n.id)
-        const hasExtras = n.icon || n.bold || n.italic || n.fontSize || (n.textAlign && n.textAlign !== 'center')
+        const hasExtras = n.icon || n.emoji || n.bold || n.italic || n.fontSize || (n.textAlign && n.textAlign !== 'center')
         if (!children.length && !hasExtras) return n.title
         const node: Record<string, unknown> = { [n.title]: children.length ? children : null }
         if (n.icon) node.icon = n.icon
+        if (n.emoji) node.emoji = n.emoji
         if (n.bold) node.bold = n.bold
         if (n.italic) node.italic = n.italic
         if (n.fontSize) node.fontSize = n.fontSize
@@ -24,6 +25,7 @@ export function exportToJSON(diagram: Diagram): string {
   const root = diagram.nodes.find(n => n.parentId === null)
   const result: Record<string, unknown> = { [diagram.name]: buildTree(root?.id ?? null) }
   if (root?.icon) result.icon = root.icon
+  if (root?.emoji) result.emoji = root.emoji
   return JSON.stringify(result, null, 2)
 }
 
