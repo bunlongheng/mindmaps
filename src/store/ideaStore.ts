@@ -21,7 +21,7 @@ import { ICON_MAP } from '../lib/icons'
 /** Compute a node width that fits its title text — font sizes must match Node.tsx */
 function computeNodeWidth(title: string, depth: number, hasIcon: boolean): number {
   const fontSize = depth === 1 ? 22 : depth === 2 ? 16 : depth === 3 ? 13 : 11
-  const charW = fontSize * 0.58
+  const charW = fontSize * 0.64
   const textPad = 24
   const textW = Math.ceil(title.length * charW) + textPad
   // icon zone takes ~20% of node width, so text zone = 80% of total
@@ -591,7 +591,7 @@ export const useIdeaStore = create<IdeaStore>()(
           .toLowerCase()
         if (ICON_MAP[kebab]) return kebab
         if (ICON_ALIASES[kebab]) return ICON_ALIASES[kebab]
-        return undefined
+        return raw ? 'sparkles' : undefined  // fallback — never leave empty if icon was provided
       }
 
       // Try JSON first

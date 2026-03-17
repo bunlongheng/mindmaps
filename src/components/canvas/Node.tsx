@@ -167,11 +167,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   // Use live preview width during resize drag, otherwise committed node width
   const displayW = previewW ?? node.width
   const iconZoneW = hasIcon ? displayW * 0.2 : 0
-  const textPad = 16
-  const availableW = displayW - iconZoneW - textPad
-  const charW = fontSize * 0.62
-  const maxChars = isRoot ? 12 : Math.max(6, Math.floor(availableW / charW))
-  const label = node.title.length > maxChars ? node.title.slice(0, maxChars - 1) + '…' : node.title
+  const label = node.title
   // All coordinates are relative to (node.x, node.y)
   const cx = displayW / 2
   const cy = node.height / 2
