@@ -338,33 +338,20 @@ export function SidePanel({ nodeId, onClose, onImport }: SidePanelProps) {
               {/* Text */}
               <SBlock title="Text">
                 <PRow label="Label">
-                  <div style={{ display: 'flex', gap: 5 }}>
-                    <input
-                      value={title}
-                      onChange={e => setTitle(e.target.value)}
-                      onKeyDown={e => { if (e.key === 'Enter') { save({ title }); (e.target as HTMLInputElement).blur() } }}
-                      onBlur={() => { if (title !== node.title) save({ title }) }}
-                      style={{
-                        flex: 1, minWidth: 0, boxSizing: 'border-box', fontSize: 12,
-                        border: '1px solid #e0e2e7', borderRadius: 7, padding: '6px 9px',
-                        outline: 'none', fontFamily: 'inherit', color: '#111827', background: '#fff',
-                      }}
-                      onFocus={e => (e.target.style.borderColor = '#3b82f6')}
-                      onBlurCapture={e => (e.target.style.borderColor = '#e0e2e7')}
-                    />
-                    <button
-                      onClick={rollDice}
-                      title={`Roll random label${selectedNodeIds.length > 1 ? ` (${selectedNodeIds.length} nodes)` : ''}`}
-                      style={{
-                        width: 32, height: 32, borderRadius: 7, border: '1px solid #e0e2e7',
-                        background: '#fff', cursor: 'pointer', fontSize: 15, flexShrink: 0,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        transition: 'background 0.1s',
-                      }}
-                      onMouseEnter={e => (e.currentTarget.style.background = '#f3f4f6')}
-                      onMouseLeave={e => (e.currentTarget.style.background = '#fff')}
-                    >🎲</button>
-                  </div>
+                  <input
+                    value={title}
+                    onChange={e => setTitle(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') { save({ title }); (e.target as HTMLInputElement).blur() } }}
+                    onBlur={() => { if (title !== node.title) save({ title }) }}
+                    style={{
+                      flex: 1, minWidth: 0, boxSizing: 'border-box', fontSize: 12,
+                      border: '1px solid #e0e2e7', borderRadius: 7, padding: '6px 9px',
+                      outline: 'none', fontFamily: 'inherit', color: '#111827', background: '#fff',
+                      width: '100%',
+                    }}
+                    onFocus={e => (e.target.style.borderColor = '#3b82f6')}
+                    onBlurCapture={e => (e.target.style.borderColor = '#e0e2e7')}
+                  />
                 </PRow>
                 <PRow label="Format">
                   <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
