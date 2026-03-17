@@ -488,7 +488,7 @@ export function SidePanel({ nodeId, onClose, onImport }: SidePanelProps) {
               }}
               onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
               onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-            ><Dice5 size={14} />Roll the Dice</button>
+            >🎲 Roll the Dice</button>
           </SBlock>
         </div>
       )}
