@@ -7,6 +7,7 @@ import { computeFishboneLayout } from '../lib/layout/fishbone'
 import { computeTimelineLayout } from '../lib/layout/timeline'
 import { getTheme } from '../lib/themes'
 import { guessIcon } from '../lib/autoIcon'
+import { ICON_MAP } from '../lib/icons'
 
 /** Compute a node width that fits its title text — font sizes must match Node.tsx */
 function computeNodeWidth(title: string, depth: number, hasIcon: boolean): number {
@@ -517,6 +518,73 @@ export const useIdeaStore = create<IdeaStore>()(
       type FlatItem = { title: string; indent: number; icon?: string }
       let parsed: FlatItem[] = []
 
+      // Normalize icon names from any source (HeroIcons, etc.) to our Lucide names
+      const ICON_ALIASES: Record<string, string> = {
+        fire: 'flame', 'fire-icon': 'flame',
+        'globe-alt': 'globe', 'globe-americas': 'globe', 'globe-europe-africa': 'globe',
+        'circle-stack': 'layers', stack: 'layers',
+        cube: 'package', 'cube-transparent': 'package',
+        'archive-box': 'folder', archive: 'folder',
+        sun: 'star', moon: 'star',
+        'academic-cap': 'graduate', 'graduation-cap': 'graduate',
+        'chat-bubble': 'message', 'chat-bubble-left': 'message',
+        'device-phone-mobile': 'phone', 'phone-arrow-up-right': 'phone',
+        'beaker': 'flask',
+        'arrow-trending-up': 'trending', 'chart-bar': 'chart', 'chart-pie': 'pie',
+        'paint-brush': 'paint', 'swatch': 'paint',
+        'face-smile': 'smile', 'emoji-happy': 'smile',
+        'building-office': 'building', 'building-office-2': 'building',
+        'banknotes': 'dollar', 'currency-dollar': 'dollar',
+        'shopping-bag': 'cart', 'shopping-cart': 'cart',
+        'credit-card': 'card',
+        'magnifying-glass': 'search',
+        'document-text': 'file', document: 'file',
+        'clock': 'clock', 'calendar-days': 'calendar',
+        'bell-alert': 'bell',
+        'exclamation-circle': 'alert', 'exclamation-triangle': 'alert',
+        'information-circle': 'info',
+        'question-mark-circle': 'help',
+        'arrow-path': 'refresh',
+        'share': 'share', 'arrow-up-on-square': 'share',
+        'arrow-down-tray': 'download', 'arrow-up-tray': 'upload',
+        'photo': 'image', 'film': 'video',
+        'microphone': 'mic',
+        'computer-desktop': 'monitor', 'device-tablet': 'monitor',
+        'signal': 'wifi', 'wifi': 'wifi',
+        'map-pin': 'map-pin', 'location-marker': 'map-pin',
+        'bookmark': 'bookmark', 'tag': 'tag',
+        'hashtag': 'hash', 'at-symbol': 'at',
+        'paper-airplane': 'send',
+        'wrench-screwdriver': 'wrench', 'cog-6-tooth': 'settings', 'cog-8-tooth': 'cog',
+        'server': 'server', 'circle-nodes': 'server',
+        'cloud-arrow-up': 'cloud', 'cloud-arrow-down': 'cloud',
+        'lock-closed': 'lock', 'lock-open': 'lock',
+        'key': 'key', 'shield-check': 'shield', 'shield-exclamation': 'shield',
+        'code-bracket': 'code', 'command-line': 'terminal',
+        'cpu-chip': 'cpu', 'link': 'link', 'squares-2x2': 'layers',
+        'rocket-launch': 'rocket', 'bolt': 'zap', 'lightning-bolt': 'zap',
+        'light-bulb': 'lightbulb', 'sparkle': 'sparkles',
+        'user-circle': 'user', 'user-group': 'user',
+        'inbox': 'mail', 'envelope': 'mail',
+        'heart': 'heart', 'hand-heart': 'heart',
+        'trophy': 'trophy', 'star': 'star', 'flag': 'flag',
+        'map': 'map', 'compass': 'compass',
+        'crosshairs': 'crosshair', 'viewfinder-circle': 'crosshair',
+        'target': 'target', 'cursor-arrow-rays': 'target',
+        'activity': 'activity', 'pulse': 'activity',
+      }
+      function normalizeIcon(raw: string | undefined): string | undefined {
+        if (!raw) return undefined
+        // Strip "Icon" suffix, convert PascalCase/camelCase to kebab-case
+        const kebab = raw
+          .replace(/Icon$/, '')
+          .replace(/([A-Z])/g, (m, l, i) => (i === 0 ? l.toLowerCase() : '-' + l.toLowerCase()))
+          .toLowerCase()
+        if (ICON_MAP[kebab]) return kebab
+        if (ICON_ALIASES[kebab]) return ICON_ALIASES[kebab]
+        return undefined
+      }
+
       // Try JSON first
       const trimmed = text.trim()
       if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
@@ -529,7 +597,7 @@ export const useIdeaStore = create<IdeaStore>()(
             // New format: title is the non-metadata key, its value is children array
             const titleKey = Object.keys(node).find(k => !META_KEYS.has(k))
             if (titleKey) {
-              parsed.push({ title: titleKey, indent: depth, icon: node.icon as string | undefined })
+              parsed.push({ title: titleKey, indent: depth, icon: normalizeIcon(node.icon as string | undefined) })
               const kids = node[titleKey]
               if (Array.isArray(kids)) for (const child of kids) flattenJson(child as Record<string, unknown> | string, depth + 1)
               return
@@ -537,7 +605,7 @@ export const useIdeaStore = create<IdeaStore>()(
             // Legacy format: { title/name, icon, children }
             const title = ((node.title ?? node.name) as string | undefined ?? '').trim()
             if (!title) return
-            parsed.push({ title, indent: depth, icon: node.icon as string | undefined })
+            parsed.push({ title, indent: depth, icon: normalizeIcon(node.icon as string | undefined) })
             if (Array.isArray(node.children)) {
               for (const child of node.children) flattenJson(child as Record<string, unknown> | string, depth + 1)
             }

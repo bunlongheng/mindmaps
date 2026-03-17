@@ -11,7 +11,7 @@ export function exportToJSON(diagram: Diagram): string {
         const children = buildTree(n.id)
         const hasExtras = n.icon || n.bold || n.italic || n.fontSize || (n.textAlign && n.textAlign !== 'center')
         if (!children.length && !hasExtras) return n.title
-        const node: Record<string, unknown> = { [n.title]: children.length ? children : undefined }
+        const node: Record<string, unknown> = { [n.title]: children.length ? children : null }
         if (n.icon) node.icon = n.icon
         if (n.bold) node.bold = n.bold
         if (n.italic) node.italic = n.italic

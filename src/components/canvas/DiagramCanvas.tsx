@@ -28,6 +28,19 @@ export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
   }, [activeIdea?.id])
 
   const [showZoomMenu, setShowZoomMenu] = useState(false)
+  const [showZoomHud, setShowZoomHud] = useState(false)
+  const zoomHudTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const isZoomingRef = useRef(false)
+
+  const flashZoomHud = useCallback(() => {
+    isZoomingRef.current = true
+    setShowZoomHud(true)
+    if (zoomHudTimer.current) clearTimeout(zoomHudTimer.current)
+    zoomHudTimer.current = setTimeout(() => {
+      isZoomingRef.current = false
+      setShowZoomHud(false)
+    }, 1200)
+  }, [])
 
   const fitView = useCallback(() => {
     const svg = svgRef.current
@@ -40,7 +53,7 @@ export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
     const maxX = Math.max(...nodes.map(n => n.x + n.width))
     const maxY = Math.max(...nodes.map(n => n.y + n.height))
     const pad = 80
-    const newZoom = Math.min((svgW - pad * 2) / (maxX - minX), (svgH - pad * 2) / (maxY - minY), 1)
+    const newZoom = Math.min((svgW - pad * 2) / (maxX - minX), (svgH - pad * 2) / (maxY - minY), MAX_ZOOM)
     const cx = (minX + maxX) / 2
     const cy = (minY + maxY) / 2
     setZoom(newZoom)
@@ -61,7 +74,8 @@ export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
       const cy = (svgH / 2 - p.y) / zoom
       return { x: svgW / 2 - cx * level, y: svgH / 2 - cy * level }
     })
-  }, [zoom])
+    flashZoomHud()
+  }, [zoom, flashZoomHud])
 
   // Auto-fit on initial diagram load
   useEffect(() => {
@@ -71,10 +85,15 @@ export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeIdea?.id])
 
+  const MIN_ZOOM = 0.2
+  const MAX_ZOOM = 9.99
+  const RUBBER = 0.22 // resistance factor when past limits
+
   // Smooth zoom via lerp animation
   const zoomCurrentRef = useRef(1)
   const zoomTargetRef = useRef(1)
   const zoomRafRef = useRef<number | null>(null)
+  const snapBackTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const animateZoomRef = useRef<(() => void) | null>(null)
   animateZoomRef.current = () => {
     const diff = zoomTargetRef.current - zoomCurrentRef.current
@@ -89,10 +108,38 @@ export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
     zoomRafRef.current = requestAnimationFrame(() => animateZoomRef.current?.())
   }
 
+  // Apply zoom with rubber-band past limits, snap back after input stops
+  const applyZoom = useCallback((rawTarget: number) => {
+    let target: number
+    if (rawTarget < MIN_ZOOM) {
+      target = MIN_ZOOM - (MIN_ZOOM - rawTarget) * RUBBER
+    } else if (rawTarget > MAX_ZOOM) {
+      target = MAX_ZOOM + (rawTarget - MAX_ZOOM) * RUBBER
+    } else {
+      target = rawTarget
+    }
+    zoomTargetRef.current = target
+    if (!zoomRafRef.current) {
+      zoomRafRef.current = requestAnimationFrame(() => animateZoomRef.current?.())
+    }
+    // Snap back to limits after input stops
+    if (snapBackTimer.current) clearTimeout(snapBackTimer.current)
+    snapBackTimer.current = setTimeout(() => {
+      zoomTargetRef.current = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoomTargetRef.current))
+      if (!zoomRafRef.current) {
+        zoomRafRef.current = requestAnimationFrame(() => animateZoomRef.current?.())
+      }
+    }, 180)
+  }, [])
+
   // Rubber-band selection state
   const [selBox, setSelBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
   const selStart = useRef<{ cx: number; cy: number } | null>(null)
   const isDragging = useRef(false)
+
+  // Pinch-to-zoom state
+  const activePointers = useRef<Map<number, { x: number; y: number }>>(new Map())
+  const lastPinchDist = useRef<number | null>(null)
 
   // Drag-reorder state: snap line between siblings
   const [, setSnapLine] = useState<{ x1: number; x2: number; y: number } | null>(null)
@@ -114,27 +161,48 @@ export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
     e.preventDefault()
     if (e.ctrlKey) {
       const factor = 1 - Math.max(-0.08, Math.min(0.08, e.deltaY * 0.004))
-      zoomTargetRef.current = Math.min(3, Math.max(0.15, zoomTargetRef.current * factor))
-      if (!zoomRafRef.current) {
-        zoomRafRef.current = requestAnimationFrame(() => animateZoomRef.current?.())
-      }
+      applyZoom(zoomTargetRef.current * factor)
+      flashZoomHud()
     } else {
       setPan(p => ({ x: p.x - e.deltaX, y: p.y - e.deltaY }))
     }
-  }, [])
+  }, [flashZoomHud])
 
 
   const handleBgPointerDown = useCallback((e: React.PointerEvent) => {
     if (e.target !== e.currentTarget && (e.target as Element).tagName !== 'svg') return
     e.preventDefault()
+    activePointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+    ;(e.target as Element).setPointerCapture(e.pointerId)
+    // Second finger landed — cancel rubber-band, switch to pinch
+    if (activePointers.current.size >= 2) {
+      selStart.current = null
+      isDragging.current = false
+      setSelBox(null)
+      lastPinchDist.current = null
+      return
+    }
     isDragging.current = false
+    if (e.pointerType !== 'mouse') return  // touch devices: no rubber-band select
     const { x, y } = screenToCanvas(e.clientX, e.clientY)
     selStart.current = { cx: x, cy: y }
     setSelBox({ x, y, w: 0, h: 0 })
-    ;(e.target as Element).setPointerCapture(e.pointerId)
   }, [])
 
   const handleBgPointerMove = useCallback((e: React.PointerEvent) => {
+    activePointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+    // Pinch-to-zoom with two fingers
+    if (activePointers.current.size === 2) {
+      const [p1, p2] = Array.from(activePointers.current.values())
+      const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y)
+      if (lastPinchDist.current !== null) {
+        const factor = dist / lastPinchDist.current
+        applyZoom(zoomTargetRef.current * factor)
+        flashZoomHud()
+      }
+      lastPinchDist.current = dist
+      return
+    }
     if (!selStart.current || !activeIdea) return
     const { x, y } = screenToCanvas(e.clientX, e.clientY)
     const sx = selStart.current.cx
@@ -155,7 +223,9 @@ export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
     }
   }, [activeIdea, setSelectedNodeIds, onNodeSelect])
 
-  const handleBgPointerUp = useCallback(() => {
+  const handleBgPointerUp = useCallback((e: React.PointerEvent) => {
+    activePointers.current.delete(e.pointerId)
+    if (activePointers.current.size < 2) lastPinchDist.current = null
     // Only act if the drag started on the background (selStart was set)
     if (selStart.current && !isDragging.current) {
       setSelectedNodeIds([])
@@ -223,6 +293,7 @@ export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
         onPointerDown={handleBgPointerDown}
         onPointerMove={handleBgPointerMove}
         onPointerUp={handleBgPointerUp}
+        onPointerCancel={handleBgPointerUp}
         style={{ userSelect: 'none' }}
       >
         <g ref={gRef} transform={`translate(${pan.x},${pan.y}) scale(${zoom})`}>
@@ -308,6 +379,21 @@ export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
           }}>Loading diagram…</span>
         </div>
       )}
+
+      {/* Zoom HUD — fixed to viewport top center, always above everything */}
+      <div style={{
+        position: 'fixed', top: 16, left: '50%', transform: 'translateX(-50%)',
+        background: 'rgba(15,20,40,0.78)', backdropFilter: 'blur(10px)',
+        color: '#fff', fontFamily: 'Inter, system-ui, sans-serif',
+        fontSize: 14, fontWeight: 700, letterSpacing: '0.04em',
+        padding: '6px 18px', borderRadius: 24,
+        pointerEvents: 'none', zIndex: 9999,
+        opacity: showZoomHud ? 1 : 0,
+        transition: showZoomHud ? 'opacity 0.05s ease' : 'opacity 0.8s ease',
+        whiteSpace: 'nowrap',
+      }}>
+        {Math.round(zoom * 100)}%
+      </div>
 
       {/* Bottom bar */}
       <div style={{

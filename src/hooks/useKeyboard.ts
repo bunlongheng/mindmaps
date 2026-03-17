@@ -11,19 +11,6 @@ export function useKeyboard() {
 
       const { deleteSelectedNodes, dissolveNode, dissolveSelectedNodes, setSelectedNodeIds, undo, redo, activeIdea, selectedNodeIds } = useIdeaStore.getState()
 
-      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key === 'v') {
-        navigator.clipboard.readText().then(text => {
-          const trimmed = text.trim()
-          const isJson = trimmed.startsWith('{') || trimmed.startsWith('[')
-          const lines = text.split('\n').filter(l => l.trim())
-          const hasIndent = lines.some(l => /^(\s{4}|\t)/.test(l))
-          if (isJson || (lines.length >= 2 && hasIndent)) {
-            useIdeaStore.getState().loadFromOutline(text)
-            showToast(`Loaded diagram`, { color: '#22c55e', confetti: true })
-          }
-        })
-        return
-      }
 
       if ((e.metaKey || e.ctrlKey) && e.key === 'a') {
         e.preventDefault()
@@ -68,11 +55,29 @@ export function useKeyboard() {
       e.clipboardData!.setData('text/plain', buildText(startId, 0))
     }
 
+    function onPaste(e: ClipboardEvent) {
+      const tag = (e.target as HTMLElement).tagName.toLowerCase()
+      if (tag === 'input' || tag === 'textarea') return
+      const text = e.clipboardData?.getData('text/plain') ?? ''
+      const trimmed = text.trim()
+      if (!trimmed) return
+      const isJson = trimmed.startsWith('{') || trimmed.startsWith('[')
+      const lines = text.split('\n').filter(l => l.trim())
+      const hasIndent = lines.some(l => /^(\s{4}|\t)/.test(l))
+      if (isJson || (lines.length >= 2 && hasIndent)) {
+        e.preventDefault()
+        useIdeaStore.getState().loadFromOutline(text)
+        showToast('Loaded diagram', { color: '#22c55e', confetti: true })
+      }
+    }
+
     window.addEventListener('keydown', onKeyDown)
     window.addEventListener('copy', onCopy)
+    window.addEventListener('paste', onPaste)
     return () => {
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('copy', onCopy)
+      window.removeEventListener('paste', onPaste)
     }
   }, [])
 }
