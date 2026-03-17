@@ -55,6 +55,7 @@ function rowToDiagram(row: Record<string, unknown>): Diagram {
     borderColor:        (n.borderColor ?? undefined) as string | undefined,
     borderWidth:        (n.borderWidth ?? undefined) as number | undefined,
     icon:               (n.icon ?? undefined) as string | undefined,
+    emoji:              (n.emoji ?? undefined) as string | undefined,
   }))
   return {
     id:             row.id as string,
@@ -159,6 +160,36 @@ export function useDiagram() {
     showToast(`✦ "${name}" created`, { color: '#6366f1', confetti: true })
   }, [loadDiagram, loadDiagramList, setActiveIdea, setDiagrams])
 
+  const createDiagramFromNodes = useCallback(async (name: string, nodes: IdeaNode[]): Promise<string | null> => {
+    // Deduplicate name: "Fruits", "Fruits 2", "Fruits 3", ...
+    const existingNames = new Set(useIdeaStore.getState().diagrams.map(d => d.name))
+    let finalName = name
+    let n = 2
+    while (existingNames.has(finalName)) finalName = `${name} ${n++}`
+
+    const id = crypto.randomUUID?.() ?? Math.random().toString(36).slice(2)
+    const now = new Date().toISOString()
+    const diagram: Diagram = { id, name: finalName, type: 'mindmap', lineStyle: 'orthogonal', createdAt: now, updatedAt: now, nodes }
+
+    if (!hasSupabase || !supabase) {
+      lsSaveDiagram(diagram)
+      setActiveIdea(diagram)
+      localStorage.setItem('activeIdeaId', id)
+      setDiagrams(lsGetList())
+      showToast(`✦ "${finalName}" created`, { color: '#22c55e', confetti: true })
+      return id
+    }
+    const { error } = await supabase.from('ideas').insert({
+      id, name: finalName, type: 'mindmap', line_style: 'orthogonal',
+      sharing_enabled: false, nodes,
+    })
+    if (error) { console.error(error); showToast('Failed to create map', { color: '#ef4444' }); return null }
+    await loadDiagram(id)
+    await loadDiagramList()
+    showToast(`✦ "${finalName}" created`, { color: '#22c55e', confetti: true })
+    return id
+  }, [loadDiagram, loadDiagramList, setActiveIdea, setDiagrams])
+
   const deleteDiagram = useCallback(async (id: string, name?: string) => {
     if (!hasSupabase || !supabase) {
       lsDeleteDiagram(id)
@@ -171,5 +202,5 @@ export function useDiagram() {
     showToast(`"${name ?? 'Map'}" deleted`, { color: '#1a1d2e' })
   }, [loadDiagramList, setDiagrams])
 
-  return { loadDiagramList, loadDiagram, saveDiagram, createDiagram, deleteDiagram }
+  return { loadDiagramList, loadDiagram, saveDiagram, createDiagram, createDiagramFromNodes, deleteDiagram }
 }

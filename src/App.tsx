@@ -46,8 +46,8 @@ function pickRandom<T>(arr: T[]): T { return arr[Math.floor(Math.random() * arr.
 type View = 'home' | 'editor' | 'viewer'
 
 export default function App() {
-  const { loadDiagramList, loadDiagram, saveDiagram } = useDiagram()
-  const { activeIdea, isDirty, setActiveIdea, addNode, selectedNodeIds, setSelectedNodeIds, updateNode } = useIdeaStore()
+  const { loadDiagramList, loadDiagram, saveDiagram, createDiagramFromNodes } = useDiagram()
+  const { activeIdea, isDirty, setActiveIdea, addNode, selectedNodeIds, setSelectedNodeIds, updateNode, setPasteImportFn } = useIdeaStore()
   const [view, setView] = useState<View>(() => {
     if (decodeShareURL()) return 'viewer'
     const params = new URLSearchParams(window.location.search)
@@ -70,6 +70,17 @@ export default function App() {
       loadDiagramList()
     }
   }, [])
+
+  useEffect(() => {
+    setPasteImportFn(async (name, nodes) => {
+      const id = await createDiagramFromNodes(name, nodes)
+      if (id) {
+        setView('editor')
+        window.history.pushState({}, '', `?map=${id}`)
+      }
+    })
+    return () => setPasteImportFn(null)
+  }, [createDiagramFromNodes, setPasteImportFn])
 
   useEffect(() => {
     if (!isDirty || !activeIdea) return

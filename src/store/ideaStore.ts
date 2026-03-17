@@ -144,6 +144,8 @@ interface IdeaStore {
   clearDiagram: () => void
   loadFromOutline: (text: string) => void
   autoAssignIcons: () => void
+  pasteImportFn: ((name: string, nodes: IdeaNode[]) => void) | null
+  setPasteImportFn: (fn: ((name: string, nodes: IdeaNode[]) => void) | null) => void
 }
 
 function pushHistory(state: IdeaStore): Pick<IdeaStore, 'past' | 'future'> {
@@ -168,6 +170,9 @@ export const useIdeaStore = create<IdeaStore>()(
     resizePreview: null,
     past: [],
     future: [],
+    pasteImportFn: null,
+
+    setPasteImportFn: (fn) => set({ pasteImportFn: fn }),
 
     setActiveIdea: (d) => set({
       activeIdea: d,
@@ -521,7 +526,6 @@ export const useIdeaStore = create<IdeaStore>()(
     loadFromOutline: (text: string) => {
       const state = get()
       if (!state.activeIdea) return
-      state.snapshotHistory()
 
       // --- Flat item type used internally ---
       type FlatItem = { title: string; indent: number; icon?: string; emoji?: string }
@@ -703,11 +707,17 @@ export const useIdeaStore = create<IdeaStore>()(
       const nodes = rebalanceColors(laid, palette)
       const name = parsed[0].title
 
-      set({
-        activeIdea: { ...state.activeIdea, name, nodes },
-        selectedNodeIds: [],
-        isDirty: true,
-      })
+      const { pasteImportFn } = get()
+      if (pasteImportFn) {
+        pasteImportFn(name, nodes)
+      } else {
+        state.snapshotHistory()
+        set({
+          activeIdea: { ...state.activeIdea, name, nodes },
+          selectedNodeIds: [],
+          isDirty: true,
+        })
+      }
       setTimeout(() => set({ isImporting: false }), 900)
     },
   }))
