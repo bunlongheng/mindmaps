@@ -7,8 +7,8 @@ import type { LineStyle, DiagramType } from '../../types'
 import { QRCodeSVG } from 'qrcode.react'
 import { downloadJSON } from '../../lib/export/json'
 import { exportDiagramAsPdf } from '../../lib/export/exportPdf'
-import { DICE_ICONS, DICE_WORDS, ROOT_TOPICS, pickRandom } from '../../lib/dice'
 import { showToast } from '../CuteToast'
+import { DICE_ICONS, ROOT_TOPICS } from '../../lib/dice'
 
 interface SidePanelProps {
   nodeId: string | null
@@ -498,15 +498,15 @@ export function SidePanel({ nodeId, onClose, onImport }: SidePanelProps) {
                 <PRow label="">
                   <button
                     onClick={() => {
-                      const { activeIdea, updateNode } = useIdeaStore.getState()
-                      const nodes = activeIdea?.nodes
+                      const { activeIdea: a, updateNode: upd } = useIdeaStore.getState()
+                      const nodes = a?.nodes
                       if (!nodes) return
                       const root = nodes.find(n => n.parentId === null)
-                      if (root) updateNode(root.id, { title: pickRandom(ROOT_TOPICS) })
+                      if (root) upd(root.id, { title: pickRandom(ROOT_TOPICS) })
                       nodes.filter(n => n.parentId !== null).forEach(n => {
                         const icon = pickRandom(DICE_ICONS)
-                        const words = DICE_WORDS[icon] ?? ['Node']
-                        updateNode(n.id, { title: pickRandom(words), icon })
+                        const words = DICE_WORDS[icon] ?? GENERIC_DICE
+                        upd(n.id, { title: pickRandom(words), icon })
                       })
                       showToast('🎲 Rolled!', { color: '#6366f1', confetti: true })
                     }}
