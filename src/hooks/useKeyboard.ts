@@ -24,7 +24,7 @@ export function useKeyboard() {
       const { deleteSelectedNodes, dissolveNode, dissolveSelectedNodes, setSelectedNodeIds, undo, redo, activeIdea, selectedNodeIds } = useIdeaStore.getState()
 
       if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key === 'v') {
-        navigator.clipboard.readText().then(tryLoad).catch(() => {})
+        navigator.clipboard?.readText().then(tryLoad).catch(() => {})
         return
       }
 

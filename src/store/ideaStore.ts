@@ -1,3 +1,12 @@
+// Polyfill crypto.randomUUID for non-secure contexts (HTTP on LAN)
+function uuid(): string {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) return uuid()
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = Math.random() * 16 | 0
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16)
+  })
+}
+
 import { create } from 'zustand'
 import { subscribeWithSelector } from 'zustand/middleware'
 import type { Diagram, DiagramMeta, DiagramType, LineStyle, IdeaNode } from '../types'
@@ -244,7 +253,7 @@ export const useIdeaStore = create<IdeaStore>()(
         ? palette[siblings.length % palette.length]
         : (parent ? parent.color : palette[8] ?? '#6366f1')
       const newNode: IdeaNode = {
-        id: crypto.randomUUID(),
+        id: uuid(),
         title,
         color,
         parentId,
@@ -644,7 +653,7 @@ export const useIdeaStore = create<IdeaStore>()(
         parsed.unshift({ title: rootTitle, indent: 0 })
       }
 
-      const nodeIds = parsed.map(() => crypto.randomUUID())
+      const nodeIds = parsed.map(() => uuid())
       const parentIds: (string | null)[] = []
       const depths: number[] = []
       const sortOrders: number[] = []
