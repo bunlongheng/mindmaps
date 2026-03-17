@@ -7,48 +7,13 @@ import { HomePage } from './components/home/HomePage'
 import { useDiagram } from './hooks/useDiagram'
 import { useIdeaStore } from './store/ideaStore'
 import { decodeShareURL } from './lib/export/share'
-import { ArrowLeft, SlidersHorizontal, FileDown } from 'lucide-react'
-import { exportDiagramAsPdf } from './lib/export/exportPdf'
-
-const DICE_ICONS = ['user','bot','server','database','zap','plug','git-branch','globe','brain','settings','folder','cloud','mail','lock','key','search','star','rocket','lightbulb','flame','check-circle','map-pin','trophy','message','phone','wrench','chart','eye','shield','flask','sparkles','smile','home','building','briefcase','clock','calendar','code','terminal','package','layers','bell','target','compass','map']
-const DICE_WORDS: Record<string, string[]> = {
-  user:['Alice','Bob','Carol','Dave','Grace','Hank'],bot:['ChatBot','AutoAgent','AI Helper','Smart Bot','Copilot','NLP Engine'],
-  server:['API Server','Web Server','Auth Service','Worker Node','Gateway','Edge Node'],database:['Postgres DB','Redis Cache','Data Lake','MongoDB','Firestore','Analytics DB'],
-  zap:['Trigger','Event Hook','Webhook','Automation','Pipeline','Quick Action'],plug:['Plugin','Extension','Connector','Integration','Bridge','Add-on'],
-  'git-branch':['Feature Branch','Release v2','Hotfix','Dev Branch','Canary','Main'],globe:['Public API','Web App','Global CDN','DNS Zone','Edge Network','Proxy'],
-  brain:['ML Model','Neural Net','AI Core','Decision Engine','Classifier','LLM'],settings:['Config','Admin Panel','Control Center','Preferences','Feature Flags','Env'],
-  folder:['Assets','Resources','Archive','Media','Documents','Uploads'],cloud:['AWS S3','Cloud Storage','GCP Bucket','Blob Store','Object Store','R2'],
-  mail:['Email Service','SMTP','Newsletter','Notification','Inbox','Digest'],lock:['Auth Layer','Security Gate','SSO','Firewall','2FA','RBAC'],
-  key:['API Key','Secret Token','OAuth','JWT Auth','Credentials','PAT'],search:['Search Index','Elastic','Full-Text','Query Engine','Discovery','Algolia'],
-  star:['Featured','Top Pick','Best Seller','Highlighted','Premium','Editor Pick'],rocket:['Launch Plan','Go-Live','Deploy v1','MVP Sprint','Release Day','Ship It'],
-  lightbulb:['Idea Hub','Innovation','Brainstorm','Prototype','Concept','Experiment'],flame:['Hot Feature','Trending','Viral Loop','Growth Hack','Momentum','FOMO'],
-  'check-circle':['Done','Complete','Verified','Shipped','Approved','Signed Off'],'map-pin':['HQ','Office','Region','Location','Branch','Datacenter'],
-  trophy:['Top Goal','KPI Win','Milestone','Achievement','Record','OKR Hit'],message:['Support Chat','Feedback','Comments','Discussion','Slack Thread','Forum'],
-  phone:['Mobile App','iOS App','Android','Push Notify','SMS','WhatsApp'],wrench:['Maintenance','Fix Mode','Debug','Patch','Repair','Refactor'],
-  chart:['Analytics','Metrics','Dashboard','Reports','KPIs','Funnels'],eye:['Monitoring','Observability','Alerting','Logs','Traces','Sentry'],
-  shield:['Security','Protection','WAF','Rate Limit','Guard','Compliance'],flask:['Lab Env','Experiment','A/B Test','Beta','Sandbox','Staging'],
-  sparkles:['Magic Feature','AI Polish','Premium UX','Delight','Wow Factor','Easter Egg'],smile:['User Delight','Happy Path','NPS +10','Customer Joy','Onboarding','Flow'],
-  home:['Home Page','Landing','Dashboard','Overview','Portal','Hub'],building:['Enterprise','Org Unit','HQ','Department','Division','Tenant'],
-  briefcase:['Project','Client Work','Contract','Engagement','Mandate','Proposal'],clock:['Scheduler','Cron Job','Timer','Reminder','Deadline','SLA'],
-  calendar:['Sprint Plan','Release Date','Roadmap','Q2 Plan','Milestone','Kickoff'],code:['Feature Code','Module','Library','Component','Hook','Utility'],
-  terminal:['CLI Tool','Shell Script','Dev Env','Console','Bash','Makefile'],package:['npm Package','SDK','Library','Dependency','Bundle','Release'],
-  layers:['Stack','Layer','Tier','Platform','Infrastructure','Monolith'],bell:['Notification','Alert','Reminder','Push','Ping','Pager'],
-  target:['OKR','Goal','KPI','North Star','Target Metric','Outcome'],compass:['Direction','Strategy','Vision','North Star','Roadmap','Charter'],
-  map:['Journey Map','Architecture','Sitemap','Flow','Diagram','Canvas'],
-}
-const ROOT_TOPICS = [
-  'Velocity','Clarity','Vision','Scale','Launch',
-  'Security','Growth','Data','Platform','Strategy',
-  'Design','Resilience','Automation','Culture','Impact',
-  'Discovery','Delivery','Metrics','Identity','Ecosystem',
-]
-function pickRandom<T>(arr: T[]): T { return arr[Math.floor(Math.random() * arr.length)] }
+import { ArrowLeft, SlidersHorizontal } from 'lucide-react'
 
 type View = 'home' | 'editor' | 'viewer'
 
 export default function App() {
   const { loadDiagramList, loadDiagram, saveDiagram, createDiagramFromNodes } = useDiagram()
-  const { activeIdea, isDirty, setActiveIdea, addNode, selectedNodeIds, setSelectedNodeIds, updateNode, setPasteImportFn } = useIdeaStore()
+  const { activeIdea, isDirty, setActiveIdea, addNode, selectedNodeIds, setSelectedNodeIds, setPasteImportFn } = useIdeaStore()
   const [view, setView] = useState<View>(() => {
     if (decodeShareURL()) return 'viewer'
     const params = new URLSearchParams(window.location.search)
@@ -134,18 +99,6 @@ export default function App() {
     if (nodeId) setSelectedPanelNodeId(nodeId)
   }, [])
 
-  const rollAllDice = useCallback(() => {
-    const nodes = activeIdea?.nodes
-    if (!nodes) return
-    const root = nodes.find(n => n.parentId === null)
-    if (root) updateNode(root.id, { title: pickRandom(ROOT_TOPICS) })
-    nodes.filter(n => n.parentId !== null).forEach(n => {
-      const icon = pickRandom(DICE_ICONS)
-      const words = DICE_WORDS[icon] ?? ['Node']
-      updateNode(n.id, { title: pickRandom(words), icon })
-    })
-  }, [activeIdea, updateNode])
-
   if (view === 'home') return (
     <>
       <CuteToast />
@@ -216,36 +169,6 @@ export default function App() {
           Format
         </button>}
       </div>
-
-      {/* Bottom bar */}
-      {activeIdea && (
-        <div style={{
-          position: 'fixed', bottom: 16, left: '50%', transform: 'translateX(-50%)',
-          zIndex: 20, display: 'flex', alignItems: 'center',
-          background: '#fff', border: '1px solid #e2e8f0',
-          borderRadius: 14, boxShadow: '0 4px 24px rgba(0,0,0,0.08)',
-          padding: '5px 6px', userSelect: 'none', gap: 2,
-        }}>
-          {[
-            { label: '🎲 Roll', icon: null, onClick: rollAllDice, title: 'Roll dice' },
-            { label: 'PDF', icon: <FileDown size={13} />, onClick: () => exportDiagramAsPdf(activeIdea.name), title: 'Download PDF' },
-          ].map(({ label, icon, onClick, title }, i, arr) => (
-            <>
-              <button key={label} onClick={onClick} title={title}
-                style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
-                  height: 30, padding: '0 12px', borderRadius: 8, border: 'none',
-                  background: 'transparent', cursor: 'pointer',
-                  fontSize: 12, fontWeight: 500, fontFamily: 'inherit', color: '#64748b',
-                }}
-                onMouseEnter={e => (e.currentTarget.style.background = '#f1f5f9')}
-                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-              >{icon}{label}</button>
-              {i < arr.length - 1 && <div style={{ width: 1, height: 18, background: '#e2e8f0', flexShrink: 0 }} />}
-            </>
-          ))}
-        </div>
-      )}
 
       {/* Right side panel — shown when a node is selected */}
       {showPanel && (

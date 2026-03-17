@@ -7,6 +7,8 @@ import type { LineStyle, DiagramType } from '../../types'
 import { QRCodeSVG } from 'qrcode.react'
 import { downloadJSON } from '../../lib/export/json'
 import { exportDiagramAsPdf } from '../../lib/export/exportPdf'
+import { DICE_ICONS, DICE_WORDS, ROOT_TOPICS, pickRandom } from '../../lib/dice'
+import { showToast } from '../CuteToast'
 
 interface SidePanelProps {
   nodeId: string | null
@@ -491,6 +493,32 @@ export function SidePanel({ nodeId, onClose, onImport }: SidePanelProps) {
                       )
                     })}
                   </div>
+                </PRow>
+
+                <PRow label="">
+                  <button
+                    onClick={() => {
+                      const { activeIdea, updateNode } = useIdeaStore.getState()
+                      const nodes = activeIdea?.nodes
+                      if (!nodes) return
+                      const root = nodes.find(n => n.parentId === null)
+                      if (root) updateNode(root.id, { title: pickRandom(ROOT_TOPICS) })
+                      nodes.filter(n => n.parentId !== null).forEach(n => {
+                        const icon = pickRandom(DICE_ICONS)
+                        const words = DICE_WORDS[icon] ?? ['Node']
+                        updateNode(n.id, { title: pickRandom(words), icon })
+                      })
+                      showToast('🎲 Rolled!', { color: '#6366f1', confetti: true })
+                    }}
+                    style={{
+                      width: '100%', padding: '9px 12px', borderRadius: 8, border: '1.5px dashed #cbd5e1',
+                      background: 'transparent', cursor: 'pointer', fontFamily: 'inherit',
+                      fontSize: 12, fontWeight: 600, color: '#64748b',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                  >🎲 Feeling Lucky? Roll the Dice</button>
                 </PRow>
               </SBlock>}
               {node.depth === 0 && <HR />}

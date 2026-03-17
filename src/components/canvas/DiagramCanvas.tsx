@@ -4,6 +4,8 @@ import { getTheme } from '../../lib/themes'
 import { EdgeLayer } from './EdgeLayer'
 import { Node } from './Node'
 import { useKeyboard } from '../../hooks/useKeyboard'
+import { exportDiagramAsPdf } from '../../lib/export/exportPdf'
+import { FileDown } from 'lucide-react'
 
 interface DiagramCanvasProps {
   onNodeSelect: (nodeId: string | null) => void
@@ -400,9 +402,25 @@ export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
         position: 'absolute', bottom: 0, left: 0, right: 0, height: 28,
         background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(8px)',
         borderTop: '1px solid #e8eaed',
-        display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '0 8px',
       }}>
+        {/* Left: PDF */}
+        {activeIdea && (
+          <button
+            onClick={() => exportDiagramAsPdf(activeIdea.name)}
+            title="Download PDF"
+            style={{
+              height: 20, padding: '0 8px', border: '1px solid #e2e8f0', borderRadius: 5,
+              background: 'transparent', cursor: 'pointer', fontSize: 11, fontWeight: 500,
+              color: '#64748b', fontFamily: 'Inter, system-ui, sans-serif',
+              display: 'flex', alignItems: 'center', gap: 4,
+            }}
+          >
+            <FileDown size={11} /> PDF
+          </button>
+        )}
+
         {/* Zoom button */}
         <div style={{ position: 'relative' }}>
           <button
