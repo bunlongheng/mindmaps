@@ -478,6 +478,31 @@ export function SidePanel({ nodeId, onClose, onImport }: SidePanelProps) {
 
             </>
           )}
+
+          <HR />
+          <SBlock title="Feeling Lucky?">
+            <button
+              onClick={() => {
+                const { activeIdea: a, updateNode: upd } = useIdeaStore.getState()
+                const nodes = a?.nodes
+                if (!nodes) return
+                nodes.filter(n => n.parentId !== null).forEach(n => {
+                  const icon = pickRandom(Object.keys(DICE_WORDS))
+                  const words = DICE_WORDS[icon] ?? GENERIC_DICE
+                  upd(n.id, { title: pickRandom(words), icon })
+                })
+                showToast('🎲 Rolled!', { color: '#6366f1', confetti: true })
+              }}
+              style={{
+                width: '100%', padding: '9px 12px', borderRadius: 8, border: '1.5px dashed #cbd5e1',
+                background: 'transparent', cursor: 'pointer', fontFamily: 'inherit',
+                fontSize: 12, fontWeight: 600, color: '#64748b',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              }}
+              onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+            >Roll the Dice</button>
+          </SBlock>
         </div>
       )}
 
