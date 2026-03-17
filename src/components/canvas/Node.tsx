@@ -371,11 +371,6 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
             onPointerMove={onResizePointerMove}
             onPointerUp={onResizePointerUp}
           />
-          {/* Visible grip dots */}
-          {[0.35, 0.5, 0.65].map(t => (
-            <circle key={t} cx={displayW + 1} cy={node.height * t} r={2}
-              fill={strokeColor} opacity={0.5} style={{ pointerEvents: 'none' }} />
-          ))}
         </g>
       )}
 
