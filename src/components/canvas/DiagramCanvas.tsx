@@ -19,6 +19,7 @@ export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
   const gRef = useRef<SVGGElement>(null!)
   const [pan, setPan] = useState({ x: 0, y: 0 })
   const [zoom, setZoom] = useState(1)
+  const [rootDragOffset, setRootDragOffset] = useState<{ dx: number; dy: number } | null>(null)
 
   // Auto-recover: if diagram has no nodes, add a root
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -308,6 +309,7 @@ export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
               onSelect={handleSelect}
               onDragEnd={handleDragEnd}
               onDragMove={handleDragMove}
+              onRootDragOffset={setRootDragOffset}
               onDoubleClick={n => { setSelectedNodeIds([n.id]); onNodeSelect(n.id) }}
               onAddChild={id => addNode(id)}
               svgRef={svgRef}
@@ -396,6 +398,20 @@ export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
       }}>
         {Math.round(zoom * 100)}%
       </div>
+
+      {/* Root drag HUD */}
+      {rootDragOffset && (
+        <div style={{
+          position: 'fixed', top: 16, left: '50%', transform: 'translateX(-50%)',
+          background: 'rgba(15,20,40,0.78)', backdropFilter: 'blur(10px)',
+          color: '#fff', fontFamily: 'Inter, system-ui, sans-serif',
+          fontSize: 13, fontWeight: 700, letterSpacing: '0.04em',
+          padding: '6px 18px', borderRadius: 24,
+          pointerEvents: 'none', zIndex: 9999, whiteSpace: 'nowrap',
+        }}>
+          {rootDragOffset.dx > 0 ? '+' : ''}{rootDragOffset.dx}px &nbsp; {rootDragOffset.dy > 0 ? '+' : ''}{rootDragOffset.dy}px
+        </div>
+      )}
 
       {/* Bottom bar */}
       <div style={{

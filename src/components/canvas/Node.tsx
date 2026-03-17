@@ -11,6 +11,7 @@ interface NodeProps {
   onDoubleClick: (node: IdeaNode) => void
   onAddChild?: (parentId: string) => void
   onDragMove?: (id: string, cx: number, cy: number) => void
+  onRootDragOffset?: (offset: { dx: number; dy: number } | null) => void
   svgRef: React.RefObject<SVGSVGElement>
   readOnly?: boolean
   l1Colors?: string[]
@@ -37,7 +38,7 @@ function darkenColor(hex: string, amount = 0.35): string {
   return `rgb(${nr},${ng},${nb})`
 }
 
-export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onDragMove, svgRef, readOnly, l1Colors = [] }: NodeProps) {
+export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onDragMove, onRootDragOffset, svgRef, readOnly, l1Colors = [] }: NodeProps) {
   const isRoot = node.depth === 0
   const isL2Plus = node.depth >= 2
   const rx = isRoot ? 10 : 8
@@ -90,7 +91,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   const textAnchor = align === 'left' ? 'start' : align === 'right' ? 'end' : 'middle'
 
   const [isDragging, setIsDragging] = useState(false)
-  const dragStart = useRef<{ x: number; y: number; nodeX: number; nodeY: number } | null>(null)
+  const dragStart = useRef<{ x: number; y: number; nodeX: number; nodeY: number; allSnap?: { id: string; x: number; y: number }[] } | null>(null)
   const didDrag = useRef(false)
 
   function getSVGPoint(e: React.PointerEvent) {
@@ -129,7 +130,10 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
     onSelect(node.id, e.metaKey || e.ctrlKey || e.shiftKey)
     const pt = getSVGPoint(e)
     if (!pt) return
-    dragStart.current = { x: pt.x, y: pt.y, nodeX: node.x, nodeY: node.y }
+    const allSnap = isRoot
+      ? (useIdeaStore.getState().activeIdea?.nodes ?? []).map(n => ({ id: n.id, x: n.x, y: n.y }))
+      : undefined
+    dragStart.current = { x: pt.x, y: pt.y, nodeX: node.x, nodeY: node.y, allSnap }
     ;(e.target as Element).setPointerCapture(e.pointerId)
   }
 
@@ -143,15 +147,21 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
     if (Math.abs(dx) > 3 || Math.abs(dy) > 3) didDrag.current = true
     const newX = dragStart.current.nodeX + dx
     const newY = dragStart.current.nodeY + dy
-    useIdeaStore.getState().updateNode(node.id, {
-      x: newX, y: newY, manuallyPositioned: true,
-    })
-    onDragMove?.(node.id, newX + node.width / 2, newY + node.height / 2)
+    if (isRoot && dragStart.current.allSnap) {
+      useIdeaStore.getState().setNodePositions(
+        dragStart.current.allSnap.map(s => ({ id: s.id, x: s.x + dx, y: s.y + dy }))
+      )
+      onRootDragOffset?.({ dx: Math.round(dx), dy: Math.round(dy) })
+    } else {
+      useIdeaStore.getState().updateNode(node.id, { x: newX, y: newY, manuallyPositioned: true })
+      onDragMove?.(node.id, newX + node.width / 2, newY + node.height / 2)
+    }
   }
 
   function onPointerUp(_e: React.PointerEvent) {
     if (!dragStart.current) return
     dragStart.current = null
+    if (isRoot) onRootDragOffset?.(null)
     if (didDrag.current) onDragEnd(node.id, 0, 0)
   }
 

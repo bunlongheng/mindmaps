@@ -146,6 +146,7 @@ interface IdeaStore {
   autoAssignIcons: () => void
   pasteImportFn: ((name: string, nodes: IdeaNode[]) => void) | null
   setPasteImportFn: (fn: ((name: string, nodes: IdeaNode[]) => void) | null) => void
+  setNodePositions: (positions: { id: string; x: number; y: number }[]) => void
 }
 
 function pushHistory(state: IdeaStore): Pick<IdeaStore, 'past' | 'future'> {
@@ -483,6 +484,16 @@ export const useIdeaStore = create<IdeaStore>()(
       const state = get()
       if (!state.activeIdea) return
       set({ showOrderNumbers: v, activeIdea: { ...state.activeIdea, showOrderNumbers: v }, isDirty: true })
+    },
+
+    setNodePositions: (positions) => {
+      const state = get()
+      if (!state.activeIdea) return
+      const posMap = new Map(positions.map(p => [p.id, p]))
+      const nodes = state.activeIdea.nodes.map(n =>
+        posMap.has(n.id) ? { ...n, x: posMap.get(n.id)!.x, y: posMap.get(n.id)!.y, manuallyPositioned: true } : n
+      )
+      set({ activeIdea: { ...state.activeIdea, nodes }, isDirty: true })
     },
 
     setIsImporting: (v) => set({ isImporting: v }),
