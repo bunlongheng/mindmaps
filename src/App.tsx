@@ -7,7 +7,8 @@ import { HomePage } from './components/home/HomePage'
 import { useDiagram } from './hooks/useDiagram'
 import { useIdeaStore } from './store/ideaStore'
 import { decodeShareURL } from './lib/export/share'
-import { ArrowLeft, SlidersHorizontal } from 'lucide-react'
+import { ArrowLeft, SlidersHorizontal, FileDown } from 'lucide-react'
+import { exportDiagramAsPdf } from './lib/export/exportPdf'
 
 const DICE_ICONS = ['user','bot','server','database','zap','plug','git-branch','globe','brain','settings','folder','cloud','mail','lock','key','search','star','rocket','lightbulb','flame','check-circle','map-pin','trophy','message','phone','wrench','chart','eye','shield','flask','sparkles','smile','home','building','briefcase','clock','calendar','code','terminal','package','layers','bell','target','compass','map']
 const DICE_WORDS: Record<string, string[]> = {
@@ -193,23 +194,6 @@ export default function App() {
           <ArrowLeft size={16} />
         </button>
 
-        {/* Roll Dice button — top left, next to back button */}
-        {activeIdea && <button
-          onClick={rollAllDice}
-          title="Roll dice — fill all nodes with random test data"
-          style={{
-            position: 'fixed', top: 14, left: 58, zIndex: 20,
-            height: 36, padding: '0 12px', borderRadius: 10,
-            background: '#fff', border: '1px solid #e2e8f0',
-            boxShadow: '0 2px 10px rgba(0,0,0,0.07)',
-            cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
-            color: '#475569', fontSize: 13, fontWeight: 500, fontFamily: 'inherit',
-          }}
-          onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
-          onMouseLeave={e => (e.currentTarget.style.background = '#fff')}
-        >
-          🎲 Roll
-        </button>}
 
         {/* Format toggle button — top right, only when a diagram is loaded */}
         {activeIdea && <button
@@ -232,6 +216,36 @@ export default function App() {
           Format
         </button>}
       </div>
+
+      {/* Bottom bar */}
+      {activeIdea && (
+        <div style={{
+          position: 'fixed', bottom: 16, left: '50%', transform: 'translateX(-50%)',
+          zIndex: 20, display: 'flex', alignItems: 'center',
+          background: '#fff', border: '1px solid #e2e8f0',
+          borderRadius: 14, boxShadow: '0 4px 24px rgba(0,0,0,0.08)',
+          padding: '5px 6px', userSelect: 'none', gap: 2,
+        }}>
+          {[
+            { label: '🎲 Roll', icon: null, onClick: rollAllDice, title: 'Roll dice' },
+            { label: 'PDF', icon: <FileDown size={13} />, onClick: () => exportDiagramAsPdf(activeIdea.name), title: 'Download PDF' },
+          ].map(({ label, icon, onClick, title }, i, arr) => (
+            <>
+              <button key={label} onClick={onClick} title={title}
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                  height: 30, padding: '0 12px', borderRadius: 8, border: 'none',
+                  background: 'transparent', cursor: 'pointer',
+                  fontSize: 12, fontWeight: 500, fontFamily: 'inherit', color: '#64748b',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.background = '#f1f5f9')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+              >{icon}{label}</button>
+              {i < arr.length - 1 && <div style={{ width: 1, height: 18, background: '#e2e8f0', flexShrink: 0 }} />}
+            </>
+          ))}
+        </div>
+      )}
 
       {/* Right side panel — shown when a node is selected */}
       {showPanel && (
