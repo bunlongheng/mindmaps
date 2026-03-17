@@ -1,3 +1,15 @@
+// Icons are from Lucide React — https://lucide.dev/icons
+// Valid icon values for the `icon` field in JSON:
+// user, bot, server, database, zap, plug, git-branch, globe, brain, settings,
+// folder, cloud, mail, lock, key, search, star, rocket, lightbulb, flame,
+// check-circle, map-pin, trophy, message, phone, wrench, chart, eye, music,
+// heart, flag, shield, flask, trending, paint, sparkles, smile, home, building,
+// briefcase, graduate, gift, clock, calendar, file, cog, cpu, link, code,
+// terminal, package, layers, bell, alert, info, help, refresh, share, download,
+// upload, image, video, mic, headphones, camera, monitor, wifi, card, cart,
+// dollar, pie, activity, target, crosshair, compass, map, bookmark, tag, hash,
+// at, send
+
 import {
   User, Bot, Server, Database, Zap, Plug, GitBranch, Globe,
   Brain, Settings, Folder, Cloud, Mail, Lock, Key, Search,

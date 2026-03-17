@@ -1,7 +1,30 @@
 import type { Diagram } from '../../types'
 
 export function exportToJSON(diagram: Diagram): string {
-  return JSON.stringify(diagram, null, 2)
+  type NodeEntry = string | Record<string, unknown>
+
+  function buildTree(parentId: string | null): NodeEntry[] {
+    return diagram.nodes
+      .filter(n => n.parentId === parentId)
+      .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+      .map(n => {
+        const children = buildTree(n.id)
+        const hasExtras = n.icon || n.bold || n.italic || n.fontSize || (n.textAlign && n.textAlign !== 'center')
+        if (!children.length && !hasExtras) return n.title
+        const node: Record<string, unknown> = { [n.title]: children.length ? children : undefined }
+        if (n.icon) node.icon = n.icon
+        if (n.bold) node.bold = n.bold
+        if (n.italic) node.italic = n.italic
+        if (n.fontSize) node.fontSize = n.fontSize
+        if (n.textAlign && n.textAlign !== 'center') node.textAlign = n.textAlign
+        return node
+      })
+  }
+
+  const root = diagram.nodes.find(n => n.parentId === null)
+  const result: Record<string, unknown> = { [diagram.name]: buildTree(root?.id ?? null) }
+  if (root?.icon) result.icon = root.icon
+  return JSON.stringify(result, null, 2)
 }
 
 export function downloadJSON(diagram: Diagram) {

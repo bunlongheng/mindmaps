@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useIdeaStore } from '../store/ideaStore'
 import { showToast } from '../components/CuteToast'
+import { exportToJSON } from '../lib/export/json'
 
 export function useKeyboard() {
   useEffect(() => {
@@ -24,22 +25,6 @@ export function useKeyboard() {
         return
       }
 
-      if ((e.metaKey || e.ctrlKey) && e.key === 'c') {
-        if (!activeIdea) return
-        const startId = selectedNodeIds.length > 0 ? selectedNodeIds[0] : activeIdea.nodes.find(n => n.parentId === null)?.id
-        if (!startId) return
-        function buildText(nodeId: string, indent: number): string {
-          const node = activeIdea!.nodes.find(n => n.id === nodeId)
-          if (!node) return ''
-          const children = activeIdea!.nodes
-            .filter(n => n.parentId === nodeId)
-            .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
-          return ['    '.repeat(indent) + node.title, ...children.map(c => buildText(c.id, indent + 1))].join('\n')
-        }
-        navigator.clipboard.writeText(buildText(startId, 0))
-        return
-      }
-
       if ((e.metaKey || e.ctrlKey) && e.key === 'a') {
         e.preventDefault()
         if (activeIdea) setSelectedNodeIds(activeIdea.nodes.map(n => n.id))
@@ -58,7 +43,36 @@ export function useKeyboard() {
       if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo() }
       if ((e.metaKey || e.ctrlKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) { e.preventDefault(); redo() }
     }
+    function onCopy(e: ClipboardEvent) {
+      const tag = (e.target as HTMLElement).tagName.toLowerCase()
+      if (tag === 'input' || tag === 'textarea') return
+      const { activeIdea, selectedNodeIds } = useIdeaStore.getState()
+      if (!activeIdea) return
+      e.preventDefault()
+      const rootId = activeIdea.nodes.find(n => n.parentId === null)?.id
+      const startId = selectedNodeIds.length > 0 ? selectedNodeIds[0] : rootId
+      if (!startId) return
+      if (startId === rootId) {
+        e.clipboardData!.setData('text/plain', exportToJSON(activeIdea))
+        showToast('Copied JSON', { color: '#6366f1' })
+        return
+      }
+      function buildText(nodeId: string, indent: number): string {
+        const node = activeIdea!.nodes.find(n => n.id === nodeId)
+        if (!node) return ''
+        const children = activeIdea!.nodes
+          .filter(n => n.parentId === nodeId)
+          .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+        return ['    '.repeat(indent) + node.title, ...children.map(c => buildText(c.id, indent + 1))].join('\n')
+      }
+      e.clipboardData!.setData('text/plain', buildText(startId, 0))
+    }
+
     window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
+    window.addEventListener('copy', onCopy)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('copy', onCopy)
+    }
   }, [])
 }

@@ -523,12 +523,23 @@ export const useIdeaStore = create<IdeaStore>()(
         try {
           const json = JSON.parse(trimmed)
           // Flatten recursive { title, icon?, children? } tree into indent list
-          function flattenJson(node: { title?: string; name?: string; icon?: string; children?: unknown[] }, depth: number) {
-            const title = (node.title ?? node.name ?? '').trim()
+          const META_KEYS = new Set(['icon', 'bold', 'italic', 'fontSize', 'textAlign', 'title', 'name', 'children', 'type', 'lineStyle'])
+          function flattenJson(node: Record<string, unknown> | string, depth: number) {
+            if (typeof node === 'string') { parsed.push({ title: node.trim(), indent: depth }); return }
+            // New format: title is the non-metadata key, its value is children array
+            const titleKey = Object.keys(node).find(k => !META_KEYS.has(k))
+            if (titleKey) {
+              parsed.push({ title: titleKey, indent: depth, icon: node.icon as string | undefined })
+              const kids = node[titleKey]
+              if (Array.isArray(kids)) for (const child of kids) flattenJson(child as Record<string, unknown> | string, depth + 1)
+              return
+            }
+            // Legacy format: { title/name, icon, children }
+            const title = ((node.title ?? node.name) as string | undefined ?? '').trim()
             if (!title) return
-            parsed.push({ title, indent: depth, icon: node.icon })
+            parsed.push({ title, indent: depth, icon: node.icon as string | undefined })
             if (Array.isArray(node.children)) {
-              for (const child of node.children) flattenJson(child as typeof node, depth + 1)
+              for (const child of node.children) flattenJson(child as Record<string, unknown> | string, depth + 1)
             }
           }
           const roots = Array.isArray(json) ? json : [json]
