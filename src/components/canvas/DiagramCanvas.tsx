@@ -402,11 +402,14 @@ export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
         position: 'absolute', bottom: 0, left: 0, right: 0, height: 28,
         background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(8px)',
         borderTop: '1px solid #e8eaed',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center',
         padding: '0 8px',
       }}>
-        {/* Left: PDF */}
-        {activeIdea && (
+        {/* Left: empty */}
+        <div />
+
+        {/* Center: PDF */}
+        {activeIdea ? (
           <button
             onClick={() => exportDiagramAsPdf(activeIdea.name)}
             title="Download PDF"
@@ -419,7 +422,10 @@ export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
           >
             <FileDown size={11} /> PDF
           </button>
-        )}
+        ) : <div />}
+
+        {/* Right: Zoom */}
+        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
 
         {/* Zoom button */}
         <div style={{ position: 'relative' }}>
@@ -466,6 +472,7 @@ export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
               ))}
             </div>
           )}
+        </div>
         </div>
       </div>
     </div>
