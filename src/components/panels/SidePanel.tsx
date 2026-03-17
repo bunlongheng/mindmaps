@@ -8,7 +8,6 @@ import { QRCodeSVG } from 'qrcode.react'
 import { downloadJSON } from '../../lib/export/json'
 import { exportDiagramAsPdf } from '../../lib/export/exportPdf'
 import { showToast } from '../CuteToast'
-import { DICE_ICONS, ROOT_TOPICS } from '../../lib/dice'
 
 interface SidePanelProps {
   nodeId: string | null
@@ -322,27 +321,6 @@ export function SidePanel({ nodeId, onClose, onImport }: SidePanelProps) {
                 <PRow label="Fill">
                   <ColorField color={node.color} onChange={c => save({ color: c })} swatches={themeColors} />
                 </PRow>
-                <PRow label="Border">
-                  <ColorField
-                    color={node.borderColor ?? 'none'}
-                    onChange={c => c === 'none'
-                      ? save({ borderColor: undefined, borderWidth: undefined })
-                      : save({ borderColor: c, borderWidth: node.borderWidth ?? 1.5 })}
-                    allowNone
-                    swatches={themeColors}
-                  />
-                </PRow>
-                {node.borderColor && (
-                  <PRow label="Width">
-                    <div style={{ display: 'flex', gap: 5 }}>
-                      {(['Thin', 'Med', 'Thick', 'Bold'] as const).map((lbl, i) => {
-                        const ws = [1, 1.5, 2.5, 4]
-                        const active = node.borderWidth === ws[i] || (!node.borderWidth && i === 1)
-                        return <button key={lbl} onClick={() => save({ borderWidth: ws[i] })} style={chip(active)}>{lbl}</button>
-                      })}
-                    </div>
-                  </PRow>
-                )}
               </SBlock>
               <HR />
 
@@ -495,31 +473,6 @@ export function SidePanel({ nodeId, onClose, onImport }: SidePanelProps) {
                   </div>
                 </PRow>
 
-                <PRow label="">
-                  <button
-                    onClick={() => {
-                      const { activeIdea: a, updateNode: upd } = useIdeaStore.getState()
-                      const nodes = a?.nodes
-                      if (!nodes) return
-                      const root = nodes.find(n => n.parentId === null)
-                      if (root) upd(root.id, { title: pickRandom(ROOT_TOPICS) })
-                      nodes.filter(n => n.parentId !== null).forEach(n => {
-                        const icon = pickRandom(DICE_ICONS)
-                        const words = DICE_WORDS[icon] ?? GENERIC_DICE
-                        upd(n.id, { title: pickRandom(words), icon })
-                      })
-                      showToast('🎲 Rolled!', { color: '#6366f1', confetti: true })
-                    }}
-                    style={{
-                      width: '100%', padding: '9px 12px', borderRadius: 8, border: '1.5px dashed #cbd5e1',
-                      background: 'transparent', cursor: 'pointer', fontFamily: 'inherit',
-                      fontSize: 12, fontWeight: 600, color: '#64748b',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                    }}
-                    onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
-                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                  >🎲 Feeling Lucky? Roll the Dice</button>
-                </PRow>
               </SBlock>}
               {node.depth === 0 && <HR />}
 
