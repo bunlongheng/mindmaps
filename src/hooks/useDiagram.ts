@@ -1,4 +1,12 @@
 import { useCallback } from 'react'
+
+function uuid(): string {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) return uuid()
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = Math.random() * 16 | 0
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16)
+  })
+}
 import { showToast } from '../components/CuteToast'
 import { supabase, hasSupabase } from '../lib/supabase'
 import { useIdeaStore } from '../store/ideaStore'
@@ -124,12 +132,12 @@ export function useDiagram() {
   }, [setIsDirty])
 
   const createDiagram = useCallback(async (name: string) => {
-    const id = crypto.randomUUID()
-    const rootId = crypto.randomUUID()
+    const id = uuid()
+    const rootId = uuid()
     const now = new Date().toISOString()
     const TOPIC_LABELS = ['Main Topic 1', 'Main Topic 2', 'Main Topic 3', 'Main Topic 4', 'Main Topic 5']
     const topicNodes: IdeaNode[] = TOPIC_LABELS.map((title, i) => ({
-      id: crypto.randomUUID(), title,
+      id: uuid(), title,
       color: ROOT_COLORS[i % ROOT_COLORS.length],
       parentId: rootId, depth: 1,
       x: 0, y: 0, width: 160, height: 40, sortOrder: i,
@@ -167,7 +175,7 @@ export function useDiagram() {
     let n = 2
     while (existingNames.has(finalName)) finalName = `${name} ${n++}`
 
-    const id = crypto.randomUUID?.() ?? Math.random().toString(36).slice(2)
+    const id = uuid()
     const now = new Date().toISOString()
     const diagram: Diagram = { id, name: finalName, type: 'mindmap', lineStyle: 'orthogonal', createdAt: now, updatedAt: now, nodes }
 
@@ -183,7 +191,7 @@ export function useDiagram() {
       id, name: finalName, type: 'mindmap', line_style: 'orthogonal',
       sharing_enabled: false, nodes,
     })
-    if (error) { console.error(error); showToast('Failed to create map', { color: '#ef4444' }); return null }
+    if (error) { console.error(error); showToast(`Failed: ${error.message}`, { color: '#ef4444' }); return null }
     await loadDiagram(id)
     await loadDiagramList()
     showToast(`✦ "${finalName}" created`, { color: '#22c55e', confetti: true })
