@@ -5,8 +5,17 @@ const L1_EXTRA = 140     // additional distance from L1 to L2
 const L2_EXTRA = 120     // additional distance from L2 to L3
 const V_SPREAD = 0.32    // angular spread (radians) between siblings
 
-function autoW(title: string, fontSize: number): number {
-  return Math.max(80, Math.ceil(title.length * fontSize * 0.60 + 24))
+/** Font sizes must match Node.tsx rendering */
+const FONT_SIZES: Record<number, number> = { 1: 22, 2: 16, 3: 13 }
+const DEFAULT_FONT_SIZE = 11
+
+function autoW(node: IdeaNode, depth: number): number {
+  const fontSize = FONT_SIZES[depth] ?? DEFAULT_FONT_SIZE
+  const hasVisual = !!(node.icon || node.emoji)
+  const textW = node.title.length * fontSize * 0.64 + 24
+  const total = hasVisual ? Math.ceil(textW / 0.78) : textW
+  const min = depth === 1 ? 120 : depth === 2 ? 90 : 70
+  return Math.max(min, Math.min(400, Math.ceil(total)))
 }
 
 function placeSubtree(
@@ -22,9 +31,8 @@ function placeSubtree(
   const node = nodes.find(n => n.id === nodeId)
   if (!node) return
 
-  const fontSize = depth === 1 ? 18 : depth === 2 ? 15 : 13
-  const w = autoW(node.title, fontSize)
-  const h = depth === 1 ? 40 : depth === 2 ? 34 : 30
+  const w = autoW(node, depth)
+  const h = depth === 1 ? 44 : depth === 2 ? 36 : 30
 
   if (!node.manuallyPositioned) {
     result.push({ ...node, x: cx - w / 2, y: cy - h / 2, width: w, height: h })
