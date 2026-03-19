@@ -146,8 +146,10 @@ export function useDiagram(userId: string | null = null) {
       .eq('user_id', userId)
       .single()
     if (error) { console.error(error); return }
-    setActiveIdea(rowToDiagram(data))
+    const diagram = rowToDiagram(data)
+    setActiveIdea(diagram)
     localStorage.setItem('activeIdeaId', id)
+    lsSaveDiagram(diagram) // cache for minimap
   }, [setActiveIdea, userId])
 
   const saveDiagram = useCallback(async (diagram: Diagram) => {
@@ -166,6 +168,7 @@ export function useDiagram(userId: string | null = null) {
       nodes:           diagram.nodes,
     })
     if (error) { console.error('save error:', error); showToast('Failed to save', { color: '#ef4444' }); return }
+    lsSaveDiagram(diagram) // keep localStorage cache fresh for minimap
     setIsDirty(false)
   }, [setIsDirty, userId])
 

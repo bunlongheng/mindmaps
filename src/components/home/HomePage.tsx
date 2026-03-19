@@ -314,7 +314,12 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
 
 // ── DiagramMinimap ─────────────────────────────────────────────────────────
 
-function DiagramMinimap({ id }: { id: string }) {
+const TYPE_LABEL: Record<string, string> = {
+  mindmap: 'Mind Map', fishbone: 'Fishbone', timeline: 'Timeline',
+  'tree-vertical': 'Tree', 'tree-horizontal': 'Tree',
+}
+
+function DiagramMinimap({ id, type }: { id: string; type: string }) {
   const [nodes, setNodes] = useState<IdeaNode[]>([])
 
   useEffect(() => {
@@ -324,39 +329,98 @@ function DiagramMinimap({ id }: { id: string }) {
     } catch {}
   }, [id])
 
-  if (nodes.length === 0) {
+  const root = nodes.find(n => n.parentId === null)
+  const l1s = root ? nodes.filter(n => n.parentId === root.id) : []
+  const totalNodes = nodes.length
+
+  // No data yet — show a lively gradient placeholder
+  if (l1s.length === 0) {
+    const placeholderColors = ['#6366f1','#ec4899','#f97316','#22c55e','#06b6d4']
     return (
-      <svg width="160" height="90" viewBox="0 0 160 90">
-        <rect x="10" y="32" width="55" height="24" rx="5" fill="#1a1d2e" opacity="0.15" />
-        <rect x="78" y="12" width="70" height="12" rx="3" fill="#6366f1" opacity="0.15" />
-        <rect x="78" y="30" width="70" height="12" rx="3" fill="#ec4899" opacity="0.15" />
-        <rect x="78" y="48" width="70" height="12" rx="3" fill="#f97316" opacity="0.15" />
-        <rect x="78" y="66" width="70" height="12" rx="3" fill="#22c55e" opacity="0.15" />
-      </svg>
+      <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '0 16px' }}>
+        <div style={{ display: 'flex', gap: 0 }}>
+          {placeholderColors.map((c, i) => (
+            <div key={i} style={{
+              width: 22, height: 22, borderRadius: '50%', background: c,
+              border: '2px solid #fff', marginLeft: i === 0 ? 0 : -6,
+              opacity: 0.3,
+            }} />
+          ))}
+        </div>
+        <div style={{ fontSize: 11, color: '#cbd5e1', fontWeight: 500 }}>Open to preview</div>
+      </div>
     )
   }
 
-  const pad = 10, svgW = 160, svgH = 90
-  const minX = Math.min(...nodes.map(n => n.x))
-  const minY = Math.min(...nodes.map(n => n.y))
-  const maxX = Math.max(...nodes.map(n => n.x + n.width))
-  const maxY = Math.max(...nodes.map(n => n.y + n.height))
-  const bW = maxX - minX || 1, bH = maxY - minY || 1
-  const scale = Math.min((svgW - pad * 2) / bW, (svgH - pad * 2) / bH)
-  const offX = pad + ((svgW - pad * 2) - bW * scale) / 2
-  const offY = pad + ((svgH - pad * 2) - bH * scale) / 2
+  // Pick accent color from first L1
+  const accent = l1s[0]?.color ?? '#6366f1'
+  const MAX_DOTS = 5
+  const visibleL1s = l1s.slice(0, MAX_DOTS)
+  const overflow = l1s.length - MAX_DOTS
 
   return (
-    <svg width={svgW} height={svgH} viewBox={`0 0 ${svgW} ${svgH}`}>
-      {nodes.map(n => (
-        <rect key={n.id}
-          x={offX + (n.x - minX) * scale} y={offY + (n.y - minY) * scale}
-          width={Math.max(n.width * scale, 2)} height={Math.max(n.height * scale, 2)}
-          rx={n.depth === 0 ? 3 : 1.5}
-          fill={n.depth === 0 ? '#1a1d2e' : n.color} opacity={0.85}
-        />
-      ))}
-    </svg>
+    <div style={{ width: '100%', height: '100%', padding: '14px 14px 10px', display: 'flex', flexDirection: 'column', gap: 10, boxSizing: 'border-box' }}>
+
+      {/* Overlapping category dots row */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <div style={{ display: 'flex' }}>
+          {visibleL1s.map((l1, i) => (
+            <div key={l1.id} title={l1.title} style={{
+              width: 24, height: 24, borderRadius: '50%',
+              background: l1.color, border: '2.5px solid #fff',
+              marginLeft: i === 0 ? 0 : -8, zIndex: visibleL1s.length - i,
+              position: 'relative', flexShrink: 0,
+              boxShadow: '0 1px 4px rgba(0,0,0,0.15)',
+            }} />
+          ))}
+          {overflow > 0 && (
+            <div style={{
+              width: 24, height: 24, borderRadius: '50%',
+              background: '#e2e8f0', border: '2.5px solid #fff',
+              marginLeft: -8, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 8, fontWeight: 700, color: '#64748b', flexShrink: 0,
+            }}>+{overflow}</div>
+          )}
+        </div>
+        <span style={{ fontSize: 10, color: '#94a3b8', marginLeft: 'auto', fontWeight: 500 }}>
+          {totalNodes} nodes
+        </span>
+      </div>
+
+      {/* Category rows — name + child count bar */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 5, flex: 1 }}>
+        {l1s.slice(0, 4).map(l1 => {
+          const childCount = nodes.filter(n => n.parentId === l1.id).length
+          const maxChildren = Math.max(...l1s.map(x => nodes.filter(n => n.parentId === x.id).length), 1)
+          const barW = Math.max((childCount / maxChildren) * 100, 8)
+          return (
+            <div key={l1.id} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div style={{ width: 7, height: 7, borderRadius: '50%', background: l1.color, flexShrink: 0 }} />
+              <span style={{ fontSize: 10, color: '#334155', fontWeight: 500, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {l1.title}
+              </span>
+              {childCount > 0 && (
+                <span style={{ fontSize: 9, fontWeight: 700, color: l1.color, background: l1.color + '20', borderRadius: 4, padding: '1px 5px', flexShrink: 0 }}>
+                  {childCount}
+                </span>
+              )}
+            </div>
+          )
+        })}
+        {l1s.length > 4 && (
+          <div style={{ fontSize: 9, color: '#94a3b8', paddingLeft: 13 }}>+{l1s.length - 4} more</div>
+        )}
+      </div>
+
+      {/* Type badge */}
+      <div style={{
+        alignSelf: 'flex-start', fontSize: 9, fontWeight: 600, color: accent,
+        background: accent + '15', borderRadius: 5, padding: '2px 7px',
+        letterSpacing: '0.03em', textTransform: 'uppercase',
+      }}>
+        {TYPE_LABEL[type] ?? type}
+      </div>
+    </div>
   )
 }
 
@@ -374,24 +438,26 @@ function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isFav, onToggleFav }:
       onMouseLeave={() => setHovered(false)}
       style={{
         background: '#fff',
-        border: hovered ? '2px solid #6366f1' : '2px solid #e2e8f0',
-        borderRadius: 14, overflow: 'hidden', cursor: 'pointer',
-        transition: 'border-color 0.15s',
-        boxShadow: hovered ? '0 4px 16px rgba(99,102,241,0.12)' : '0 1px 4px rgba(0,0,0,0.04)',
+        border: `2px solid ${hovered ? '#6366f1' : '#e8edf5'}`,
+        borderRadius: 16, overflow: 'hidden', cursor: 'pointer',
+        transition: 'border-color 0.15s, box-shadow 0.15s, transform 0.15s',
+        boxShadow: hovered ? '0 8px 24px rgba(99,102,241,0.15)' : '0 1px 4px rgba(0,0,0,0.05)',
+        transform: hovered ? 'translateY(-2px)' : 'translateY(0)',
       }}
       onClick={onOpen}
     >
-      <div style={{ height: 130, background: '#fafbff', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', borderBottom: '1px solid #f1f5f9' }}>
-        <DiagramMinimap id={diagram.id} />
+      {/* Thumbnail */}
+      <div style={{ height: 150, background: 'linear-gradient(145deg, #f8faff 0%, #f1f5ff 100%)', position: 'relative', borderBottom: '1px solid #eef2f8' }}>
+        <DiagramMinimap id={diagram.id} type={diagram.type} />
         {hovered && (
           <>
             <button onClick={e => { e.stopPropagation(); onToggleFav() }} title={isFav ? 'Unfavorite' : 'Favorite'}
-              style={{ position: 'absolute', top: 8, left: 8, width: 26, height: 26, borderRadius: 7, border: isFav ? '1px solid #fde68a' : '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', color: isFav ? '#eab308' : '#94a3b8', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Star size={12} fill={isFav ? '#eab308' : 'none'} />
+              style={{ position: 'absolute', top: 8, left: 8, width: 28, height: 28, borderRadius: 8, border: isFav ? '1px solid #fde68a' : '1px solid #e2e8f0', background: 'rgba(255,255,255,0.95)', cursor: 'pointer', color: isFav ? '#eab308' : '#94a3b8', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }}>
+              <Star size={13} fill={isFav ? '#eab308' : 'none'} />
             </button>
             <button onClick={e => { e.stopPropagation(); onDelete() }}
-              style={{ position: 'absolute', top: 8, right: 8, width: 26, height: 26, borderRadius: 7, border: '1px solid #fee2e2', background: '#fff', cursor: 'pointer', color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Trash2 size={12} />
+              style={{ position: 'absolute', top: 8, right: 8, width: 28, height: 28, borderRadius: 8, border: '1px solid #fecaca', background: 'rgba(255,255,255,0.95)', cursor: 'pointer', color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }}>
+              <Trash2 size={13} />
             </button>
           </>
         )}
