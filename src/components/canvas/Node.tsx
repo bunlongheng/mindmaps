@@ -341,9 +341,15 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
             const zoneW = displayW * 0.2
             const emojiSize = Math.min(node.height * 0.52, 22)
             const textAreaX = zoneW + (displayW - zoneW) / 2
+            const sw = strokeW / 2
             const h = node.height
             return (
               <>
+                <path
+                  d={`M ${rx},${sw} L ${zoneW},${sw} L ${zoneW},${h - sw} L ${rx},${h - sw} Q ${sw},${h - sw} ${sw},${h - rx} L ${sw},${rx} Q ${sw},${sw} ${rx},${sw} Z`}
+                  fill="rgba(255,255,255,0.95)"
+                  style={{ pointerEvents: 'none' }}
+                />
                 <text
                   x={zoneW / 2} y={h / 2 + emojiSize * 0.36}
                   textAnchor="middle" fontSize={emojiSize}
