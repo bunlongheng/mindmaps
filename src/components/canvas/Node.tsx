@@ -224,11 +224,20 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
     useIdeaStore.getState().setResizePreview(null)
   }
 
+  const clipId = `clip-${node.id}`
+
   return (
     <g style={{
       transform: `translate(${node.x}px, ${node.y}px)`,
       transition: isDragging ? 'none' : 'transform 0.22s cubic-bezier(0.4,0,0.2,1)',
     }}>
+    {!isRoot && (
+      <defs>
+        <clipPath id={clipId}>
+          <rect x={4} y={0} width={displayW - 8} height={node.height} rx={rx} ry={rx} />
+        </clipPath>
+      </defs>
+    )}
     <g
       onPointerDown={handlePointerDown}
       onPointerMove={onPointerMove}
@@ -325,7 +334,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
           />
         </foreignObject>
       ) : (
-        <>
+        <g clipPath={isRoot ? undefined : `url(#${clipId})`}>
           {hasEmoji && resolvedEmoji && (() => {
             const zoneW = displayW * 0.2
             const emojiSize = Math.min(node.height * 0.52, 22)
@@ -400,7 +409,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
               style={{ pointerEvents: 'none' }}
             >{label}</text>
           )}
-        </>
+        </g>
       )}
 
       {/* Resize handle — right edge, non-root only */}
