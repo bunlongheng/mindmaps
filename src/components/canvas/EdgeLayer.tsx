@@ -245,7 +245,7 @@ export function EdgeLayer({ nodes, lineStyle, diagramType }: EdgeLayerProps) {
     const l1s = nodes.filter(n => n.depth === 1).sort((a, b) => a.x - b.x)
     const spineY = root.y + root.height / 2
     const spineEndX = l1s.length > 0
-      ? l1s[l1s.length - 1].x + l1s[l1s.length - 1].width + 20
+      ? l1s[l1s.length - 1].x + l1s[l1s.length - 1].width
       : root.x + root.width + 400
 
     return (
