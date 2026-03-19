@@ -235,7 +235,7 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
             <h2 style={{ fontSize: 13, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 16 }}>
               {favDiagrams.length > 0 ? 'Recent' : 'All Maps'} · {recentDiagrams.length}
             </h2>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12 }}>
               {recentDiagrams.map(d => (
                 <DiagramCard
                   key={d.id} diagram={d} timeAgo={timeAgo(d.updatedAt)}
@@ -423,7 +423,7 @@ function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isFav, onToggleFav }:
       </div>
 
       {/* Thumbnail */}
-      <div style={{ height: 150, background: 'linear-gradient(145deg, #f8faff 0%, #f1f5ff 100%)', position: 'relative' }}>
+      <div style={{ height: 110, background: 'linear-gradient(145deg, #f8faff 0%, #f1f5ff 100%)', position: 'relative' }}>
         <DiagramMinimap id={diagram.id} />
         {hovered && (
           <>
