@@ -362,7 +362,7 @@ function DiagramMinimap({ id }: { id: string }) {
                 {l1.title}
               </span>
               <span style={{ fontSize: 10, fontWeight: 700, color: l1.color, background: l1.color + '18', borderRadius: 4, padding: '1px 6px', flexShrink: 0 }}>
-                {childCount} node{childCount !== 1 ? 's' : ''}
+                {childCount}
               </span>
             </div>
           )
