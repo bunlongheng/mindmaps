@@ -218,18 +218,6 @@ export function SidePanel({ nodeId, onClose, onImport, onDelete }: SidePanelProp
     ? `${window.location.origin}${window.location.pathname}?map=${activeIdea.id}`
     : ''
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  function rollDice() {
-    const store = useIdeaStore.getState()
-    const ids = selectedNodeIds.length > 1 ? selectedNodeIds : (nodeId ? [nodeId] : [])
-    const allNodes = activeIdea?.nodes ?? []
-    ids.forEach(id => {
-      const n = allNodes.find(nd => nd.id === id)
-      if (!n) return
-      const pool = (n.icon && DICE_WORDS[n.icon]) ? DICE_WORDS[n.icon] : GENERIC_DICE
-      store.updateNode(id, { title: pickRandom(pool) })
-    })
-  }
 
   function copyShare() {
     navigator.clipboard.writeText(shareUrl).then(() => {
