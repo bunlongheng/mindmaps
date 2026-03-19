@@ -378,7 +378,7 @@ function DiagramMinimap({ id }: { id: string }) {
             const childCount = nodes.filter(n => n.parentId === l1.id).length
             return (
               <div key={l1.id} title={l1.title} style={{
-                width: 22, height: 22, borderRadius: '50%',
+                width: 16, height: 16, borderRadius: '50%',
                 background: l1.color,
                 marginLeft: i === 0 ? 0 : -6,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
