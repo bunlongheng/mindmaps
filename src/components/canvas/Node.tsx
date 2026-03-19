@@ -89,7 +89,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   const bgOpacity = 1
   const fontStyle = node.italic ? 'italic' : 'normal'
   // Text alignment — default left for non-root nodes
-  const align = isRoot ? 'center' : (node.textAlign ?? 'left')
+  const align = isRoot ? 'center' : node.depth === 1 ? (node.textAlign ?? 'left') : 'left'
   const textAnchor = align === 'left' ? 'start' : align === 'right' ? 'end' : 'middle'
 
   const [isDragging, setIsDragging] = useState(false)
