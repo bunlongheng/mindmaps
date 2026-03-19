@@ -257,8 +257,6 @@ export function EdgeLayer({ nodes, lineStyle, diagramType }: EdgeLayerProps) {
         {/* Per L1: spine tick + vertical branch through all descendants (L2+L3 centered at l1CX) */}
         {l1s.map(l1 => {
           const l1CX = l1.x + l1.width / 2
-          const above = l1.y + l1.height / 2 < spineY
-          const l1SpineEdge = above ? l1.y + l1.height : l1.y
 
           // All descendants are centered at l1CX — find the farthest one
           const descendants = nodes.filter(n => {
@@ -269,6 +267,10 @@ export function EdgeLayer({ nodes, lineStyle, diagramType }: EdgeLayerProps) {
             }
             return false
           })
+
+          // Detect above/below from descendants' actual positions (L1 is always centered at spineY)
+          const above = descendants.length > 0 && descendants.some(n => n.y + n.height < spineY)
+          const l1SpineEdge = above ? l1.y : l1.y + l1.height
 
           const farY = descendants.length > 0
             ? above

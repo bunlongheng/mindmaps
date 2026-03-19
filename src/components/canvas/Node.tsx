@@ -70,10 +70,12 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
     strokeW = 3
   }
 
-  // Icon color: saturated brand color against the white zone (all depths)
+  // Icon color: white on L1 (solid bg), darkened on L2+ (light bg), textColor on root
   const iconColor = isRoot
     ? textColor
-    : (node.color.startsWith('#') ? darkenColor(node.color, 0.35) : node.color)
+    : node.depth === 1
+      ? '#ffffff'
+      : (node.color.startsWith('#') ? darkenColor(node.color, 0.35) : node.color)
 
   // Node-level overrides from panel
   if (node.borderColor) { strokeColor = node.borderColor; strokeW = Math.max(strokeW, node.borderWidth ?? 1.5) }
@@ -234,7 +236,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
     {!isRoot && (
       <defs>
         <clipPath id={clipId}>
-          <rect x={4} y={0} width={displayW - 8} height={node.height} rx={rx} ry={rx} />
+          <rect x={0} y={0} width={displayW - 4} height={node.height} rx={rx} ry={rx} />
         </clipPath>
       </defs>
     )}
@@ -339,15 +341,9 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
             const zoneW = displayW * 0.2
             const emojiSize = Math.min(node.height * 0.52, 22)
             const textAreaX = zoneW + (displayW - zoneW) / 2
-            const sw = strokeW / 2
             const h = node.height
             return (
               <>
-                <path
-                  d={`M ${rx},${sw} L ${zoneW},${sw} L ${zoneW},${h - sw} L ${rx},${h - sw} Q ${sw},${h - sw} ${sw},${h - rx} L ${sw},${rx} Q ${sw},${sw} ${rx},${sw} Z`}
-                  fill="rgba(255,255,255,0.95)"
-                  style={{ pointerEvents: 'none' }}
-                />
                 <text
                   x={zoneW / 2} y={h / 2 + emojiSize * 0.36}
                   textAnchor="middle" fontSize={emojiSize}
@@ -373,18 +369,6 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
             const textAreaX = zoneW + (displayW - zoneW) / 2
             return (
               <>
-                {/* White icon zone — inset by half stroke so it never bleeds over the border */}
-                {(() => {
-                  const sw = strokeW / 2
-                  const h = node.height
-                  return (
-                    <path
-                      d={`M ${rx},${sw} L ${zoneW},${sw} L ${zoneW},${h - sw} L ${rx},${h - sw} Q ${sw},${h - sw} ${sw},${h - rx} L ${sw},${rx} Q ${sw},${sw} ${rx},${sw} Z`}
-                      fill="rgba(255,255,255,0.95)"
-                      style={{ pointerEvents: 'none' }}
-                    />
-                  )
-                })()}
                 <NodeIcon icon={resolvedIcon} x={iconX} y={iconY} size={iconSize} color={iconColor} strokeWidth={node.depth === 1 ? 2.8 : 1.8} />
                 <text
                   x={align === 'left' ? zoneW + 8 : align === 'right' ? displayW - 8 : textAreaX}
