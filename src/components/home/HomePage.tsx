@@ -141,20 +141,21 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
               style={{
                 width: 34, height: 34, borderRadius: '50%', overflow: 'hidden',
                 border: showUserMenu ? '2px solid #6366f1' : '2px solid #e2e8f0',
-                cursor: 'pointer', padding: 0, background: '#f1f5f9',
-                transition: 'border-color 0.15s',
-                flexShrink: 0,
+                cursor: 'pointer', padding: 0, background: '#e0e7ff',
+                transition: 'border-color 0.15s', flexShrink: 0,
+                position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}
               title={displayName}
             >
-              {/* Initials always rendered as base layer */}
-              <span style={{ fontSize: 13, fontWeight: 700, color: '#6366f1', position: 'absolute', userSelect: 'none' }}>
+              {/* Initials — always centered, visible when image fails */}
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#6366f1', userSelect: 'none', lineHeight: 1 }}>
                 {displayName[0]?.toUpperCase() ?? '?'}
               </span>
-              {/* Avatar image floats on top — hides on error, initials show through */}
+              {/* Avatar image — covers initials when it loads, disappears on error */}
               {avatarUrl && (
-                <img src={avatarUrl} alt={displayName}
-                  style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }}
+                <img src={avatarUrl} alt=""
+                  referrerPolicy="no-referrer"
+                  style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
                   onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
                 />
               )}
