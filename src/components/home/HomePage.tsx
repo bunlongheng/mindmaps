@@ -327,7 +327,6 @@ function DiagramMinimap({ id }: { id: string }) {
 
   const root = nodes.find(n => n.parentId === null)
   const l1s = root ? nodes.filter(n => n.parentId === root.id) : []
-  const totalNodes = nodes.length
 
   // No data yet — show a lively gradient placeholder
   if (l1s.length === 0) {
@@ -348,34 +347,34 @@ function DiagramMinimap({ id }: { id: string }) {
     )
   }
 
-  return (
-    <div style={{ width: '100%', height: '100%', padding: '14px 14px 10px', display: 'flex', flexDirection: 'column', gap: 10, boxSizing: 'border-box' }}>
+  const MAX_ROWS = 5
 
-      {/* Total node count */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-        <span style={{ fontSize: 10, color: '#94a3b8', fontWeight: 500 }}>{totalNodes} nodes</span>
+  return (
+    <div style={{ width: '100%', height: '100%', padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 6, boxSizing: 'border-box' }}>
+
+      {/* Category count summary */}
+      <div style={{ fontSize: 10, fontWeight: 600, color: '#6366f1', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+        {l1s.length} {l1s.length === 1 ? 'category' : 'categories'}
       </div>
 
-      {/* Category rows — name + child count bar */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 5, flex: 1 }}>
-        {l1s.slice(0, 4).map(l1 => {
+      {/* Per-category breakdown */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1 }}>
+        {l1s.slice(0, MAX_ROWS).map(l1 => {
           const childCount = nodes.filter(n => n.parentId === l1.id).length
           return (
             <div key={l1.id} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <div style={{ width: 7, height: 7, borderRadius: '50%', background: l1.color, flexShrink: 0 }} />
-              <span style={{ fontSize: 10, color: '#334155', fontWeight: 500, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <div style={{ width: 8, height: 8, borderRadius: '50%', background: l1.color, flexShrink: 0 }} />
+              <span style={{ fontSize: 11, color: '#334155', fontWeight: 500, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {l1.title}
               </span>
-              {childCount > 0 && (
-                <span style={{ fontSize: 9, fontWeight: 700, color: l1.color, background: l1.color + '20', borderRadius: 4, padding: '1px 5px', flexShrink: 0 }}>
-                  {childCount}
-                </span>
-              )}
+              <span style={{ fontSize: 10, fontWeight: 700, color: l1.color, background: l1.color + '18', borderRadius: 4, padding: '1px 6px', flexShrink: 0 }}>
+                {childCount} node{childCount !== 1 ? 's' : ''}
+              </span>
             </div>
           )
         })}
-        {l1s.length > 4 && (
-          <div style={{ fontSize: 9, color: '#94a3b8', paddingLeft: 13 }}>+{l1s.length - 4} more</div>
+        {l1s.length > MAX_ROWS && (
+          <div style={{ fontSize: 10, color: '#94a3b8', paddingLeft: 14 }}>+{l1s.length - MAX_ROWS} more categories</div>
         )}
       </div>
 
