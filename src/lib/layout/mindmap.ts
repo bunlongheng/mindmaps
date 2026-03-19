@@ -1,12 +1,12 @@
 import type { IdeaNode } from '../../types'
 
-const ROOT_RADIUS = 90   // distance from root center to L1 center
-const L1_EXTRA = 140     // additional distance from L1 to L2
-const L2_EXTRA = 120     // additional distance from L2 to L3
-const V_SPREAD = 0.32    // angular spread (radians) between siblings
+const ROOT_RADIUS = 180  // distance from root center to L1 center
+const L1_EXTRA = 200     // additional distance from L1 to L2
+const L2_EXTRA = 160     // additional distance from L2 to L3
+const V_SPREAD = 0.45    // minimum angular spread (radians) per sibling
 
-/** Font sizes must match Node.tsx rendering */
-const FONT_SIZES: Record<number, number> = { 1: 22, 2: 16, 3: 13 }
+/** Slightly reduced font sizes for mindmap to prevent branch overlap (~18% smaller) */
+const FONT_SIZES: Record<number, number> = { 1: 18, 2: 13, 3: 11 }
 const DEFAULT_FONT_SIZE = 11
 
 function autoW(node: IdeaNode, depth: number): number {
@@ -14,8 +14,8 @@ function autoW(node: IdeaNode, depth: number): number {
   const hasVisual = !!(node.icon || node.emoji)
   const textW = node.title.length * fontSize * 0.64 + 24
   const total = hasVisual ? Math.ceil(textW / 0.78) : textW
-  const min = depth === 1 ? 120 : depth === 2 ? 90 : 70
-  return Math.max(min, Math.min(400, Math.ceil(total)))
+  const min = depth === 1 ? 100 : depth === 2 ? 80 : 60
+  return Math.max(min, Math.min(360, Math.ceil(total)))
 }
 
 function placeSubtree(
@@ -31,11 +31,12 @@ function placeSubtree(
   const node = nodes.find(n => n.id === nodeId)
   if (!node) return
 
+  const fontSize = FONT_SIZES[depth] ?? DEFAULT_FONT_SIZE
   const w = autoW(node, depth)
-  const h = depth === 1 ? 44 : depth === 2 ? 36 : 30
+  const h = depth === 1 ? 40 : depth === 2 ? 32 : 28
 
   if (!node.manuallyPositioned) {
-    result.push({ ...node, x: cx - w / 2, y: cy - h / 2, width: w, height: h })
+    result.push({ ...node, x: cx - w / 2, y: cy - h / 2, width: w, height: h, fontSize })
   } else {
     result.push(node)
   }
