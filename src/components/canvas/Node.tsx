@@ -86,7 +86,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   const fontWeight = node.bold ? '700' : (isRoot ? '500' : node.depth === 1 ? '500' : '400')
 
   // Depth-based bg opacity only (text stays fully opaque)
-  const bgOpacity = node.depth === 2 ? 0.9 : node.depth === 3 ? 0.8 : node.depth >= 4 ? 0.7 : 1
+  const bgOpacity = 1
   const fontStyle = node.italic ? 'italic' : 'normal'
   // Text alignment — default left for non-root nodes
   const align = isRoot ? 'center' : (node.textAlign ?? 'left')

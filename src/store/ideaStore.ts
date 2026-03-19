@@ -175,15 +175,19 @@ export const useIdeaStore = create<IdeaStore>()(
 
     setPasteImportFn: (fn) => set({ pasteImportFn: fn }),
 
-    setActiveIdea: (d) => set({
-      activeIdea: d,
-      diagramType: d.type,
-      lineStyle: d.lineStyle,
-      showOrderNumbers: d.showOrderNumbers ?? true,
-      past: [],
-      future: [],
-      isDirty: false,
-    }),
+    setActiveIdea: (d) => {
+      // Re-run layout on load so node sizes always reflect current title text
+      const nodes = runLayout(d.nodes, d.type)
+      set({
+        activeIdea: { ...d, nodes },
+        diagramType: d.type,
+        lineStyle: d.lineStyle,
+        showOrderNumbers: d.showOrderNumbers ?? true,
+        past: [],
+        future: [],
+        isDirty: false,
+      })
+    },
 
     setDiagrams: (ds) => set({ diagrams: ds }),
     setSelectedNodeIds: (ids) => set({ selectedNodeIds: ids }),
