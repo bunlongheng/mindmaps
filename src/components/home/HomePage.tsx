@@ -319,7 +319,7 @@ const TYPE_LABEL: Record<string, string> = {
   'tree-vertical': 'Tree', 'tree-horizontal': 'Tree',
 }
 
-function DiagramMinimap({ id, type }: { id: string; type: string }) {
+function DiagramMinimap({ id }: { id: string }) {
   const [nodes, setNodes] = useState<IdeaNode[]>([])
 
   useEffect(() => {
@@ -352,39 +352,12 @@ function DiagramMinimap({ id, type }: { id: string; type: string }) {
     )
   }
 
-  // Pick accent color from first L1
-  const accent = l1s[0]?.color ?? '#6366f1'
-  const MAX_DOTS = 5
-  const visibleL1s = l1s.slice(0, MAX_DOTS)
-  const overflow = l1s.length - MAX_DOTS
-
   return (
     <div style={{ width: '100%', height: '100%', padding: '14px 14px 10px', display: 'flex', flexDirection: 'column', gap: 10, boxSizing: 'border-box' }}>
 
-      {/* Overlapping category dots row */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <div style={{ display: 'flex' }}>
-          {visibleL1s.map((l1, i) => (
-            <div key={l1.id} title={l1.title} style={{
-              width: 24, height: 24, borderRadius: '50%',
-              background: l1.color, border: '2.5px solid #fff',
-              marginLeft: i === 0 ? 0 : -8, zIndex: visibleL1s.length - i,
-              position: 'relative', flexShrink: 0,
-              boxShadow: '0 1px 4px rgba(0,0,0,0.15)',
-            }} />
-          ))}
-          {overflow > 0 && (
-            <div style={{
-              width: 24, height: 24, borderRadius: '50%',
-              background: '#e2e8f0', border: '2.5px solid #fff',
-              marginLeft: -8, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 8, fontWeight: 700, color: '#64748b', flexShrink: 0,
-            }}>+{overflow}</div>
-          )}
-        </div>
-        <span style={{ fontSize: 10, color: '#94a3b8', marginLeft: 'auto', fontWeight: 500 }}>
-          {totalNodes} nodes
-        </span>
+      {/* Total node count */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <span style={{ fontSize: 10, color: '#94a3b8', fontWeight: 500 }}>{totalNodes} nodes</span>
       </div>
 
       {/* Category rows — name + child count bar */}
@@ -410,14 +383,6 @@ function DiagramMinimap({ id, type }: { id: string; type: string }) {
         )}
       </div>
 
-      {/* Type badge */}
-      <div style={{
-        alignSelf: 'flex-start', fontSize: 9, fontWeight: 600, color: accent,
-        background: accent + '15', borderRadius: 5, padding: '2px 7px',
-        letterSpacing: '0.03em', textTransform: 'uppercase',
-      }}>
-        {TYPE_LABEL[type] ?? type}
-      </div>
     </div>
   )
 }
@@ -446,7 +411,7 @@ function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isFav, onToggleFav }:
     >
       {/* Thumbnail */}
       <div style={{ height: 150, background: 'linear-gradient(145deg, #f8faff 0%, #f1f5ff 100%)', position: 'relative', borderBottom: '1px solid #eef2f8' }}>
-        <DiagramMinimap id={diagram.id} type={diagram.type} />
+        <DiagramMinimap id={diagram.id} />
         {hovered && (
           <>
             <button onClick={e => { e.stopPropagation(); onToggleFav() }} title={isFav ? 'Unfavorite' : 'Favorite'}
@@ -461,8 +426,13 @@ function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isFav, onToggleFav }:
         )}
       </div>
       <div style={{ padding: '10px 14px 12px' }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: '#1e293b', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {diagram.name}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+            {diagram.name}
+          </div>
+          <div style={{ fontSize: 9, fontWeight: 600, color: '#6366f1', background: '#6366f115', borderRadius: 5, padding: '2px 6px', letterSpacing: '0.03em', textTransform: 'uppercase', flexShrink: 0 }}>
+            {TYPE_LABEL[diagram.type] ?? diagram.type}
+          </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#94a3b8' }}>
           <Clock size={11} /> {timeAgo}
