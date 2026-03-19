@@ -215,7 +215,7 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
             <h2 style={{ fontSize: 13, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 6 }}>
               <Star size={12} fill="#eab308" color="#eab308" /> Favorites · {favDiagrams.length}
             </h2>
-            <div style={{ display: 'flex', gap: 16, overflowX: 'auto', paddingBottom: 8, scrollbarWidth: 'none' }}>
+            <div style={{ display: 'flex', gap: 16, overflowX: 'auto', overflowY: 'visible', paddingBottom: 12, paddingTop: 4, scrollbarWidth: 'none' }}>
               {favDiagrams.map(d => (
                 <div key={d.id} style={{ flexShrink: 0, width: 220 }}>
                   <DiagramCard
