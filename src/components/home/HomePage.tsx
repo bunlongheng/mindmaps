@@ -354,13 +354,18 @@ function DiagramMinimap({ id }: { id: string }) {
 
       {/* Per-category breakdown */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1 }}>
-        {l1s.slice(0, MAX_ROWS).map(l1 => {
+        {l1s.slice(0, MAX_ROWS).map((l1, idx) => {
           const childCount = nodes.filter(n => n.parentId === l1.id).length
+          const isLast = idx === Math.min(MAX_ROWS, l1s.length) - 1
+          const overflow = l1s.length - MAX_ROWS
           return (
             <div key={l1.id} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <span style={{ fontSize: 11, color: '#334155', fontWeight: 500, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {l1.title}
               </span>
+              {isLast && overflow > 0 && (
+                <span style={{ fontSize: 10, fontWeight: 600, color: '#94a3b8', flexShrink: 0 }}>+{overflow}</span>
+              )}
               <span style={{ fontSize: 10, fontWeight: 700, color: l1.color, background: l1.color + '18', borderRadius: 4, padding: '1px 6px', flexShrink: 0 }}>
                 {childCount}
               </span>
