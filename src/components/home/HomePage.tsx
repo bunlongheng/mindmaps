@@ -314,10 +314,6 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
 
 // ── DiagramMinimap ─────────────────────────────────────────────────────────
 
-const TYPE_LABEL: Record<string, string> = {
-  mindmap: 'Mind Map', fishbone: 'Fishbone', timeline: 'Timeline',
-  'tree-vertical': 'Tree', 'tree-horizontal': 'Tree',
-}
 
 function DiagramMinimap({ id }: { id: string }) {
   const [nodes, setNodes] = useState<IdeaNode[]>([])
@@ -409,18 +405,18 @@ function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isFav, onToggleFav }:
       }}
       onClick={onOpen}
     >
-      {/* Header — name + type badge */}
+      {/* Header — name (left) + time (right) */}
       <div style={{ padding: '12px 14px 10px', borderBottom: '1px solid #eef2f8', display: 'flex', alignItems: 'center', gap: 6 }}>
         <div style={{ fontSize: 13, fontWeight: 600, color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
           {diagram.name}
         </div>
-        <div style={{ fontSize: 9, fontWeight: 600, color: '#6366f1', background: '#6366f115', borderRadius: 5, padding: '2px 6px', letterSpacing: '0.03em', textTransform: 'uppercase', flexShrink: 0 }}>
-          {TYPE_LABEL[diagram.type] ?? diagram.type}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, color: '#94a3b8', flexShrink: 0 }}>
+          <Clock size={11} /> {timeAgo}
         </div>
       </div>
 
       {/* Thumbnail */}
-      <div style={{ height: 130, background: 'linear-gradient(145deg, #f8faff 0%, #f1f5ff 100%)', position: 'relative' }}>
+      <div style={{ height: 150, background: 'linear-gradient(145deg, #f8faff 0%, #f1f5ff 100%)', position: 'relative' }}>
         <DiagramMinimap id={diagram.id} />
         {hovered && (
           <>
@@ -434,13 +430,6 @@ function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isFav, onToggleFav }:
             </button>
           </>
         )}
-      </div>
-
-      {/* Footer — time */}
-      <div style={{ padding: '8px 14px 10px', borderTop: '1px solid #eef2f8' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#94a3b8' }}>
-          <Clock size={11} /> {timeAgo}
-        </div>
       </div>
     </div>
   )
