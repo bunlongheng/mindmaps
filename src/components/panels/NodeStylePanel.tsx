@@ -156,7 +156,7 @@ export function NodeStylePanel({ nodeId, onClose }: NodeStylePanelProps) {
         <HR />
 
         {/* ── Branch ── */}
-        {(diagramType === 'mindmap' || diagramType === 'tree-vertical' || diagramType === 'tree-horizontal') && <SBlock title="Branch">
+        {(diagramType === 'logic-chart' || diagramType === 'tree-vertical' || diagramType === 'tree-horizontal') && <SBlock title="Branch">
           <PRow label="Line">
             <div style={{ display: 'flex', gap: 6 }}>
               {([

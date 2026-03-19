@@ -12,6 +12,7 @@ import { subscribeWithSelector } from 'zustand/middleware'
 import type { Diagram, DiagramMeta, DiagramType, LineStyle, IdeaNode } from '../types'
 import { computeTreeLayout } from '../lib/layout/tree'
 import { computeIdeasLayout } from '../lib/layout/ideas'
+import { computeMindmapLayout } from '../lib/layout/mindmap'
 import { computeFishboneLayout } from '../lib/layout/fishbone'
 import { computeTimelineLayout } from '../lib/layout/timeline'
 import { getTheme } from '../lib/themes'
@@ -90,11 +91,12 @@ function rebalanceColors(nodes: IdeaNode[], palette: string[]): IdeaNode[] {
 
 function runLayout(nodes: IdeaNode[], type: DiagramType): IdeaNode[] {
   switch (type) {
-    case 'mindmap': return computeIdeasLayout(nodes)
-    case 'fishbone': return computeFishboneLayout(nodes)
-    case 'tree-vertical': return computeTreeLayout(nodes, 'vertical')
+    case 'logic-chart': return computeIdeasLayout(nodes)
+    case 'mindmap':     return computeMindmapLayout(nodes)
+    case 'fishbone':    return computeFishboneLayout(nodes)
+    case 'tree-vertical':   return computeTreeLayout(nodes, 'vertical')
     case 'tree-horizontal': return computeTreeLayout(nodes, 'horizontal')
-    case 'timeline': return computeTimelineLayout(nodes)
+    case 'timeline':    return computeTimelineLayout(nodes)
   }
 }
 
@@ -163,7 +165,7 @@ export const useIdeaStore = create<IdeaStore>()(
     diagrams: [],
     selectedNodeIds: [],
     isDirty: false,
-    diagramType: 'mindmap',
+    diagramType: 'logic-chart',
     lineStyle: 'orthogonal',
     themeId: localStorage.getItem('ideas:themeId') ?? 'default',
     showOrderNumbers: true,

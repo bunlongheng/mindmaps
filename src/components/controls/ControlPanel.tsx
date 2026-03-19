@@ -14,6 +14,7 @@ interface ControlPanelProps {
 }
 
 const DIAGRAM_TYPES: { value: DiagramType; label: string }[] = [
+  { value: 'logic-chart',     label: 'Logic' },
   { value: 'mindmap',         label: 'Mind' },
   { value: 'tree-vertical',   label: 'Tree ↓' },
   { value: 'tree-horizontal', label: 'Tree →' },

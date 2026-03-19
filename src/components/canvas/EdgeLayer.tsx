@@ -89,8 +89,8 @@ export function EdgeLayer({ nodes, lineStyle, diagramType }: EdgeLayerProps) {
   const showOrderNumbers = useIdeaStore(s => s.showOrderNumbers)
   const nodeMap = new Map(nodes.map(n => [n.id, n]))
 
-  // ── Mindmap ───────────────────────────────────────────────────────────────
-  if (diagramType === 'mindmap') {
+  // ── Logic Chart ───────────────────────────────────────────────────────────
+  if (diagramType === 'logic-chart') {
     const root = nodes.find(n => n.parentId === null)
     if (!root) return null
 
@@ -162,6 +162,31 @@ export function EdgeLayer({ nodes, lineStyle, diagramType }: EdgeLayerProps) {
         {deeperEdges.map(n => (
           <Edge key={n.id} parent={nodeMap.get(n.parentId!)!} child={n} lineStyle={lineStyle} diagramType={diagramType} />
         ))}
+      </g>
+    )
+  }
+
+  // ── Mindmap (radial) ──────────────────────────────────────────────────────
+  if (diagramType === 'mindmap') {
+    const edges = nodes.filter(n => n.parentId && nodeMap.has(n.parentId))
+    return (
+      <g>
+        {edges.map(n => {
+          const parent = nodeMap.get(n.parentId!)!
+          const x1 = parent.x + parent.width / 2
+          const y1 = parent.y + parent.height / 2
+          const x2 = n.x + n.width / 2
+          const y2 = n.y + n.height / 2
+          const mx = (x1 + x2) / 2
+          const my = (y1 + y2) / 2
+          return (
+            <path key={n.id}
+              d={`M ${x1} ${y1} Q ${mx} ${my} ${x2} ${y2}`}
+              stroke={n.color} strokeWidth={n.depth === 1 ? 3 : 2}
+              fill="none" strokeLinecap="round"
+            />
+          )
+        })}
       </g>
     )
   }

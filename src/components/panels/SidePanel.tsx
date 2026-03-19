@@ -17,6 +17,7 @@ interface SidePanelProps {
 }
 
 const DIAGRAM_TYPES: { value: DiagramType; label: string }[] = [
+  { value: 'logic-chart',     label: 'Logic Chart' },
   { value: 'mindmap',         label: 'Mind Map' },
   { value: 'tree-vertical',   label: 'Tree ↓' },
   { value: 'tree-horizontal', label: 'Tree →' },
@@ -25,7 +26,7 @@ const DIAGRAM_TYPES: { value: DiagramType; label: string }[] = [
 ]
 
 function DiagramTypeIcon({ value, color }: { value: string; color: string }) {
-  if (value === 'mindmap') return (
+  if (value === 'logic-chart') return (
     <svg width="36" height="26" viewBox="0 0 36 26" fill="none">
       <circle cx="7" cy="13" r="5" fill={color} opacity="0.9"/>
       <line x1="12" y1="13" x2="17" y2="13" stroke={color} strokeWidth="1.8" strokeLinecap="round"/>
@@ -36,6 +37,22 @@ function DiagramTypeIcon({ value, color }: { value: string; color: string }) {
       <rect x="25" y="3"  width="10" height="5" rx="1.5" fill={color} opacity="0.3"/>
       <rect x="25" y="10" width="10" height="5" rx="1.5" fill={color} opacity="0.3"/>
       <rect x="25" y="17" width="10" height="5" rx="1.5" fill={color} opacity="0.3"/>
+    </svg>
+  )
+  if (value === 'mindmap') return (
+    <svg width="36" height="26" viewBox="0 0 36 26" fill="none">
+      <circle cx="18" cy="13" r="4" fill={color} opacity="0.9"/>
+      {/* radial branches: top, right, bottom, left, top-right, bottom-left */}
+      <line x1="18" y1="9"  x2="18" y2="3"  stroke={color} strokeWidth="1.6" strokeLinecap="round"/>
+      <line x1="22" y1="13" x2="30" y2="13" stroke={color} strokeWidth="1.6" strokeLinecap="round"/>
+      <line x1="18" y1="17" x2="18" y2="23" stroke={color} strokeWidth="1.6" strokeLinecap="round"/>
+      <line x1="14" y1="13" x2="6"  y2="13" stroke={color} strokeWidth="1.6" strokeLinecap="round"/>
+      <line x1="21" y1="10" x2="27" y2="5"  stroke={color} strokeWidth="1.4" strokeLinecap="round"/>
+      <line x1="15" y1="16" x2="9"  y2="21" stroke={color} strokeWidth="1.4" strokeLinecap="round"/>
+      <rect x="14" y="1"  width="8" height="4" rx="1.5" fill={color} opacity="0.3"/>
+      <rect x="28" y="11" width="7" height="4" rx="1.5" fill={color} opacity="0.3"/>
+      <rect x="14" y="21" width="8" height="4" rx="1.5" fill={color} opacity="0.3"/>
+      <rect x="1"  y="11" width="7" height="4" rx="1.5" fill={color} opacity="0.3"/>
     </svg>
   )
   if (value === 'tree-vertical') return (
@@ -272,7 +289,7 @@ export function SidePanel({ nodeId, onClose, onImport, onDelete }: SidePanelProp
             <>
 
               {/* Root circle controls */}
-              {node.depth === 0 && diagramType === 'mindmap' && (
+              {node.depth === 0 && diagramType === 'logic-chart' && (
                 <>
                   <SBlock title="Circle">
                     <PRow label="Radius">
@@ -509,32 +526,36 @@ export function SidePanel({ nodeId, onClose, onImport, onDelete }: SidePanelProp
               })}
             </div>
           </SBlock>
-          <HR />
-          <SBlock title="Line Style">
-            <div style={{ display: 'flex', gap: 6 }}>
-              {([
-                { value: 'curved' as LineStyle,     label: 'Brace',    d: 'M1,2 L5,2 M1,5 L5,5 M1,8 L5,8 M5,2 L5,8 L9,5' },
-                { value: 'straight' as LineStyle,   label: 'Straight', d: 'M1,8 L15,2' },
-                { value: 'orthogonal' as LineStyle, label: 'Square',   d: 'M1,8 L8,8 L8,2 L15,2' },
-              ]).map(({ value, label, d }) => {
-                const active = lineStyle === value
-                return (
-                  <button key={value} onClick={() => setLineStyle(value)}
-                    style={{
-                      flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
-                      gap: 5, padding: '8px 4px', borderRadius: 8, cursor: 'pointer',
-                      border: `1.5px solid ${active ? '#3b82f6' : '#e0e2e7'}`,
-                      background: active ? '#eff6ff' : '#fff', fontFamily: 'inherit',
-                    }}>
-                    <svg width="16" height="10" viewBox="0 0 16 10" fill="none">
-                      <path d={d} stroke={active ? '#3b82f6' : '#64748b'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                    <span style={{ fontSize: 9, fontWeight: active ? 600 : 500, color: active ? '#3b82f6' : '#64748b' }}>{label}</span>
-                  </button>
-                )
-              })}
-            </div>
-          </SBlock>
+          {diagramType !== 'fishbone' && diagramType !== 'timeline' && (
+            <>
+              <HR />
+              <SBlock title="Line Style">
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {([
+                    { value: 'curved' as LineStyle,     label: 'Brace',    d: 'M1,2 L5,2 M1,5 L5,5 M1,8 L5,8 M5,2 L5,8 L9,5' },
+                    { value: 'straight' as LineStyle,   label: 'Straight', d: 'M1,8 L15,2' },
+                    { value: 'orthogonal' as LineStyle, label: 'Square',   d: 'M1,8 L8,8 L8,2 L15,2' },
+                  ]).map(({ value, label, d }) => {
+                    const active = lineStyle === value
+                    return (
+                      <button key={value} onClick={() => setLineStyle(value)}
+                        style={{
+                          flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
+                          gap: 5, padding: '8px 4px', borderRadius: 8, cursor: 'pointer',
+                          border: `1.5px solid ${active ? '#3b82f6' : '#e0e2e7'}`,
+                          background: active ? '#eff6ff' : '#fff', fontFamily: 'inherit',
+                        }}>
+                        <svg width="16" height="10" viewBox="0 0 16 10" fill="none">
+                          <path d={d} stroke={active ? '#3b82f6' : '#64748b'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                        <span style={{ fontSize: 9, fontWeight: active ? 600 : 500, color: active ? '#3b82f6' : '#64748b' }}>{label}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </SBlock>
+            </>
+          )}
           <HR />
           <SBlock title="Display">
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>

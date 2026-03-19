@@ -11,13 +11,21 @@ const LS_LIST = 'ideas:list'
 const lsKey = (id: string) => `ideas:diagram:${id}`
 
 function lsGetList(): DiagramMeta[] {
-  try { return JSON.parse(localStorage.getItem(LS_LIST) ?? '[]') } catch { return [] }
+  try {
+    const list = JSON.parse(localStorage.getItem(LS_LIST) ?? '[]')
+    return list.map((m: DiagramMeta) => m.type === 'mindmap' ? { ...m, type: 'logic-chart' } : m)
+  } catch { return [] }
 }
 function lsSaveList(list: DiagramMeta[]) {
   localStorage.setItem(LS_LIST, JSON.stringify(list))
 }
 function lsGetDiagram(id: string): Diagram | null {
-  try { return JSON.parse(localStorage.getItem(lsKey(id)) ?? 'null') } catch { return null }
+  try {
+    const d = JSON.parse(localStorage.getItem(lsKey(id)) ?? 'null')
+    if (!d) return null
+    if (d.type === 'mindmap') d.type = 'logic-chart'  // migrate old data
+    return d
+  } catch { return null }
 }
 function lsSaveDiagram(d: Diagram) {
   localStorage.setItem(lsKey(d.id), JSON.stringify(d))
@@ -60,7 +68,7 @@ function rowToDiagram(row: Record<string, unknown>): Diagram {
   return {
     id:             row.id as string,
     name:           row.name as string,
-    type:           row.type as Diagram['type'],
+    type:           ((row.type === 'mindmap' ? 'logic-chart' : row.type)) as Diagram['type'],
     lineStyle:      row.line_style as Diagram['lineStyle'],
     createdAt:      row.created_at as string,
     updatedAt:      row.updated_at as string,
@@ -196,7 +204,7 @@ export function useDiagram(userId: string | null = null) {
     ]
     const { computeIdeasLayout } = await import('../lib/layout/ideas')
     const laid = computeIdeasLayout(allNodes)
-    const diagram: Diagram = { id, name, type: 'mindmap', lineStyle: 'orthogonal', createdAt: now, updatedAt: now, nodes: laid }
+    const diagram: Diagram = { id, name, type: 'logic-chart', lineStyle: 'orthogonal', createdAt: now, updatedAt: now, nodes: laid }
 
     if (!hasSupabase || !supabase || !userId) {
       lsSaveDiagram(diagram)
@@ -207,7 +215,7 @@ export function useDiagram(userId: string | null = null) {
       return
     }
     const { error } = await supabase.from('ideas').insert({
-      id, user_id: userId, name, type: 'mindmap', line_style: 'orthogonal',
+      id, user_id: userId, name, type: 'logic-chart', line_style: 'orthogonal',
       sharing_enabled: false, nodes: laid,
     })
     if (error) { console.error(error); showToast('Failed to create map', { color: '#ef4444' }); return }
@@ -224,7 +232,7 @@ export function useDiagram(userId: string | null = null) {
 
     const id = crypto.randomUUID()
     const now = new Date().toISOString()
-    const diagram: Diagram = { id, name: finalName, type: 'mindmap', lineStyle: 'orthogonal', createdAt: now, updatedAt: now, nodes }
+    const diagram: Diagram = { id, name: finalName, type: 'logic-chart', lineStyle: 'orthogonal', createdAt: now, updatedAt: now, nodes }
 
     if (!hasSupabase || !supabase || !userId) {
       lsSaveDiagram(diagram)
@@ -235,7 +243,7 @@ export function useDiagram(userId: string | null = null) {
       return id
     }
     const { error } = await supabase.from('ideas').insert({
-      id, user_id: userId, name: finalName, type: 'mindmap', line_style: 'orthogonal',
+      id, user_id: userId, name: finalName, type: 'logic-chart', line_style: 'orthogonal',
       sharing_enabled: false, nodes,
     })
     if (error) { console.error(error); showToast(`Failed: ${error.message}`, { color: '#ef4444' }); return null }
