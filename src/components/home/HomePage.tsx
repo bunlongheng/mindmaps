@@ -358,7 +358,6 @@ function DiagramMinimap({ id }: { id: string }) {
           const childCount = nodes.filter(n => n.parentId === l1.id).length
           return (
             <div key={l1.id} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <div style={{ width: 8, height: 8, borderRadius: '50%', background: l1.color, flexShrink: 0 }} />
               <span style={{ fontSize: 11, color: '#334155', fontWeight: 500, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {l1.title}
               </span>
@@ -375,7 +374,7 @@ function DiagramMinimap({ id }: { id: string }) {
             return (
               <div key={l1.id} title={l1.title} style={{
                 width: 22, height: 22, borderRadius: '50%',
-                background: l1.color, border: '2px solid #fff',
+                background: l1.color,
                 marginLeft: i === 0 ? 0 : -6,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: 8, fontWeight: 700, color: '#fff',
