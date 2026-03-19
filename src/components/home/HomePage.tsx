@@ -147,11 +147,17 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
               }}
               title={displayName}
             >
-              {avatarUrl
-                ? <img src={avatarUrl} alt={displayName} style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                    onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
-                : <span style={{ fontSize: 13, fontWeight: 700, color: '#6366f1' }}>{displayName[0]?.toUpperCase()}</span>
-              }
+              {/* Initials always rendered as base layer */}
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#6366f1', position: 'absolute', userSelect: 'none' }}>
+                {displayName[0]?.toUpperCase() ?? '?'}
+              </span>
+              {/* Avatar image floats on top — hides on error, initials show through */}
+              {avatarUrl && (
+                <img src={avatarUrl} alt={displayName}
+                  style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }}
+                  onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
+                />
+              )}
             </button>
 
             {showUserMenu && (

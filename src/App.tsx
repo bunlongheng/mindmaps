@@ -62,17 +62,24 @@ export default function App() {
     })
   }
 
+  // Re-run load when userId becomes available (auth resolves after mount)
+  const prevUserId = useRef<string | null>(null)
   useEffect(() => {
+    if (authLoading) return // wait for auth to resolve
     const shared = decodeShareURL()
     if (shared) { setActiveIdea(shared); return }
+    const userId = user?.id ?? null
     const params = new URLSearchParams(window.location.search)
     const mapId = params.get('map') || localStorage.getItem('activeIdeaId')
+    // Only re-run if userId just changed (null → value) or first load
+    if (prevUserId.current === userId && prevUserId.current !== null) return
+    prevUserId.current = userId
     if (mapId) {
       loadDiagram(mapId)
     } else {
       loadDiagramList()
     }
-  }, [])
+  }, [authLoading, user?.id])
 
   useEffect(() => {
     setPasteImportFn(async (name, nodes) => {
