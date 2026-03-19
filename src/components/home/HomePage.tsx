@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from 'react'
-import type { User } from '@supabase/supabase-js'
 import { useIdeaStore } from '../../store/ideaStore'
 import { useDiagram } from '../../hooks/useDiagram'
 import type { DiagramMeta, IdeaNode } from '../../types'

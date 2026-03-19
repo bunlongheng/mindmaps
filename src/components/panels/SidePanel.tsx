@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import { NODE_ICONS } from '../../lib/icons'
 import { useIdeaStore } from '../../store/ideaStore'
 import { getTheme, THEMES } from '../../lib/themes'
-import { X, AlignLeft, AlignCenter, AlignRight, Copy, Check, RefreshCw, Download, Upload, FileDown, Dice5, Trash2 } from 'lucide-react'
+import { X, AlignLeft, AlignCenter, AlignRight, Copy, Check, RefreshCw, Download, Upload, FileDown, Trash2 } from 'lucide-react'
 import type { LineStyle, DiagramType } from '../../types'
 import { QRCodeSVG } from 'qrcode.react'
 import { downloadJSON } from '../../lib/export/json'
@@ -218,6 +218,7 @@ export function SidePanel({ nodeId, onClose, onImport, onDelete }: SidePanelProp
     ? `${window.location.origin}${window.location.pathname}?map=${activeIdea.id}`
     : ''
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   function rollDice() {
     const store = useIdeaStore.getState()
     const ids = selectedNodeIds.length > 1 ? selectedNodeIds : (nodeId ? [nodeId] : [])

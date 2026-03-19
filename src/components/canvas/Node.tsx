@@ -179,7 +179,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   const hasIcon = !!resolvedIcon && !!getLucideIcon(resolvedIcon)
   // Use live preview width during resize drag, otherwise committed node width
   const displayW = previewW ?? node.width
-  const iconZoneW = (hasIcon || hasEmoji) ? displayW * 0.2 : 0
+  void ((hasIcon || hasEmoji) ? displayW * 0.2 : 0) // iconZoneW — reserved for future use
   const label = node.title
   // All coordinates are relative to (node.x, node.y)
   const cx = displayW / 2

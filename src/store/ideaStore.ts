@@ -1,6 +1,6 @@
 // Polyfill crypto.randomUUID for non-secure contexts (HTTP on LAN)
 function uuid(): string {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) return uuid()
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID()
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
     const r = Math.random() * 16 | 0
     return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16)
@@ -602,7 +602,7 @@ export const useIdeaStore = create<IdeaStore>()(
         // Strip "Icon" suffix, convert PascalCase/camelCase to kebab-case
         const kebab = raw
           .replace(/Icon$/, '')
-          .replace(/([A-Z])/g, (m, l, i) => (i === 0 ? l.toLowerCase() : '-' + l.toLowerCase()))
+          .replace(/([A-Z])/g, (_m, l, i) => (i === 0 ? l.toLowerCase() : '-' + l.toLowerCase()))
           .toLowerCase()
         if (ICON_MAP[kebab]) return kebab
         if (ICON_ALIASES[kebab]) return ICON_ALIASES[kebab]
