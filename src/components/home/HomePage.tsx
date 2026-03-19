@@ -368,7 +368,8 @@ function DiagramMinimap({ id }: { id: string }) {
             </div>
           )
         })}
-        <div style={{ display: 'flex', gap: 0, paddingLeft: 2 }}>
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 0, flex: 1 }}>
           {l1s.map((l1, i) => {
             const childCount = nodes.filter(n => n.parentId === l1.id).length
             return (
@@ -385,6 +386,10 @@ function DiagramMinimap({ id }: { id: string }) {
               </div>
             )
           })}
+          </div>
+          <span style={{ fontSize: 10, fontWeight: 700, color: '#1e293b', background: '#1e293b18', borderRadius: 20, padding: '2px 7px', flexShrink: 0, marginLeft: 6 }}>
+            {l1s.length}
+          </span>
         </div>
       </div>
 
@@ -399,15 +404,6 @@ function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isFav, onToggleFav }:
   isFav: boolean; onToggleFav: () => void
 }) {
   const [hovered, setHovered] = useState(false)
-  const l1Count = (() => {
-    try {
-      const data = JSON.parse(localStorage.getItem(`ideas:diagram:${diagram.id}`) ?? 'null')
-      if (!data?.nodes) return 0
-      const root = data.nodes.find((n: { parentId: string | null }) => n.parentId === null)
-      return root ? data.nodes.filter((n: { parentId: string }) => n.parentId === root.id).length : 0
-    } catch { return 0 }
-  })()
-
   return (
     <div
       onMouseEnter={() => setHovered(true)}
@@ -427,11 +423,6 @@ function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isFav, onToggleFav }:
         <div style={{ fontSize: 13, fontWeight: 600, color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
           {diagram.name}
         </div>
-        {l1Count > 0 && (
-          <span style={{ fontSize: 10, fontWeight: 700, color: '#6366f1', background: '#6366f115', borderRadius: 20, padding: '2px 7px', flexShrink: 0 }}>
-            {l1Count}
-          </span>
-        )}
         <div style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, color: '#94a3b8', flexShrink: 0 }}>
           <Clock size={11} /> {timeAgo}
         </div>
