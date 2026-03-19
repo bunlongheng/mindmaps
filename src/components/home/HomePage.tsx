@@ -369,7 +369,24 @@ function DiagramMinimap({ id }: { id: string }) {
           )
         })}
         {l1s.length > MAX_ROWS && (
-          <div style={{ fontSize: 10, color: '#94a3b8', paddingLeft: 14 }}>+{l1s.length - MAX_ROWS}</div>
+          <div style={{ display: 'flex', gap: 0, paddingLeft: 2 }}>
+            {l1s.slice(MAX_ROWS).map((l1, i) => {
+              const childCount = nodes.filter(n => n.parentId === l1.id).length
+              return (
+                <div key={l1.id} title={l1.title} style={{
+                  width: 22, height: 22, borderRadius: '50%',
+                  background: l1.color, border: '2px solid #fff',
+                  marginLeft: i === 0 ? 0 : -6,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 8, fontWeight: 700, color: '#fff',
+                  flexShrink: 0, boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                  zIndex: l1s.length - MAX_ROWS - i, position: 'relative',
+                }}>
+                  {childCount}
+                </div>
+              )
+            })}
+          </div>
         )}
       </div>
 
