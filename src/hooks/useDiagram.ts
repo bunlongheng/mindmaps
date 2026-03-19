@@ -1,12 +1,4 @@
 import { useCallback } from 'react'
-
-function uuid(): string {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) return uuid()
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
-    const r = Math.random() * 16 | 0
-    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16)
-  })
-}
 import { showToast } from '../components/CuteToast'
 import { supabase, hasSupabase } from '../lib/supabase'
 import { useIdeaStore } from '../store/ideaStore'
@@ -55,7 +47,7 @@ function rowToDiagram(row: Record<string, unknown>): Diagram {
     width:              n.width as number,
     height:             n.height as number,
     sortOrder:          n.sortOrder as number,
-    manuallyPositioned: (n.manuallyPositioned ?? false) as boolean,
+    manuallyPositioned: n.depth === 0 ? false : (n.manuallyPositioned ?? false) as boolean,
     fontSize:           (n.fontSize && n.fontSize !== 13) ? n.fontSize as number : undefined,
     bold:               (n.bold ?? undefined) as boolean | undefined,
     italic:             (n.italic ?? undefined) as boolean | undefined,
@@ -79,26 +71,70 @@ function rowToDiagram(row: Record<string, unknown>): Diagram {
 
 // ── hook ────────────────────────────────────────────────────────────────────
 
-export function useDiagram() {
+export function useDiagram(userId: string | null = null) {
   const { setActiveIdea, setDiagrams, setIsDirty } = useIdeaStore()
 
   const loadDiagramList = useCallback(async () => {
-    if (!hasSupabase || !supabase) {
+    if (!hasSupabase || !supabase || !userId) {
       setDiagrams(lsGetList())
       return
     }
     const { data, error } = await supabase
       .from('ideas')
       .select('id, name, type, updated_at')
+      .eq('user_id', userId)
       .order('updated_at', { ascending: false })
     if (error) { console.error(error); setDiagrams(lsGetList()); return }
+
+    // ── One-time migration: if Supabase is empty, upload from localStorage ──
+    if ((data ?? []).length === 0) {
+      const localList = lsGetList()
+      if (localList.length > 0) {
+        const rows = localList
+          .map(meta => lsGetDiagram(meta.id))
+          .filter(Boolean) as Diagram[]
+        if (rows.length > 0) {
+          const { error: insertErr } = await supabase.from('ideas').insert(
+            rows.map(d => ({
+              id:              d.id,
+              user_id:         userId,
+              name:            d.name,
+              type:            d.type,
+              line_style:      d.lineStyle ?? 'orthogonal',
+              sharing_enabled: d.sharingEnabled ?? false,
+              nodes:           d.nodes,
+            }))
+          )
+          if (insertErr) {
+            console.error('Migration error:', insertErr)
+            showToast(`Sync failed: ${insertErr.message}`, { color: '#ef4444' })
+            // Still show local maps so user isn't blocked
+            setDiagrams(localList)
+            return
+          }
+          showToast(`✦ ${rows.length} map${rows.length > 1 ? 's' : ''} synced to cloud`, { color: '#22c55e', confetti: true })
+          const { data: fresh } = await supabase
+            .from('ideas')
+            .select('id, name, type, updated_at')
+            .eq('user_id', userId)
+            .order('updated_at', { ascending: false })
+          setDiagrams((fresh ?? []).map(d => ({ id: d.id, name: d.name, type: d.type, updatedAt: d.updated_at })))
+          return
+        } else {
+          // localList has entries but no full diagram data — show them anyway
+          setDiagrams(localList)
+          return
+        }
+      }
+    }
+
     setDiagrams((data ?? []).map(d => ({
       id: d.id, name: d.name, type: d.type, updatedAt: d.updated_at,
     })))
-  }, [setDiagrams])
+  }, [setDiagrams, userId])
 
   const loadDiagram = useCallback(async (id: string) => {
-    if (!hasSupabase || !supabase) {
+    if (!hasSupabase || !supabase || !userId) {
       const d = lsGetDiagram(id)
       if (d) { setActiveIdea(d); localStorage.setItem('activeIdeaId', id) }
       return
@@ -107,20 +143,22 @@ export function useDiagram() {
       .from('ideas')
       .select('*')
       .eq('id', id)
+      .eq('user_id', userId)
       .single()
     if (error) { console.error(error); return }
     setActiveIdea(rowToDiagram(data))
     localStorage.setItem('activeIdeaId', id)
-  }, [setActiveIdea])
+  }, [setActiveIdea, userId])
 
   const saveDiagram = useCallback(async (diagram: Diagram) => {
-    if (!hasSupabase || !supabase) {
+    if (!hasSupabase || !supabase || !userId) {
       lsSaveDiagram(diagram)
       setIsDirty(false)
       return
     }
     const { error } = await supabase.from('ideas').upsert({
       id:              diagram.id,
+      user_id:         userId,
       name:            diagram.name,
       type:            diagram.type,
       line_style:      diagram.lineStyle,
@@ -129,15 +167,15 @@ export function useDiagram() {
     })
     if (error) { console.error('save error:', error); showToast('Failed to save', { color: '#ef4444' }); return }
     setIsDirty(false)
-  }, [setIsDirty])
+  }, [setIsDirty, userId])
 
   const createDiagram = useCallback(async (name: string) => {
-    const id = uuid()
-    const rootId = uuid()
+    const id = crypto.randomUUID()
+    const rootId = crypto.randomUUID()
     const now = new Date().toISOString()
     const TOPIC_LABELS = ['Main Topic 1', 'Main Topic 2', 'Main Topic 3', 'Main Topic 4', 'Main Topic 5']
     const topicNodes: IdeaNode[] = TOPIC_LABELS.map((title, i) => ({
-      id: uuid(), title,
+      id: crypto.randomUUID(), title,
       color: ROOT_COLORS[i % ROOT_COLORS.length],
       parentId: rootId, depth: 1,
       x: 0, y: 0, width: 160, height: 40, sortOrder: i,
@@ -150,7 +188,7 @@ export function useDiagram() {
     const laid = computeIdeasLayout(allNodes)
     const diagram: Diagram = { id, name, type: 'mindmap', lineStyle: 'orthogonal', createdAt: now, updatedAt: now, nodes: laid }
 
-    if (!hasSupabase || !supabase) {
+    if (!hasSupabase || !supabase || !userId) {
       lsSaveDiagram(diagram)
       setActiveIdea(diagram)
       localStorage.setItem('activeIdeaId', id)
@@ -159,27 +197,26 @@ export function useDiagram() {
       return
     }
     const { error } = await supabase.from('ideas').insert({
-      id, name, type: 'mindmap', line_style: 'orthogonal',
+      id, user_id: userId, name, type: 'mindmap', line_style: 'orthogonal',
       sharing_enabled: false, nodes: laid,
     })
     if (error) { console.error(error); showToast('Failed to create map', { color: '#ef4444' }); return }
     await loadDiagram(id)
     await loadDiagramList()
     showToast(`✦ "${name}" created`, { color: '#6366f1', confetti: true })
-  }, [loadDiagram, loadDiagramList, setActiveIdea, setDiagrams])
+  }, [loadDiagram, loadDiagramList, setActiveIdea, setDiagrams, userId])
 
   const createDiagramFromNodes = useCallback(async (name: string, nodes: IdeaNode[]): Promise<string | null> => {
-    // Deduplicate name: "Fruits", "Fruits 2", "Fruits 3", ...
     const existingNames = new Set(useIdeaStore.getState().diagrams.map(d => d.name))
     let finalName = name
     let n = 2
     while (existingNames.has(finalName)) finalName = `${name} ${n++}`
 
-    const id = uuid()
+    const id = crypto.randomUUID()
     const now = new Date().toISOString()
     const diagram: Diagram = { id, name: finalName, type: 'mindmap', lineStyle: 'orthogonal', createdAt: now, updatedAt: now, nodes }
 
-    if (!hasSupabase || !supabase) {
+    if (!hasSupabase || !supabase || !userId) {
       lsSaveDiagram(diagram)
       setActiveIdea(diagram)
       localStorage.setItem('activeIdeaId', id)
@@ -188,7 +225,7 @@ export function useDiagram() {
       return id
     }
     const { error } = await supabase.from('ideas').insert({
-      id, name: finalName, type: 'mindmap', line_style: 'orthogonal',
+      id, user_id: userId, name: finalName, type: 'mindmap', line_style: 'orthogonal',
       sharing_enabled: false, nodes,
     })
     if (error) { console.error(error); showToast(`Failed: ${error.message}`, { color: '#ef4444' }); return null }
@@ -196,19 +233,19 @@ export function useDiagram() {
     await loadDiagramList()
     showToast(`✦ "${finalName}" created`, { color: '#22c55e', confetti: true })
     return id
-  }, [loadDiagram, loadDiagramList, setActiveIdea, setDiagrams])
+  }, [loadDiagram, loadDiagramList, setActiveIdea, setDiagrams, userId])
 
   const deleteDiagram = useCallback(async (id: string, name?: string) => {
-    if (!hasSupabase || !supabase) {
+    if (!hasSupabase || !supabase || !userId) {
       lsDeleteDiagram(id)
       setDiagrams(lsGetList())
       showToast(`"${name ?? 'Map'}" deleted`, { color: '#1a1d2e' })
       return
     }
-    await supabase.from('ideas').delete().eq('id', id)
+    await supabase.from('ideas').delete().eq('id', id).eq('user_id', userId)
     await loadDiagramList()
     showToast(`"${name ?? 'Map'}" deleted`, { color: '#1a1d2e' })
-  }, [loadDiagramList, setDiagrams])
+  }, [loadDiagramList, setDiagrams, userId])
 
   return { loadDiagramList, loadDiagram, saveDiagram, createDiagram, createDiagramFromNodes, deleteDiagram }
 }

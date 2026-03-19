@@ -1,27 +1,62 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import type { User } from '@supabase/supabase-js'
 import { useIdeaStore } from '../../store/ideaStore'
 import { useDiagram } from '../../hooks/useDiagram'
-import type { DiagramMeta } from '../../types'
-import { Plus, Search, Clock, Trash2 } from 'lucide-react'
+import type { DiagramMeta, IdeaNode } from '../../types'
+import { Plus, Search, Clock, Trash2, Star } from 'lucide-react'
 import { IdeasLogo } from '../IdeasLogo'
+
+const LS_FAVS = 'ideas:favorites'
+function loadFavs(): Set<string> {
+  try { return new Set(JSON.parse(localStorage.getItem(LS_FAVS) ?? '[]')) } catch { return new Set() }
+}
+function saveFavs(favs: Set<string>) {
+  localStorage.setItem(LS_FAVS, JSON.stringify([...favs]))
+}
 
 interface HomePageProps {
   onOpen: (id: string) => void
+  user?: import('@supabase/supabase-js').User | null
+  onSignOut?: () => void
 }
 
-export function HomePage({ onOpen }: HomePageProps) {
+export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
   const { diagrams } = useIdeaStore()
-  const { loadDiagramList, createDiagram, deleteDiagram } = useDiagram()
+  const { loadDiagramList, createDiagram, deleteDiagram } = useDiagram(user?.id ?? null)
   const [search, setSearch] = useState('')
   const [creating, setCreating] = useState(false)
   const [newName, setNewName] = useState('')
   const [showCreate, setShowCreate] = useState(false)
+  const [favs, setFavs] = useState<Set<string>>(loadFavs)
+  const [showUserMenu, setShowUserMenu] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => { loadDiagramList() }, [])
+
+  // Close user menu on outside click
+  useEffect(() => {
+    function onClick(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setShowUserMenu(false)
+    }
+    document.addEventListener('mousedown', onClick)
+    return () => document.removeEventListener('mousedown', onClick)
+  }, [])
+
+  function toggleFav(id: string) {
+    setFavs(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      saveFavs(next)
+      return next
+    })
+  }
 
   const filtered = diagrams.filter(d =>
     d.name.toLowerCase().includes(search.toLowerCase())
   )
+
+  const favDiagrams = filtered.filter(d => favs.has(d.id))
+  const recentDiagrams = filtered.filter(d => !favs.has(d.id))
 
   async function handleCreate() {
     const name = newName.trim() || 'Untitled'
@@ -46,17 +81,30 @@ export function HomePage({ onOpen }: HomePageProps) {
     return new Date(iso).toLocaleDateString()
   }
 
+  // Cache user profile in localStorage so it's available instantly on next load
+  const avatarUrl = (() => {
+    const live = user?.user_metadata?.avatar_url as string | undefined
+    if (live) { localStorage.setItem('ideas:avatar', live); return live }
+    return localStorage.getItem('ideas:avatar') ?? undefined
+  })()
+  const displayName = (() => {
+    const live = (user?.user_metadata?.full_name ?? user?.email ?? '') as string
+    if (live) { localStorage.setItem('ideas:displayName', live); return live }
+    return localStorage.getItem('ideas:displayName') ?? ''
+  })()
+
   return (
     <div style={{ minHeight: '100vh', background: '#f8fafc', fontFamily: 'Inter, system-ui, sans-serif' }}>
 
       {/* Top nav */}
       <header style={{
         background: '#fff', borderBottom: '1px solid #f1f5f9',
-        padding: '0 32px', height: 56,
+        padding: '0 24px', height: 56,
         display: 'flex', alignItems: 'center', gap: 16,
         position: 'sticky', top: 0, zIndex: 10,
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        {/* Logo + name */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
           <div style={{
             width: 32, height: 32, borderRadius: 9,
             background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
@@ -68,9 +116,7 @@ export function HomePage({ onOpen }: HomePageProps) {
           <span style={{ fontSize: 15, fontWeight: 700, color: '#1e293b' }}>Think</span>
         </div>
 
-        <div style={{ flex: 1 }} />
-
-        {/* Search */}
+        {/* Search — next to app name */}
         <div style={{ position: 'relative', width: 220 }}>
           <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
           <input
@@ -78,7 +124,7 @@ export function HomePage({ onOpen }: HomePageProps) {
             onChange={e => setSearch(e.target.value)}
             placeholder="Search maps…"
             style={{
-              width: '100%', padding: '7px 12px 7px 32px',
+              width: '100%', padding: '7px 12px 7px 32px', boxSizing: 'border-box',
               border: '1px solid #e2e8f0', borderRadius: 9, fontSize: 13,
               outline: 'none', fontFamily: 'inherit', color: '#334155',
               background: '#f8fafc',
@@ -86,25 +132,64 @@ export function HomePage({ onOpen }: HomePageProps) {
           />
         </div>
 
-        {/* Create */}
-        <button
-          onClick={() => setShowCreate(true)}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 7,
-            padding: '8px 16px', background: '#6366f1', color: '#fff',
-            border: 'none', borderRadius: 9, fontSize: 13, fontWeight: 600,
-            cursor: 'pointer', fontFamily: 'inherit',
-            boxShadow: '0 2px 8px rgba(99,102,241,0.3)',
-          }}>
-          <Plus size={15} /> New Map
-        </button>
+        <div style={{ flex: 1 }} />
+
+        {/* Avatar + dropdown */}
+        {user && (
+          <div ref={menuRef} style={{ position: 'relative' }}>
+            <button
+              onClick={() => setShowUserMenu(p => !p)}
+              style={{
+                width: 34, height: 34, borderRadius: '50%', overflow: 'hidden',
+                border: showUserMenu ? '2px solid #6366f1' : '2px solid #e2e8f0',
+                cursor: 'pointer', padding: 0, background: '#f1f5f9',
+                transition: 'border-color 0.15s',
+                flexShrink: 0,
+              }}
+              title={displayName}
+            >
+              {avatarUrl
+                ? <img src={avatarUrl} alt={displayName} style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                : <span style={{ fontSize: 13, fontWeight: 700, color: '#6366f1' }}>{displayName[0]?.toUpperCase()}</span>
+              }
+            </button>
+
+            {showUserMenu && (
+              <div style={{
+                position: 'absolute', top: 42, right: 0, width: 200,
+                background: '#fff', borderRadius: 12, boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
+                border: '1px solid #f1f5f9', overflow: 'hidden', zIndex: 50,
+              }}>
+                {/* User info */}
+                <div style={{ padding: '12px 14px 10px', borderBottom: '1px solid #f1f5f9' }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {displayName}
+                  </div>
+                  <div style={{ fontSize: 11, color: '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 2 }}>
+                    {user.email}
+                  </div>
+                </div>
+                {/* Sign out */}
+                <button
+                  onClick={() => { setShowUserMenu(false); onSignOut?.() }}
+                  style={{
+                    width: '100%', padding: '10px 14px', textAlign: 'left',
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    fontSize: 13, color: '#ef4444', fontFamily: 'inherit', fontWeight: 500,
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.background = '#fef2f2')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                >
+                  Sign out
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </header>
 
       <main style={{ maxWidth: 1100, margin: '0 auto', padding: '32px 24px' }}>
-
-        <h2 style={{ fontSize: 13, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 20 }}>
-          All Maps · {filtered.length}
-        </h2>
 
         {filtered.length === 0 && (
           <div style={{
@@ -114,26 +199,72 @@ export function HomePage({ onOpen }: HomePageProps) {
           }}>
             <div style={{ opacity: 0.25, marginBottom: 16 }}><IdeasLogo size={40} color="#64748b" /></div>
             <p style={{ fontSize: 15, color: '#94a3b8', fontWeight: 600, margin: 0 }}>No maps yet</p>
-            <p style={{ fontSize: 13, color: '#cbd5e1', marginTop: 6 }}>Click "New Map" to get started</p>
+            <p style={{ fontSize: 13, color: '#cbd5e1', marginTop: 6 }}>Tap + to create your first map</p>
           </div>
         )}
 
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
-          gap: 16,
-        }}>
-          {filtered.map(d => (
-            <DiagramCard
-              key={d.id}
-              diagram={d}
-              timeAgo={timeAgo(d.updatedAt)}
-              onOpen={() => onOpen(d.id)}
-              onDelete={() => deleteDiagram(d.id, d.name)}
-            />
-          ))}
-        </div>
+        {/* Favorites row */}
+        {favDiagrams.length > 0 && (
+          <section style={{ marginBottom: 36 }}>
+            <h2 style={{ fontSize: 13, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Star size={12} fill="#eab308" color="#eab308" /> Favorites · {favDiagrams.length}
+            </h2>
+            <div style={{ display: 'flex', gap: 16, overflowX: 'auto', paddingBottom: 8, scrollbarWidth: 'none' }}>
+              {favDiagrams.map(d => (
+                <div key={d.id} style={{ flexShrink: 0, width: 220 }}>
+                  <DiagramCard
+                    diagram={d} timeAgo={timeAgo(d.updatedAt)}
+                    onOpen={() => onOpen(d.id)} onDelete={() => deleteDiagram(d.id, d.name)}
+                    isFav={true} onToggleFav={() => toggleFav(d.id)}
+                  />
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* All / Recent */}
+        {recentDiagrams.length > 0 && (
+          <section>
+            <h2 style={{ fontSize: 13, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 16 }}>
+              {favDiagrams.length > 0 ? 'Recent' : 'All Maps'} · {recentDiagrams.length}
+            </h2>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 16 }}>
+              {recentDiagrams.map(d => (
+                <DiagramCard
+                  key={d.id} diagram={d} timeAgo={timeAgo(d.updatedAt)}
+                  onOpen={() => onOpen(d.id)} onDelete={() => deleteDiagram(d.id, d.name)}
+                  isFav={false} onToggleFav={() => toggleFav(d.id)}
+                />
+              ))}
+            </div>
+          </section>
+        )}
       </main>
+
+      {/* Floating New Map button — bottom right */}
+      <button
+        onClick={() => setShowCreate(true)}
+        title="New Map"
+        style={{
+          position: 'fixed', bottom: 28, right: 28,
+          width: 56, height: 56, borderRadius: '50%',
+          background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+          border: 'none', cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          boxShadow: '0 4px 20px rgba(99,102,241,0.45)',
+          animation: 'fabPulse 2.5s ease-in-out infinite',
+          zIndex: 20,
+        }}
+      >
+        <Plus size={24} color="#fff" strokeWidth={2.5} />
+      </button>
+      <style>{`
+        @keyframes fabPulse {
+          0%, 100% { box-shadow: 0 4px 20px rgba(99,102,241,0.45); transform: scale(1); }
+          50%       { box-shadow: 0 4px 32px rgba(99,102,241,0.7);  transform: scale(1.06); }
+        }
+      `}</style>
 
       {/* Create modal */}
       {showCreate && (
@@ -175,12 +306,61 @@ export function HomePage({ onOpen }: HomePageProps) {
   )
 }
 
-function DiagramCard({ diagram, timeAgo, onOpen, onDelete }: {
+// ── DiagramMinimap ─────────────────────────────────────────────────────────
+
+function DiagramMinimap({ id }: { id: string }) {
+  const [nodes, setNodes] = useState<IdeaNode[]>([])
+
+  useEffect(() => {
+    try {
+      const data = JSON.parse(localStorage.getItem(`ideas:diagram:${id}`) ?? 'null')
+      if (data?.nodes?.length) setNodes(data.nodes)
+    } catch {}
+  }, [id])
+
+  if (nodes.length === 0) {
+    return (
+      <svg width="160" height="90" viewBox="0 0 160 90">
+        <rect x="10" y="32" width="55" height="24" rx="5" fill="#1a1d2e" opacity="0.15" />
+        <rect x="78" y="12" width="70" height="12" rx="3" fill="#6366f1" opacity="0.15" />
+        <rect x="78" y="30" width="70" height="12" rx="3" fill="#ec4899" opacity="0.15" />
+        <rect x="78" y="48" width="70" height="12" rx="3" fill="#f97316" opacity="0.15" />
+        <rect x="78" y="66" width="70" height="12" rx="3" fill="#22c55e" opacity="0.15" />
+      </svg>
+    )
+  }
+
+  const pad = 10, svgW = 160, svgH = 90
+  const minX = Math.min(...nodes.map(n => n.x))
+  const minY = Math.min(...nodes.map(n => n.y))
+  const maxX = Math.max(...nodes.map(n => n.x + n.width))
+  const maxY = Math.max(...nodes.map(n => n.y + n.height))
+  const bW = maxX - minX || 1, bH = maxY - minY || 1
+  const scale = Math.min((svgW - pad * 2) / bW, (svgH - pad * 2) / bH)
+  const offX = pad + ((svgW - pad * 2) - bW * scale) / 2
+  const offY = pad + ((svgH - pad * 2) - bH * scale) / 2
+
+  return (
+    <svg width={svgW} height={svgH} viewBox={`0 0 ${svgW} ${svgH}`}>
+      {nodes.map(n => (
+        <rect key={n.id}
+          x={offX + (n.x - minX) * scale} y={offY + (n.y - minY) * scale}
+          width={Math.max(n.width * scale, 2)} height={Math.max(n.height * scale, 2)}
+          rx={n.depth === 0 ? 3 : 1.5}
+          fill={n.depth === 0 ? '#1a1d2e' : n.color} opacity={0.85}
+        />
+      ))}
+    </svg>
+  )
+}
+
+// ── DiagramCard ────────────────────────────────────────────────────────────
+
+function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isFav, onToggleFav }: {
   diagram: DiagramMeta; timeAgo: string; onOpen: () => void; onDelete: () => void
+  isFav: boolean; onToggleFav: () => void
 }) {
   const [hovered, setHovered] = useState(false)
-
-  const previewColors = ['#6366f1', '#ec4899', '#f97316', '#eab308', '#22c55e']
 
   return (
     <div
@@ -188,58 +368,34 @@ function DiagramCard({ diagram, timeAgo, onOpen, onDelete }: {
       onMouseLeave={() => setHovered(false)}
       style={{
         background: '#fff',
-        border: `${hovered ? '2.5px' : '1px'} solid ${hovered ? '#6366f1' : '#e2e8f0'}`,
+        border: hovered ? '2px solid #6366f1' : '2px solid #e2e8f0',
         borderRadius: 14, overflow: 'hidden', cursor: 'pointer',
-        transition: 'all 0.15s',
-        boxShadow: hovered ? '0 4px 20px rgba(99,102,241,0.12)' : '0 1px 4px rgba(0,0,0,0.04)',
-        transform: hovered ? 'translateY(-2px)' : 'none',
+        transition: 'border-color 0.15s',
+        boxShadow: hovered ? '0 4px 16px rgba(99,102,241,0.12)' : '0 1px 4px rgba(0,0,0,0.04)',
       }}
       onClick={onOpen}
     >
-      {/* Thumbnail */}
       <div style={{ height: 130, background: '#fafbff', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', borderBottom: '1px solid #f1f5f9' }}>
-        <svg width="160" height="90" viewBox="0 0 160 90">
-          {/* Root node preview */}
-          <rect x="10" y="32" width="55" height="24" rx="6" fill="#1a1d2e" />
-          <text x="37" y="48" textAnchor="middle" fontSize="8" fontWeight="700" fill="white" fontFamily="Inter, sans-serif">{diagram.name.slice(0,8)}</text>
-          {/* Brace line */}
-          <line x1="65" y1="44" x2="78" y2="44" stroke="#94a3b8" strokeWidth="1.5" strokeLinecap="round" />
-          <line x1="78" y1="16" x2="78" y2="72" stroke="#94a3b8" strokeWidth="1.5" strokeLinecap="round" />
-          {/* Topic previews */}
-          {[0,1,2,3,4].map((i) => {
-            const y = 12 + i * 14
-            return (
-              <g key={i}>
-                <line x1="78" y1={y + 5} x2="84" y2={y + 5} stroke={previewColors[i % 5]} strokeWidth="1.5" strokeLinecap="round" />
-                <rect x="84" y={y} width="62" height="11" rx="3" fill={previewColors[i % 5]} />
-              </g>
-            )
-          })}
-        </svg>
-
-        {/* Delete button */}
+        <DiagramMinimap id={diagram.id} />
         {hovered && (
-          <button
-            onClick={e => { e.stopPropagation(); onDelete() }}
-            style={{
-              position: 'absolute', top: 8, right: 8,
-              width: 26, height: 26, borderRadius: 7, border: '1px solid #fee2e2',
-              background: '#fff', cursor: 'pointer', color: '#ef4444',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-            <Trash2 size={12} />
-          </button>
+          <>
+            <button onClick={e => { e.stopPropagation(); onToggleFav() }} title={isFav ? 'Unfavorite' : 'Favorite'}
+              style={{ position: 'absolute', top: 8, left: 8, width: 26, height: 26, borderRadius: 7, border: isFav ? '1px solid #fde68a' : '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', color: isFav ? '#eab308' : '#94a3b8', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Star size={12} fill={isFav ? '#eab308' : 'none'} />
+            </button>
+            <button onClick={e => { e.stopPropagation(); onDelete() }}
+              style={{ position: 'absolute', top: 8, right: 8, width: 26, height: 26, borderRadius: 7, border: '1px solid #fee2e2', background: '#fff', cursor: 'pointer', color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Trash2 size={12} />
+            </button>
+          </>
         )}
       </div>
-
-      {/* Info */}
       <div style={{ padding: '10px 14px 12px' }}>
         <div style={{ fontSize: 13, fontWeight: 600, color: '#1e293b', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {diagram.name}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#94a3b8' }}>
-          <Clock size={11} />
-          {timeAgo}
+          <Clock size={11} /> {timeAgo}
         </div>
       </div>
     </div>

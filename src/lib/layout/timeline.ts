@@ -1,13 +1,10 @@
 import type { IdeaNode } from '../../types'
 
-const SPINE_Y = 380
-const ROOT_X = 120
-const ROOT_W = 180, ROOT_H = 52
-const L1_W = 160, L1_H = 44
-const L2_W = 110, L2_H = 32
-const L3_W = 100, L3_H = 30
-const L1_SEG = 60   // horizontal gap between consecutive L1 nodes
-const L2_GAP = 10   // vertical gap between L2 siblings
+const SPINE_Y = 400
+const ROOT_X = 80
+const V_GAP = 12      // vertical gap between stacked L2/L3 nodes
+const BRANCH_GAP = 20 // vertical gap between L1 edge and nearest L2
+const L1_SEG = 64     // horizontal gap between L1 nodes
 
 export function computeTimelineLayout(nodes: IdeaNode[]): IdeaNode[] {
   const root = nodes.find(n => n.parentId === null)
@@ -17,37 +14,56 @@ export function computeTimelineLayout(nodes: IdeaNode[]): IdeaNode[] {
     .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
 
   const result: IdeaNode[] = []
-  result.push({ ...root, x: ROOT_X, y: SPINE_Y - ROOT_H / 2, width: ROOT_W, height: ROOT_H, manuallyPositioned: false })
+  const rootW = root.width > 0 ? root.width : 180
+  const rootH = root.height > 0 ? root.height : 180
+  result.push({ ...root, x: ROOT_X, y: SPINE_Y - rootH / 2, width: rootW, height: rootH, manuallyPositioned: false })
+
+  let curX = ROOT_X + rootW + 48
 
   l1s.forEach((l1, i) => {
-    const l1X = ROOT_X + ROOT_W + 40 + i * (L1_W + L1_SEG)
-    result.push({ ...l1, x: l1X, y: SPINE_Y - L1_H / 2, width: L1_W, height: L1_H, manuallyPositioned: false })
+    const above = i % 2 === 0
+    const l1w = l1.width > 0 ? l1.width : 160
+    const l1h = l1.height > 0 ? l1.height : 44
+    const l1X = curX
+    const l1CX = l1X + l1w / 2
+
+    result.push({ ...l1, x: l1X, y: SPINE_Y - l1h / 2, width: l1w, height: l1h, manuallyPositioned: false })
 
     const l2s = nodes.filter(n => n.parentId === l1.id)
       .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
-    const above = i % 2 === 0
-    const n2 = l2s.length
-    const totalH = n2 * L2_H + (n2 - 1) * L2_GAP
-    const l2X = l1X + L1_W + 30
+
+    // Track widest node in this column for spacing
+    let maxW = l1w
 
     l2s.forEach((l2, j) => {
+      const l2w = l2.width > 0 ? l2.width : 140
+      const l2h = l2.height > 0 ? l2.height : 36
+      // Center L2 under L1
+      const l2X = l1CX - l2w / 2
+      // Stack: j=0 is closest to spine, j increases away
       const l2Y = above
-        ? SPINE_Y - L1_H / 2 - 20 - totalH + j * (L2_H + L2_GAP)
-        : SPINE_Y + L1_H / 2 + 20 + j * (L2_H + L2_GAP)
+        ? SPINE_Y - l1h / 2 - BRANCH_GAP - l2h - j * (l2h + V_GAP)
+        : SPINE_Y + l1h / 2 + BRANCH_GAP + j * (l2h + V_GAP)
 
-      result.push({ ...l2, x: l2X, y: l2Y, width: L2_W, height: L2_H, manuallyPositioned: false })
+      maxW = Math.max(maxW, l2w)
+      result.push({ ...l2, x: l2X, y: l2Y, width: l2w, height: l2h, manuallyPositioned: false })
 
       const l3s = nodes.filter(n => n.parentId === l2.id)
         .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+
       l3s.forEach((l3, k) => {
-        result.push({
-          ...l3,
-          x: l2X + L2_W + 14 + k * (L3_W + 12),
-          y: l2Y + (L2_H - L3_H) / 2,
-          width: L3_W, height: L3_H, manuallyPositioned: false,
-        })
+        const l3w = l3.width > 0 ? l3.width : 120
+        const l3h = l3.height > 0 ? l3.height : 30
+        const l3X = l1CX - l3w / 2
+        const l3Y = above
+          ? l2Y - (k + 1) * (l3h + V_GAP)
+          : l2Y + l2h + V_GAP + k * (l3h + V_GAP)
+        maxW = Math.max(maxW, l3w)
+        result.push({ ...l3, x: l3X, y: l3Y, width: l3w, height: l3h, manuallyPositioned: false })
       })
     })
+
+    curX += maxW + L1_SEG
   })
 
   return result

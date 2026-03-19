@@ -5,14 +5,17 @@ import { EdgeLayer } from './EdgeLayer'
 import { Node } from './Node'
 import { useKeyboard } from '../../hooks/useKeyboard'
 import { exportDiagramAsPdf } from '../../lib/export/exportPdf'
-import { FileDown } from 'lucide-react'
+import { FileDown, Trash2, Star } from 'lucide-react'
 
 interface DiagramCanvasProps {
   onNodeSelect: (nodeId: string | null) => void
   readOnly?: boolean
+  onDelete?: () => void
+  isFav?: boolean
+  onToggleFav?: () => void
 }
 
-export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
+export function DiagramCanvas({ onNodeSelect, readOnly, onDelete, isFav, onToggleFav }: DiagramCanvasProps) {
   const { activeIdea, selectedNodeIds, setSelectedNodeIds, diagramType, lineStyle, themeId, addNode, reorderNode, isImporting } = useIdeaStore()
   const canvasBg = getTheme(themeId).canvasBg
   const svgRef = useRef<SVGSVGElement>(null!)
@@ -20,6 +23,8 @@ export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
   const [pan, setPan] = useState({ x: 0, y: 0 })
   const [zoom, setZoom] = useState(1)
   const [rootDragOffset, setRootDragOffset] = useState<{ dx: number; dy: number } | null>(null)
+  const rootDragClientRef = useRef<{ x: number; y: number } | null>(null)
+  const rootAutoPanRafRef = useRef<number | null>(null)
 
   // Auto-recover: if diagram has no nodes, add a root
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -274,6 +279,49 @@ export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
     reorderNode(id, snap.insertBeforeId)
   }, [reorderNode])
 
+  const handleRootDragOffset = useCallback((info: { dx: number; dy: number; clientX: number; clientY: number } | null) => {
+    if (!info) {
+      rootDragClientRef.current = null
+      setRootDragOffset(null)
+      if (rootAutoPanRafRef.current) {
+        cancelAnimationFrame(rootAutoPanRafRef.current)
+        rootAutoPanRafRef.current = null
+      }
+      return
+    }
+    rootDragClientRef.current = { x: info.clientX, y: info.clientY }
+    if (info.dx !== 0 || info.dy !== 0) setRootDragOffset({ dx: info.dx, dy: info.dy })
+
+    if (rootAutoPanRafRef.current) return // already running
+    const EDGE_ZONE = 80
+    const MAX_SPEED = 10
+    function autoPanLoop() {
+      const client = rootDragClientRef.current
+      if (!client) { rootAutoPanRafRef.current = null; return }
+      const vw = window.innerWidth
+      const vh = window.innerHeight
+      let panDx = 0, panDy = 0
+      if (client.x < EDGE_ZONE) panDx = -MAX_SPEED * (1 - client.x / EDGE_ZONE)
+      else if (client.x > vw - EDGE_ZONE) panDx = MAX_SPEED * (1 - (vw - client.x) / EDGE_ZONE)
+      if (client.y < EDGE_ZONE) panDy = -MAX_SPEED * (1 - client.y / EDGE_ZONE)
+      else if (client.y > vh - EDGE_ZONE) panDy = MAX_SPEED * (1 - (vh - client.y) / EDGE_ZONE)
+      if (panDx !== 0 || panDy !== 0) {
+        setPan(p => ({ x: p.x + panDx, y: p.y + panDy }))
+        const z = zoomCurrentRef.current
+        const root = useIdeaStore.getState().activeIdea?.nodes.find(n => n.depth === 0)
+        if (root) {
+          useIdeaStore.getState().updateNode(root.id, {
+            x: root.x - panDx / z,
+            y: root.y - panDy / z,
+            manuallyPositioned: true,
+          })
+        }
+      }
+      rootAutoPanRafRef.current = requestAnimationFrame(autoPanLoop)
+    }
+    rootAutoPanRafRef.current = requestAnimationFrame(autoPanLoop)
+  }, [])
+
   const handleSelect = useCallback((id: string, multi: boolean) => {
     if (multi) {
       const next = selectedNodeIds.includes(id) ? selectedNodeIds.filter(n => n !== id) : [...selectedNodeIds, id]
@@ -309,7 +357,7 @@ export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
               onSelect={handleSelect}
               onDragEnd={handleDragEnd}
               onDragMove={handleDragMove}
-              onRootDragOffset={setRootDragOffset}
+              onRootDragOffset={handleRootDragOffset}
               onDoubleClick={n => { setSelectedNodeIds([n.id]); onNodeSelect(n.id) }}
               onAddChild={id => addNode(id)}
               svgRef={svgRef}
@@ -400,18 +448,24 @@ export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
       </div>
 
       {/* Root drag HUD */}
-      {rootDragOffset && (
-        <div style={{
-          position: 'fixed', top: 16, left: '50%', transform: 'translateX(-50%)',
-          background: 'rgba(15,20,40,0.78)', backdropFilter: 'blur(10px)',
-          color: '#fff', fontFamily: 'Inter, system-ui, sans-serif',
-          fontSize: 13, fontWeight: 700, letterSpacing: '0.04em',
-          padding: '6px 18px', borderRadius: 24,
-          pointerEvents: 'none', zIndex: 9999, whiteSpace: 'nowrap',
-        }}>
-          {rootDragOffset.dx > 0 ? '+' : ''}{rootDragOffset.dx}px &nbsp; {rootDragOffset.dy > 0 ? '+' : ''}{rootDragOffset.dy}px
-        </div>
-      )}
+      {rootDragOffset && (() => {
+        const root = activeIdea?.nodes.find(n => n.depth === 0)
+        const l1 = activeIdea?.nodes.find(n => n.depth === 1)
+        if (!root || !l1) return null
+        const trunkLen = Math.max(0, Math.round((l1.x - 60) - (root.x + root.width)))
+        return (
+          <div style={{
+            position: 'fixed', top: 16, left: '50%', transform: 'translateX(-50%)',
+            background: 'rgba(15,20,40,0.78)', backdropFilter: 'blur(10px)',
+            color: '#fff', fontFamily: 'Inter, system-ui, sans-serif',
+            fontSize: 13, fontWeight: 700, letterSpacing: '0.04em',
+            padding: '6px 18px', borderRadius: 24,
+            pointerEvents: 'none', zIndex: 9999, whiteSpace: 'nowrap',
+          }}>
+            ↔ {trunkLen}px
+          </div>
+        )
+      })()}
 
       {/* Bottom bar */}
       <div style={{
@@ -424,20 +478,50 @@ export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
         {/* Left: empty */}
         <div />
 
-        {/* Center: PDF */}
+        {/* Center: PDF + Fav + Delete */}
         {activeIdea ? (
-          <button
-            onClick={() => exportDiagramAsPdf(activeIdea.name)}
-            title="Download PDF"
-            style={{
-              height: 20, padding: '0 8px', border: '1px solid #e2e8f0', borderRadius: 5,
-              background: 'transparent', cursor: 'pointer', fontSize: 11, fontWeight: 500,
-              color: '#64748b', fontFamily: 'Inter, system-ui, sans-serif',
-              display: 'flex', alignItems: 'center', gap: 4,
-            }}
-          >
-            <FileDown size={11} /> PDF
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <button
+              onClick={() => exportDiagramAsPdf(activeIdea.name)}
+              title="Download PDF"
+              style={{
+                height: 20, padding: '0 8px', border: '1px solid #e2e8f0', borderRadius: 5,
+                background: 'transparent', cursor: 'pointer', fontSize: 11, fontWeight: 500,
+                color: '#64748b', fontFamily: 'Inter, system-ui, sans-serif',
+                display: 'flex', alignItems: 'center', gap: 4,
+              }}
+            >
+              <FileDown size={11} /> PDF
+            </button>
+            {onToggleFav && (
+              <button
+                onClick={onToggleFav}
+                title={isFav ? 'Unfavorite' : 'Favorite'}
+                style={{
+                  height: 20, padding: '0 8px', border: '1px solid #e2e8f0', borderRadius: 5,
+                  background: 'transparent', cursor: 'pointer', fontSize: 11, fontWeight: 500,
+                  color: isFav ? '#eab308' : '#94a3b8', fontFamily: 'Inter, system-ui, sans-serif',
+                  display: 'flex', alignItems: 'center', gap: 4,
+                }}
+              >
+                <Star size={10} fill={isFav ? '#eab308' : 'none'} /> Star
+              </button>
+            )}
+            {onDelete && (
+              <button
+                onClick={onDelete}
+                title="Delete map"
+                style={{
+                  height: 20, padding: '0 8px', border: '1px solid #fecaca', borderRadius: 5,
+                  background: 'transparent', cursor: 'pointer', fontSize: 11, fontWeight: 500,
+                  color: '#ef4444', fontFamily: 'Inter, system-ui, sans-serif',
+                  display: 'flex', alignItems: 'center', gap: 4,
+                }}
+              >
+                <Trash2 size={10} /> Delete
+              </button>
+            )}
+          </div>
         ) : <div />}
 
         {/* Right: Zoom */}

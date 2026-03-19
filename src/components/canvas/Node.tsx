@@ -11,7 +11,7 @@ interface NodeProps {
   onDoubleClick: (node: IdeaNode) => void
   onAddChild?: (parentId: string) => void
   onDragMove?: (id: string, cx: number, cy: number) => void
-  onRootDragOffset?: (offset: { dx: number; dy: number } | null) => void
+  onRootDragOffset?: (offset: { dx: number; dy: number; clientX: number; clientY: number } | null) => void
   svgRef: React.RefObject<SVGSVGElement>
   readOnly?: boolean
   l1Colors?: string[]
@@ -132,6 +132,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
     if (!pt) return
     dragStart.current = { x: pt.x, y: pt.y, nodeX: node.x, nodeY: node.y }
     ;(e.target as Element).setPointerCapture(e.pointerId)
+    if (isRoot) onRootDragOffset?.({ dx: 0, dy: 0, clientX: e.clientX, clientY: e.clientY })
   }
 
   function onPointerMove(e: React.PointerEvent) {
@@ -142,10 +143,19 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
     const dx = pt.x - dragStart.current.x
     const dy = pt.y - dragStart.current.y
     if (Math.abs(dx) > 3 || Math.abs(dy) > 3) didDrag.current = true
-    const newX = dragStart.current.nodeX + dx
-    const newY = dragStart.current.nodeY + dy
+    let newX = dragStart.current.nodeX + dx
+    if (isRoot) {
+      const l1 = useIdeaStore.getState().activeIdea?.nodes.find(n => n.depth === 1)
+      if (l1) {
+        const barX = l1.x - 60
+        const minX = barX - 500 - node.width  // trunk = 500px
+        const maxX = barX - node.width          // trunk = 0px
+        newX = Math.max(minX, Math.min(maxX, newX))
+      }
+    }
+    const newY = isRoot ? node.y : dragStart.current.nodeY + dy
     useIdeaStore.getState().updateNode(node.id, { x: newX, y: newY, manuallyPositioned: true })
-    if (isRoot) onRootDragOffset?.({ dx: Math.round(dx), dy: Math.round(dy) })
+    if (isRoot) onRootDragOffset?.({ dx: Math.round(dx), dy: Math.round(dy), clientX: e.clientX, clientY: e.clientY })
     onDragMove?.(node.id, newX + node.width / 2, newY + node.height / 2)
   }
 

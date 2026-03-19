@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useIdeaStore } from '../../store/ideaStore'
-import { Share2, Download, Upload, RefreshCw, Plus, Menu, Undo2, Redo2, MoreHorizontal } from 'lucide-react'
+import { Share2, Download, Upload, RefreshCw, Plus, Menu, Undo2, Redo2, MoreHorizontal, Trash2 } from 'lucide-react'
 import { downloadJSON } from '../../lib/export/json'
 import { encodeShareURL } from '../../lib/export/share'
 import type { DiagramType, LineStyle } from '../../types'
@@ -10,6 +10,7 @@ interface ControlPanelProps {
   onImport: () => void
   onShare: (url: string) => void
   onBack: () => void
+  onDelete?: () => void
 }
 
 const DIAGRAM_TYPES: { value: DiagramType; label: string }[] = [
@@ -27,9 +28,10 @@ const LINE_STYLES: { value: LineStyle; symbol: string; title: string }[] = [
 
 const Sep = () => <div style={{ width: 1, height: 20, background: '#e2e8f0', flexShrink: 0 }} />
 
-export function ControlPanel({ onAddNode, onImport, onShare, onBack }: ControlPanelProps) {
+export function ControlPanel({ onAddNode, onImport, onShare, onBack, onDelete }: ControlPanelProps) {
   const { activeIdea, rerunLayout, undo, redo, past, future, diagramType, lineStyle, setDiagramType, setLineStyle } = useIdeaStore()
   const [showMore, setShowMore] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const moreRef = useRef<HTMLDivElement>(null)
 
   const canUndo = past.length > 0
@@ -90,6 +92,21 @@ export function ControlPanel({ onAddNode, onImport, onShare, onBack }: ControlPa
         onMouseEnter={e => hov(e, true)} onMouseLeave={e => hov(e, false)}>
         <Plus size={15} />
       </button>
+
+      <Sep />
+
+      {/* Delete */}
+      {onDelete && (
+        <>
+          <Sep />
+          <button onClick={() => setShowDeleteConfirm(true)} title="Delete map"
+            style={{ ...btn, color: '#ef4444' }}
+            onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = '#fef2f2'}
+            onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}>
+            <Trash2 size={14} />
+          </button>
+        </>
+      )}
 
       <Sep />
 
@@ -168,6 +185,34 @@ export function ControlPanel({ onAddNode, onImport, onShare, onBack }: ControlPa
           </div>
         )}
       </div>
+
+      {/* Delete confirm modal */}
+      {showDeleteConfirm && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.25)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200,
+        }} onClick={() => setShowDeleteConfirm(false)}>
+          <div style={{
+            background: '#fff', borderRadius: 16, padding: 24, width: 320,
+            boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
+          }} onClick={e => e.stopPropagation()}>
+            <h3 style={{ fontSize: 15, fontWeight: 700, color: '#1e293b', marginBottom: 8 }}>Delete map?</h3>
+            <p style={{ fontSize: 13, color: '#64748b', marginBottom: 20 }}>
+              "<strong>{activeIdea?.name}</strong>" will be permanently deleted.
+            </p>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button onClick={() => setShowDeleteConfirm(false)} style={{
+                padding: '8px 16px', border: '1px solid #e2e8f0', borderRadius: 9,
+                background: '#fff', cursor: 'pointer', fontSize: 13, fontFamily: 'inherit', color: '#64748b',
+              }}>Cancel</button>
+              <button onClick={() => { setShowDeleteConfirm(false); onDelete?.() }} style={{
+                padding: '8px 18px', background: '#ef4444', color: '#fff',
+                border: 'none', borderRadius: 9, cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
+              }}>Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

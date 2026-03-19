@@ -1,14 +1,19 @@
 import type { IdeaNode } from '../../types'
 
-const NODE_W = 160
-const NODE_H = 40
-const H_GAP = 60
-const V_GAP = 24
+const H_GAP = 70   // vertical gap between parent row and child row
+const V_GAP = 20   // horizontal gap between sibling subtrees
+
+// Compact fixed sizes for tree mode — independent of mindmap widths
+const TREE_W: Record<number, number> = { 0: 180, 1: 160, 2: 145, 3: 130 }
+const TREE_H: Record<number, number> = { 0: 180, 1: 42,  2: 38,  3: 34  }
+
+function tw(node: IdeaNode) { return TREE_W[Math.min(node.depth, 3)] ?? 115 }
+function th(node: IdeaNode) { return TREE_H[Math.min(node.depth, 3)] ?? 30 }
 
 interface TreeNode {
   node: IdeaNode
   children: TreeNode[]
-  width: number
+  subtreeW: number
   x: number
   y: number
 }
@@ -17,53 +22,50 @@ function buildTree(nodes: IdeaNode[], parentId: string | null): TreeNode[] {
   return nodes
     .filter(n => n.parentId === parentId)
     .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
-    .map(n => {
-      const children = buildTree(nodes, n.id)
-      return { node: n, children, width: 0, x: 0, y: 0 }
-    })
+    .map(n => ({ node: n, children: buildTree(nodes, n.id), subtreeW: 0, x: 0, y: 0 }))
 }
 
-function computeWidth(t: TreeNode): number {
+function computeSubtreeW(t: TreeNode): number {
+  const w = tw(t.node)
   if (t.children.length === 0) {
-    t.width = NODE_W
+    t.subtreeW = w
   } else {
-    const total = t.children.reduce((s, c) => s + computeWidth(c) + V_GAP, -V_GAP)
-    t.width = Math.max(NODE_W, total)
+    const total = t.children.reduce((s, c) => s + computeSubtreeW(c) + V_GAP, -V_GAP)
+    t.subtreeW = Math.max(w, total)
   }
-  return t.width
+  return t.subtreeW
 }
 
 function assignPositions(t: TreeNode, x: number, y: number) {
-  t.x = x + (t.width - NODE_W) / 2
+  const w = tw(t.node)
+  const h = th(t.node)
+  t.x = x + (t.subtreeW - w) / 2
   t.y = y
   let cx = x
   for (const child of t.children) {
-    assignPositions(child, cx, y + NODE_H + H_GAP)
-    cx += child.width + V_GAP
+    assignPositions(child, cx, y + h + H_GAP)
+    cx += child.subtreeW + V_GAP
   }
 }
 
-function flattenTree(t: TreeNode, result: IdeaNode[]) {
+function flatten(t: TreeNode, out: IdeaNode[]) {
   if (!t.node.manuallyPositioned) {
-    result.push({ ...t.node, x: t.x, y: t.y, width: t.node.width > 0 ? t.node.width : NODE_W, height: t.node.height > 0 ? t.node.height : NODE_H })
+    out.push({ ...t.node, x: t.x, y: t.y, width: tw(t.node), height: th(t.node) })
   } else {
-    result.push(t.node)
+    out.push(t.node)
   }
-  for (const c of t.children) flattenTree(c, result)
+  for (const c of t.children) flatten(c, out)
 }
 
-export function computeTreeLayout(nodes: IdeaNode[], _direction: 'vertical' | 'horizontal' = 'vertical'): IdeaNode[] {
-  const root = nodes.find(n => n.parentId === null)
-  if (!root) return nodes
+export function computeTreeLayout(nodes: IdeaNode[], direction: 'vertical' | 'horizontal' = 'vertical'): IdeaNode[] {
   const tree = buildTree(nodes, null)
   if (tree.length === 0) return nodes
-  const rootTree = tree[0]
-  computeWidth(rootTree)
-  const startX = 400 - rootTree.width / 2
-  assignPositions(rootTree, startX, 60)
+  const root = tree[0]
+  computeSubtreeW(root)
+  assignPositions(root, 400 - root.subtreeW / 2, 60)
   const result: IdeaNode[] = []
-  flattenTree(rootTree, result)
-  if (_direction === 'horizontal') {
+  flatten(root, result)
+  if (direction === 'horizontal') {
     return result.map(n => ({ ...n, x: n.y, y: n.x }))
   }
   return result

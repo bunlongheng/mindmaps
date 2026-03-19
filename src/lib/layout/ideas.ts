@@ -84,18 +84,15 @@ export function computeIdeasLayout(nodes: IdeaNode[]): IdeaNode[] {
   const l1s = nodes.filter(n => n.parentId === root.id)
     .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
 
-  const ROOT_X = 200
+  const ROOT_X = 60
   const centerY = 340
   const { w: rw, h: rh } = nodeSize(root, 0)
 
   const result: IdeaNode[] = []
-  if (!root.manuallyPositioned) {
-    result.push({ ...root, x: ROOT_X, y: centerY - rh / 2, width: rw, height: rh })
-  } else {
-    result.push(root)
-  }
+  const rootX = root.manuallyPositioned ? root.x : ROOT_X
 
-  const anchorX = ROOT_X + rw + (root.branchGap ?? H_GAPS[0])
+  // anchorX stays at the original position so L1 column doesn't move
+  const anchorX = 200 + rw + (root.branchGap ?? H_GAPS[0])
   const totalH = l1s.reduce((s, l) => s + subtreeH(l.id, 1, nodes), 0) + Math.max(0, l1s.length - 1) * V_GAP
   let curY = centerY - totalH / 2
   for (const l1 of l1s) {
@@ -103,6 +100,13 @@ export function computeIdeasLayout(nodes: IdeaNode[]): IdeaNode[] {
     place(l1.id, 1, anchorX, curY + h / 2, nodes, result)
     curY += h + V_GAP
   }
+
+  // Root y always = vertical midpoint of L1 nodes so trunk connects cleanly
+  const l1Results = result.filter(n => n.depth === 1)
+  const l1MidY = l1Results.length > 0
+    ? (Math.min(...l1Results.map(n => n.y + n.height / 2)) + Math.max(...l1Results.map(n => n.y + n.height / 2))) / 2
+    : centerY
+  result.push({ ...root, x: rootX, y: l1MidY - rh / 2, width: rw, height: rh })
 
   const placed = new Set(result.map(n => n.id))
   for (const n of nodes) {

@@ -96,14 +96,17 @@ export function EdgeLayer({ nodes, lineStyle, diagramType }: EdgeLayerProps) {
 
     const l1Nodes = nodes.filter(n => n.parentId === root.id)
       .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
-    const rootRightX = root.x + root.width
+    const rootRightX = root.x + root.width / 2
     const rootCY = root.y + root.height / 2
     const l1LeftX = l1Nodes.length > 0 ? l1Nodes[0].x : rootRightX + 120
-    const barX = (rootRightX + l1LeftX) / 2
-
+    const barX = l1LeftX - 60
+    const sortedL1 = [...l1Nodes].sort((a, b) => a.y - b.y)
+    const l1MidY = sortedL1.length > 0
+      ? ((sortedL1[0].y + sortedL1[0].height / 2) + (sortedL1[sortedL1.length - 1].y + sortedL1[sortedL1.length - 1].height / 2)) / 2
+      : rootCY
     const trunk = l1Nodes.length > 0 && (
       <>
-        <line x1={rootRightX} y1={rootCY} x2={barX} y2={rootCY}
+        <line x1={rootRightX} y1={l1MidY} x2={barX} y2={l1MidY}
           stroke="#1a1d2e" strokeWidth={4} strokeLinecap="round" />
         {l1Nodes.length > 1 && l1Nodes.map((l1, i) => {
           if (i === l1Nodes.length - 1) return null
@@ -204,11 +207,13 @@ export function EdgeLayer({ nodes, lineStyle, diagramType }: EdgeLayerProps) {
           const l1CY = l1.y + l1.height / 2
           const attachX = l1CX - FISHBONE_SLANT
           const above = l1CY < spineY
-          const boneH = Math.abs(l1CY - spineY)
+          // Use the near EDGE of L1 — exactly where the diagonal line terminates
+          const l1EdgeY = above ? l1.y + l1.height : l1.y
+          const boneEdgeH = Math.abs(l1EdgeY - spineY)
           const l2CY = l2.y + l2.height / 2
           const t = above
-            ? (spineY - l2CY) / boneH
-            : (l2CY - spineY) / boneH
+            ? (spineY - l2CY) / boneEdgeH
+            : (l2CY - spineY) / boneEdgeH
           const diagX = attachX + FISHBONE_SLANT * t
           return (
             <line key={l2.id}
@@ -249,22 +254,39 @@ export function EdgeLayer({ nodes, lineStyle, diagramType }: EdgeLayerProps) {
         <line x1={root.x + root.width} y1={spineY} x2={spineEndX} y2={spineY}
           stroke="#94a3b8" strokeWidth={2.5} strokeLinecap="round" />
 
-        {/* L2 brackets (BracketConnector from each L1) */}
+        {/* Per L1: spine tick + vertical branch through all descendants (L2+L3 centered at l1CX) */}
         {l1s.map(l1 => {
-          const children = nodes.filter(n => n.parentId === l1.id)
-          if (children.length === 0) return null
-          return <BracketConnector key={l1.id} parent={l1} children={children} />
-        })}
+          const l1CX = l1.x + l1.width / 2
+          const above = l1.y + l1.height / 2 < spineY
+          const l1SpineEdge = above ? l1.y + l1.height : l1.y
 
-        {/* L3+: horizontal */}
-        {nodes.filter(n => n.depth >= 3).map(n => {
-          const parent = nodeMap.get(n.parentId!)
-          if (!parent) return null
+          // All descendants are centered at l1CX — find the farthest one
+          const descendants = nodes.filter(n => {
+            let cur = nodeMap.get(n.parentId ?? '')
+            while (cur) {
+              if (cur.id === l1.id) return true
+              cur = nodeMap.get(cur.parentId ?? '')
+            }
+            return false
+          })
+
+          const farY = descendants.length > 0
+            ? above
+              ? Math.min(...descendants.map(n => n.y))
+              : Math.max(...descendants.map(n => n.y + n.height))
+            : l1SpineEdge
+
           return (
-            <line key={n.id}
-              x1={parent.x + parent.width} y1={parent.y + parent.height / 2}
-              x2={n.x} y2={n.y + n.height / 2}
-              stroke={n.color} strokeWidth={1.5} strokeLinecap="round" />
+            <g key={`branch-${l1.id}`}>
+              {/* Spine tick */}
+              <line x1={l1CX} y1={spineY} x2={l1CX} y2={l1SpineEdge}
+                stroke={l1.color} strokeWidth={2} strokeLinecap="round" />
+              {/* Vertical branch through descendants */}
+              {descendants.length > 0 && (
+                <line x1={l1CX} y1={l1SpineEdge} x2={l1CX} y2={farY}
+                  stroke={l1.color} strokeWidth={1.8} strokeLinecap="round" />
+              )}
+            </g>
           )
         })}
       </g>

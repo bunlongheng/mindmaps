@@ -15,7 +15,7 @@ function hexToRgb(hex: string): [number, number, number] {
 }
 
 export function NodeStylePanel({ nodeId, onClose }: NodeStylePanelProps) {
-  const { activeIdea, updateNode, batchUpdateNodes, lineStyle, setLineStyle, selectedNodeIds } = useIdeaStore()
+  const { activeIdea, updateNode, batchUpdateNodes, lineStyle, setLineStyle, selectedNodeIds, diagramType } = useIdeaStore()
 
   const node = nodeId ? activeIdea?.nodes.find(n => n.id === nodeId) : null
   const [title, setTitle] = useState(node?.title ?? '')
@@ -156,7 +156,7 @@ export function NodeStylePanel({ nodeId, onClose }: NodeStylePanelProps) {
         <HR />
 
         {/* ── Branch ── */}
-        <SBlock title="Branch">
+        {(diagramType === 'mindmap' || diagramType === 'tree-vertical' || diagramType === 'tree-horizontal') && <SBlock title="Branch">
           <PRow label="Line">
             <div style={{ display: 'flex', gap: 6 }}>
               {([
@@ -185,7 +185,7 @@ export function NodeStylePanel({ nodeId, onClose }: NodeStylePanelProps) {
               })}
             </div>
           </PRow>
-        </SBlock>
+        </SBlock>}
 
 
       </div>
