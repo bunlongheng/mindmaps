@@ -81,10 +81,17 @@ export function useDiagram(userId: string | null = null) {
     }
     const { data, error } = await supabase
       .from('ideas')
-      .select('id, name, type, updated_at')
+      .select('id, name, type, updated_at, nodes')
       .eq('user_id', userId)
       .order('updated_at', { ascending: false })
     if (error) { console.error(error); setDiagrams(lsGetList()); return }
+
+    // Cache all diagrams locally so minimap thumbnails are populated for every card
+    if (data && data.length > 0) {
+      for (const row of data) {
+        if (row.nodes) lsSaveDiagram(rowToDiagram(row as Record<string, unknown>))
+      }
+    }
 
     // ── One-time migration: if Supabase is empty, upload from localStorage ──
     if ((data ?? []).length === 0) {
