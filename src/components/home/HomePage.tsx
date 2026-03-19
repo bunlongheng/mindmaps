@@ -347,15 +347,10 @@ function DiagramMinimap({ id }: { id: string }) {
     )
   }
 
-  const MAX_ROWS = 5
+  const MAX_ROWS = 3
 
   return (
     <div style={{ width: '100%', height: '100%', padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 6, boxSizing: 'border-box' }}>
-
-      {/* Category count summary */}
-      <div style={{ fontSize: 10, fontWeight: 600, color: '#6366f1', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-        {l1s.length} {l1s.length === 1 ? 'category' : 'categories'}
-      </div>
 
       {/* Per-category breakdown */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1 }}>
@@ -374,7 +369,7 @@ function DiagramMinimap({ id }: { id: string }) {
           )
         })}
         {l1s.length > MAX_ROWS && (
-          <div style={{ fontSize: 10, color: '#94a3b8', paddingLeft: 14 }}>+{l1s.length - MAX_ROWS} more categories</div>
+          <div style={{ fontSize: 10, color: '#94a3b8', paddingLeft: 14 }}>+{l1s.length - MAX_ROWS}</div>
         )}
       </div>
 
@@ -389,6 +384,14 @@ function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isFav, onToggleFav }:
   isFav: boolean; onToggleFav: () => void
 }) {
   const [hovered, setHovered] = useState(false)
+  const l1Count = (() => {
+    try {
+      const data = JSON.parse(localStorage.getItem(`ideas:diagram:${diagram.id}`) ?? 'null')
+      if (!data?.nodes) return 0
+      const root = data.nodes.find((n: { parentId: string | null }) => n.parentId === null)
+      return root ? data.nodes.filter((n: { parentId: string }) => n.parentId === root.id).length : 0
+    } catch { return 0 }
+  })()
 
   return (
     <div
@@ -404,11 +407,16 @@ function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isFav, onToggleFav }:
       }}
       onClick={onOpen}
     >
-      {/* Header — name (left) + time (right) */}
+      {/* Header — name + count pill (left) + time (right) */}
       <div style={{ padding: '12px 14px 10px', borderBottom: '1px solid #eef2f8', display: 'flex', alignItems: 'center', gap: 6 }}>
         <div style={{ fontSize: 13, fontWeight: 600, color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
           {diagram.name}
         </div>
+        {l1Count > 0 && (
+          <span style={{ fontSize: 10, fontWeight: 700, color: '#6366f1', background: '#6366f115', borderRadius: 20, padding: '2px 7px', flexShrink: 0 }}>
+            {l1Count}
+          </span>
+        )}
         <div style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, color: '#94a3b8', flexShrink: 0 }}>
           <Clock size={11} /> {timeAgo}
         </div>
