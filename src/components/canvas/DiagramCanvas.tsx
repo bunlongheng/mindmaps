@@ -85,13 +85,13 @@ export function DiagramCanvas({ onNodeSelect, readOnly, onDelete, isFav, onToggl
     flashZoomHud()
   }, [zoom, flashZoomHud])
 
-  // Auto-fit on initial diagram load
+  // Auto-fit on initial diagram load or diagram type switch
   useEffect(() => {
     if (!activeIdea) return
     const raf = requestAnimationFrame(fitView)
     return () => cancelAnimationFrame(raf)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeIdea?.id])
+  }, [activeIdea?.id, diagramType])
 
   const MIN_ZOOM = 0.2
   const MAX_ZOOM = 9.99

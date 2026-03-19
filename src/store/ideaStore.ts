@@ -18,6 +18,7 @@ import { computeTimelineLayout } from '../lib/layout/timeline'
 import { getTheme } from '../lib/themes'
 import { guessIcon } from '../lib/autoIcon'
 import { ICON_MAP } from '../lib/icons'
+import { showToast } from '../components/CuteToast'
 
 /** Compute a node width that fits its title text — font sizes must match Node.tsx */
 function computeNodeWidth(title: string, depth: number, hasIcon: boolean): number {
@@ -204,6 +205,12 @@ export const useIdeaStore = create<IdeaStore>()(
         activeIdea: { ...state.activeIdea, type: t, nodes: newNodes },
         isDirty: true,
       })
+      const labels: Record<string, string> = {
+        'logic-chart': 'Logic Chart', 'mindmap': 'Mind Map',
+        'tree-vertical': 'Tree ↓', 'tree-horizontal': 'Tree →',
+        'fishbone': 'Fishbone', 'timeline': 'Timeline',
+      }
+      showToast(`✦ Switched to ${labels[t] ?? t}`, { color: '#6366f1' })
     },
     setLineStyle: (s) => {
       const state = get()

@@ -21,10 +21,7 @@ function lsSaveList(list: DiagramMeta[]) {
 }
 function lsGetDiagram(id: string): Diagram | null {
   try {
-    const d = JSON.parse(localStorage.getItem(lsKey(id)) ?? 'null')
-    if (!d) return null
-    if (d.type === 'mindmap') d.type = 'logic-chart'  // migrate old data
-    return d
+    return JSON.parse(localStorage.getItem(lsKey(id)) ?? 'null')
   } catch { return null }
 }
 function lsSaveDiagram(d: Diagram) {
@@ -68,7 +65,7 @@ function rowToDiagram(row: Record<string, unknown>): Diagram {
   return {
     id:             row.id as string,
     name:           row.name as string,
-    type:           ((row.type === 'mindmap' ? 'logic-chart' : row.type)) as Diagram['type'],
+    type:           row.type as Diagram['type'],
     lineStyle:      row.line_style as Diagram['lineStyle'],
     createdAt:      row.created_at as string,
     updatedAt:      row.updated_at as string,

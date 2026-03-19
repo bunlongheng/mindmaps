@@ -2,28 +2,42 @@ import type { IdeaNode } from '../../types'
 
 const SIZES: Record<number, { w: number; h: number }> = {
   0: { w: 180, h: 180 },  // circle: w === h
-  1: { w: 320, h: 54 },
 }
-const DEFAULT_SIZE = { w: 170, h: 38 }
+const DEFAULT_H: Record<number, number> = { 1: 54, 2: 38, 3: 34 }
+const DEFAULT_HEIGHT = 30
 const H_GAPS: Record<number, number> = { 0: 120, 1: 60 }
 const DEFAULT_H_GAP = 50
 const V_GAP = 22
 
-function getSize(depth: number) { return SIZES[depth] ?? DEFAULT_SIZE }
 function getHGap(depth: number) { return H_GAPS[depth] ?? DEFAULT_H_GAP }
 
-/** Effective size: always respect stored node dimensions if set */
+/** Auto-compute width from title text so every node fits its content */
+function autoWidth(node: IdeaNode, depth: number): number {
+  const fontSize = depth === 1 ? 22 : depth === 2 ? 16 : depth === 3 ? 13 : 11
+  const hasVisual = !!(node.icon || node.emoji)
+  const textW = node.title.length * fontSize * 0.64 + 24
+  const total = hasVisual ? Math.ceil(textW / 0.78) : textW
+  const min = depth === 1 ? 160 : depth === 2 ? 110 : 90
+  return Math.max(min, Math.min(400, Math.ceil(total)))
+}
+
+/** Effective size: root uses stored circle size; all others auto-fit title */
 function nodeSize(node: IdeaNode, depth: number) {
-  const { w, h } = getSize(depth)
-  if (depth === 0 && node.width > 0 && node.width === node.height) return { w: node.width, h: node.height }
-  if (depth > 0 && node.width > 0) return { w: node.width, h: node.height > 0 ? node.height : h }
+  if (depth === 0) {
+    const { w, h } = SIZES[0]
+    if (node.width > 0 && node.width === node.height) return { w: node.width, h: node.height }
+    return { w, h }
+  }
+  const w = autoWidth(node, depth)
+  const h = node.height > 0 ? node.height : (DEFAULT_H[depth] ?? DEFAULT_HEIGHT)
   return { w, h }
 }
 
 function subtreeH(nodeId: string, depth: number, nodes: IdeaNode[]): number {
   const node = nodes.find(n => n.id === nodeId)
   const children = nodes.filter(n => n.parentId === nodeId)
-  const h = node ? nodeSize(node, depth).h : getSize(depth).h
+  const fallbackH = DEFAULT_H[depth] ?? DEFAULT_HEIGHT
+  const h = node ? nodeSize(node, depth).h : fallbackH
   if (children.length === 0) return h
   const childDepth = depth + 1
   const childrenTotal = children.reduce((sum, c) => sum + subtreeH(c.id, childDepth, nodes), 0)
