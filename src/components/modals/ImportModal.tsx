@@ -1,13 +1,13 @@
 import { useState, useRef } from 'react'
 import { importFromJSON } from '../../lib/export/json'
-import { useIdeaStore } from '../../store/ideaStore'
+import { useMindmapStore } from '../../store/mindmapStore'
 import { X, Upload } from 'lucide-react'
 
 interface ImportModalProps { onClose: () => void }
 
 export function ImportModal({ onClose }: ImportModalProps) {
   const [error, setError] = useState('')
-  const { setActiveIdea } = useIdeaStore()
+  const { setActiveMindmap } = useMindmapStore()
   const inputRef = useRef<HTMLInputElement>(null)
 
   function handleFile(file: File) {
@@ -16,7 +16,7 @@ export function ImportModal({ onClose }: ImportModalProps) {
       const text = e.target?.result as string
       const diagram = importFromJSON(text)
       if (!diagram) { setError('Invalid diagram file'); return }
-      setActiveIdea(diagram)
+      setActiveMindmap(diagram)
       onClose()
     }
     reader.readAsText(file)

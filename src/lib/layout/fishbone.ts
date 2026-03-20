@@ -1,4 +1,4 @@
-import type { IdeaNode } from '../../types'
+import type { MindmapNode } from '../../types'
 
 export const FISHBONE_SLANT = 90
 
@@ -12,14 +12,14 @@ const SPINE_SEG = 340         // horizontal gap between L1 attachment points
 const BONE_HEIGHT_BASE = 260  // minimum vertical distance from spine to L1 tip
 const L2_MIN_SPACING = 56     // minimum vertical gap between L2 nodes on the diagonal
 
-export function computeFishboneLayout(nodes: IdeaNode[]): IdeaNode[] {
+export function computeFishboneLayout(nodes: MindmapNode[]): MindmapNode[] {
   const root = nodes.find(n => n.parentId === null)
   if (!root) return nodes
 
   const l1s = nodes.filter(n => n.parentId === root.id)
     .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
 
-  const result: IdeaNode[] = []
+  const result: MindmapNode[] = []
   result.push({ ...root, x: ROOT_X, y: SPINE_Y - ROOT_H / 2, width: ROOT_W, height: ROOT_H, manuallyPositioned: false })
 
   const spineOriginX = ROOT_X + ROOT_W

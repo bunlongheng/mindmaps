@@ -1,25 +1,25 @@
-import type { IdeaNode } from '../types'
+import type { MindmapNode } from '../types'
 
 export interface Point { x: number; y: number }
 export interface Rect { x: number; y: number; w: number; h: number }
 
-export function nodeRect(n: IdeaNode): Rect {
+export function nodeRect(n: MindmapNode): Rect {
   return { x: n.x, y: n.y, w: n.width, h: n.height }
 }
 
-export function nodeCenterRight(n: IdeaNode): Point {
+export function nodeCenterRight(n: MindmapNode): Point {
   return { x: n.x + n.width, y: n.y + n.height / 2 }
 }
-export function nodeCenterLeft(n: IdeaNode): Point {
+export function nodeCenterLeft(n: MindmapNode): Point {
   return { x: n.x, y: n.y + n.height / 2 }
 }
-export function nodeCenterBottom(n: IdeaNode): Point {
+export function nodeCenterBottom(n: MindmapNode): Point {
   return { x: n.x + n.width / 2, y: n.y + n.height }
 }
-export function nodeCenterTop(n: IdeaNode): Point {
+export function nodeCenterTop(n: MindmapNode): Point {
   return { x: n.x + n.width / 2, y: n.y }
 }
-export function nodeCenter(n: IdeaNode): Point {
+export function nodeCenter(n: MindmapNode): Point {
   return { x: n.x + n.width / 2, y: n.y + n.height / 2 }
 }
 

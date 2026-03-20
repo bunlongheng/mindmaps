@@ -9,9 +9,9 @@ function uuid(): string {
 
 import { create } from 'zustand'
 import { subscribeWithSelector } from 'zustand/middleware'
-import type { Diagram, DiagramMeta, DiagramType, LineStyle, IdeaNode } from '../types'
+import type { Diagram, DiagramMeta, DiagramType, LineStyle, MindmapNode } from '../types'
 import { computeTreeLayout } from '../lib/layout/tree'
-import { computeIdeasLayout } from '../lib/layout/ideas'
+import { computeMindmapsLayout } from '../lib/layout/mindmaps-layout'
 import { computeMindmapLayout } from '../lib/layout/mindmap'
 import { computeFishboneLayout } from '../lib/layout/fishbone'
 import { computeTimelineLayout } from '../lib/layout/timeline'
@@ -32,7 +32,7 @@ function computeNodeWidth(title: string, depth: number, hasIcon: boolean): numbe
 }
 
 /** Make all nodes at the same depth share the width of the widest node at that depth */
-function normalizeWidthsPerDepth(nodes: IdeaNode[]): IdeaNode[] {
+function normalizeWidthsPerDepth(nodes: MindmapNode[]): MindmapNode[] {
   const maxByDepth = new Map<number, number>()
   for (const n of nodes) {
     if (n.depth > 0) maxByDepth.set(n.depth, Math.max(maxByDepth.get(n.depth) ?? 0, n.width))
@@ -41,8 +41,8 @@ function normalizeWidthsPerDepth(nodes: IdeaNode[]): IdeaNode[] {
 }
 
 /** Re-index sortOrder per parent group so numbers are always 0,1,2,... with no gaps */
-function reindexSortOrders(nodes: IdeaNode[]): IdeaNode[] {
-  const groups = new Map<string | null, IdeaNode[]>()
+function reindexSortOrders(nodes: MindmapNode[]): MindmapNode[] {
+  const groups = new Map<string | null, MindmapNode[]>()
   for (const n of nodes) {
     const key = n.parentId ?? null
     if (!groups.has(key)) groups.set(key, [])
@@ -67,7 +67,7 @@ function isTooLight(hex: string): boolean {
 }
 
 /** Spread L1 colors evenly across the 12-color palette, propagate to descendants */
-function rebalanceColors(nodes: IdeaNode[], palette: string[]): IdeaNode[] {
+function rebalanceColors(nodes: MindmapNode[], palette: string[]): MindmapNode[] {
   // Only use first 12 — the vibrant wheel colors; the rest are utility (darks, grays, whites)
   const vibrant = palette.slice(0, 12).filter(c => !isTooLight(c))
   const effectivePalette = vibrant.length >= 2 ? vibrant : palette.slice(0, 12)
@@ -78,7 +78,7 @@ function rebalanceColors(nodes: IdeaNode[], palette: string[]): IdeaNode[] {
     n.id,
     effectivePalette[Math.round(i * effectivePalette.length / N) % effectivePalette.length],
   ]))
-  function inheritedColor(node: IdeaNode): string {
+  function inheritedColor(node: MindmapNode): string {
     if (node.depth === 1) return colorMap.get(node.id) ?? node.color
     const parent = nodes.find(p => p.id === node.parentId)
     return parent ? inheritedColor(parent) : node.color
@@ -90,9 +90,9 @@ function rebalanceColors(nodes: IdeaNode[], palette: string[]): IdeaNode[] {
   })
 }
 
-function runLayout(nodes: IdeaNode[], type: DiagramType): IdeaNode[] {
+function runLayout(nodes: MindmapNode[], type: DiagramType): MindmapNode[] {
   switch (type) {
-    case 'logic-chart': return computeIdeasLayout(nodes)
+    case 'logic-chart': return computeMindmapsLayout(nodes)
     case 'mindmap':     return computeMindmapLayout(nodes)
     case 'fishbone':    return computeFishboneLayout(nodes)
     case 'tree-vertical':   return computeTreeLayout(nodes, 'vertical')
@@ -101,11 +101,11 @@ function runLayout(nodes: IdeaNode[], type: DiagramType): IdeaNode[] {
   }
 }
 
-interface HistoryState { nodes: IdeaNode[] }
+interface HistoryState { nodes: MindmapNode[] }
 
-interface IdeaStore {
+interface MindmapStore {
   // Data
-  activeIdea: Diagram | null
+  activeMindmap: Diagram | null
   diagrams: DiagramMeta[]
   selectedNodeIds: string[]
   isDirty: boolean
@@ -120,16 +120,16 @@ interface IdeaStore {
   past: HistoryState[]
   future: HistoryState[]
   // Actions
-  setActiveIdea: (d: Diagram) => void
+  setActiveMindmap: (d: Diagram) => void
   setDiagrams: (ds: DiagramMeta[]) => void
   setSelectedNodeIds: (ids: string[]) => void
   setDiagramType: (t: DiagramType) => void
   setLineStyle: (s: LineStyle) => void
   setTheme: (id: string) => void
   setIsDirty: (v: boolean) => void
-  addNode: (parentId: string | null, title?: string) => IdeaNode
-  updateNode: (id: string, updates: Partial<IdeaNode>) => void
-  batchUpdateNodes: (ids: string[], updates: Partial<IdeaNode>) => void
+  addNode: (parentId: string | null, title?: string) => MindmapNode
+  updateNode: (id: string, updates: Partial<MindmapNode>) => void
+  batchUpdateNodes: (ids: string[], updates: Partial<MindmapNode>) => void
   reorderNode: (nodeId: string, insertBeforeId: string | null) => void
   deleteNode: (id: string) => void
   deleteSelectedNodes: () => void
@@ -147,22 +147,22 @@ interface IdeaStore {
   clearDiagram: () => void
   loadFromOutline: (text: string) => void
   autoAssignIcons: () => void
-  pasteImportFn: ((name: string, nodes: IdeaNode[]) => void) | null
-  setPasteImportFn: (fn: ((name: string, nodes: IdeaNode[]) => void) | null) => void
+  pasteImportFn: ((name: string, nodes: MindmapNode[]) => void) | null
+  setPasteImportFn: (fn: ((name: string, nodes: MindmapNode[]) => void) | null) => void
   setNodePositions: (positions: { id: string; x: number; y: number }[]) => void
 }
 
-function pushHistory(state: IdeaStore): Pick<IdeaStore, 'past' | 'future'> {
-  const current = state.activeIdea?.nodes ?? []
+function pushHistory(state: MindmapStore): Pick<MindmapStore, 'past' | 'future'> {
+  const current = state.activeMindmap?.nodes ?? []
   return {
     past: [...state.past.slice(-30), { nodes: current }],
     future: [],
   }
 }
 
-export const useIdeaStore = create<IdeaStore>()(
+export const useMindmapStore = create<MindmapStore>()(
   subscribeWithSelector((set, get) => ({
-    activeIdea: null,
+    activeMindmap: null,
     diagrams: [],
     selectedNodeIds: [],
     isDirty: false,
@@ -178,7 +178,7 @@ export const useIdeaStore = create<IdeaStore>()(
 
     setPasteImportFn: (fn) => set({ pasteImportFn: fn }),
 
-    setActiveIdea: (d) => {
+    setActiveMindmap: (d) => {
       // Re-run layout on load: reset widths → compute auto-widths → normalize per depth → final layout
       const freshNodes = d.nodes.map(n => {
         if (n.depth !== 0) return { ...n, width: 0, height: 0, manuallyPositioned: false }
@@ -195,7 +195,7 @@ export const useIdeaStore = create<IdeaStore>()(
       const themeId = d.themeId ?? localStorage.getItem('mindmaps:themeId') ?? 'default'
       localStorage.setItem('mindmaps:themeId', themeId)
       set({
-        activeIdea: { ...d, nodes },
+        activeMindmap: { ...d, nodes },
         diagramType: d.type,
         lineStyle: d.lineStyle,
         themeId,
@@ -210,9 +210,9 @@ export const useIdeaStore = create<IdeaStore>()(
     setSelectedNodeIds: (ids) => set({ selectedNodeIds: ids }),
     setDiagramType: (t) => {
       const state = get()
-      if (!state.activeIdea) return
+      if (!state.activeMindmap) return
       // Clear manual positions AND reset dimensions so every layout starts fresh with correct sizes for the target type
-      const resetNodes = state.activeIdea.nodes.map(n =>
+      const resetNodes = state.activeMindmap.nodes.map(n =>
         n.depth === 0 ? { ...n, manuallyPositioned: false } : { ...n, manuallyPositioned: false, width: 0, height: 0 }
       )
       // Run layout once to get auto-computed widths, normalize per depth, then re-layout for correct positions
@@ -220,7 +220,7 @@ export const useIdeaStore = create<IdeaStore>()(
       const newNodes = runLayout(normalizeWidthsPerDepth(withWidths), t)
       set({
         diagramType: t,
-        activeIdea: { ...state.activeIdea, type: t, nodes: newNodes },
+        activeMindmap: { ...state.activeMindmap, type: t, nodes: newNodes },
         isDirty: true,
       })
       const labels: Record<string, string> = {
@@ -232,10 +232,10 @@ export const useIdeaStore = create<IdeaStore>()(
     },
     setLineStyle: (s) => {
       const state = get()
-      if (!state.activeIdea) return
+      if (!state.activeMindmap) return
       set({
         lineStyle: s,
-        activeIdea: { ...state.activeIdea, lineStyle: s },
+        activeMindmap: { ...state.activeMindmap, lineStyle: s },
         isDirty: true,
       })
     },
@@ -246,10 +246,10 @@ export const useIdeaStore = create<IdeaStore>()(
       const state = get()
       const palette = getTheme(id).colors
       // Re-color all L1 nodes (depth === 1) using the new theme palette
-      if (state.activeIdea) {
-        const l1s = state.activeIdea.nodes.filter(n => n.depth === 1)
+      if (state.activeMindmap) {
+        const l1s = state.activeMindmap.nodes.filter(n => n.depth === 1)
           .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
-        const nodes = state.activeIdea.nodes.map(n => {
+        const nodes = state.activeMindmap.nodes.map(n => {
           if (n.depth !== 1) return n
           const idx = l1s.findIndex(l => l.id === n.id)
           const newColor = palette[idx % palette.length]
@@ -258,15 +258,15 @@ export const useIdeaStore = create<IdeaStore>()(
         })
         // Propagate L1 color down to descendants
         const colorMap = new Map(nodes.filter(n => n.depth === 1).map(n => [n.id, n.color]))
-        function getInheritedColor(node: IdeaNode): string {
+        function getInheritedColor(node: MindmapNode): string {
           if (node.depth === 1) return colorMap.get(node.id) ?? node.color
           const parent = nodes.find(p => p.id === node.parentId)
           if (!parent) return node.color
           return getInheritedColor(parent)
         }
         const recolored = nodes.map(n => n.depth > 1 ? { ...n, color: getInheritedColor(n) } : n)
-        const updatedDiagram = { ...state.activeIdea, themeId: id, nodes: recolored }
-        set({ themeId: id, activeIdea: updatedDiagram, isDirty: true })
+        const updatedDiagram = { ...state.activeMindmap, themeId: id, nodes: recolored }
+        set({ themeId: id, activeMindmap: updatedDiagram, isDirty: true })
         // Immediately update localStorage cache so homepage minimap reflects new colors instantly
         try {
           localStorage.setItem(`mindmaps:diagram:${updatedDiagram.id}`, JSON.stringify(updatedDiagram))
@@ -283,18 +283,18 @@ export const useIdeaStore = create<IdeaStore>()(
 
     addNode: (parentId, title = 'New Node') => {
       const state = get()
-      if (!state.activeIdea) throw new Error('No active diagram')
+      if (!state.activeMindmap) throw new Error('No active diagram')
       state.snapshotHistory()
 
-      const parent = parentId ? state.activeIdea.nodes.find(n => n.id === parentId) : null
+      const parent = parentId ? state.activeMindmap.nodes.find(n => n.id === parentId) : null
       const depth = parent ? parent.depth + 1 : 0
-      const siblings = state.activeIdea.nodes.filter(n => n.parentId === parentId)
+      const siblings = state.activeMindmap.nodes.filter(n => n.parentId === parentId)
       // Depth-1 nodes (direct children of root) each get a unique palette color
       const palette = getTheme(get().themeId).colors
       const color = parent?.depth === 0
         ? palette[siblings.length % palette.length]
         : (parent ? parent.color : palette[8] ?? '#6366f1')
-      const newNode: IdeaNode = {
+      const newNode: MindmapNode = {
         id: uuid(),
         title,
         color,
@@ -307,11 +307,11 @@ export const useIdeaStore = create<IdeaStore>()(
         sortOrder: siblings.length,
       }
       // Strip manuallyPositioned so the layout is always clean when adding nodes
-      const reset = [...state.activeIdea.nodes, newNode].map(n => ({ ...n, manuallyPositioned: false }))
+      const reset = [...state.activeMindmap.nodes, newNode].map(n => ({ ...n, manuallyPositioned: false }))
       const laid = runLayout(normalizeWidthsPerDepth(reset), state.diagramType)
       const newNodes = rebalanceColors(laid, palette)
       set({
-        activeIdea: { ...state.activeIdea, nodes: newNodes },
+        activeMindmap: { ...state.activeMindmap, nodes: newNodes },
         isDirty: true,
       })
       return newNode
@@ -319,8 +319,8 @@ export const useIdeaStore = create<IdeaStore>()(
 
     updateNode: (id, updates) => {
       const state = get()
-      if (!state.activeIdea) return
-      const nodes = state.activeIdea.nodes.map(n => {
+      if (!state.activeMindmap) return
+      const nodes = state.activeMindmap.nodes.map(n => {
         if (n.id !== id) return n
         const merged = { ...n, ...updates }
         // Auto-resize width when title changes (non-root nodes only)
@@ -331,28 +331,28 @@ export const useIdeaStore = create<IdeaStore>()(
         return merged
       })
       // Keep diagram name in sync with root node title
-      const isRoot = state.activeIdea.nodes.find(n => n.id === id)?.parentId === null
-      const name = isRoot && updates.title ? updates.title : state.activeIdea.name
+      const isRoot = state.activeMindmap.nodes.find(n => n.id === id)?.parentId === null
+      const name = isRoot && updates.title ? updates.title : state.activeMindmap.name
       set({
-        activeIdea: { ...state.activeIdea, name, nodes },
+        activeMindmap: { ...state.activeMindmap, name, nodes },
         isDirty: true,
       })
     },
 
     batchUpdateNodes: (ids, updates) => {
       const state = get()
-      if (!state.activeIdea || ids.length === 0) return
+      if (!state.activeMindmap || ids.length === 0) return
       const idSet = new Set(ids)
-      const nodes = state.activeIdea.nodes.map(n => idSet.has(n.id) ? { ...n, ...updates } : n)
-      set({ activeIdea: { ...state.activeIdea, nodes }, isDirty: true })
+      const nodes = state.activeMindmap.nodes.map(n => idSet.has(n.id) ? { ...n, ...updates } : n)
+      set({ activeMindmap: { ...state.activeMindmap, nodes }, isDirty: true })
     },
 
     reorderNode: (nodeId, insertBeforeId) => {
       const state = get()
-      if (!state.activeIdea) return
-      const moving = state.activeIdea.nodes.find(n => n.id === nodeId)
+      if (!state.activeMindmap) return
+      const moving = state.activeMindmap.nodes.find(n => n.id === nodeId)
       if (!moving) return
-      const siblings = state.activeIdea.nodes
+      const siblings = state.activeMindmap.nodes
         .filter(n => n.parentId === moving.parentId && n.id !== nodeId)
         .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
       const insertIdx = insertBeforeId
@@ -364,30 +364,30 @@ export const useIdeaStore = create<IdeaStore>()(
         ...siblings.slice(insertIdx),
       ]
       const idToOrder = new Map(reordered.map((n, i) => [n.id, i]))
-      const nodes = state.activeIdea.nodes
+      const nodes = state.activeMindmap.nodes
         .map(n => idToOrder.has(n.id) ? { ...n, sortOrder: idToOrder.get(n.id)!, manuallyPositioned: false } : n)
       const laid = runLayout(nodes, state.diagramType)
 
       const recolored = rebalanceColors(laid, getTheme(state.themeId).colors)
-      set({ activeIdea: { ...state.activeIdea, nodes: recolored }, isDirty: true })
+      set({ activeMindmap: { ...state.activeMindmap, nodes: recolored }, isDirty: true })
     },
 
     deleteNode: (id) => {
       const state = get()
-      if (!state.activeIdea) return
+      if (!state.activeMindmap) return
       state.snapshotHistory()
       // Delete node and all descendants
       function getDescendants(nodeId: string): string[] {
-        const children = state.activeIdea!.nodes.filter(n => n.parentId === nodeId)
+        const children = state.activeMindmap!.nodes.filter(n => n.parentId === nodeId)
         return [nodeId, ...children.flatMap(c => getDescendants(c.id))]
       }
       const toDelete = new Set(getDescendants(id))
-      const remaining = state.activeIdea.nodes.filter(n => !toDelete.has(n.id))
+      const remaining = state.activeMindmap.nodes.filter(n => !toDelete.has(n.id))
       const reindexed = reindexSortOrders(remaining)
       const laid = runLayout(reindexed.map(n => ({ ...n, manuallyPositioned: false })), state.diagramType)
       const nodes = rebalanceColors(laid, getTheme(state.themeId).colors)
       set({
-        activeIdea: { ...state.activeIdea, nodes },
+        activeMindmap: { ...state.activeMindmap, nodes },
         selectedNodeIds: state.selectedNodeIds.filter(nid => !toDelete.has(nid)),
         isDirty: true,
       })
@@ -395,38 +395,38 @@ export const useIdeaStore = create<IdeaStore>()(
 
     deleteSelectedNodes: () => {
       const state = get()
-      if (!state.activeIdea || state.selectedNodeIds.length === 0) return
+      if (!state.activeMindmap || state.selectedNodeIds.length === 0) return
       // Never delete the root node
-      const rootId = state.activeIdea.nodes.find(n => n.parentId === null)?.id
+      const rootId = state.activeMindmap.nodes.find(n => n.parentId === null)?.id
       const idsToDelete = state.selectedNodeIds.filter(id => id !== rootId)
       if (idsToDelete.length === 0) return
       state.snapshotHistory()
       function getDescendants(nodeId: string): string[] {
-        const children = state.activeIdea!.nodes.filter(n => n.parentId === nodeId)
+        const children = state.activeMindmap!.nodes.filter(n => n.parentId === nodeId)
         return [nodeId, ...children.flatMap(c => getDescendants(c.id))]
       }
       const toDelete = new Set(idsToDelete.flatMap(id => getDescendants(id)))
-      const remaining = state.activeIdea.nodes.filter(n => !toDelete.has(n.id))
+      const remaining = state.activeMindmap.nodes.filter(n => !toDelete.has(n.id))
       const reindexed = reindexSortOrders(remaining)
       const laid = runLayout(reindexed.map(n => ({ ...n, manuallyPositioned: false })), state.diagramType)
       const nodes = rebalanceColors(laid, getTheme(state.themeId).colors)
-      set({ activeIdea: { ...state.activeIdea, nodes }, selectedNodeIds: [], isDirty: true })
+      set({ activeMindmap: { ...state.activeMindmap, nodes }, selectedNodeIds: [], isDirty: true })
     },
 
     dissolveNode: (id) => {
       const state = get()
-      if (!state.activeIdea) return
-      const node = state.activeIdea.nodes.find(n => n.id === id)
+      if (!state.activeMindmap) return
+      const node = state.activeMindmap.nodes.find(n => n.id === id)
       if (!node || node.parentId === null) return // never dissolve root
       state.snapshotHistory()
       // Re-parent direct children to this node's parent, inheriting depth-1
-      const children = state.activeIdea.nodes.filter(n => n.parentId === id)
-      const siblingsOfNode = state.activeIdea.nodes
+      const children = state.activeMindmap.nodes.filter(n => n.parentId === id)
+      const siblingsOfNode = state.activeMindmap.nodes
         .filter(n => n.parentId === node.parentId && n.id !== id)
         .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
       const insertAt = node.sortOrder ?? siblingsOfNode.length
       // Build updated nodes: remove dissolved node, re-parent its children
-      const updated = state.activeIdea.nodes
+      const updated = state.activeMindmap.nodes
         .filter(n => n.id !== id)
         .map(n => {
           if (n.parentId === id) {
@@ -447,22 +447,22 @@ export const useIdeaStore = create<IdeaStore>()(
       const reindexed = reindexSortOrders(patched)
       const laid = runLayout(reindexed.map(n => ({ ...n, manuallyPositioned: false })), state.diagramType)
       const nodes = rebalanceColors(laid, getTheme(state.themeId).colors)
-      set({ activeIdea: { ...state.activeIdea, nodes }, selectedNodeIds: [], isDirty: true })
+      set({ activeMindmap: { ...state.activeMindmap, nodes }, selectedNodeIds: [], isDirty: true })
     },
 
     dissolveSelectedNodes: () => {
       const state = get()
-      if (!state.activeIdea || state.selectedNodeIds.length === 0) return
-      const rootId = state.activeIdea.nodes.find(n => n.parentId === null)?.id
+      if (!state.activeMindmap || state.selectedNodeIds.length === 0) return
+      const rootId = state.activeMindmap.nodes.find(n => n.parentId === null)?.id
       // Process shallowest first so re-parenting cascades correctly
       const toDissolve = state.selectedNodeIds
         .filter(id => id !== rootId)
-        .map(id => state.activeIdea!.nodes.find(n => n.id === id)!)
+        .map(id => state.activeMindmap!.nodes.find(n => n.id === id)!)
         .filter(Boolean)
         .sort((a, b) => a.depth - b.depth)
       if (toDissolve.length === 0) return
       state.snapshotHistory()
-      let nodes = state.activeIdea.nodes
+      let nodes = state.activeMindmap.nodes
       for (const target of toDissolve) {
         const node = nodes.find(n => n.id === target.id)
         if (!node || node.parentId === null) continue
@@ -488,48 +488,48 @@ export const useIdeaStore = create<IdeaStore>()(
       const reindexed = reindexSortOrders(nodes)
       const laid = runLayout(reindexed.map(n => ({ ...n, manuallyPositioned: false })), state.diagramType)
       const result = rebalanceColors(laid, getTheme(state.themeId).colors)
-      set({ activeIdea: { ...state.activeIdea, nodes: result }, selectedNodeIds: [], isDirty: true })
+      set({ activeMindmap: { ...state.activeMindmap, nodes: result }, selectedNodeIds: [], isDirty: true })
     },
 
     resizeNodeDepth: (depth, width) => {
       const state = get()
-      if (!state.activeIdea) return
+      if (!state.activeMindmap) return
       const clamped = Math.max(100, Math.min(500, width))
-      const nodes = state.activeIdea.nodes.map(n =>
+      const nodes = state.activeMindmap.nodes.map(n =>
         n.depth === depth ? { ...n, width: clamped, manuallyPositioned: false } : n
       )
       const laid = runLayout(nodes, state.diagramType)
-      set({ activeIdea: { ...state.activeIdea, nodes: laid }, isDirty: true })
+      set({ activeMindmap: { ...state.activeMindmap, nodes: laid }, isDirty: true })
     },
 
     rerunLayout: () => {
       const state = get()
-      if (!state.activeIdea) return
-      const nodes = normalizeWidthsPerDepth(state.activeIdea.nodes.map(n => ({ ...n, manuallyPositioned: false })))
+      if (!state.activeMindmap) return
+      const nodes = normalizeWidthsPerDepth(state.activeMindmap.nodes.map(n => ({ ...n, manuallyPositioned: false })))
       const newNodes = runLayout(nodes, state.diagramType)
-      set({ activeIdea: { ...state.activeIdea, nodes: newNodes }, isDirty: true })
+      set({ activeMindmap: { ...state.activeMindmap, nodes: newNodes }, isDirty: true })
     },
 
     setShareEnabled: (enabled) => {
       const state = get()
-      if (!state.activeIdea) return
-      set({ activeIdea: { ...state.activeIdea, sharingEnabled: enabled }, isDirty: true })
+      if (!state.activeMindmap) return
+      set({ activeMindmap: { ...state.activeMindmap, sharingEnabled: enabled }, isDirty: true })
     },
 
     setShowOrderNumbers: (v) => {
       const state = get()
-      if (!state.activeIdea) return
-      set({ showOrderNumbers: v, activeIdea: { ...state.activeIdea, showOrderNumbers: v }, isDirty: true })
+      if (!state.activeMindmap) return
+      set({ showOrderNumbers: v, activeMindmap: { ...state.activeMindmap, showOrderNumbers: v }, isDirty: true })
     },
 
     setNodePositions: (positions) => {
       const state = get()
-      if (!state.activeIdea) return
+      if (!state.activeMindmap) return
       const posMap = new Map(positions.map(p => [p.id, p]))
-      const nodes = state.activeIdea.nodes.map(n =>
+      const nodes = state.activeMindmap.nodes.map(n =>
         posMap.has(n.id) ? { ...n, x: posMap.get(n.id)!.x, y: posMap.get(n.id)!.y, manuallyPositioned: true } : n
       )
-      set({ activeIdea: { ...state.activeIdea, nodes }, isDirty: true })
+      set({ activeMindmap: { ...state.activeMindmap, nodes }, isDirty: true })
     },
 
     setIsImporting: (v) => set({ isImporting: v }),
@@ -537,42 +537,42 @@ export const useIdeaStore = create<IdeaStore>()(
 
     undo: () => {
       const state = get()
-      if (state.past.length === 0 || !state.activeIdea) return
+      if (state.past.length === 0 || !state.activeMindmap) return
       const prev = state.past[state.past.length - 1]
       set({
         past: state.past.slice(0, -1),
-        future: [{ nodes: state.activeIdea.nodes }, ...state.future],
-        activeIdea: { ...state.activeIdea, nodes: prev.nodes },
+        future: [{ nodes: state.activeMindmap.nodes }, ...state.future],
+        activeMindmap: { ...state.activeMindmap, nodes: prev.nodes },
         isDirty: true,
       })
     },
 
     redo: () => {
       const state = get()
-      if (state.future.length === 0 || !state.activeIdea) return
+      if (state.future.length === 0 || !state.activeMindmap) return
       const next = state.future[0]
       set({
-        past: [...state.past, { nodes: state.activeIdea.nodes }],
+        past: [...state.past, { nodes: state.activeMindmap.nodes }],
         future: state.future.slice(1),
-        activeIdea: { ...state.activeIdea, nodes: next.nodes },
+        activeMindmap: { ...state.activeMindmap, nodes: next.nodes },
         isDirty: true,
       })
     },
 
     autoAssignIcons: () => {
       const state = get()
-      if (!state.activeIdea) return
-      const nodes = state.activeIdea.nodes.map(n =>
+      if (!state.activeMindmap) return
+      const nodes = state.activeMindmap.nodes.map(n =>
         n.depth > 0 ? { ...n, icon: n.icon ?? guessIcon(n.title) } : n
       )
-      set({ activeIdea: { ...state.activeIdea, nodes }, isDirty: true })
+      set({ activeMindmap: { ...state.activeMindmap, nodes }, isDirty: true })
     },
 
-    clearDiagram: () => set({ activeIdea: null, selectedNodeIds: [], past: [], future: [], isDirty: false }),
+    clearDiagram: () => set({ activeMindmap: null, selectedNodeIds: [], past: [], future: [], isDirty: false }),
 
     loadFromOutline: (text: string) => {
       const state = get()
-      if (!state.activeIdea) return
+      if (!state.activeMindmap) return
 
       // --- Flat item type used internally ---
       type FlatItem = { title: string; indent: number; icon?: string; emoji?: string }
@@ -727,7 +727,7 @@ export const useIdeaStore = create<IdeaStore>()(
       }
 
       const palette = getTheme(state.themeId).colors
-      const rawNodes: IdeaNode[] = parsed.map((p, i) => {
+      const rawNodes: MindmapNode[] = parsed.map((p, i) => {
         const depth = depths[i]
         
         const icon = depth <= 2 ? p.icon : undefined
@@ -760,7 +760,7 @@ export const useIdeaStore = create<IdeaStore>()(
       } else {
         state.snapshotHistory()
         set({
-          activeIdea: { ...state.activeIdea, name, nodes },
+          activeMindmap: { ...state.activeMindmap, name, nodes },
           selectedNodeIds: [],
           isDirty: true,
         })

@@ -44,7 +44,7 @@ export function LoginPage() {
         </div>
 
         <h1 style={{ fontSize: 22, fontWeight: 700, color: '#1e293b', margin: '0 0 6px', letterSpacing: '-0.02em' }}>
-          Ideas
+          Mindmaps
         </h1>
         <p style={{ fontSize: 13, color: '#94a3b8', margin: '0 0 32px', textAlign: 'center' }}>
           Sign in to access your maps

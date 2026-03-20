@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { useIdeaStore } from '../store/ideaStore'
+import { useMindmapStore } from '../store/mindmapStore'
 import { showToast } from '../components/CuteToast'
 import { exportToJSON } from '../lib/export/json'
 
@@ -12,7 +12,7 @@ export function useKeyboard() {
       const lines = text.split('\n').filter(l => l.trim())
       const hasIndent = lines.some(l => /^(\s{4}|\t)/.test(l))
       if (isJson || (lines.length >= 2 && hasIndent)) {
-        useIdeaStore.getState().loadFromOutline(text)
+        useMindmapStore.getState().loadFromOutline(text)
         showToast('Loaded diagram', { color: '#22c55e', confetti: true })
       }
     }
@@ -21,7 +21,7 @@ export function useKeyboard() {
       const tag = (e.target as HTMLElement).tagName.toLowerCase()
       if (tag === 'input' || tag === 'textarea') return
 
-      const { deleteSelectedNodes, dissolveNode, dissolveSelectedNodes, setSelectedNodeIds, undo, redo, activeIdea, selectedNodeIds } = useIdeaStore.getState()
+      const { deleteSelectedNodes, dissolveNode, dissolveSelectedNodes, setSelectedNodeIds, undo, redo, activeMindmap, selectedNodeIds } = useMindmapStore.getState()
 
       if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key === 'v') {
         navigator.clipboard?.readText().then(tryLoad).catch(() => {})
@@ -30,7 +30,7 @@ export function useKeyboard() {
 
       if ((e.metaKey || e.ctrlKey) && e.key === 'a') {
         e.preventDefault()
-        if (activeIdea) setSelectedNodeIds(activeIdea.nodes.map(n => n.id))
+        if (activeMindmap) setSelectedNodeIds(activeMindmap.nodes.map(n => n.id))
         return
       }
       if ((e.metaKey || e.ctrlKey) && (e.key === 'Delete' || e.key === 'Backspace')) {
@@ -49,21 +49,21 @@ export function useKeyboard() {
     function onCopy(e: ClipboardEvent) {
       const tag = (e.target as HTMLElement).tagName.toLowerCase()
       if (tag === 'input' || tag === 'textarea') return
-      const { activeIdea, selectedNodeIds } = useIdeaStore.getState()
-      if (!activeIdea) return
+      const { activeMindmap, selectedNodeIds } = useMindmapStore.getState()
+      if (!activeMindmap) return
       e.preventDefault()
-      const rootId = activeIdea.nodes.find(n => n.parentId === null)?.id
+      const rootId = activeMindmap.nodes.find(n => n.parentId === null)?.id
       const startId = selectedNodeIds.length > 0 ? selectedNodeIds[0] : rootId
       if (!startId) return
       if (startId === rootId) {
-        e.clipboardData!.setData('text/plain', exportToJSON(activeIdea))
+        e.clipboardData!.setData('text/plain', exportToJSON(activeMindmap))
         showToast('Copied JSON', { color: '#6366f1' })
         return
       }
       function buildText(nodeId: string, indent: number): string {
-        const node = activeIdea!.nodes.find(n => n.id === nodeId)
+        const node = activeMindmap!.nodes.find(n => n.id === nodeId)
         if (!node) return ''
-        const children = activeIdea!.nodes
+        const children = activeMindmap!.nodes
           .filter(n => n.parentId === nodeId)
           .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
         return ['    '.repeat(indent) + node.title, ...children.map(c => buildText(c.id, indent + 1))].join('\n')

@@ -1,7 +1,7 @@
 export type DiagramType = 'logic-chart' | 'mindmap' | 'fishbone' | 'timeline' | 'tree-vertical' | 'tree-horizontal'
 export type LineStyle = 'straight' | 'curved' | 'orthogonal'
 
-export interface IdeaNode {
+export interface MindmapNode {
   id: string
   title: string
   color: string        // hex base color (inherited from nearest user-set ancestor)
@@ -29,7 +29,7 @@ export interface Diagram {
   name: string
   type: DiagramType
   lineStyle: LineStyle
-  nodes: IdeaNode[]
+  nodes: MindmapNode[]
   createdAt: string
   updatedAt: string
   sharingEnabled?: boolean

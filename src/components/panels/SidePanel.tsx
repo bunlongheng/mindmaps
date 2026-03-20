@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { NODE_ICONS } from '../../lib/icons'
-import { useIdeaStore } from '../../store/ideaStore'
+import { useMindmapStore } from '../../store/mindmapStore'
 import { getTheme, THEMES } from '../../lib/themes'
 import { X, AlignLeft, AlignCenter, AlignRight, Copy, Check, RefreshCw, Download, Upload, FileDown, Trash2 } from 'lucide-react'
 import type { LineStyle, DiagramType } from '../../types'
@@ -206,17 +206,17 @@ function pickRandom(arr: string[]) { return arr[Math.floor(Math.random() * arr.l
 
 export function SidePanel({ nodeId, onClose, onImport, onDelete }: SidePanelProps) {
   const {
-    activeIdea, updateNode, batchUpdateNodes, selectedNodeIds,
+    activeMindmap, updateNode, batchUpdateNodes, selectedNodeIds,
     lineStyle, setLineStyle, diagramType, setDiagramType, rerunLayout, setShareEnabled,
     themeId, setTheme, showOrderNumbers, setShowOrderNumbers, autoAssignIcons,
-  } = useIdeaStore()
+  } = useMindmapStore()
   const themeColors = getTheme(themeId).colors
 
   const [tab, setTab] = useState<Tab>('style')
   const [copied, setCopied] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
-  const rootNode = activeIdea?.nodes.find(n => n.parentId === null)
-  const node = (nodeId ? activeIdea?.nodes.find(n => n.id === nodeId) : null) ?? rootNode ?? null
+  const rootNode = activeMindmap?.nodes.find(n => n.parentId === null)
+  const node = (nodeId ? activeMindmap?.nodes.find(n => n.id === nodeId) : null) ?? rootNode ?? null
   const [title, setTitle] = useState(node?.title ?? '')
 
   useEffect(() => { setTitle(node?.title ?? '') }, [nodeId, node?.title])
@@ -231,8 +231,8 @@ export function SidePanel({ nodeId, onClose, onImport, onDelete }: SidePanelProp
   }
 
 
-  const shareUrl = activeIdea
-    ? `${window.location.origin}${window.location.pathname}?map=${activeIdea.id}`
+  const shareUrl = activeMindmap
+    ? `${window.location.origin}${window.location.pathname}?map=${activeMindmap.id}`
     : ''
 
 
@@ -478,7 +478,7 @@ export function SidePanel({ nodeId, onClose, onImport, onDelete }: SidePanelProp
           <SBlock title="Feeling Lucky?">
             <button
               onClick={() => {
-                const { activeIdea: a, updateNode: upd } = useIdeaStore.getState()
+                const { activeMindmap: a, updateNode: upd } = useMindmapStore.getState()
                 const nodes = a?.nodes
                 if (!nodes) return
                 nodes.filter(n => n.parentId !== null).forEach(n => {
@@ -643,18 +643,18 @@ export function SidePanel({ nodeId, onClose, onImport, onDelete }: SidePanelProp
             {/* Toggle row */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <span style={{ fontSize: 12, color: '#374151' }}>
-                {activeIdea?.sharingEnabled ? 'Link active' : 'Link disabled'}
+                {activeMindmap?.sharingEnabled ? 'Link active' : 'Link disabled'}
               </span>
               <button
-                onClick={() => setShareEnabled(!activeIdea?.sharingEnabled)}
+                onClick={() => setShareEnabled(!activeMindmap?.sharingEnabled)}
                 style={{
                   width: 40, height: 22, borderRadius: 11, border: 'none', cursor: 'pointer', padding: 0,
-                  background: activeIdea?.sharingEnabled ? '#1a1d2e' : '#d1d5db',
+                  background: activeMindmap?.sharingEnabled ? '#1a1d2e' : '#d1d5db',
                   position: 'relative', transition: 'background 0.2s', flexShrink: 0,
                 }}
               >
                 <span style={{
-                  position: 'absolute', top: 3, left: activeIdea?.sharingEnabled ? 20 : 3,
+                  position: 'absolute', top: 3, left: activeMindmap?.sharingEnabled ? 20 : 3,
                   width: 16, height: 16, borderRadius: '50%', background: '#fff',
                   transition: 'left 0.2s', display: 'block',
                 }} />
@@ -662,7 +662,7 @@ export function SidePanel({ nodeId, onClose, onImport, onDelete }: SidePanelProp
             </div>
 
             {/* QR + copy — only when enabled */}
-            {activeIdea?.sharingEnabled && (
+            {activeMindmap?.sharingEnabled && (
               <>
                 <div style={{ display: 'flex', justifyContent: 'center', margin: '10px 0 8px' }}>
                   <QRCodeSVG value={shareUrl} size={160} bgColor="#ffffff" fgColor="#1a1d2e" level="M" />
@@ -687,7 +687,7 @@ export function SidePanel({ nodeId, onClose, onImport, onDelete }: SidePanelProp
           </SBlock>
           <HR />
           <SBlock title="File">
-            <button onClick={() => activeIdea && downloadJSON(activeIdea)} style={{
+            <button onClick={() => activeMindmap && downloadJSON(activeMindmap)} style={{
               width: '100%', padding: '9px 12px', borderRadius: 8, marginBottom: 6,
               border: '1px solid #e0e2e7', background: '#fff',
               cursor: 'pointer', fontSize: 12, fontWeight: 500,
@@ -710,7 +710,7 @@ export function SidePanel({ nodeId, onClose, onImport, onDelete }: SidePanelProp
               <Upload size={13} /> Import JSON
             </button>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={() => activeIdea && exportDiagramAsPdf(activeIdea.name)} style={{
+              <button onClick={() => activeMindmap && exportDiagramAsPdf(activeMindmap.name)} style={{
                 flex: 1, padding: '9px 12px', borderRadius: 8,
                 border: '1px solid #e0e2e7', background: '#fff',
                 cursor: 'pointer', fontSize: 12, fontWeight: 500,
@@ -747,7 +747,7 @@ export function SidePanel({ nodeId, onClose, onImport, onDelete }: SidePanelProp
               }} onClick={e => e.stopPropagation()}>
                 <h3 style={{ fontSize: 15, fontWeight: 700, color: '#1e293b', marginBottom: 8 }}>Delete map?</h3>
                 <p style={{ fontSize: 13, color: '#64748b', marginBottom: 20 }}>
-                  "<strong>{activeIdea?.name}</strong>" will be permanently deleted.
+                  "<strong>{activeMindmap?.name}</strong>" will be permanently deleted.
                 </p>
                 <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
                   <button onClick={() => setShowDeleteConfirm(false)} style={{

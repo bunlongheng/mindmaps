@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useIdeaStore } from '../../store/ideaStore'
+import { useMindmapStore } from '../../store/mindmapStore'
 import { ROOT_COLORS } from '../../lib/color'
 import { X, ChevronDown, AlignLeft, AlignCenter, AlignRight } from 'lucide-react'
 import type { LineStyle } from '../../types'
@@ -15,9 +15,9 @@ function hexToRgb(hex: string): [number, number, number] {
 }
 
 export function NodeStylePanel({ nodeId, onClose }: NodeStylePanelProps) {
-  const { activeIdea, updateNode, batchUpdateNodes, lineStyle, setLineStyle, selectedNodeIds, diagramType } = useIdeaStore()
+  const { activeMindmap, updateNode, batchUpdateNodes, lineStyle, setLineStyle, selectedNodeIds, diagramType } = useMindmapStore()
 
-  const node = nodeId ? activeIdea?.nodes.find(n => n.id === nodeId) : null
+  const node = nodeId ? activeMindmap?.nodes.find(n => n.id === nodeId) : null
   const [title, setTitle] = useState(node?.title ?? '')
 
   useEffect(() => { setTitle(node?.title ?? '') }, [nodeId, node?.title])

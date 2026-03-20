@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useIdeaStore } from '../../store/ideaStore'
+import { useMindmapStore } from '../../store/mindmapStore'
 import { useDiagram } from '../../hooks/useDiagram'
 import { Plus, Trash2, GitBranch } from 'lucide-react'
 import type { DiagramMeta } from '../../types'
@@ -9,7 +9,7 @@ interface DiagramSidebarProps {
 }
 
 export function DiagramSidebar({ onSave }: DiagramSidebarProps) {
-  const { diagrams, activeIdea, isDirty } = useIdeaStore()
+  const { diagrams, activeMindmap, isDirty } = useMindmapStore()
   const { loadDiagram, createDiagram, deleteDiagram } = useDiagram()
   const [newName, setNewName] = useState('')
   const [creating, setCreating] = useState(false)
@@ -44,7 +44,7 @@ export function DiagramSidebar({ onSave }: DiagramSidebarProps) {
             <GitBranch size={15} color="#fff" />
           </div>
           <div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: '#1e293b', lineHeight: 1.2 }}>Ideas</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#1e293b', lineHeight: 1.2 }}>Mindmaps</div>
             <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 1 }}>Visual diagrams</div>
           </div>
         </div>
@@ -90,8 +90,8 @@ export function DiagramSidebar({ onSave }: DiagramSidebarProps) {
         {diagrams.map(d => (
           <DiagramItem
             key={d.id} diagram={d}
-            isActive={activeIdea?.id === d.id}
-            isDirty={isDirty && activeIdea?.id === d.id}
+            isActive={activeMindmap?.id === d.id}
+            isDirty={isDirty && activeMindmap?.id === d.id}
             onLoad={() => { if (isDirty) onSave(); loadDiagram(d.id) }}
             onDelete={() => deleteDiagram(d.id)}
           />

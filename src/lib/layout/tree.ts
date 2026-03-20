@@ -1,4 +1,4 @@
-import type { IdeaNode } from '../../types'
+import type { MindmapNode } from '../../types'
 
 const H_GAP = 70   // vertical gap between parent row and child row
 const V_GAP = 20   // horizontal gap between sibling subtrees
@@ -7,18 +7,18 @@ const V_GAP = 20   // horizontal gap between sibling subtrees
 const TREE_W: Record<number, number> = { 0: 180, 1: 160, 2: 145, 3: 130 }
 const TREE_H: Record<number, number> = { 0: 180, 1: 42,  2: 38,  3: 34  }
 
-function tw(node: IdeaNode) { return TREE_W[Math.min(node.depth, 3)] ?? 115 }
-function th(node: IdeaNode) { return TREE_H[Math.min(node.depth, 3)] ?? 30 }
+function tw(node: MindmapNode) { return TREE_W[Math.min(node.depth, 3)] ?? 115 }
+function th(node: MindmapNode) { return TREE_H[Math.min(node.depth, 3)] ?? 30 }
 
 interface TreeNode {
-  node: IdeaNode
+  node: MindmapNode
   children: TreeNode[]
   subtreeW: number
   x: number
   y: number
 }
 
-function buildTree(nodes: IdeaNode[], parentId: string | null): TreeNode[] {
+function buildTree(nodes: MindmapNode[], parentId: string | null): TreeNode[] {
   return nodes
     .filter(n => n.parentId === parentId)
     .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
@@ -48,7 +48,7 @@ function assignPositions(t: TreeNode, x: number, y: number) {
   }
 }
 
-function flatten(t: TreeNode, out: IdeaNode[]) {
+function flatten(t: TreeNode, out: MindmapNode[]) {
   if (!t.node.manuallyPositioned) {
     out.push({ ...t.node, x: t.x, y: t.y, width: tw(t.node), height: th(t.node) })
   } else {
@@ -57,13 +57,13 @@ function flatten(t: TreeNode, out: IdeaNode[]) {
   for (const c of t.children) flatten(c, out)
 }
 
-export function computeTreeLayout(nodes: IdeaNode[], direction: 'vertical' | 'horizontal' = 'vertical'): IdeaNode[] {
+export function computeTreeLayout(nodes: MindmapNode[], direction: 'vertical' | 'horizontal' = 'vertical'): MindmapNode[] {
   const tree = buildTree(nodes, null)
   if (tree.length === 0) return nodes
   const root = tree[0]
   computeSubtreeW(root)
   assignPositions(root, 400 - root.subtreeW / 2, 60)
-  const result: IdeaNode[] = []
+  const result: MindmapNode[] = []
   flatten(root, result)
   if (direction === 'horizontal') {
     return result.map(n => ({ ...n, x: n.y, y: n.x }))

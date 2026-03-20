@@ -1,4 +1,4 @@
-import type { IdeaNode } from '../../types'
+import type { MindmapNode } from '../../types'
 
 const ROOT_X = 120
 export const BRACE_GAP = 50  // horizontal space per level (includes the brace connector)
@@ -9,11 +9,11 @@ const HEIGHTS = [52,  44,  36,  32]
 function nW(d: number) { return WIDTHS[Math.min(d, 3)] }
 function nH(d: number) { return HEIGHTS[Math.min(d, 3)] }
 
-export function computeBraceLayout(nodes: IdeaNode[]): IdeaNode[] {
+export function computeBraceLayout(nodes: MindmapNode[]): MindmapNode[] {
   const root = nodes.find(n => n.parentId === null)
   if (!root) return nodes
 
-  const result: IdeaNode[] = []
+  const result: MindmapNode[] = []
 
   function subtreeH(id: string, depth: number): number {
     const node = nodes.find(n => n.id === id)

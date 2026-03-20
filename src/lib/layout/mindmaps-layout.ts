@@ -1,4 +1,4 @@
-import type { IdeaNode } from '../../types'
+import type { MindmapNode } from '../../types'
 
 const SIZES: Record<number, { w: number; h: number }> = {
   0: { w: 180, h: 180 },  // circle: w === h
@@ -12,7 +12,7 @@ const V_GAP = 22
 function getHGap(depth: number) { return H_GAPS[depth] ?? DEFAULT_H_GAP }
 
 /** Auto-compute width from title text so every node fits its content */
-function autoWidth(node: IdeaNode, depth: number): number {
+function autoWidth(node: MindmapNode, depth: number): number {
   const fontSize = depth === 1 ? 22 : depth === 2 ? 16 : depth === 3 ? 13 : 11
   const hasVisual = !!(node.icon || node.emoji)
   const textW = node.title.length * fontSize * 0.64 + 24
@@ -22,7 +22,7 @@ function autoWidth(node: IdeaNode, depth: number): number {
 }
 
 /** Effective size: root uses stored circle size; all others use stored width (respects resize + normalisation) */
-function nodeSize(node: IdeaNode, depth: number) {
+function nodeSize(node: MindmapNode, depth: number) {
   if (depth === 0) {
     if (node.width > 0 && node.height > 0) return { w: node.width, h: node.height }
     return SIZES[0]
@@ -32,7 +32,7 @@ function nodeSize(node: IdeaNode, depth: number) {
   return { w, h }
 }
 
-function subtreeH(nodeId: string, depth: number, nodes: IdeaNode[]): number {
+function subtreeH(nodeId: string, depth: number, nodes: MindmapNode[]): number {
   const node = nodes.find(n => n.id === nodeId)
   const children = nodes.filter(n => n.parentId === nodeId)
   const fallbackH = DEFAULT_H[depth] ?? DEFAULT_HEIGHT
@@ -53,8 +53,8 @@ function place(
   depth: number,
   x: number,
   centerY: number,
-  nodes: IdeaNode[],
-  result: IdeaNode[],
+  nodes: MindmapNode[],
+  result: MindmapNode[],
   goRight = true,
 ) {
   const node = nodes.find(n => n.id === nodeId)
@@ -90,7 +90,7 @@ function place(
   }
 }
 
-export function computeIdeasLayout(nodes: IdeaNode[]): IdeaNode[] {
+export function computeMindmapsLayout(nodes: MindmapNode[]): MindmapNode[] {
   const root = nodes.find(n => n.parentId === null)
   if (!root) return nodes
 
@@ -101,7 +101,7 @@ export function computeIdeasLayout(nodes: IdeaNode[]): IdeaNode[] {
   const centerY = 340
   const { w: rw, h: rh } = nodeSize(root, 0)
 
-  const result: IdeaNode[] = []
+  const result: MindmapNode[] = []
   const rootX = root.manuallyPositioned ? root.x : ROOT_X
 
   // anchorX stays at the original position so L1 column doesn't move

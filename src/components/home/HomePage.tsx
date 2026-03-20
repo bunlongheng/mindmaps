@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
-import { useIdeaStore } from '../../store/ideaStore'
+import { useMindmapStore } from '../../store/mindmapStore'
 import { useDiagram } from '../../hooks/useDiagram'
-import type { DiagramMeta, IdeaNode } from '../../types'
+import type { DiagramMeta, MindmapNode } from '../../types'
 import { Plus, Search, Clock, Trash2, Star, Network, Workflow, Fish, Milestone, GitMerge, GitFork } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
-import { IdeasLogo } from '../IdeasLogo'
+import { MindmapsLogo } from '../MindmapsLogo'
 import { getTheme } from '../../lib/themes'
 
 const LS_FAVS = 'mindmaps:favorites'
@@ -22,7 +22,7 @@ interface HomePageProps {
 }
 
 export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
-  const { diagrams } = useIdeaStore()
+  const { diagrams } = useMindmapStore()
   const { loadDiagramList, createDiagram, deleteDiagram } = useDiagram(user?.id ?? null)
   const [search, setSearch] = useState('')
   const [creating, setCreating] = useState(false)
@@ -66,7 +66,7 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
     setNewName('')
     setShowCreate(false)
     setCreating(false)
-    const fresh = useIdeaStore.getState().diagrams[0]
+    const fresh = useMindmapStore.getState().diagrams[0]
     if (fresh) onOpen(fresh.id)
   }
 
@@ -106,8 +106,8 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
       }}>
         {/* Logo + name */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-          <IdeasLogo size={28} />
-          <span style={{ fontSize: 15, fontWeight: 700, color: '#1e293b' }}>Ideas</span>
+          <MindmapsLogo size={28} />
+          <span style={{ fontSize: 15, fontWeight: 700, color: '#1e293b' }}>Mindmaps</span>
         </div>
 
         {/* Search — next to app name */}
@@ -198,7 +198,7 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
             pointerEvents: 'none',
           }}>
-            <div style={{ opacity: 0.25, marginBottom: 16 }}><IdeasLogo size={40} color="#64748b" /></div>
+            <div style={{ opacity: 0.25, marginBottom: 16 }}><MindmapsLogo size={40} color="#64748b" /></div>
             <p style={{ fontSize: 15, color: '#94a3b8', fontWeight: 600, margin: 0 }}>No maps yet</p>
             <p style={{ fontSize: 13, color: '#cbd5e1', marginTop: 6 }}>Tap + to create your first map</p>
           </div>
@@ -311,8 +311,8 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
 
 
 function DiagramMinimap({ id, type }: { id: string; type: string }) {
-  const storeThemeId = useIdeaStore(s => s.themeId) // re-read when theme changes
-  const [nodes, setNodes] = useState<IdeaNode[]>([])
+  const storeThemeId = useMindmapStore(s => s.themeId) // re-read when theme changes
+  const [nodes, setNodes] = useState<MindmapNode[]>([])
   const [diagramThemeId, setDiagramThemeId] = useState<string>('default')
 
   useEffect(() => {

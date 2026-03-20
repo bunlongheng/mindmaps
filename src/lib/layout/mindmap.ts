@@ -1,4 +1,4 @@
-import type { IdeaNode } from '../../types'
+import type { MindmapNode } from '../../types'
 
 const ROOT_RADIUS = 275   // root center → L1 center (25% longer stems)
 const L1_EXTRA   = 160   // L1 center → L2 center
@@ -8,7 +8,7 @@ const MIN_ARC    = 0.52  // minimum arc (radians) reserved per child node
 const FONT_SIZES: Record<number, number> = { 1: 18, 2: 13, 3: 11 }
 const DEFAULT_FONT_SIZE = 11
 
-function autoW(node: IdeaNode, depth: number): number {
+function autoW(node: MindmapNode, depth: number): number {
   const fontSize = FONT_SIZES[depth] ?? DEFAULT_FONT_SIZE
   const hasVisual = !!(node.icon || node.emoji) && depth < 2
   const textW = node.title.length * fontSize * 0.64 + 24
@@ -21,7 +21,7 @@ const L1_CIRCLE_SIZE = 88
 const L2_CIRCLE_SIZE = 60
 
 /** Count total leaf+internal nodes in subtree (used to weight arc allocation) */
-function subtreeWeight(nodeId: string, nodes: IdeaNode[]): number {
+function subtreeWeight(nodeId: string, nodes: MindmapNode[]): number {
   const children = nodes.filter(n => n.parentId === nodeId)
   if (children.length === 0) return 1
   return children.reduce((s, c) => s + subtreeWeight(c.id, nodes), 0)
@@ -34,8 +34,8 @@ function placeSubtree(
   cy: number,
   angle: number,
   arcSpread: number,
-  nodes: IdeaNode[],
-  result: IdeaNode[],
+  nodes: MindmapNode[],
+  result: MindmapNode[],
 ) {
   const node = nodes.find(n => n.id === nodeId)
   if (!node) return
@@ -78,14 +78,14 @@ function placeSubtree(
   })
 }
 
-export function computeMindmapLayout(nodes: IdeaNode[]): IdeaNode[] {
+export function computeMindmapLayout(nodes: MindmapNode[]): MindmapNode[] {
   const root = nodes.find(n => n.parentId === null)
   if (!root) return nodes
 
   const rw = root.width > 0 && root.width === root.height ? root.width : 160
   const cx = 0, cy = 0
 
-  const result: IdeaNode[] = []
+  const result: MindmapNode[] = []
   if (!root.manuallyPositioned) {
     result.push({ ...root, x: cx - rw / 2, y: cy - rw / 2, width: rw, height: rw })
   } else {

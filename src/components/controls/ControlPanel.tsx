@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { useIdeaStore } from '../../store/ideaStore'
+import { useMindmapStore } from '../../store/mindmapStore'
 import { Share2, Download, Upload, RefreshCw, Plus, Menu, Undo2, Redo2, MoreHorizontal, Trash2, Copy } from 'lucide-react'
 import { showToast } from '../CuteToast'
 import { downloadJSON } from '../../lib/export/json'
@@ -31,7 +31,7 @@ const LINE_STYLES: { value: LineStyle; symbol: string; title: string }[] = [
 const Sep = () => <div style={{ width: 1, height: 20, background: '#e2e8f0', flexShrink: 0 }} />
 
 export function ControlPanel({ onAddNode, onImport, onShare, onBack, onDelete }: ControlPanelProps) {
-  const { activeIdea, rerunLayout, undo, redo, past, future, diagramType, lineStyle, setDiagramType, setLineStyle } = useIdeaStore()
+  const { activeMindmap, rerunLayout, undo, redo, past, future, diagramType, lineStyle, setDiagramType, setLineStyle } = useMindmapStore()
   const [showMore, setShowMore] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const moreRef = useRef<HTMLDivElement>(null)
@@ -169,10 +169,10 @@ export function ControlPanel({ onAddNode, onImport, onShare, onBack, onDelete }:
             {/* Actions */}
             {[
               { icon: <RefreshCw size={13}/>, label: 'Re-run layout', onClick: () => { rerunLayout(); setShowMore(false) } },
-              { icon: <Copy size={13}/>, label: 'Copy JSON', onClick: () => { if (activeIdea) { const clean = { ...activeIdea, nodes: activeIdea.nodes.map(({ fontSize: _fs, ...n }) => n) }; navigator.clipboard.writeText(JSON.stringify(clean, null, 2)).then(() => showToast('JSON copied', { color: '#6366f1' })) } setShowMore(false) } },
-              { icon: <Download size={13}/>, label: 'Export JSON', onClick: () => { activeIdea && downloadJSON(activeIdea); setShowMore(false) } },
+              { icon: <Copy size={13}/>, label: 'Copy JSON', onClick: () => { if (activeMindmap) { const clean = { ...activeMindmap, nodes: activeMindmap.nodes.map(({ fontSize: _fs, ...n }) => n) }; navigator.clipboard.writeText(JSON.stringify(clean, null, 2)).then(() => showToast('JSON copied', { color: '#6366f1' })) } setShowMore(false) } },
+              { icon: <Download size={13}/>, label: 'Export JSON', onClick: () => { activeMindmap && downloadJSON(activeMindmap); setShowMore(false) } },
               { icon: <Upload size={13}/>, label: 'Import JSON', onClick: () => { onImport(); setShowMore(false) } },
-              { icon: <Share2 size={13}/>, label: 'Share link', onClick: () => { activeIdea && onShare(encodeShareURL(activeIdea)); setShowMore(false) } },
+              { icon: <Share2 size={13}/>, label: 'Share link', onClick: () => { activeMindmap && onShare(encodeShareURL(activeMindmap)); setShowMore(false) } },
             ].map(({ icon, label, onClick }) => (
               <button key={label} onClick={onClick}
                 style={{
@@ -201,7 +201,7 @@ export function ControlPanel({ onAddNode, onImport, onShare, onBack, onDelete }:
           }} onClick={e => e.stopPropagation()}>
             <h3 style={{ fontSize: 15, fontWeight: 700, color: '#1e293b', marginBottom: 8 }}>Delete map?</h3>
             <p style={{ fontSize: 13, color: '#64748b', marginBottom: 20 }}>
-              "<strong>{activeIdea?.name}</strong>" will be permanently deleted.
+              "<strong>{activeMindmap?.name}</strong>" will be permanently deleted.
             </p>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button onClick={() => setShowDeleteConfirm(false)} style={{

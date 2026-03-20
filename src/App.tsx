@@ -7,7 +7,7 @@ import { ImportModal } from './components/modals/ImportModal'
 import { HomePage } from './components/home/HomePage'
 import { LoginPage } from './components/auth/LoginPage'
 import { useDiagram } from './hooks/useDiagram'
-import { useIdeaStore } from './store/ideaStore'
+import { useMindmapStore } from './store/mindmapStore'
 import { decodeShareURL } from './lib/export/share'
 import { supabase, hasSupabase } from './lib/supabase'
 import { ArrowLeft, SlidersHorizontal } from 'lucide-react'
@@ -53,7 +53,7 @@ export default function App() {
   // Triple-locked: only when (1) isLocal, (2) no real session, (3) env var is set.
   const effectiveUserId = user?.id ?? (isLocal ? (import.meta.env.VITE_LOCAL_USER_ID ?? null) : null)
   const { loadDiagramList, loadDiagram, saveDiagram, createDiagramFromNodes, deleteDiagram } = useDiagram(effectiveUserId)
-  const { activeIdea, isDirty, setActiveIdea, addNode, selectedNodeIds, setSelectedNodeIds, setPasteImportFn } = useIdeaStore()
+  const { activeMindmap, isDirty, setActiveMindmap, addNode, selectedNodeIds, setSelectedNodeIds, setPasteImportFn } = useMindmapStore()
   const [view, setView] = useState<View>(() => {
     if (decodeShareURL()) return 'viewer'
     if (getMapParam()) return 'editor'
@@ -82,7 +82,7 @@ export default function App() {
     if (didLoad.current) return
     didLoad.current = true
     const shared = decodeShareURL()
-    if (shared) { setActiveIdea(shared); return }
+    if (shared) { setActiveMindmap(shared); return }
     const mapId = getMapParam()
     if (mapId) {
       // Normalize ?id= → ?map= in the URL
@@ -107,11 +107,11 @@ export default function App() {
   }, [createDiagramFromNodes, setPasteImportFn])
 
   useEffect(() => {
-    if (!isDirty || !activeIdea) return
+    if (!isDirty || !activeMindmap) return
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
-    saveTimerRef.current = setTimeout(() => saveDiagram(activeIdea), 1500)
+    saveTimerRef.current = setTimeout(() => saveDiagram(activeMindmap), 1500)
     return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current) }
-  }, [isDirty, activeIdea])
+  }, [isDirty, activeMindmap])
 
   // Sync view with URL on browser back/forward
   useEffect(() => {
@@ -144,7 +144,7 @@ export default function App() {
       if (tag === 'input' || tag === 'textarea') return
       if (e.key === 'Tab' && view === 'editor') {
         e.preventDefault()
-        const parentId = selectedNodeIds[0] ?? activeIdea?.nodes.find(n => n.parentId === null)?.id ?? null
+        const parentId = selectedNodeIds[0] ?? activeMindmap?.nodes.find(n => n.parentId === null)?.id ?? null
         if (parentId) {
           const newNode = addNode(parentId)
           setSelectedNodeIds([newNode.id])
@@ -154,7 +154,7 @@ export default function App() {
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [selectedNodeIds, activeIdea, addNode, view])
+  }, [selectedNodeIds, activeMindmap, addNode, view])
 
   const handleOpenDiagram = useCallback(async (id: string) => {
     setShowPanel(false); setSelectedPanelNodeId(null)
@@ -184,7 +184,7 @@ export default function App() {
   if (hasSupabase && !user && view !== 'viewer' && !isLocal) return <LoginPage />
 
   // If editor has no diagram (e.g. bad URL), fall back to home
-  if (view === 'editor' && !activeIdea && !authLoading) {
+  if (view === 'editor' && !activeMindmap && !authLoading) {
     const mapId = getMapParam()
     if (!mapId) { handleBack(); return null }
   }
@@ -223,9 +223,9 @@ export default function App() {
       <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
         <DiagramCanvas
           onNodeSelect={handleNodeSelect}
-          isFav={activeIdea ? favs.has(activeIdea.id) : false}
-          onToggleFav={activeIdea ? () => toggleFav(activeIdea.id) : undefined}
-          onDelete={activeIdea ? () => setShowDeleteConfirm(true) : undefined}
+          isFav={activeMindmap ? favs.has(activeMindmap.id) : false}
+          onToggleFav={activeMindmap ? () => toggleFav(activeMindmap.id) : undefined}
+          onDelete={activeMindmap ? () => setShowDeleteConfirm(true) : undefined}
         />
 
         {/* Back button — top left */}
@@ -253,7 +253,7 @@ export default function App() {
             }} onClick={e => e.stopPropagation()}>
               <h3 style={{ fontSize: 15, fontWeight: 700, color: '#1e293b', marginBottom: 8 }}>Delete map?</h3>
               <p style={{ fontSize: 13, color: '#64748b', marginBottom: 20 }}>
-                "<strong>{activeIdea?.name}</strong>" will be permanently deleted.
+                "<strong>{activeMindmap?.name}</strong>" will be permanently deleted.
               </p>
               <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
                 <button onClick={() => setShowDeleteConfirm(false)} style={{
@@ -262,9 +262,9 @@ export default function App() {
                 }}>Cancel</button>
                 <button onClick={() => {
                   setShowDeleteConfirm(false)
-                  if (activeIdea) {
-                    const name = activeIdea.name
-                    deleteDiagram(activeIdea.id, name).then(() => {
+                  if (activeMindmap) {
+                    const name = activeMindmap.name
+                    deleteDiagram(activeMindmap.id, name).then(() => {
                       handleBack()
                       setTimeout(() => showToast(`"${name}" deleted`, { color: '#ef4444' }), 50)
                     })
@@ -280,7 +280,7 @@ export default function App() {
 
 
         {/* Format toggle button — top right, only when a diagram is loaded */}
-        {activeIdea && <button
+        {activeMindmap && <button
           onClick={() => setShowPanel(p => !p)}
           title="Format"
           style={{
@@ -307,9 +307,9 @@ export default function App() {
           nodeId={selectedPanelNodeId}
           onClose={() => { setSelectedPanelNodeId(null); setSelectedNodeIds([]); setShowPanel(false) }}
           onImport={() => setShowImport(true)}
-          onDelete={activeIdea ? () => {
-            const name = activeIdea.name
-            deleteDiagram(activeIdea.id, name).then(() => {
+          onDelete={activeMindmap ? () => {
+            const name = activeMindmap.name
+            deleteDiagram(activeMindmap.id, name).then(() => {
               handleBack()
               setTimeout(() => showToast(`"${name}" deleted`, { color: '#ef4444' }), 50)
             })

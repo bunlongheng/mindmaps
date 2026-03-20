@@ -1,18 +1,18 @@
-import type { IdeaNode } from '../../types'
+import type { MindmapNode } from '../../types'
 import type { LineStyle, DiagramType } from '../../types'
 import { Edge } from './Edge'
 import { FISHBONE_SLANT } from '../../lib/layout/fishbone'
-import { useIdeaStore } from '../../store/ideaStore'
+import { useMindmapStore } from '../../store/mindmapStore'
 
 
 interface EdgeLayerProps {
-  nodes: IdeaNode[]
+  nodes: MindmapNode[]
   lineStyle: LineStyle
   diagramType: DiagramType
 }
 
 /** Curved bezier connecting parent center-edge to child center-edge (auto-detects direction) */
-function CurvedEdge({ parent, child, goRight = true }: { parent: IdeaNode; child: IdeaNode; goRight?: boolean }) {
+function CurvedEdge({ parent, child, goRight = true }: { parent: MindmapNode; child: MindmapNode; goRight?: boolean }) {
   const x1 = goRight ? parent.x + parent.width : parent.x
   const y1 = parent.y + parent.height / 2
   const x2 = goRight ? child.x : child.x + child.width
@@ -30,7 +30,7 @@ function CurvedEdge({ parent, child, goRight = true }: { parent: IdeaNode; child
 }
 
 /** Bracket connector: vertical bar with horizontal branches to each child */
-function BracketConnector({ parent, children, goRight = true, showOrderNumbers = false }: { parent: IdeaNode; children: IdeaNode[]; goRight?: boolean; showOrderNumbers?: boolean }) {
+function BracketConnector({ parent, children, goRight = true, showOrderNumbers = false }: { parent: MindmapNode; children: MindmapNode[]; goRight?: boolean; showOrderNumbers?: boolean }) {
   if (children.length === 0) return null
 
   const sorted = [...children].sort((a, b) => a.y - b.y)
@@ -86,7 +86,7 @@ function BracketConnector({ parent, children, goRight = true, showOrderNumbers =
 }
 
 export function EdgeLayer({ nodes, lineStyle, diagramType }: EdgeLayerProps) {
-  const showOrderNumbers = useIdeaStore(s => s.showOrderNumbers)
+  const showOrderNumbers = useMindmapStore(s => s.showOrderNumbers)
   const nodeMap = new Map(nodes.map(n => [n.id, n]))
 
   // ── Logic Chart ───────────────────────────────────────────────────────────

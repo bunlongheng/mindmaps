@@ -1,14 +1,14 @@
 import { useRef, useState, useCallback } from 'react'
-import type { IdeaNode } from '../../types'
-import { useIdeaStore } from '../../store/ideaStore'
+import type { MindmapNode } from '../../types'
+import { useMindmapStore } from '../../store/mindmapStore'
 import { NodeIcon, getLucideIcon } from './NodeIcon'
 
 interface NodeProps {
-  node: IdeaNode
+  node: MindmapNode
   isSelected: boolean
   onSelect: (id: string, multi: boolean) => void
   onDragEnd: (id: string, dx: number, dy: number) => void
-  onDoubleClick: (node: IdeaNode) => void
+  onDoubleClick: (node: MindmapNode) => void
   onAddChild?: (parentId: string) => void
   onDragMove?: (id: string, cx: number, cy: number) => void
   onRootDragOffset?: (offset: { dx: number; dy: number; clientX: number; clientY: number } | null) => void
@@ -45,11 +45,11 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
-  const resizePreview = useIdeaStore(s => s.resizePreview)
-  const diagramType = useIdeaStore(s => s.diagramType)
-  const parentNode = useIdeaStore(s =>
+  const resizePreview = useMindmapStore(s => s.resizePreview)
+  const diagramType = useMindmapStore(s => s.diagramType)
+  const parentNode = useMindmapStore(s =>
     diagramType === 'mindmap' && node.depth >= 2
-      ? s.activeIdea?.nodes.find(n => n.id === node.parentId)
+      ? s.activeMindmap?.nodes.find(n => n.id === node.parentId)
       : undefined
   )
   const canDrag = (isRoot && diagramType !== 'mindmap') || diagramType === 'logic-chart'
@@ -149,7 +149,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
     setEditing(false)
     const val = draft.trim()
     if (!val || val === node.title) return
-    const updates: Partial<IdeaNode> = { title: val }
+    const updates: Partial<MindmapNode> = { title: val }
     if (isRoot) {
       const textW = val.length * fontSize * 0.55
       if (val.length >= 15) {
@@ -163,8 +163,8 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
         updates.height = diameter
       }
     }
-    useIdeaStore.getState().updateNode(node.id, updates)
-    if (isRoot) setTimeout(() => useIdeaStore.getState().rerunLayout(), 0)
+    useMindmapStore.getState().updateNode(node.id, updates)
+    if (isRoot) setTimeout(() => useMindmapStore.getState().rerunLayout(), 0)
   }
 
   function onPointerDown(e: React.PointerEvent) {
@@ -190,7 +190,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
     if (Math.abs(dx) > 3 || Math.abs(dy) > 3) didDrag.current = true
     let newX = dragStart.current.nodeX + dx
     if (isRoot) {
-      const l1 = useIdeaStore.getState().activeIdea?.nodes.find(n => n.depth === 1)
+      const l1 = useMindmapStore.getState().activeMindmap?.nodes.find(n => n.depth === 1)
       if (l1) {
         const barX = l1.x - 60
         const minX = barX - 500 - node.width  // trunk = 500px
@@ -199,7 +199,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
       }
     }
     const newY = isRoot ? node.y : dragStart.current.nodeY + dy
-    useIdeaStore.getState().updateNode(node.id, { x: newX, y: newY, manuallyPositioned: true })
+    useMindmapStore.getState().updateNode(node.id, { x: newX, y: newY, manuallyPositioned: true })
     if (isRoot) onRootDragOffset?.({ dx: Math.round(dx), dy: Math.round(dy), clientX: e.clientX, clientY: e.clientY })
     onDragMove?.(node.id, newX + node.width / 2, newY + node.height / 2)
   }
@@ -248,7 +248,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
     const pt = getSVGPoint(e)
     if (!pt) return
     resizeStart.current = { startX: pt.x, startW: node.width }
-    useIdeaStore.getState().setResizePreview({ depth: node.depth, width: node.width })
+    useMindmapStore.getState().setResizePreview({ depth: node.depth, width: node.width })
     ;(e.currentTarget as Element).setPointerCapture(e.pointerId)
   }
   function onResizePointerMove(e: React.PointerEvent) {
@@ -257,16 +257,16 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
     const pt = getSVGPoint(e)
     if (!pt) return
     const newW = Math.max(100, Math.min(500, resizeStart.current.startW + (pt.x - resizeStart.current.startX)))
-    useIdeaStore.getState().setResizePreview({ depth: node.depth, width: newW })
+    useMindmapStore.getState().setResizePreview({ depth: node.depth, width: newW })
   }
   function onResizePointerUp(e: React.PointerEvent) {
     e.stopPropagation()
-    const preview = useIdeaStore.getState().resizePreview
+    const preview = useMindmapStore.getState().resizePreview
     if (resizeStart.current && preview) {
-      useIdeaStore.getState().resizeNodeDepth(node.depth, preview.width)
+      useMindmapStore.getState().resizeNodeDepth(node.depth, preview.width)
     }
     resizeStart.current = null
-    useIdeaStore.getState().setResizePreview(null)
+    useMindmapStore.getState().setResizePreview(null)
   }
 
   const clipId = `clip-${node.id}`

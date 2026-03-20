@@ -1,13 +1,13 @@
-interface IdeasLogoProps {
+interface MindmapsLogoProps {
   size?: number
 }
 
 /**
- * Ideas logo — Figma-style lightbulb:
+ * Mindmaps logo — Figma-style lightbulb:
  * red pill (top) · purple rect (mid-left) · blue circle (mid-right)
  * · green teardrop (bottom) · metallic base cap
  */
-export function IdeasLogo({ size = 32 }: IdeasLogoProps) {
+export function MindmapsLogo({ size = 32 }: MindmapsLogoProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 32 36" fill="none" xmlns="http://www.w3.org/2000/svg">
       <defs>

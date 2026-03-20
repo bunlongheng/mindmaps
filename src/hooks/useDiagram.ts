@@ -1,9 +1,9 @@
 import { useCallback } from 'react'
 import { showToast } from '../components/CuteToast'
 import { supabase, hasSupabase } from '../lib/supabase'
-import { useIdeaStore } from '../store/ideaStore'
+import { useMindmapStore } from '../store/mindmapStore'
 import { ROOT_COLORS } from '../lib/color'
-import type { Diagram, DiagramMeta, IdeaNode } from '../types'
+import type { Diagram, DiagramMeta, MindmapNode } from '../types'
 
 // ── localStorage helpers ────────────────────────────────────────────────────
 
@@ -41,7 +41,7 @@ function lsDeleteDiagram(id: string) {
 
 function rowToDiagram(row: Record<string, unknown>): Diagram {
   const rawNodes = (row.nodes ?? []) as Record<string, unknown>[]
-  const nodes: IdeaNode[] = rawNodes.map(n => ({
+  const nodes: MindmapNode[] = rawNodes.map(n => ({
     id:                 n.id as string,
     title:              n.title as string,
     color:              n.color as string,
@@ -78,7 +78,7 @@ function rowToDiagram(row: Record<string, unknown>): Diagram {
 // ── hook ────────────────────────────────────────────────────────────────────
 
 export function useDiagram(userId: string | null = null) {
-  const { setActiveIdea, setDiagrams, setIsDirty } = useIdeaStore()
+  const { setActiveMindmap, setDiagrams, setIsDirty } = useMindmapStore()
 
   const loadDiagramList = useCallback(async () => {
     if (!hasSupabase || !supabase || !userId) {
@@ -144,7 +144,7 @@ export function useDiagram(userId: string | null = null) {
     // 1. Try localStorage cache first (instant)
     const cached = lsGetDiagram(id)
     if (cached) {
-      setActiveIdea(cached)
+      setActiveMindmap(cached)
       localStorage.setItem('activeMindmapId', id)
       // Still refresh from Supabase in the background if possible
     }
@@ -161,7 +161,7 @@ export function useDiagram(userId: string | null = null) {
         // Re-upload cache to Supabase if it got wiped
         const recached = lsGetDiagram(id)
         if (recached) {
-          setActiveIdea(recached)
+          setActiveMindmap(recached)
           localStorage.setItem('activeMindmapId', id)
           await supabase.from('mindmaps').upsert({
             id: recached.id, user_id: userId, name: recached.name,
@@ -175,10 +175,10 @@ export function useDiagram(userId: string | null = null) {
     }
 
     const diagram = rowToDiagram(data)
-    setActiveIdea(diagram)
+    setActiveMindmap(diagram)
     localStorage.setItem('activeMindmapId', id)
     lsSaveDiagram(diagram)
-  }, [setActiveIdea, userId])
+  }, [setActiveMindmap, userId])
 
   const saveDiagram = useCallback(async (diagram: Diagram) => {
     if (!hasSupabase || !supabase || !userId) {
@@ -210,23 +210,23 @@ export function useDiagram(userId: string | null = null) {
     const rootId = crypto.randomUUID()
     const now = new Date().toISOString()
     const TOPIC_LABELS = ['Main Topic 1', 'Main Topic 2', 'Main Topic 3', 'Main Topic 4', 'Main Topic 5']
-    const topicNodes: IdeaNode[] = TOPIC_LABELS.map((title, i) => ({
+    const topicNodes: MindmapNode[] = TOPIC_LABELS.map((title, i) => ({
       id: crypto.randomUUID(), title,
       color: ROOT_COLORS[i % ROOT_COLORS.length],
       parentId: rootId, depth: 1,
       x: 0, y: 0, width: 160, height: 40, sortOrder: i,
     }))
-    const allNodes: IdeaNode[] = [
+    const allNodes: MindmapNode[] = [
       { id: rootId, title: name, color: '#6366f1', parentId: null, depth: 0, x: 0, y: 0, width: 140, height: 140, sortOrder: 0 },
       ...topicNodes,
     ]
-    const { computeIdeasLayout } = await import('../lib/layout/ideas')
-    const laid = computeIdeasLayout(allNodes)
+    const { computeMindmapsLayout } = await import('../lib/layout/mindmaps-layout')
+    const laid = computeMindmapsLayout(allNodes)
     const diagram: Diagram = { id, name, type: 'logic-chart', lineStyle: 'orthogonal', createdAt: now, updatedAt: now, nodes: laid }
 
     if (!hasSupabase || !supabase || !userId) {
       lsSaveDiagram(diagram)
-      setActiveIdea(diagram)
+      setActiveMindmap(diagram)
       localStorage.setItem('activeMindmapId', id)
       setDiagrams(lsGetList())
       showToast(`✦ "${name}" created`, { color: '#6366f1', confetti: true })
@@ -240,10 +240,10 @@ export function useDiagram(userId: string | null = null) {
     await loadDiagram(id)
     await loadDiagramList()
     showToast(`✦ "${name}" created`, { color: '#6366f1', confetti: true })
-  }, [loadDiagram, loadDiagramList, setActiveIdea, setDiagrams, userId])
+  }, [loadDiagram, loadDiagramList, setActiveMindmap, setDiagrams, userId])
 
-  const createDiagramFromNodes = useCallback(async (name: string, nodes: IdeaNode[]): Promise<string | null> => {
-    const existingNames = new Set(useIdeaStore.getState().diagrams.map(d => d.name))
+  const createDiagramFromNodes = useCallback(async (name: string, nodes: MindmapNode[]): Promise<string | null> => {
+    const existingNames = new Set(useMindmapStore.getState().diagrams.map(d => d.name))
     let finalName = name
     let n = 2
     while (existingNames.has(finalName)) finalName = `${name} ${n++}`
@@ -254,7 +254,7 @@ export function useDiagram(userId: string | null = null) {
 
     if (!hasSupabase || !supabase || !userId) {
       lsSaveDiagram(diagram)
-      setActiveIdea(diagram)
+      setActiveMindmap(diagram)
       localStorage.setItem('activeMindmapId', id)
       setDiagrams(lsGetList())
       showToast(`✦ "${finalName}" created`, { color: '#22c55e', confetti: true })
@@ -269,7 +269,7 @@ export function useDiagram(userId: string | null = null) {
     await loadDiagramList()
     showToast(`✦ "${finalName}" created`, { color: '#22c55e', confetti: true })
     return id
-  }, [loadDiagram, loadDiagramList, setActiveIdea, setDiagrams, userId])
+  }, [loadDiagram, loadDiagramList, setActiveMindmap, setDiagrams, userId])
 
   const deleteDiagram = useCallback(async (id: string, name?: string) => {
     if (!hasSupabase || !supabase || !userId) {

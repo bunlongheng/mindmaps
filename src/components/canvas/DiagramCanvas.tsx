@@ -1,5 +1,5 @@
 import { useRef, useState, useCallback, useEffect } from 'react'
-import { useIdeaStore } from '../../store/ideaStore'
+import { useMindmapStore } from '../../store/mindmapStore'
 import { getTheme } from '../../lib/themes'
 import { EdgeLayer } from './EdgeLayer'
 import { Node } from './Node'
@@ -16,7 +16,7 @@ interface DiagramCanvasProps {
 }
 
 export function DiagramCanvas({ onNodeSelect, readOnly, onDelete, isFav, onToggleFav }: DiagramCanvasProps) {
-  const { activeIdea, selectedNodeIds, setSelectedNodeIds, diagramType, lineStyle, themeId, addNode, reorderNode, isImporting } = useIdeaStore()
+  const { activeMindmap, selectedNodeIds, setSelectedNodeIds, diagramType, lineStyle, themeId, addNode, reorderNode, isImporting } = useMindmapStore()
   const canvasBg = getTheme(themeId).canvasBg
   const svgRef = useRef<SVGSVGElement>(null!)
   const gRef = useRef<SVGGElement>(null!)
@@ -29,11 +29,11 @@ export function DiagramCanvas({ onNodeSelect, readOnly, onDelete, isFav, onToggl
   // Auto-recover: if diagram has no nodes, add a root
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (!activeIdea) return
-    if (activeIdea.nodes.length === 0) {
-      addNode(null, activeIdea.name || 'Root')
+    if (!activeMindmap) return
+    if (activeMindmap.nodes.length === 0) {
+      addNode(null, activeMindmap.name || 'Root')
     }
-  }, [activeIdea?.id])
+  }, [activeMindmap?.id])
 
   const [showZoomMenu, setShowZoomMenu] = useState(false)
   const [showZoomHud, setShowZoomHud] = useState(false)
@@ -52,10 +52,10 @@ export function DiagramCanvas({ onNodeSelect, readOnly, onDelete, isFav, onToggl
 
   const fitView = useCallback(() => {
     const svg = svgRef.current
-    if (!svg || !activeIdea?.nodes.length) return
+    if (!svg || !activeMindmap?.nodes.length) return
     const { width: svgW, height: svgH } = svg.getBoundingClientRect()
     if (svgW === 0 || svgH === 0) return
-    const nodes = activeIdea.nodes
+    const nodes = activeMindmap.nodes
     const minX = Math.min(...nodes.map(n => n.x))
     const minY = Math.min(...nodes.map(n => n.y))
     const maxX = Math.max(...nodes.map(n => n.x + n.width))
@@ -68,7 +68,7 @@ export function DiagramCanvas({ onNodeSelect, readOnly, onDelete, isFav, onToggl
     zoomCurrentRef.current = newZoom
     zoomTargetRef.current = newZoom
     setPan({ x: svgW / 2 - cx * newZoom, y: svgH / 2 - cy * newZoom })
-  }, [activeIdea])
+  }, [activeMindmap])
 
   const setZoomLevel = useCallback((level: number) => {
     const svg = svgRef.current
@@ -87,11 +87,11 @@ export function DiagramCanvas({ onNodeSelect, readOnly, onDelete, isFav, onToggl
 
   // Auto-fit on initial diagram load or diagram type switch
   useEffect(() => {
-    if (!activeIdea) return
+    if (!activeMindmap) return
     const raf = requestAnimationFrame(fitView)
     return () => cancelAnimationFrame(raf)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeIdea?.id, diagramType])
+  }, [activeMindmap?.id, diagramType])
 
   const MIN_ZOOM = 0.2
   const MAX_ZOOM = 9.99
@@ -211,7 +211,7 @@ export function DiagramCanvas({ onNodeSelect, readOnly, onDelete, isFav, onToggl
       lastPinchDist.current = dist
       return
     }
-    if (!selStart.current || !activeIdea) return
+    if (!selStart.current || !activeMindmap) return
     const { x, y } = screenToCanvas(e.clientX, e.clientY)
     const sx = selStart.current.cx
     const sy = selStart.current.cy
@@ -222,14 +222,14 @@ export function DiagramCanvas({ onNodeSelect, readOnly, onDelete, isFav, onToggl
     if (box.w > 4 || box.h > 4) {
       isDragging.current = true
       setSelBox(box)
-      const hits = activeIdea.nodes.filter(n =>
+      const hits = activeMindmap.nodes.filter(n =>
         n.x < box.x + box.w && n.x + n.width > box.x &&
         n.y < box.y + box.h && n.y + n.height > box.y
       )
       setSelectedNodeIds(hits.map(n => n.id))
       onNodeSelect(hits.length === 1 ? hits[0].id : null)
     }
-  }, [activeIdea, setSelectedNodeIds, onNodeSelect])
+  }, [activeMindmap, setSelectedNodeIds, onNodeSelect])
 
   const handleBgPointerUp = useCallback((e: React.PointerEvent) => {
     activePointers.current.delete(e.pointerId)
@@ -245,11 +245,11 @@ export function DiagramCanvas({ onNodeSelect, readOnly, onDelete, isFav, onToggl
   }, [setSelectedNodeIds, onNodeSelect])
 
   const handleDragMove = useCallback((id: string, _cx: number, cy: number) => {
-    if (!activeIdea) return
-    const node = activeIdea.nodes.find(n => n.id === id)
+    if (!activeMindmap) return
+    const node = activeMindmap.nodes.find(n => n.id === id)
     if (!node) return
     // Find siblings (same parent), sorted by Y
-    const siblings = activeIdea.nodes
+    const siblings = activeMindmap.nodes
       .filter(n => n.parentId === node.parentId && n.id !== id)
       .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
     if (siblings.length === 0) { setSnapLine(null); snapTargetRef.current = null; return }
@@ -269,7 +269,7 @@ export function DiagramCanvas({ onNodeSelect, readOnly, onDelete, isFav, onToggl
     const maxX = Math.max(...siblings.map(s => s.x + s.width))
     snapTargetRef.current = { insertBeforeId: insertBefore }
     setSnapLine({ x1: minX - 6, x2: maxX + 6, y: snapY })
-  }, [activeIdea])
+  }, [activeMindmap])
 
   const handleDragEnd = useCallback((id: string) => {
     const snap = snapTargetRef.current
@@ -308,9 +308,9 @@ export function DiagramCanvas({ onNodeSelect, readOnly, onDelete, isFav, onToggl
       if (panDx !== 0 || panDy !== 0) {
         setPan(p => ({ x: p.x + panDx, y: p.y + panDy }))
         const z = zoomCurrentRef.current
-        const root = useIdeaStore.getState().activeIdea?.nodes.find(n => n.depth === 0)
+        const root = useMindmapStore.getState().activeMindmap?.nodes.find(n => n.depth === 0)
         if (root) {
-          useIdeaStore.getState().updateNode(root.id, {
+          useMindmapStore.getState().updateNode(root.id, {
             x: root.x - panDx / z,
             y: root.y - panDy / z,
             manuallyPositioned: true,
@@ -333,7 +333,7 @@ export function DiagramCanvas({ onNodeSelect, readOnly, onDelete, isFav, onToggl
     }
   }, [selectedNodeIds, setSelectedNodeIds, onNodeSelect])
 
-  if (!activeIdea) {
+  if (!activeMindmap) {
     return <div style={{ position: 'absolute', inset: 0, background: canvasBg }} />
   }
 
@@ -348,8 +348,8 @@ export function DiagramCanvas({ onNodeSelect, readOnly, onDelete, isFav, onToggl
         style={{ userSelect: 'none' }}
       >
         <g ref={gRef} transform={`translate(${pan.x},${pan.y}) scale(${zoom})`}>
-          <EdgeLayer nodes={activeIdea.nodes} lineStyle={lineStyle} diagramType={diagramType} />
-          {activeIdea.nodes.map(node => (
+          <EdgeLayer nodes={activeMindmap.nodes} lineStyle={lineStyle} diagramType={diagramType} />
+          {activeMindmap.nodes.map(node => (
             <Node
               key={node.id}
               node={node}
@@ -362,7 +362,7 @@ export function DiagramCanvas({ onNodeSelect, readOnly, onDelete, isFav, onToggl
               onAddChild={id => addNode(id)}
               svgRef={svgRef}
               readOnly={readOnly}
-              l1Colors={node.depth === 0 ? activeIdea.nodes.filter(n => n.depth === 1).map(n => n.color) : undefined}
+              l1Colors={node.depth === 0 ? activeMindmap.nodes.filter(n => n.depth === 1).map(n => n.color) : undefined}
             />
           ))}
           {/* Rubber-band selection box */}
@@ -449,8 +449,8 @@ export function DiagramCanvas({ onNodeSelect, readOnly, onDelete, isFav, onToggl
 
       {/* Root drag HUD */}
       {rootDragOffset && (() => {
-        const root = activeIdea?.nodes.find(n => n.depth === 0)
-        const l1 = activeIdea?.nodes.find(n => n.depth === 1)
+        const root = activeMindmap?.nodes.find(n => n.depth === 0)
+        const l1 = activeMindmap?.nodes.find(n => n.depth === 1)
         if (!root || !l1) return null
         const trunkLen = Math.max(0, Math.round((l1.x - 60) - (root.x + root.width)))
         return (
@@ -479,10 +479,10 @@ export function DiagramCanvas({ onNodeSelect, readOnly, onDelete, isFav, onToggl
         <div />
 
         {/* Center: PDF + Fav + Delete */}
-        {activeIdea ? (
+        {activeMindmap ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
             <button
-              onClick={() => exportDiagramAsPdf(activeIdea.name)}
+              onClick={() => exportDiagramAsPdf(activeMindmap.name)}
               title="Download PDF"
               style={{
                 height: 20, padding: '0 8px', border: '1px solid #e2e8f0', borderRadius: 5,

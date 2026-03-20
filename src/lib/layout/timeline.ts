@@ -1,4 +1,4 @@
-import type { IdeaNode } from '../../types'
+import type { MindmapNode } from '../../types'
 
 const SPINE_Y = 400
 const ROOT_X = 80
@@ -13,14 +13,14 @@ function autoWidth(title: string, fontSize: number, hasIconOrEmoji: boolean, min
   return Math.max(minW, Math.ceil(textW + iconZone + 28))
 }
 
-export function computeTimelineLayout(nodes: IdeaNode[]): IdeaNode[] {
+export function computeTimelineLayout(nodes: MindmapNode[]): MindmapNode[] {
   const root = nodes.find(n => n.parentId === null)
   if (!root) return nodes
 
   const l1s = nodes.filter(n => n.parentId === root.id)
     .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
 
-  const result: IdeaNode[] = []
+  const result: MindmapNode[] = []
   const rootW = root.width > 0 ? root.width : 180
   const rootH = root.height > 0 ? root.height : 180
   result.push({ ...root, x: ROOT_X, y: SPINE_Y - rootH / 2, width: rootW, height: rootH, manuallyPositioned: false })
