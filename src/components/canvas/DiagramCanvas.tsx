@@ -165,7 +165,8 @@ export function DiagramCanvas({ onNodeSelect, readOnly, onDelete, isFav, onToggl
     return { x: r.x, y: r.y }
   }
 
-  const handleWheel = useCallback((e: React.WheelEvent) => {
+  const handleWheelRef = useRef<((e: WheelEvent) => void) | null>(null)
+  handleWheelRef.current = (e: WheelEvent) => {
     e.preventDefault()
     if (e.ctrlKey) {
       const factor = 1 - Math.max(-0.08, Math.min(0.08, e.deltaY * 0.004))
@@ -174,7 +175,16 @@ export function DiagramCanvas({ onNodeSelect, readOnly, onDelete, isFav, onToggl
     } else {
       setPan(p => ({ x: p.x - e.deltaX, y: p.y - e.deltaY }))
     }
-  }, [flashZoomHud])
+  }
+
+  // Attach as non-passive so preventDefault() actually blocks browser back/forward gesture
+  useEffect(() => {
+    const el = svgRef.current
+    if (!el) return
+    const handler = (e: WheelEvent) => handleWheelRef.current?.(e)
+    el.addEventListener('wheel', handler, { passive: false })
+    return () => el.removeEventListener('wheel', handler)
+  }, [])
 
 
   const handleBgPointerDown = useCallback((e: React.PointerEvent) => {
@@ -340,7 +350,6 @@ export function DiagramCanvas({ onNodeSelect, readOnly, onDelete, isFav, onToggl
   return (
     <div className="diagram-canvas-root" style={{ position: 'absolute', inset: 0, overflow: 'hidden', background: canvasBg, cursor: 'default' }}>
       <svg ref={svgRef} width="100%" height="100%"
-        onWheel={handleWheel}
         onPointerDown={handleBgPointerDown}
         onPointerMove={handleBgPointerMove}
         onPointerUp={handleBgPointerUp}

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useMindmapStore } from '../../store/mindmapStore'
 import { useDiagram } from '../../hooks/useDiagram'
 import type { DiagramMeta, MindmapNode } from '../../types'
-import { Plus, Search, Clock, Trash2, Star, Network, Workflow, Fish, Milestone, GitMerge, GitFork } from 'lucide-react'
+import { Plus, Search, Clock, Trash2, Star, Network, Workflow, Fish, Milestone, GitMerge, GitFork, LayoutGrid } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { MindmapsLogo } from '../MindmapsLogo'
 import { getTheme } from '../../lib/themes'
@@ -31,8 +31,23 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
   const [favs, setFavs] = useState<Set<string>>(loadFavs)
   const [showUserMenu, setShowUserMenu] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
+  const favScrollRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => { loadDiagramList() }, [])
+
+  // Capture horizontal trackpad scroll on favorites row — prevent browser back/forward
+  useEffect(() => {
+    const el = favScrollRef.current
+    if (!el) return
+    function onWheel(e: WheelEvent) {
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+        e.preventDefault()
+        el!.scrollLeft += e.deltaX
+      }
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  }, [])
 
   // Close user menu on outside click
   useEffect(() => {
@@ -44,12 +59,10 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
   }, [])
 
   function toggleFav(id: string) {
-    setFavs(prev => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id); else next.add(id)
-      saveFavs(next)
-      return next
-    })
+    const next = new Set(favs)
+    if (next.has(id)) next.delete(id); else next.add(id)
+    saveFavs(next)
+    setFavs(next)
   }
 
   const filtered = diagrams.filter(d =>
@@ -94,12 +107,20 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
     return localStorage.getItem('mindmaps:displayName') ?? ''
   })()
 
+  const BG = '#eef0f5'
+  const SURFACE = '#ffffff'
+  const BORDER = '#dde2ec'
+  const BORDER_HOVER = '#a5b4fc'
+  const TEXT_PRIMARY = '#1e293b'
+  const TEXT_MUTED = '#94a3b8'
+
   return (
-    <div style={{ minHeight: '100vh', background: '#f8fafc', fontFamily: 'Inter, system-ui, sans-serif' }}>
+    <div style={{ minHeight: '100vh', background: BG, fontFamily: 'Inter, system-ui, sans-serif' }}>
 
       {/* Top nav */}
       <header style={{
-        background: '#fff', borderBottom: '1px solid #f1f5f9',
+        background: 'rgba(238,240,245,0.88)', backdropFilter: 'blur(16px)',
+        borderBottom: `1px solid ${BORDER}`,
         padding: '0 24px', height: 56,
         display: 'flex', alignItems: 'center', gap: 16,
         position: 'sticky', top: 0, zIndex: 10,
@@ -107,10 +128,10 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
         {/* Logo + name */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
           <MindmapsLogo size={28} />
-          <span style={{ fontSize: 15, fontWeight: 700, color: '#1e293b' }}>Mindmaps</span>
+          <span style={{ fontSize: 15, fontWeight: 700, color: TEXT_PRIMARY }}>Mindmaps</span>
         </div>
 
-        {/* Search — next to app name */}
+        {/* Search */}
         <div style={{ position: 'relative', width: 220 }}>
           <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
           <input
@@ -119,9 +140,9 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
             placeholder="Search maps…"
             style={{
               width: '100%', padding: '7px 12px 7px 32px', boxSizing: 'border-box',
-              border: '1px solid #e2e8f0', borderRadius: 9, fontSize: 13,
-              outline: 'none', fontFamily: 'inherit', color: '#334155',
-              background: '#f8fafc',
+              border: `1px solid ${BORDER}`, borderRadius: 9, fontSize: 13,
+              outline: 'none', fontFamily: 'inherit', color: TEXT_PRIMARY,
+              background: '#fff',
             }}
           />
         </div>
@@ -135,18 +156,16 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
               onClick={() => setShowUserMenu(p => !p)}
               style={{
                 width: 34, height: 34, borderRadius: '50%', overflow: 'hidden',
-                border: showUserMenu ? '2px solid #6366f1' : '1px solid #e2e8f0',
+                border: showUserMenu ? '2px solid #6366f1' : `1px solid ${BORDER}`,
                 cursor: 'pointer', padding: 0, background: '#e0e7ff',
                 transition: 'border-color 0.15s', flexShrink: 0,
                 position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}
               title={displayName}
             >
-              {/* Initials — always centered, visible when image fails */}
               <span style={{ fontSize: 13, fontWeight: 700, color: '#6366f1', userSelect: 'none', lineHeight: 1 }}>
                 {displayName[0]?.toUpperCase() ?? '?'}
               </span>
-              {/* Avatar image — covers initials when it loads, disappears on error */}
               {avatarUrl && (
                 <img src={avatarUrl} alt=""
                   referrerPolicy="no-referrer"
@@ -159,19 +178,18 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
             {showUserMenu && (
               <div style={{
                 position: 'absolute', top: 42, right: 0, width: 200,
-                background: '#fff', borderRadius: 12, boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
-                border: '1px solid #f1f5f9', overflow: 'hidden', zIndex: 50,
+                background: '#fff', borderRadius: 12,
+                boxShadow: '0 8px 32px rgba(0,0,0,0.12), 0 0 0 1px #e2e8f0',
+                overflow: 'hidden', zIndex: 50,
               }}>
-                {/* User info */}
-                <div style={{ padding: '12px 14px 10px', borderBottom: '1px solid #f1f5f9' }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <div style={{ padding: '12px 14px 10px', borderBottom: `1px solid ${BORDER}` }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: TEXT_PRIMARY, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {displayName}
                   </div>
-                  <div style={{ fontSize: 11, color: '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 2 }}>
+                  <div style={{ fontSize: 11, color: TEXT_MUTED, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 2 }}>
                     {user.email}
                   </div>
                 </div>
-                {/* Sign out */}
                 <button
                   onClick={() => { setShowUserMenu(false); onSignOut?.() }}
                   style={{
@@ -207,19 +225,25 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
         {/* Favorites row */}
         {favDiagrams.length > 0 && (
           <section style={{ marginBottom: 36 }}>
-            <h2 style={{ fontSize: 13, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 6 }}>
-              <Star size={12} fill="#eab308" color="#eab308" /> Favorites · {favDiagrams.length}
+            <h2 style={{ fontSize: 11, fontWeight: 600, color: TEXT_MUTED, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Star size={11} fill="#eab308" color="#eab308" /> Favorites
+              <span style={{ fontSize: 13, fontWeight: 800, color: '#eab308' }}>{favDiagrams.length}</span>
             </h2>
-            <div style={{ display: 'flex', gap: 16, overflowX: 'auto', overflowY: 'visible', paddingBottom: 12, paddingTop: 4, scrollbarWidth: 'none' }}>
-              {favDiagrams.map(d => (
-                <div key={d.id} style={{ flexShrink: 0, width: 220 }}>
-                  <DiagramCard
-                    diagram={d} timeAgo={timeAgo(d.updatedAt)}
-                    onOpen={() => onOpen(d.id)} onDelete={() => deleteDiagram(d.id, d.name)}
-                    isFav={true} onToggleFav={() => toggleFav(d.id)}
-                  />
-                </div>
-              ))}
+            <div style={{ position: 'relative' }}>
+              <div ref={favScrollRef} style={{ display: 'flex', gap: 16, overflowX: 'auto', overflowY: 'visible', paddingBottom: 12, paddingTop: 4, scrollbarWidth: 'none' }}>
+                {favDiagrams.map(d => (
+                  <div key={d.id} style={{ flexShrink: 0, width: 220 }}>
+                    <DiagramCard
+                      diagram={d} timeAgo={timeAgo(d.updatedAt)}
+                      onOpen={() => onOpen(d.id)} onDelete={() => deleteDiagram(d.id, d.name)}
+                      isFav={true} onToggleFav={() => toggleFav(d.id)}
+                    />
+                  </div>
+                ))}
+              </div>
+              {favDiagrams.length > 4 && (
+                <div style={{ position: 'absolute', right: 0, top: 0, bottom: 12, width: 80, background: `linear-gradient(to right, transparent, ${BG})`, pointerEvents: 'none' }} />
+              )}
             </div>
           </section>
         )}
@@ -227,8 +251,11 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
         {/* All / Recent */}
         {recentDiagrams.length > 0 && (
           <section>
-            <h2 style={{ fontSize: 13, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 16 }}>
-              {favDiagrams.length > 0 ? 'Recent' : 'All Maps'} · {recentDiagrams.length}
+            <h2 style={{ fontSize: 11, fontWeight: 600, color: TEXT_MUTED, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 6 }}>
+              {favDiagrams.length > 0
+                ? <><Clock size={11} color={TEXT_MUTED} /> Recent</>
+                : <><LayoutGrid size={11} color={TEXT_MUTED} /> All Maps</>}
+              <span style={{ fontSize: 13, fontWeight: 800, color: '#6366f1' }}>{recentDiagrams.length}</span>
             </h2>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 12 }}>
               {recentDiagrams.map(d => (
@@ -243,7 +270,7 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
         )}
       </main>
 
-      {/* Floating New Map button — bottom right */}
+      {/* Floating New Map button */}
       <button
         onClick={() => setShowCreate(true)}
         title="New Map"
@@ -253,7 +280,7 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
           background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
           border: 'none', cursor: 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: '0 4px 20px rgba(99,102,241,0.45)',
+          boxShadow: '0 4px 24px rgba(99,102,241,0.5)',
           animation: 'fabPulse 2.5s ease-in-out infinite',
           zIndex: 20,
         }}
@@ -262,22 +289,24 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
       </button>
       <style>{`
         @keyframes fabPulse {
-          0%, 100% { box-shadow: 0 4px 20px rgba(99,102,241,0.45); transform: scale(1); }
-          50%       { box-shadow: 0 4px 32px rgba(99,102,241,0.7);  transform: scale(1.06); }
+          0%, 100% { box-shadow: 0 4px 24px rgba(99,102,241,0.5); transform: scale(1); }
+          50%       { box-shadow: 0 4px 40px rgba(99,102,241,0.75); transform: scale(1.06); }
         }
+        input::placeholder { color: #94a3b8 !important; }
       `}</style>
 
       {/* Create modal */}
       {showCreate && (
         <div style={{
-          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.2)',
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.25)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50,
+          backdropFilter: 'blur(4px)',
         }} onClick={() => setShowCreate(false)}>
           <div style={{
-            background: '#fff', borderRadius: 16, padding: 24, width: 360,
+            background: SURFACE, borderRadius: 16, padding: 24, width: 360,
             boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
           }} onClick={e => e.stopPropagation()}>
-            <h3 style={{ fontSize: 16, fontWeight: 700, color: '#1e293b', marginBottom: 16 }}>New Map</h3>
+            <h3 style={{ fontSize: 16, fontWeight: 700, color: TEXT_PRIMARY, marginBottom: 16 }}>New Map</h3>
             <input
               autoFocus
               value={newName}
@@ -286,13 +315,14 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
               placeholder="Map name…"
               style={{
                 width: '100%', padding: '10px 14px', fontSize: 14,
-                border: '1px solid #e2e8f0', borderRadius: 10, outline: 'none',
+                border: `1px solid ${BORDER}`, borderRadius: 10, outline: 'none',
                 fontFamily: 'inherit', marginBottom: 16, boxSizing: 'border-box',
+                background: '#f8fafc', color: TEXT_PRIMARY,
               }}
             />
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button onClick={() => setShowCreate(false)}
-                style={{ padding: '8px 16px', border: '1px solid #e2e8f0', borderRadius: 9, background: '#fff', cursor: 'pointer', fontSize: 13, fontFamily: 'inherit', color: '#64748b' }}>
+                style={{ padding: '8px 16px', border: `1px solid ${BORDER}`, borderRadius: 9, background: 'none', cursor: 'pointer', fontSize: 13, fontFamily: 'inherit', color: TEXT_MUTED }}>
                 Cancel
               </button>
               <button onClick={handleCreate} disabled={creating}
@@ -303,6 +333,11 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
           </div>
         </div>
       )}
+
+      {/* Dark mode vars */}
+      <style>{`
+        :root { --card-bg: ${SURFACE}; --card-border: ${BORDER}; --card-border-hover: ${BORDER_HOVER}; }
+      `}</style>
     </div>
   )
 }
@@ -363,24 +398,26 @@ function DiagramMinimap({ id, type }: { id: string; type: string }) {
     const l1H = Math.max(7, Math.min(18, Math.round(rowH * 0.65)))
     const totalH = n * l1H + (n - 1) * (rowH - l1H)
     const startY = (H - totalH) / 2
-    const rootCX = 22, rootCY = H / 2, rootR = 16
+    const rootCX = 22, rootCY = H / 2, rootR = 10
     const barX = 52, l1X = 60, l1W = 100
 
     return (
       <svg viewBox={VB} style={{ width: '100%', height: '100%' }} overflow="hidden">
         <rect x={-P} y={-P} width={W + P * 2} height={H + P * 2} fill={canvasBg} />
-        <circle cx={rootCX} cy={rootCY} r={rootR} fill={rootFill} />
-        <line x1={rootCX + rootR} y1={rootCY} x2={barX} y2={rootCY} stroke={rootFill} strokeWidth={2.5} strokeLinecap="round" />
-        {n > 1 && <line x1={barX} y1={startY + l1H / 2} x2={barX} y2={startY + totalH - l1H / 2} stroke={l1s[Math.floor(n / 2)].color} strokeWidth={2.5} />}
-        {l1s.map((l1, i) => {
-          const cy = startY + i * rowH + l1H / 2
-          return (
-            <g key={l1.id}>
-              <line x1={barX} y1={cy} x2={l1X} y2={cy} stroke={l1.color} strokeWidth={1.8} strokeLinecap="round" />
-              <rect x={l1X} y={cy - l1H / 2} width={l1W} height={l1H} rx={l1H / 2} fill={l1.color} />
-            </g>
-          )
-        })}
+        <g transform={`translate(${W / 2} ${H / 2}) scale(0.8) translate(${-W / 2} ${-H / 2})`}>
+          <circle cx={rootCX} cy={rootCY} r={rootR} fill={rootFill} />
+          <line x1={rootCX + rootR} y1={rootCY} x2={barX} y2={rootCY} stroke={rootFill} strokeWidth={2.5} strokeLinecap="round" />
+          {n > 1 && <line x1={barX} y1={startY + l1H / 2} x2={barX} y2={startY + totalH - l1H / 2} stroke={l1s[Math.floor(n / 2)].color} strokeWidth={2.5} />}
+          {l1s.map((l1, i) => {
+            const cy = startY + i * rowH + l1H / 2
+            return (
+              <g key={l1.id}>
+                <line x1={barX} y1={cy} x2={l1X} y2={cy} stroke={l1.color} strokeWidth={1.8} strokeLinecap="round" />
+                <rect x={l1X} y={cy - l1H / 2} width={l1W} height={l1H} rx={l1H / 2} fill={l1.color} />
+              </g>
+            )
+          })}
+        </g>
       </svg>
     )
   }
@@ -483,8 +520,8 @@ function DiagramMinimap({ id, type }: { id: string; type: string }) {
   // ── Tree horizontal (default fallback) ───────────────────────────
   const n2 = l1s.length, step2 = (H - 16) / Math.max(n2, 1)
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: '100%' }} overflow="hidden">
-      <rect x={0} y={0} width={W} height={H} fill={canvasBg} />
+    <svg viewBox={VB} style={{ width: '100%', height: '100%' }} overflow="hidden">
+      <rect x={-P} y={-P} width={W + P * 2} height={H + P * 2} fill={canvasBg} />
       <rect x={12} y={H / 2 - 16} width={24} height={32} rx={5} fill={rootFill} />
       {l1s.map((l1, i) => {
         const y = 8 + i * step2 + step2 / 2
@@ -520,45 +557,38 @@ function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isFav, onToggleFav }:
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
-        background: '#fff',
-        border: `1px solid ${hovered ? '#6366f1' : '#e2e8f0'}`,
+        background: 'var(--card-bg)',
+        border: `1px solid ${hovered ? 'var(--card-border-hover)' : 'var(--card-border)'}`,
         borderRadius: 16, overflow: 'hidden', cursor: 'pointer',
-        transition: 'border-color 0.15s, box-shadow 0.15s, transform 0.15s',
-        boxShadow: hovered ? '0 8px 24px rgba(99,102,241,0.15)' : '0 1px 4px rgba(0,0,0,0.05)',
+        transition: 'border-color 0.2s, box-shadow 0.2s, transform 0.2s',
+        boxShadow: hovered
+          ? '0 0 0 3px rgba(99,102,241,0.08), 0 0 20px rgba(99,102,241,0.14), 0 4px 16px rgba(0,0,0,0.07)'
+          : '0 1px 4px rgba(0,0,0,0.06)',
         transform: hovered ? 'translateY(-2px)' : 'translateY(0)',
       }}
       onClick={onOpen}
     >
-      {/* Header — name + count pill (left) + time (right) */}
-      <div style={{ padding: '12px 14px 10px', display: 'flex', alignItems: 'center', gap: 6 }}>
-        {(() => { const Icon = TYPE_ICON[diagram.type]; return Icon ? (
-          <span style={{
-            width: 20, height: 20, borderRadius: '50%',
-            background: '#ede9fe', flexShrink: 0,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <Icon size={11} color="#6366f1" strokeWidth={2.2} />
-          </span>
-        ) : null })()}
-        <div style={{ fontSize: 13, fontWeight: 600, color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+      {/* Header */}
+      <div style={{ padding: '11px 13px 9px', display: 'flex', alignItems: 'center', gap: 6, background: '#f8fafc', borderBottom: '1px solid #eef0f5' }}>
+        <div style={{ fontSize: 12, fontWeight: 600, color: '#475569', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
           {diagram.name}
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, color: '#94a3b8', flexShrink: 0 }}>
-          <Clock size={11} /> {timeAgo}
+        <div style={{ fontSize: 10, color: '#94a3b8', flexShrink: 0 }}>
+          {timeAgo}
         </div>
       </div>
 
       {/* Thumbnail */}
-      <div style={{ height: 110, background: '#f8fafc', position: 'relative' }}>
+      <div style={{ height: 110, background: 'transparent', position: 'relative' }}>
         <DiagramMinimap id={diagram.id} type={diagram.type} />
         {hovered && (
           <>
             <button onClick={e => { e.stopPropagation(); onToggleFav() }} title={isFav ? 'Unfavorite' : 'Favorite'}
-              style={{ position: 'absolute', top: 8, left: 8, width: 28, height: 28, borderRadius: 8, border: isFav ? '1px solid #fde68a' : '1px solid #e2e8f0', background: 'rgba(255,255,255,0.95)', cursor: 'pointer', color: isFav ? '#eab308' : '#94a3b8', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }}>
+              style={{ position: 'absolute', top: 8, left: 8, width: 28, height: 28, borderRadius: 8, border: isFav ? '1px solid #fde68a' : '1px solid #e2e8f0', background: 'rgba(255,255,255,0.92)', cursor: 'pointer', color: isFav ? '#eab308' : '#94a3b8', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(8px)' }}>
               <Star size={13} fill={isFav ? '#eab308' : 'none'} />
             </button>
             <button onClick={e => { e.stopPropagation(); onDelete() }}
-              style={{ position: 'absolute', top: 8, right: 8, width: 28, height: 28, borderRadius: 8, border: '1px solid #fecaca', background: 'rgba(255,255,255,0.95)', cursor: 'pointer', color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }}>
+              style={{ position: 'absolute', top: 8, right: 8, width: 28, height: 28, borderRadius: 8, border: '1px solid #fecaca', background: 'rgba(255,255,255,0.92)', cursor: 'pointer', color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(8px)' }}>
               <Trash2 size={13} />
             </button>
           </>

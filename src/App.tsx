@@ -130,14 +130,6 @@ export default function App() {
     return () => window.removeEventListener('popstate', onPopState)
   }, [loadDiagram, loadDiagramList])
 
-  // Block macOS swipe-back/forward gesture in editor
-  useEffect(() => {
-    if (view !== 'editor') return
-    function onWheel(e: WheelEvent) { e.preventDefault() }
-    document.addEventListener('wheel', onWheel, { passive: false })
-    return () => document.removeEventListener('wheel', onWheel)
-  }, [view])
-
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       const tag = (e.target as HTMLElement).tagName.toLowerCase()

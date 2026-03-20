@@ -5,6 +5,7 @@ const ROOT_X = 80
 const V_GAP = 12      // vertical gap between stacked L2/L3 nodes
 const BRANCH_GAP = 20 // vertical gap between L1 edge and nearest L2
 const L1_SEG = 64     // horizontal gap between L1 nodes
+const BRANCH_INDENT = 20 // horizontal offset from branch line to node left edge
 
 /** Estimate rendered width from title text and font size */
 function autoWidth(title: string, fontSize: number, hasIconOrEmoji: boolean, minW: number): number {
@@ -33,7 +34,6 @@ export function computeTimelineLayout(nodes: MindmapNode[]): MindmapNode[] {
     const l1w = autoWidth(l1.title, 22, !!(l1.icon || l1.emoji), 120)
     const l1h = 44
     const l1X = curX
-    const l1CX = l1X + l1w / 2
 
     result.push({ ...l1, x: l1X, y: SPINE_Y - l1h / 2, width: l1w, height: l1h, manuallyPositioned: false })
 
@@ -46,8 +46,8 @@ export function computeTimelineLayout(nodes: MindmapNode[]): MindmapNode[] {
     l2s.forEach((l2, j) => {
       const l2w = autoWidth(l2.title, 16, !!(l2.icon || l2.emoji), 90)
       const l2h = l2.height > 0 ? l2.height : 36
-      // Center L2 under L1
-      const l2X = l1CX - l2w / 2
+      // Offset L2 right from the branch line
+      const l2X = l1X + BRANCH_INDENT
       // Stack: j=0 is closest to spine, j increases away
       const l2Y = above
         ? SPINE_Y - l1h / 2 - BRANCH_GAP - l2h - j * (l2h + V_GAP)
@@ -62,7 +62,7 @@ export function computeTimelineLayout(nodes: MindmapNode[]): MindmapNode[] {
       l3s.forEach((l3, k) => {
         const l3w = autoWidth(l3.title, 13, !!(l3.icon || l3.emoji), 80)
         const l3h = l3.height > 0 ? l3.height : 30
-        const l3X = l1CX - l3w / 2
+        const l3X = l1X + BRANCH_INDENT
         const l3Y = above
           ? l2Y - (k + 1) * (l3h + V_GAP)
           : l2Y + l2h + V_GAP + k * (l3h + V_GAP)

@@ -326,7 +326,7 @@ export function EdgeLayer({ nodes, lineStyle, diagramType }: EdgeLayerProps) {
     const l1s = nodes.filter(n => n.depth === 1).sort((a, b) => a.x - b.x)
     const spineY = root.y + root.height / 2
     const spineEndX = l1s.length > 0
-      ? l1s[l1s.length - 1].x + l1s[l1s.length - 1].width
+      ? l1s[l1s.length - 1].x + l1s[l1s.length - 1].width + 24
       : root.x + root.width + 400
 
     return (
@@ -337,9 +337,8 @@ export function EdgeLayer({ nodes, lineStyle, diagramType }: EdgeLayerProps) {
 
         {/* Per L1: spine tick + vertical branch through all descendants (L2+L3 centered at l1CX) */}
         {l1s.map(l1 => {
-          const l1CX = l1.x + l1.width / 2
+          const branchX = l1.x  // vertical branch runs at left edge of L1
 
-          // All descendants are centered at l1CX — find the farthest one
           const descendants = nodes.filter(n => {
             let cur = nodeMap.get(n.parentId ?? '')
             while (cur) {
@@ -349,7 +348,6 @@ export function EdgeLayer({ nodes, lineStyle, diagramType }: EdgeLayerProps) {
             return false
           })
 
-          // Detect above/below from descendants' actual positions (L1 is always centered at spineY)
           const above = descendants.length > 0 && descendants.some(n => n.y + n.height < spineY)
           const l1SpineEdge = above ? l1.y : l1.y + l1.height
 
@@ -361,14 +359,23 @@ export function EdgeLayer({ nodes, lineStyle, diagramType }: EdgeLayerProps) {
 
           return (
             <g key={`branch-${l1.id}`}>
-              {/* Spine tick */}
-              <line x1={l1CX} y1={spineY} x2={l1CX} y2={l1SpineEdge}
+              {/* Vertical tick: spine → L1 edge */}
+              <line x1={branchX} y1={spineY} x2={branchX} y2={l1SpineEdge}
                 stroke={l1.color} strokeWidth={2} strokeLinecap="round" />
-              {/* Vertical branch through descendants */}
+              {/* Vertical branch through all descendants */}
               {descendants.length > 0 && (
-                <line x1={l1CX} y1={l1SpineEdge} x2={l1CX} y2={farY}
+                <line x1={branchX} y1={l1SpineEdge} x2={branchX} y2={farY}
                   stroke={l1.color} strokeWidth={1.8} strokeLinecap="round" />
               )}
+              {/* Orthogonal horizontal connector from branch line to each node's left-center */}
+              {descendants.map(n => {
+                const nodeCY = n.y + n.height / 2
+                return (
+                  <line key={`h-${n.id}`}
+                    x1={branchX} y1={nodeCY} x2={n.x} y2={nodeCY}
+                    stroke={l1.color} strokeWidth={1.5} strokeLinecap="round" />
+                )
+              })}
             </g>
           )
         })}
