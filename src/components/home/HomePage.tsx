@@ -2,8 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useMindmapStore } from '../../store/mindmapStore'
 import { useDiagram } from '../../hooks/useDiagram'
 import type { DiagramMeta, MindmapNode } from '../../types'
-import { Plus, Search, Clock, Trash2, Star, Network, Workflow, Fish, Milestone, GitMerge, GitFork, LayoutGrid } from 'lucide-react'
-import type { LucideIcon } from 'lucide-react'
+import { Plus, Search, Clock, Trash2, Star, LayoutGrid } from 'lucide-react'
 import { MindmapsLogo } from '../MindmapsLogo'
 import { getTheme } from '../../lib/themes'
 
@@ -537,15 +536,6 @@ function DiagramMinimap({ id, type }: { id: string; type: string }) {
 }
 
 // ── DiagramCard ────────────────────────────────────────────────────────────
-
-const TYPE_ICON: Record<string, LucideIcon> = {
-  'logic-chart': Workflow,
-  'mindmap': Network,
-  'fishbone': Fish,
-  'timeline': Milestone,
-  'tree-vertical': GitMerge,
-  'tree-horizontal': GitFork,
-}
 
 function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isFav, onToggleFav }: {
   diagram: DiagramMeta; timeAgo: string; onOpen: () => void; onDelete: () => void
