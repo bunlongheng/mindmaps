@@ -1,37 +1,55 @@
 interface IdeasLogoProps {
   size?: number
-  color?: string
 }
 
 /**
- * Ideas logo — a central node with 5 curved branches radiating out,
- * evoking a mind map / neural thought pattern.
+ * Ideas logo — Figma-style lightbulb:
+ * red pill (top) · purple rect (mid-left) · blue circle (mid-right)
+ * · green teardrop (bottom) · metallic base cap
  */
-export function IdeasLogo({ size = 32, color = 'white' }: IdeasLogoProps) {
+export function IdeasLogo({ size = 32 }: IdeasLogoProps) {
   return (
-    <svg width={size} height={size} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-      {/* Center node */}
-      <circle cx="16" cy="16" r="3.8" fill={color} />
+    <svg width={size} height={size} viewBox="0 0 32 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <radialGradient id="ilR" cx="38%" cy="28%" r="72%">
+          <stop offset="0%" stopColor="#ff6a42"/>
+          <stop offset="100%" stopColor="#c82200"/>
+        </radialGradient>
+        <radialGradient id="ilP" cx="35%" cy="28%" r="70%">
+          <stop offset="0%" stopColor="#c07eff"/>
+          <stop offset="100%" stopColor="#6a10cc"/>
+        </radialGradient>
+        <radialGradient id="ilB" cx="64%" cy="28%" r="70%">
+          <stop offset="0%" stopColor="#88d8ff"/>
+          <stop offset="100%" stopColor="#1890d8"/>
+        </radialGradient>
+        <radialGradient id="ilG" cx="35%" cy="28%" r="70%">
+          <stop offset="0%" stopColor="#72ee90"/>
+          <stop offset="100%" stopColor="#0a9022"/>
+        </radialGradient>
+        <linearGradient id="ilM" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stopColor="#d8e2ea"/>
+          <stop offset="100%" stopColor="#7e8e9e"/>
+        </linearGradient>
+      </defs>
 
-      {/* Branch: top-left */}
-      <path d="M13.3 13.3 C11 10.5 8.5 9.5 6.5 7.5" stroke={color} strokeWidth="1.8" strokeLinecap="round" opacity="0.85" />
-      <circle cx="5.8" cy="6.8" r="2.2" fill={color} opacity="0.75" />
+      {/* Top pill — red-orange, full width */}
+      <rect x="1.5" y="0.5" width="29" height="10" rx="5" fill="url(#ilR)"/>
 
-      {/* Branch: top-right */}
-      <path d="M18.2 12.8 C20 9.8 23 8.5 25.5 7" stroke={color} strokeWidth="1.8" strokeLinecap="round" opacity="0.85" />
-      <circle cx="26.5" cy="6.3" r="2.2" fill={color} opacity="0.75" />
+      {/* Middle-left — purple rounded square */}
+      <rect x="1.5" y="11.5" width="13.5" height="13.5" rx="5" fill="url(#ilP)"/>
 
-      {/* Branch: right */}
-      <path d="M19.8 16 C22.5 15.8 25 17 27 16.5" stroke={color} strokeWidth="1.8" strokeLinecap="round" opacity="0.85" />
-      <circle cx="28.2" cy="16.3" r="2" fill={color} opacity="0.75" />
+      {/* Middle-right — blue circle */}
+      <circle cx="22" cy="18.25" r="6.75" fill="url(#ilB)"/>
 
-      {/* Branch: bottom-right */}
-      <path d="M18 19 C19.5 21.5 21.5 23 22.5 25.5" stroke={color} strokeWidth="1.8" strokeLinecap="round" opacity="0.85" />
-      <circle cx="23.2" cy="27" r="2" fill={color} opacity="0.75" />
+      {/* Bottom — green teardrop (narrows toward neck) */}
+      <path
+        d="M4.5 26.5 C1.5 26.5 1.5 29.5 1.5 30.5 C1.5 33 3.5 34.5 8 34.5 C12.5 34.5 15 33 15 30.5 C15 29.5 15 26.5 12 26.5 Z"
+        fill="url(#ilG)"
+      />
 
-      {/* Branch: bottom-left */}
-      <path d="M13.5 18.8 C11.5 21 9 22 7 24" stroke={color} strokeWidth="1.8" strokeLinecap="round" opacity="0.85" />
-      <circle cx="5.8" cy="25.5" r="2" fill={color} opacity="0.75" />
+      {/* Base cap — metallic gray */}
+      <rect x="5.5" y="34" width="9" height="2.5" rx="1.25" fill="url(#ilM)"/>
     </svg>
   )
 }

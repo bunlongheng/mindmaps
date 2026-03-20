@@ -46,7 +46,29 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   const [draft, setDraft] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
   const resizePreview = useIdeaStore(s => s.resizePreview)
+  const diagramType = useIdeaStore(s => s.diagramType)
+  const parentNode = useIdeaStore(s =>
+    diagramType === 'mindmap' && node.depth >= 2
+      ? s.activeIdea?.nodes.find(n => n.id === node.parentId)
+      : undefined
+  )
+  const canDrag = (isRoot && diagramType !== 'mindmap') || diagramType === 'logic-chart'
+  // Root becomes a pill when title is long (≥15 chars) or when stored dims are non-square
+  const isRootPill = isRoot && (node.title.length >= 15 || node.width !== node.height)
+  const isMindmapCircle = diagramType === 'mindmap' && (node.depth === 1 || node.depth === 2)
+  const isMindmapL2Plus = diagramType === 'mindmap' && node.depth >= 3
   const previewW = (!isRoot && resizePreview?.depth === node.depth) ? resizePreview.width : null
+
+  // For mindmap L2+ nodes: rotate along the edge direction
+  const mindmapAngle = (() => {
+    if (diagramType !== 'mindmap' || node.depth < 2 || !parentNode) return null
+    const dx = (node.x + node.width / 2) - (parentNode.x + parentNode.width / 2)
+    const dy = (node.y + node.height / 2) - (parentNode.y + parentNode.height / 2)
+    let angle = Math.atan2(dy, dx) * 180 / Math.PI
+    // Flip upside-down text so it always reads left→right
+    if (angle > 90 || angle <= -90) angle += 180
+    return angle
+  })()
 
   // Styling per depth
   let bg: string, textColor: string, strokeColor: string, strokeW: number
@@ -56,26 +78,39 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
     textColor = '#ffffff'
     strokeColor = '#1a1d2e'
     strokeW = 5
+  } else if (isMindmapCircle && node.depth === 2) {
+    bg = node.color
+    textColor = '#ffffff'
+    strokeColor = node.color
+    strokeW = 2
   } else if (isL2Plus) {
     const lightenAmt = node.depth === 2 ? 0.58 : node.depth === 3 ? 0.68 : 0.76
     bg = node.color.startsWith('#') ? lighten(node.color, lightenAmt) : '#f8fafc'
     textColor = node.color.startsWith('#') ? darkenColor(node.color, 0.55) : node.color
     strokeColor = node.color
     strokeW = 2
+  } else if (isMindmapCircle) {
+    // L1 mindmap circles: solid color fill
+    bg = node.color
+    textColor = '#ffffff'
+    strokeColor = node.color
+    strokeW = 3
   } else {
-    // L1: solid fill, white text, black border
+    // L1 all other diagrams: solid color fill
     bg = node.color
     textColor = '#ffffff'
     strokeColor = '#1a1d2e'
     strokeW = 3
   }
 
-  // Icon color: white on L1 (solid bg), darkened on L2+ (light bg), textColor on root
+  // Icon color: on white circles use node.color, on light text nodes use darkened color
   const iconColor = isRoot
     ? textColor
-    : node.depth === 1
+    : isMindmapCircle
       ? '#ffffff'
-      : (node.color.startsWith('#') ? darkenColor(node.color, 0.35) : node.color)
+      : node.depth === 1
+        ? '#ffffff'
+        : (node.color.startsWith('#') ? darkenColor(node.color, 0.35) : node.color)
 
   // Node-level overrides from panel
   if (node.borderColor) { strokeColor = node.borderColor; strokeW = Math.max(strokeW, node.borderWidth ?? 1.5) }
@@ -117,9 +152,16 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
     const updates: Partial<IdeaNode> = { title: val }
     if (isRoot) {
       const textW = val.length * fontSize * 0.55
-      const diameter = Math.max(180, Math.round(textW + 56))
-      updates.width = diameter
-      updates.height = diameter
+      if (val.length >= 15) {
+        // pill: auto width, fixed height
+        updates.width = Math.max(240, Math.round(textW + 72))
+        updates.height = 90
+      } else {
+        // circle: equal width and height
+        const diameter = Math.max(180, Math.round(textW + 56))
+        updates.width = diameter
+        updates.height = diameter
+      }
     }
     useIdeaStore.getState().updateNode(node.id, updates)
     if (isRoot) setTimeout(() => useIdeaStore.getState().rerunLayout(), 0)
@@ -130,6 +172,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
     e.stopPropagation()
     didDrag.current = false
     onSelect(node.id, e.metaKey || e.ctrlKey || e.shiftKey)
+    if (!canDrag) return
     const pt = getSVGPoint(e)
     if (!pt) return
     dragStart.current = { x: pt.x, y: pt.y, nodeX: node.x, nodeY: node.y }
@@ -230,7 +273,9 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
 
   return (
     <g style={{
-      transform: `translate(${node.x}px, ${node.y}px)`,
+      transform: mindmapAngle !== null
+        ? `translate(${node.x + node.width / 2}px, ${node.y + node.height / 2}px) rotate(${mindmapAngle}deg) translate(${-node.width / 2}px, ${-node.height / 2}px)`
+        : `translate(${node.x}px, ${node.y}px)`,
       transition: isDragging ? 'none' : 'transform 0.22s cubic-bezier(0.4,0,0.2,1)',
     }}>
     {!isRoot && (
@@ -245,60 +290,75 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
       onPointerMove={onPointerMove}
       onPointerUp={handlePointerUp}
       onDoubleClick={handleDoubleClick}
-      style={{ cursor: editing ? 'default' : 'grab', userSelect: 'none' }}
+      style={{ cursor: editing ? 'default' : canDrag ? 'grab' : 'pointer', userSelect: 'none' }}
     >
       {isRoot ? (
         <>
-          {/* Siri-style animated wave glow */}
-          <SiriWave cx={cx} cy={cy} r={r} colors={l1Colors} />
+          {/* Siri-style animated wave glow — use half-height as radius for pills */}
+          {(() => { const ar = isRootPill ? node.height / 2 : r; return (
+          <>
+          <SiriWave cx={cx} cy={cy} r={ar} colors={l1Colors} />
 
           {/* Back ring — horizontal orbit, spinning */}
-          <ellipse cx={cx} cy={cy} rx={r * 2.0} ry={r * 0.32}
+          <ellipse cx={cx} cy={cy} rx={ar * 2.0} ry={ar * 0.32}
             stroke="#6b7280" strokeWidth={2} fill="none" opacity={0.25}
             style={{ pointerEvents: 'none' }}>
             <animateTransform attributeName="transform" type="rotate"
               from={`0 ${cx} ${cy}`} to={`360 ${cx} ${cy}`} dur="12s" repeatCount="indefinite" />
           </ellipse>
           {/* Second ring — vertical spine (90° to first), counter-spinning */}
-          <ellipse cx={cx} cy={cy} rx={r * 0.32} ry={r * 2.0}
+          <ellipse cx={cx} cy={cy} rx={ar * 0.32} ry={ar * 2.0}
             stroke="#6b7280" strokeWidth={2} fill="none" opacity={0.25}
             style={{ pointerEvents: 'none' }}>
             <animateTransform attributeName="transform" type="rotate"
               from={`0 ${cx} ${cy}`} to={`-360 ${cx} ${cy}`} dur="12s" repeatCount="indefinite" />
           </ellipse>
-          <ellipse cx={cx} cy={cy} rx={r * 2.4} ry={r * 0.38}
+          <ellipse cx={cx} cy={cy} rx={ar * 2.4} ry={ar * 0.38}
             stroke="#9ca3af" strokeWidth={1.2} fill="none" opacity={0.14}
             style={{ pointerEvents: 'none' }}>
             <animateTransform attributeName="transform" type="rotate"
               from={`0 ${cx} ${cy}`} to={`-360 ${cx} ${cy}`} dur="18s" repeatCount="indefinite" />
           </ellipse>
 
-          {/* Root circle */}
-          <circle
-            cx={cx} cy={cy} r={r} fill={bg}
-            stroke={strokeColor} strokeWidth={strokeW}
-            filter="drop-shadow(0 4px 16px rgba(0,0,0,0.35))"
-          />
+          {/* Root shape: pill rect for long titles, circle for short */}
+          {isRootPill ? (
+            <rect x={0} y={0} width={displayW} height={node.height}
+              rx={node.height / 2} ry={node.height / 2}
+              fill={bg} fillOpacity={0.8} stroke={strokeColor} strokeWidth={strokeW}
+              filter="drop-shadow(0 4px 16px rgba(0,0,0,0.35))" />
+          ) : (
+            <circle cx={cx} cy={cy} r={r} fill={bg} fillOpacity={0.8}
+              stroke={strokeColor} strokeWidth={strokeW}
+              filter="drop-shadow(0 4px 16px rgba(0,0,0,0.35))" />
+          )}
 
           {/* Front ring glint — horizontal */}
-          <ellipse cx={cx} cy={cy} rx={r * 2.0} ry={r * 0.32}
+          <ellipse cx={cx} cy={cy} rx={ar * 2.0} ry={ar * 0.32}
             stroke="#d1d5db" strokeWidth={2} fill="none" opacity={0.55}
-            strokeDasharray={`${r * 3.14} ${r * 9.42}`}
-            strokeDashoffset={`${r * 1.57}`}
+            strokeDasharray={`${ar * 3.14} ${ar * 9.42}`}
+            strokeDashoffset={`${ar * 1.57}`}
             style={{ pointerEvents: 'none' }}>
             <animateTransform attributeName="transform" type="rotate"
               from={`0 ${cx} ${cy}`} to={`360 ${cx} ${cy}`} dur="12s" repeatCount="indefinite" />
           </ellipse>
           {/* Front ring glint — vertical spine */}
-          <ellipse cx={cx} cy={cy} rx={r * 0.32} ry={r * 2.0}
+          <ellipse cx={cx} cy={cy} rx={ar * 0.32} ry={ar * 2.0}
             stroke="#d1d5db" strokeWidth={2} fill="none" opacity={0.55}
-            strokeDasharray={`${r * 3.14} ${r * 9.42}`}
-            strokeDashoffset={`${r * 1.57}`}
+            strokeDasharray={`${ar * 3.14} ${ar * 9.42}`}
+            strokeDashoffset={`${ar * 1.57}`}
             style={{ pointerEvents: 'none' }}>
             <animateTransform attributeName="transform" type="rotate"
               from={`0 ${cx} ${cy}`} to={`-360 ${cx} ${cy}`} dur="12s" repeatCount="indefinite" />
           </ellipse>
+          </>)})()}
         </>
+      ) : isMindmapCircle ? (
+        <circle
+          cx={displayW / 2} cy={node.height / 2} r={node.height / 2}
+          fill={bg} fillOpacity={bgOpacity}
+          stroke={strokeColor} strokeWidth={strokeW}
+          filter="drop-shadow(0 2px 8px rgba(0,0,0,0.18))"
+        />
       ) : (
         <rect
           x={0} y={0} width={displayW} height={node.height}
@@ -336,8 +396,8 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
           />
         </foreignObject>
       ) : (
-        <g clipPath={isRoot ? undefined : `url(#${clipId})`}>
-          {hasEmoji && resolvedEmoji && (() => {
+        <g clipPath={isRoot || isMindmapCircle ? undefined : `url(#${clipId})`}>
+          {hasEmoji && resolvedEmoji && !isMindmapCircle && !isMindmapL2Plus && (() => {
             const zoneW = displayW * 0.2
             const emojiSize = Math.min(node.height * 0.52, 22)
             const textAreaX = zoneW + (displayW - zoneW) / 2
@@ -367,7 +427,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
               </>
             )
           })()}
-          {hasIcon && resolvedIcon && (() => {
+          {hasIcon && resolvedIcon && !isMindmapCircle && !isMindmapL2Plus && (() => {
             const zoneW = displayW * 0.2
             const iconSize = Math.min(fontSize + 4, zoneW * 0.65)
             const iconX = (zoneW - iconSize) / 2
@@ -388,9 +448,9 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
               </>
             )
           })()}
-          {(!hasIcon && !hasEmoji || isRoot) && (
+          {((!hasIcon && !hasEmoji) || isRoot || isMindmapL2Plus) && !isMindmapCircle && (
             <text
-              x={isRoot ? cx : align === 'left' ? 12 : align === 'right' ? displayW - 12 : displayW / 2}
+              x={isRoot ? cx : isMindmapL2Plus ? ((hasEmoji || hasIcon) ? 26 : 12) : align === 'left' ? 12 : align === 'right' ? displayW - 12 : displayW / 2}
               y={isRoot ? cy + fontSize * 0.38 : node.height / 2 + fontSize * 0.38}
               textAnchor={isRoot ? 'middle' : textAnchor}
               fontSize={fontSize} fontWeight={fontWeight} fontStyle={fontStyle}
@@ -399,11 +459,22 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
               style={{ pointerEvents: 'none' }}
             >{label}</text>
           )}
+          {isMindmapCircle && (
+            <>
+              {hasIcon && resolvedIcon
+                ? <NodeIcon icon={resolvedIcon} x={(displayW - fontSize * 1.4) / 2} y={(node.height - fontSize * 1.4) / 2} size={fontSize * 1.4} color={iconColor} strokeWidth={2.2} />
+                : hasEmoji && resolvedEmoji
+                  ? <text x={displayW / 2} y={node.height / 2 + node.height * 0.18} textAnchor="middle" fontSize={node.height * 0.50} style={{ pointerEvents: 'none' }}>{resolvedEmoji}</text>
+                  : <text x={displayW / 2} y={node.height / 2 + fontSize * 0.38} textAnchor="middle" fontSize={Math.min(fontSize, Math.floor(displayW / (label.length * 0.6 + 1)))} fontWeight="700" fontFamily="Inter, system-ui, sans-serif" fill={textColor} style={{ pointerEvents: 'none' }}>{label}</text>
+              }
+              {/* label moved to stem in EdgeLayer */}
+            </>
+          )}
         </g>
       )}
 
-      {/* Resize handle — right edge, non-root only */}
-      {!isRoot && !readOnly && (
+      {/* Resize handle — right edge, non-root only, not mindmap circles */}
+      {!isRoot && !readOnly && !isMindmapCircle && (
         <g style={{ cursor: 'ew-resize', userSelect: 'none' }}>
           {/* Hit area — all pointer events on this rect so capture works */}
           <rect
@@ -416,17 +487,52 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
         </g>
       )}
 
+      {/* Mindmap L2+: emoji/icon circle at the near edge (toward parent), rendered outside clip */}
+      {isMindmapL2Plus && (hasEmoji || hasIcon) && (() => {
+        const emojiR = 10
+        const cx2 = emojiR + 2   // sits at the beginning (left edge) of the node
+        const cy2 = node.height / 2
+        const iconS = emojiR * 1.4
+        return (
+          <g style={{ pointerEvents: 'none' }}>
+            <circle cx={cx2} cy={cy2} r={emojiR} fill={node.color} stroke="white" strokeWidth={1.5} />
+            {hasEmoji && resolvedEmoji
+              ? <text x={cx2} y={cy2} textAnchor="middle" dominantBaseline="central"
+                  fontSize={emojiR * 1.3} style={{ pointerEvents: 'none' }}>{resolvedEmoji}</text>
+              : hasIcon && resolvedIcon
+                ? <NodeIcon icon={resolvedIcon} x={cx2 - iconS / 2} y={cy2 - iconS / 2}
+                    size={iconS} color="#fff" strokeWidth={1.8} />
+                : null
+            }
+          </g>
+        )
+      })()}
+
       {/* Selection ring — always on top */}
       {isSelected && (isRoot ? (
-        <>
-          <circle cx={cx} cy={cy} r={r + 5}
-            fill="none" stroke="rgba(59,130,246,0.18)" strokeWidth={6}
-            style={{ pointerEvents: 'none' }} />
-          <circle cx={cx} cy={cy} r={r + 3}
-            fill="none" stroke="#3b82f6" strokeWidth={3.5}
-            filter="drop-shadow(0 0 8px rgba(59,130,246,0.7))"
-            style={{ pointerEvents: 'none' }} />
-        </>
+        isRootPill ? (
+          <>
+            <rect x={-5} y={-5} width={displayW + 10} height={node.height + 10}
+              rx={node.height / 2 + 5} ry={node.height / 2 + 5}
+              fill="none" stroke="rgba(59,130,246,0.18)" strokeWidth={6}
+              style={{ pointerEvents: 'none' }} />
+            <rect x={-2} y={-2} width={displayW + 4} height={node.height + 4}
+              rx={node.height / 2 + 2} ry={node.height / 2 + 2}
+              fill="none" stroke="#3b82f6" strokeWidth={3.5}
+              filter="drop-shadow(0 0 8px rgba(59,130,246,0.7))"
+              style={{ pointerEvents: 'none' }} />
+          </>
+        ) : (
+          <>
+            <circle cx={cx} cy={cy} r={r + 5}
+              fill="none" stroke="rgba(59,130,246,0.18)" strokeWidth={6}
+              style={{ pointerEvents: 'none' }} />
+            <circle cx={cx} cy={cy} r={r + 3}
+              fill="none" stroke="#3b82f6" strokeWidth={3.5}
+              filter="drop-shadow(0 0 8px rgba(59,130,246,0.7))"
+              style={{ pointerEvents: 'none' }} />
+          </>
+        )
       ) : (
         <>
           <rect

@@ -179,12 +179,68 @@ export function EdgeLayer({ nodes, lineStyle, diagramType }: EdgeLayerProps) {
           const y2 = n.y + n.height / 2
           const mx = (x1 + x2) / 2
           const my = (y1 + y2) / 2
+
+          const isL1 = n.depth === 1
+          const isL2 = n.depth === 2
+          const isCircleStem = isL1 || isL2
+          let labelAngle = 0
+          const dx = x2 - x1, dy = y2 - y1
+          const len = Math.hypot(dx, dy) || 1
+          const ux = dx / len, uy = dy / len
+          // Number sits ON the line just past parent circle edge
+          const parentR = parent.width / 2
+          const numDist = parentR + 16
+          const ox = x1 + ux * numDist
+          const oy = y1 + uy * numDist
+          // L1: center pill in the *visible* segment (root edge → L1 edge), not center-to-center
+          // L2: midpoint of the full center-to-center line is fine
+          const childR = n.width / 2
+          const visMid = isL1 ? (parentR + (len - childR)) / 2 : len / 2
+          const tx = x1 + ux * visMid
+          const ty = y1 + uy * visMid
+          if (isCircleStem) {
+            const rawAngle = Math.atan2(dy, dx) * 180 / Math.PI
+            labelAngle = rawAngle > 90 || rawAngle <= -90 ? rawAngle + 180 : rawAngle
+          }
+
           return (
-            <path key={n.id}
-              d={`M ${x1} ${y1} Q ${mx} ${my} ${x2} ${y2}`}
-              stroke={n.color} strokeWidth={n.depth === 1 ? 3 : 2}
-              fill="none" strokeLinecap="round"
-            />
+            <g key={n.id}>
+              <path
+                d={`M ${x1} ${y1} Q ${mx} ${my} ${x2} ${y2}`}
+                stroke={n.color} strokeWidth={isL1 ? 3 : isL2 ? 2.5 : 2}
+                fill="none" strokeLinecap="round"
+              />
+              {isCircleStem && (() => {
+                const fs = isL1 ? 12 : 10
+                const pillH = fs + 10
+                const pillR = pillH / 2
+                const estW = Math.ceil(n.title.length * fs * 0.58) + 20
+                return (
+                  <g transform={`rotate(${labelAngle}, ${tx}, ${ty})`} style={{ pointerEvents: 'none' }}>
+                    <rect x={tx - estW / 2} y={ty - pillH / 2} width={estW} height={pillH}
+                      rx={pillR} ry={pillR}
+                      fill="white" stroke={n.color} strokeWidth={1.2} opacity={0.96}
+                    />
+                    <text x={tx} y={ty}
+                      textAnchor="middle" dominantBaseline="central"
+                      fontSize={fs} fontWeight="700"
+                      fontFamily="Inter, system-ui, sans-serif"
+                      fill={n.color}
+                      style={{ pointerEvents: 'none' }}
+                    >{n.title}</text>
+                  </g>
+                )
+              })()}
+              {isL1 && showOrderNumbers && (
+                <g style={{ pointerEvents: 'none' }}>
+                  <circle cx={ox} cy={oy} r={11} fill={n.color} />
+                  <text x={ox} y={oy} textAnchor="middle" dominantBaseline="central"
+                    fontSize={11} fontWeight="700"
+                    fontFamily="Inter, system-ui, sans-serif" fill="#fff"
+                  >{(n.sortOrder ?? 0) + 1}</text>
+                </g>
+              )}
+            </g>
           )
         })}
       </g>

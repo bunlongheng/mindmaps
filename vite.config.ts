@@ -8,9 +8,9 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       manifest: {
-        name: 'Ideas',
-        short_name: 'Ideas',
-        description: 'Visual ideas and diagram tool',
+        name: 'Mindmaps',
+        short_name: 'Mindmaps',
+        description: 'Visual mind map and diagram tool',
         start_url: '/',
         scope: '/',
         display: 'standalone',

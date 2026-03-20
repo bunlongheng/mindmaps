@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useIdeaStore } from '../../store/ideaStore'
-import { Share2, Download, Upload, RefreshCw, Plus, Menu, Undo2, Redo2, MoreHorizontal, Trash2 } from 'lucide-react'
+import { Share2, Download, Upload, RefreshCw, Plus, Menu, Undo2, Redo2, MoreHorizontal, Trash2, Copy } from 'lucide-react'
+import { showToast } from '../CuteToast'
 import { downloadJSON } from '../../lib/export/json'
 import { encodeShareURL } from '../../lib/export/share'
 import type { DiagramType, LineStyle } from '../../types'
@@ -168,6 +169,7 @@ export function ControlPanel({ onAddNode, onImport, onShare, onBack, onDelete }:
             {/* Actions */}
             {[
               { icon: <RefreshCw size={13}/>, label: 'Re-run layout', onClick: () => { rerunLayout(); setShowMore(false) } },
+              { icon: <Copy size={13}/>, label: 'Copy JSON', onClick: () => { if (activeIdea) { const clean = { ...activeIdea, nodes: activeIdea.nodes.map(({ fontSize: _fs, ...n }) => n) }; navigator.clipboard.writeText(JSON.stringify(clean, null, 2)).then(() => showToast('JSON copied', { color: '#6366f1' })) } setShowMore(false) } },
               { icon: <Download size={13}/>, label: 'Export JSON', onClick: () => { activeIdea && downloadJSON(activeIdea); setShowMore(false) } },
               { icon: <Upload size={13}/>, label: 'Import JSON', onClick: () => { onImport(); setShowMore(false) } },
               { icon: <Share2 size={13}/>, label: 'Share link', onClick: () => { activeIdea && onShare(encodeShareURL(activeIdea)); setShowMore(false) } },

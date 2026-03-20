@@ -7,8 +7,8 @@ import type { Diagram, DiagramMeta, IdeaNode } from '../types'
 
 // ── localStorage helpers ────────────────────────────────────────────────────
 
-const LS_LIST = 'ideas:list'
-const lsKey = (id: string) => `ideas:diagram:${id}`
+const LS_LIST = 'mindmaps:list'
+const lsKey = (id: string) => `mindmaps:diagram:${id}`
 
 function lsGetList(): DiagramMeta[] {
   try {
@@ -70,6 +70,7 @@ function rowToDiagram(row: Record<string, unknown>): Diagram {
     createdAt:      row.created_at as string,
     updatedAt:      row.updated_at as string,
     sharingEnabled: (row.sharing_enabled ?? false) as boolean,
+    themeId: (row.theme_id as string | undefined) ?? 'default',
     nodes,
   }
 }
@@ -85,7 +86,7 @@ export function useDiagram(userId: string | null = null) {
       return
     }
     const { data, error } = await supabase
-      .from('ideas')
+      .from('mindmaps')
       .select('id, name, type, updated_at, nodes')
       .eq('user_id', userId)
       .order('updated_at', { ascending: false })
@@ -98,46 +99,40 @@ export function useDiagram(userId: string | null = null) {
       }
     }
 
-    // ── One-time migration: if Supabase is empty, upload from localStorage ──
-    if ((data ?? []).length === 0) {
-      const localList = lsGetList()
-      if (localList.length > 0) {
-        const rows = localList
-          .map(meta => lsGetDiagram(meta.id))
-          .filter(Boolean) as Diagram[]
-        if (rows.length > 0) {
-          const { error: insertErr } = await supabase.from('ideas').insert(
-            rows.map(d => ({
-              id:              d.id,
-              user_id:         userId,
-              name:            d.name,
-              type:            d.type,
-              line_style:      d.lineStyle ?? 'orthogonal',
-              sharing_enabled: d.sharingEnabled ?? false,
-              nodes:           d.nodes,
-            }))
-          )
-          if (insertErr) {
-            console.error('Migration error:', insertErr)
-            showToast(`Sync failed: ${insertErr.message}`, { color: '#ef4444' })
-            // Still show local maps so user isn't blocked
-            setDiagrams(localList)
-            return
-          }
-          showToast(`✦ ${rows.length} map${rows.length > 1 ? 's' : ''} synced to cloud`, { color: '#22c55e', confetti: true })
-          const { data: fresh } = await supabase
-            .from('ideas')
-            .select('id, name, type, updated_at')
-            .eq('user_id', userId)
-            .order('updated_at', { ascending: false })
-          setDiagrams((fresh ?? []).map(d => ({ id: d.id, name: d.name, type: d.type, updatedAt: d.updated_at })))
-          return
-        } else {
-          // localList has entries but no full diagram data — show them anyway
-          setDiagrams(localList)
-          return
-        }
+    // ── Sync: upload any local diagrams missing from Supabase ──
+    const remoteIds = new Set((data ?? []).map((d: { id: string }) => d.id))
+    const localList = lsGetList()
+    const missing = localList
+      .filter(meta => !remoteIds.has(meta.id))
+      .map(meta => lsGetDiagram(meta.id))
+      .filter(Boolean) as Diagram[]
+    if (missing.length > 0) {
+      const { error: insertErr } = await supabase.from('mindmaps').upsert(
+        missing.map(d => ({
+          id:              d.id,
+          user_id:         userId,
+          name:            d.name,
+          type:            d.type,
+          line_style:      d.lineStyle ?? 'orthogonal',
+          sharing_enabled: d.sharingEnabled ?? false,
+          theme_id:        d.themeId ?? 'default',
+          nodes:           d.nodes,
+        }))
+      )
+      if (insertErr) {
+        console.error('Sync error:', insertErr)
+        showToast(`Sync failed: ${insertErr.message}`, { color: '#ef4444' })
+        setDiagrams(localList)
+        return
       }
+      showToast(`✦ ${missing.length} map${missing.length > 1 ? 's' : ''} restored`, { color: '#22c55e', confetti: true })
+      const { data: fresh } = await supabase
+        .from('mindmaps')
+        .select('id, name, type, updated_at')
+        .eq('user_id', userId)
+        .order('updated_at', { ascending: false })
+      setDiagrams((fresh ?? []).map((d: { id: string; name: string; type: string; updated_at: string }) => ({ id: d.id, name: d.name, type: d.type as DiagramMeta['type'], updatedAt: d.updated_at })))
+      return
     }
 
     setDiagrams((data ?? []).map(d => ({
@@ -146,22 +141,43 @@ export function useDiagram(userId: string | null = null) {
   }, [setDiagrams, userId])
 
   const loadDiagram = useCallback(async (id: string) => {
-    if (!hasSupabase || !supabase || !userId) {
-      const d = lsGetDiagram(id)
-      if (d) { setActiveIdea(d); localStorage.setItem('activeIdeaId', id) }
+    // 1. Try localStorage cache first (instant)
+    const cached = lsGetDiagram(id)
+    if (cached) {
+      setActiveIdea(cached)
+      localStorage.setItem('activeMindmapId', id)
+      // Still refresh from Supabase in the background if possible
+    }
+
+    if (!hasSupabase || !supabase) return
+
+    // 2. Query Supabase — with user_id filter if authenticated, without if local/anonymous
+    const query = supabase.from('mindmaps').select('*').eq('id', id)
+    const { data, error } = await (userId ? query.eq('user_id', userId) : query).single()
+
+    if (error || !data) {
+      // Already loaded from cache above; if nothing found anywhere, nothing to do
+      if (!cached && userId) {
+        // Re-upload cache to Supabase if it got wiped
+        const recached = lsGetDiagram(id)
+        if (recached) {
+          setActiveIdea(recached)
+          localStorage.setItem('activeMindmapId', id)
+          await supabase.from('mindmaps').upsert({
+            id: recached.id, user_id: userId, name: recached.name,
+            type: recached.type, line_style: recached.lineStyle,
+            sharing_enabled: recached.sharingEnabled ?? false,
+            theme_id: recached.themeId ?? 'default', nodes: recached.nodes,
+          })
+        }
+      }
       return
     }
-    const { data, error } = await supabase
-      .from('ideas')
-      .select('*')
-      .eq('id', id)
-      .eq('user_id', userId)
-      .single()
-    if (error) { console.error(error); return }
+
     const diagram = rowToDiagram(data)
     setActiveIdea(diagram)
-    localStorage.setItem('activeIdeaId', id)
-    lsSaveDiagram(diagram) // cache for minimap
+    localStorage.setItem('activeMindmapId', id)
+    lsSaveDiagram(diagram)
   }, [setActiveIdea, userId])
 
   const saveDiagram = useCallback(async (diagram: Diagram) => {
@@ -170,16 +186,21 @@ export function useDiagram(userId: string | null = null) {
       setIsDirty(false)
       return
     }
-    const { error } = await supabase.from('ideas').upsert({
+    const { error } = await supabase.from('mindmaps').upsert({
       id:              diagram.id,
       user_id:         userId,
       name:            diagram.name,
       type:            diagram.type,
       line_style:      diagram.lineStyle,
       sharing_enabled: diagram.sharingEnabled ?? false,
+      theme_id:        diagram.themeId ?? 'default',
       nodes:           diagram.nodes,
     })
-    if (error) { console.error('save error:', error); showToast('Failed to save', { color: '#ef4444' }); return }
+    if (error) {
+      // On local dev without real auth, Supabase write is blocked by RLS — fall back to localStorage silently
+      if (error.code === '42501') { lsSaveDiagram(diagram); setIsDirty(false); return }
+      console.error('save error:', error); showToast('Failed to save', { color: '#ef4444' }); return
+    }
     lsSaveDiagram(diagram) // keep localStorage cache fresh for minimap
     setIsDirty(false)
   }, [setIsDirty, userId])
@@ -206,12 +227,12 @@ export function useDiagram(userId: string | null = null) {
     if (!hasSupabase || !supabase || !userId) {
       lsSaveDiagram(diagram)
       setActiveIdea(diagram)
-      localStorage.setItem('activeIdeaId', id)
+      localStorage.setItem('activeMindmapId', id)
       setDiagrams(lsGetList())
       showToast(`✦ "${name}" created`, { color: '#6366f1', confetti: true })
       return
     }
-    const { error } = await supabase.from('ideas').insert({
+    const { error } = await supabase.from('mindmaps').insert({
       id, user_id: userId, name, type: 'logic-chart', line_style: 'orthogonal',
       sharing_enabled: false, nodes: laid,
     })
@@ -234,12 +255,12 @@ export function useDiagram(userId: string | null = null) {
     if (!hasSupabase || !supabase || !userId) {
       lsSaveDiagram(diagram)
       setActiveIdea(diagram)
-      localStorage.setItem('activeIdeaId', id)
+      localStorage.setItem('activeMindmapId', id)
       setDiagrams(lsGetList())
       showToast(`✦ "${finalName}" created`, { color: '#22c55e', confetti: true })
       return id
     }
-    const { error } = await supabase.from('ideas').insert({
+    const { error } = await supabase.from('mindmaps').insert({
       id, user_id: userId, name: finalName, type: 'logic-chart', line_style: 'orthogonal',
       sharing_enabled: false, nodes,
     })
@@ -257,7 +278,7 @@ export function useDiagram(userId: string | null = null) {
       showToast(`"${name ?? 'Map'}" deleted`, { color: '#1a1d2e' })
       return
     }
-    await supabase.from('ideas').delete().eq('id', id).eq('user_id', userId)
+    await supabase.from('mindmaps').delete().eq('id', id).eq('user_id', userId)
     await loadDiagramList()
     showToast(`"${name ?? 'Map'}" deleted`, { color: '#1a1d2e' })
   }, [loadDiagramList, setDiagrams, userId])

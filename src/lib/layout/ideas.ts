@@ -21,14 +21,13 @@ function autoWidth(node: IdeaNode, depth: number): number {
   return Math.max(min, Math.min(400, Math.ceil(total)))
 }
 
-/** Effective size: root uses stored circle size; all others auto-fit title */
+/** Effective size: root uses stored circle size; all others use stored width (respects resize + normalisation) */
 function nodeSize(node: IdeaNode, depth: number) {
   if (depth === 0) {
-    const { w, h } = SIZES[0]
-    if (node.width > 0 && node.width === node.height) return { w: node.width, h: node.height }
-    return { w, h }
+    if (node.width > 0 && node.height > 0) return { w: node.width, h: node.height }
+    return SIZES[0]
   }
-  const w = autoWidth(node, depth)
+  const w = node.width > 0 ? node.width : autoWidth(node, depth)
   const h = node.height > 0 ? node.height : (DEFAULT_H[depth] ?? DEFAULT_HEIGHT)
   return { w, h }
 }

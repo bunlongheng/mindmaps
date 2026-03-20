@@ -12,7 +12,7 @@ import { decodeShareURL } from './lib/export/share'
 import { supabase, hasSupabase } from './lib/supabase'
 import { ArrowLeft, SlidersHorizontal } from 'lucide-react'
 
-const LS_FAVS = 'ideas:favorites'
+const LS_FAVS = 'mindmaps:favorites'
 function loadFavs(): Set<string> {
   try { return new Set(JSON.parse(localStorage.getItem(LS_FAVS) ?? '[]')) } catch { return new Set() }
 }
@@ -21,6 +21,17 @@ function saveFavs(favs: Set<string>) {
 }
 
 type View = 'home' | 'editor' | 'viewer'
+
+// Accept both ?map= and ?id= as the diagram param
+function getMapParam(search = window.location.search) {
+  const p = new URLSearchParams(search)
+  return p.get('map') ?? p.get('id') ?? null
+}
+
+// Skip auth gate when running locally (dev server or local IP)
+const isLocal = import.meta.env.DEV ||
+  ['localhost', '127.0.0.1'].includes(window.location.hostname) ||
+  /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(window.location.hostname)
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null)
@@ -38,12 +49,14 @@ export default function App() {
     return () => subscription.unsubscribe()
   }, [])
 
-  const { loadDiagramList, loadDiagram, saveDiagram, createDiagramFromNodes, deleteDiagram } = useDiagram(user?.id ?? null)
+  // Local dev: fall back to the hardcoded dev user ID so Supabase queries work without auth.
+  // Triple-locked: only when (1) isLocal, (2) no real session, (3) env var is set.
+  const effectiveUserId = user?.id ?? (isLocal ? (import.meta.env.VITE_LOCAL_USER_ID ?? null) : null)
+  const { loadDiagramList, loadDiagram, saveDiagram, createDiagramFromNodes, deleteDiagram } = useDiagram(effectiveUserId)
   const { activeIdea, isDirty, setActiveIdea, addNode, selectedNodeIds, setSelectedNodeIds, setPasteImportFn } = useIdeaStore()
   const [view, setView] = useState<View>(() => {
     if (decodeShareURL()) return 'viewer'
-    const params = new URLSearchParams(window.location.search)
-    if (params.get('map') || localStorage.getItem('activeIdeaId')) return 'editor'
+    if (getMapParam()) return 'editor'
     return 'home'
   })
   const [selectedPanelNodeId, setSelectedPanelNodeId] = useState<string | null>(null)
@@ -62,19 +75,20 @@ export default function App() {
     })
   }
 
-  // Re-run load when userId becomes available (auth resolves after mount)
-  const prevUserId = useRef<string | null>(null)
+  // Load diagram or list once auth is ready
+  const didLoad = useRef(false)
   useEffect(() => {
-    if (authLoading) return // wait for auth to resolve
+    if (authLoading) return
+    if (didLoad.current) return
+    didLoad.current = true
     const shared = decodeShareURL()
     if (shared) { setActiveIdea(shared); return }
-    const userId = user?.id ?? null
-    const params = new URLSearchParams(window.location.search)
-    const mapId = params.get('map') || localStorage.getItem('activeIdeaId')
-    // Only re-run if userId just changed (null → value) or first load
-    if (prevUserId.current === userId && prevUserId.current !== null) return
-    prevUserId.current = userId
+    const mapId = getMapParam()
     if (mapId) {
+      // Normalize ?id= → ?map= in the URL
+      if (!new URLSearchParams(window.location.search).has('map')) {
+        window.history.replaceState({}, '', `?map=${mapId}`)
+      }
       loadDiagram(mapId)
     } else {
       loadDiagramList()
@@ -98,6 +112,23 @@ export default function App() {
     saveTimerRef.current = setTimeout(() => saveDiagram(activeIdea), 1500)
     return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current) }
   }, [isDirty, activeIdea])
+
+  // Sync view with URL on browser back/forward
+  useEffect(() => {
+    function onPopState() {
+      if (decodeShareURL()) return
+      const mapId = getMapParam()
+      if (mapId) {
+        loadDiagram(mapId)
+        setView('editor')
+      } else {
+        loadDiagramList()
+        setView('home')
+      }
+    }
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [loadDiagram, loadDiagramList])
 
   // Block macOS swipe-back/forward gesture in editor
   useEffect(() => {
@@ -150,7 +181,13 @@ export default function App() {
       <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
     </div>
   )
-  if (hasSupabase && !user && view !== 'viewer') return <LoginPage />
+  if (hasSupabase && !user && view !== 'viewer' && !isLocal) return <LoginPage />
+
+  // If editor has no diagram (e.g. bad URL), fall back to home
+  if (view === 'editor' && !activeIdea && !authLoading) {
+    const mapId = getMapParam()
+    if (!mapId) { handleBack(); return null }
+  }
 
   async function handleSignOut() {
     if (supabase) await supabase.auth.signOut()

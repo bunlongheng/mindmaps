@@ -2,10 +2,12 @@ import { useState, useEffect, useRef } from 'react'
 import { useIdeaStore } from '../../store/ideaStore'
 import { useDiagram } from '../../hooks/useDiagram'
 import type { DiagramMeta, IdeaNode } from '../../types'
-import { Plus, Search, Clock, Trash2, Star } from 'lucide-react'
+import { Plus, Search, Clock, Trash2, Star, Network, Workflow, Fish, Milestone, GitMerge, GitFork } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import { IdeasLogo } from '../IdeasLogo'
+import { getTheme } from '../../lib/themes'
 
-const LS_FAVS = 'ideas:favorites'
+const LS_FAVS = 'mindmaps:favorites'
 function loadFavs(): Set<string> {
   try { return new Set(JSON.parse(localStorage.getItem(LS_FAVS) ?? '[]')) } catch { return new Set() }
 }
@@ -83,13 +85,13 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
   // Cache user profile in localStorage so it's available instantly on next load
   const avatarUrl = (() => {
     const live = user?.user_metadata?.avatar_url as string | undefined
-    if (live) { localStorage.setItem('ideas:avatar', live); return live }
-    return localStorage.getItem('ideas:avatar') ?? undefined
+    if (live) { localStorage.setItem('mindmaps:avatar', live); return live }
+    return localStorage.getItem('mindmaps:avatar') ?? undefined
   })()
   const displayName = (() => {
     const live = (user?.user_metadata?.full_name ?? user?.email ?? '') as string
-    if (live) { localStorage.setItem('ideas:displayName', live); return live }
-    return localStorage.getItem('ideas:displayName') ?? ''
+    if (live) { localStorage.setItem('mindmaps:displayName', live); return live }
+    return localStorage.getItem('mindmaps:displayName') ?? ''
   })()
 
   return (
@@ -104,15 +106,8 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
       }}>
         {/* Logo + name */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-          <div style={{
-            width: 32, height: 32, borderRadius: 9,
-            background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 2px 8px rgba(99,102,241,0.3)',
-          }}>
-            <IdeasLogo size={18} />
-          </div>
-          <span style={{ fontSize: 15, fontWeight: 700, color: '#1e293b' }}>Think</span>
+          <IdeasLogo size={28} />
+          <span style={{ fontSize: 15, fontWeight: 700, color: '#1e293b' }}>Ideas</span>
         </div>
 
         {/* Search — next to app name */}
@@ -140,7 +135,7 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
               onClick={() => setShowUserMenu(p => !p)}
               style={{
                 width: 34, height: 34, borderRadius: '50%', overflow: 'hidden',
-                border: showUserMenu ? '2px solid #6366f1' : '2px solid #e2e8f0',
+                border: showUserMenu ? '2px solid #6366f1' : '1px solid #e2e8f0',
                 cursor: 'pointer', padding: 0, background: '#e0e7ff',
                 transition: 'border-color 0.15s', flexShrink: 0,
                 position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -195,7 +190,7 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
         )}
       </header>
 
-      <main style={{ maxWidth: 1100, margin: '0 auto', padding: '32px 24px' }}>
+      <main style={{ maxWidth: '100%', padding: '32px 24px' }}>
 
         {filtered.length === 0 && (
           <div style={{
@@ -235,7 +230,7 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
             <h2 style={{ fontSize: 13, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 16 }}>
               {favDiagrams.length > 0 ? 'Recent' : 'All Maps'} · {recentDiagrams.length}
             </h2>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 12 }}>
               {recentDiagrams.map(d => (
                 <DiagramCard
                   key={d.id} diagram={d} timeAgo={timeAgo(d.updatedAt)}
@@ -315,93 +310,205 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
 // ── DiagramMinimap ─────────────────────────────────────────────────────────
 
 
-function DiagramMinimap({ id }: { id: string }) {
+function DiagramMinimap({ id, type }: { id: string; type: string }) {
+  const storeThemeId = useIdeaStore(s => s.themeId) // re-read when theme changes
   const [nodes, setNodes] = useState<IdeaNode[]>([])
+  const [diagramThemeId, setDiagramThemeId] = useState<string>('default')
 
   useEffect(() => {
     try {
-      const data = JSON.parse(localStorage.getItem(`ideas:diagram:${id}`) ?? 'null')
-      if (data?.nodes?.length) setNodes(data.nodes)
+      const data = JSON.parse(localStorage.getItem(`mindmaps:diagram:${id}`) ?? 'null')
+      if (data?.nodes?.length) {
+        setNodes(data.nodes)
+        setDiagramThemeId(data.themeId ?? 'default')
+      }
     } catch {}
-  }, [id])
+  }, [id, storeThemeId]) // re-read when active theme changes
+
+  const theme = getTheme(diagramThemeId)
+  const canvasBg = theme.canvasBg
+  // Root node fill: contrasting color for the theme's canvas
+  const isDarkCanvas = (() => {
+    const hex = canvasBg.replace('#', '')
+    const r = parseInt(hex.slice(0, 2), 16)
+    const g = parseInt(hex.slice(2, 4), 16)
+    const b = parseInt(hex.slice(4, 6), 16)
+    return (r * 299 + g * 587 + b * 114) / 1000 < 128
+  })()
+  const rootFill = isDarkCanvas ? theme.colors[0] : '#1e293b'
+  const spineFill = isDarkCanvas ? 'rgba(255,255,255,0.3)' : '#94a3b8'
 
   const root = nodes.find(n => n.parentId === null)
-  const l1s = root ? nodes.filter(n => n.parentId === root.id) : []
+  const l1s = root
+    ? nodes.filter(n => n.parentId === root.id).sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+    : []
 
-  // No data yet — show a lively gradient placeholder
   if (l1s.length === 0) {
-    const placeholderColors = ['#6366f1','#ec4899','#f97316','#22c55e','#06b6d4']
     return (
-      <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '0 16px' }}>
-        <div style={{ display: 'flex', gap: 0 }}>
-          {placeholderColors.map((c, i) => (
-            <div key={i} style={{
-              width: 22, height: 22, borderRadius: '50%', background: c,
-              border: '2px solid #fff', marginLeft: i === 0 ? 0 : -6,
-              opacity: 0.3,
-            }} />
-          ))}
-        </div>
-        <div style={{ fontSize: 11, color: '#cbd5e1', fontWeight: 500 }}>Open to preview</div>
+      <div style={{ width: '100%', height: '100%', background: canvasBg, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '0 0 14px 14px' }}>
+        <div style={{ fontSize: 11, color: isDarkCanvas ? 'rgba(255,255,255,0.3)' : '#cbd5e1', fontWeight: 500 }}>Open to preview</div>
       </div>
     )
   }
 
-  const MAX_ROWS = 3
+  // Diagram content area — padding is baked into the viewBox so canvasBg fills edge-to-edge
+  const P = 14  // internal padding
+  const W = 200, H = 110
+  const VB = `${-P} ${-P} ${W + P * 2} ${H + P * 2}`  // expanded viewBox
 
-  return (
-    <div style={{ width: '100%', height: '100%', padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 6, boxSizing: 'border-box' }}>
+  // ── Logic Chart ──────────────────────────────────────────────────
+  if (type === 'logic-chart' || !type) {
+    const n = l1s.length
+    const rowH = (H - 14) / n
+    const l1H = Math.max(7, Math.min(18, Math.round(rowH * 0.65)))
+    const totalH = n * l1H + (n - 1) * (rowH - l1H)
+    const startY = (H - totalH) / 2
+    const rootCX = 22, rootCY = H / 2, rootR = 16
+    const barX = 52, l1X = 60, l1W = 100
 
-      {/* Per-category breakdown */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1 }}>
-        {l1s.slice(0, MAX_ROWS).map((l1, idx) => {
-          const childCount = nodes.filter(n => n.parentId === l1.id).length
-          const isLast = idx === Math.min(MAX_ROWS, l1s.length) - 1
-          const overflow = l1s.length - MAX_ROWS
+    return (
+      <svg viewBox={VB} style={{ width: '100%', height: '100%' }} overflow="hidden">
+        <rect x={-P} y={-P} width={W + P * 2} height={H + P * 2} fill={canvasBg} />
+        <circle cx={rootCX} cy={rootCY} r={rootR} fill={rootFill} />
+        <line x1={rootCX + rootR} y1={rootCY} x2={barX} y2={rootCY} stroke={rootFill} strokeWidth={2.5} strokeLinecap="round" />
+        {n > 1 && <line x1={barX} y1={startY + l1H / 2} x2={barX} y2={startY + totalH - l1H / 2} stroke={l1s[Math.floor(n / 2)].color} strokeWidth={2.5} />}
+        {l1s.map((l1, i) => {
+          const cy = startY + i * rowH + l1H / 2
           return (
-            <div key={l1.id} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ fontSize: 11, color: '#334155', fontWeight: 500, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {l1.title}
-              </span>
-              {isLast && overflow > 0 && (
-                <span style={{ fontSize: 10, fontWeight: 600, color: '#94a3b8', flexShrink: 0 }}>+{overflow}</span>
-              )}
-              <span style={{ fontSize: 10, fontWeight: 700, color: l1.color, background: l1.color + '18', borderRadius: 4, padding: '1px 6px', flexShrink: 0 }}>
-                {childCount}
-              </span>
-            </div>
+            <g key={l1.id}>
+              <line x1={barX} y1={cy} x2={l1X} y2={cy} stroke={l1.color} strokeWidth={1.8} strokeLinecap="round" />
+              <rect x={l1X} y={cy - l1H / 2} width={l1W} height={l1H} rx={l1H / 2} fill={l1.color} />
+            </g>
           )
         })}
-        <div style={{ display: 'flex', alignItems: 'center' }}>
-          <div style={{ display: 'flex', gap: 0, flex: 1 }}>
-          {l1s.map((l1, i) => {
-            const childCount = nodes.filter(n => n.parentId === l1.id).length
-            return (
-              <div key={l1.id} title={l1.title} style={{
-                width: 16, height: 16, borderRadius: '50%',
-                background: l1.color,
-                marginLeft: i === 0 ? 0 : -6,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 8, fontWeight: 700, color: '#fff',
-                flexShrink: 0, boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
-                zIndex: l1s.length - i, position: 'relative',
-              }}>
-                {childCount}
-              </div>
-            )
-          })}
-          </div>
-          <span style={{ fontSize: 10, fontWeight: 700, color: '#1e293b', background: '#1e293b18', borderRadius: 20, padding: '2px 7px', flexShrink: 0, marginLeft: 6 }}>
-            {l1s.length}
-          </span>
-        </div>
-      </div>
+      </svg>
+    )
+  }
 
-    </div>
+  // ── Mindmap ──────────────────────────────────────────────────────
+  if (type === 'mindmap') {
+    const cx = W / 2, cy = H / 2, rootR = 16
+    const stemLen = 36
+    const n = l1s.length
+
+    return (
+      <svg viewBox={VB} style={{ width: '100%', height: '100%' }} overflow="hidden">
+        <rect x={-P} y={-P} width={W + P * 2} height={H + P * 2} fill={canvasBg} />
+        {l1s.map((l1, i) => {
+          const angle = (i / n) * Math.PI * 2 - Math.PI / 2
+          const l1cx = cx + stemLen * Math.cos(angle)
+          const l1cy = cy + stemLen * Math.sin(angle)
+          return (
+            <g key={l1.id}>
+              <line x1={cx} y1={cy} x2={l1cx} y2={l1cy} stroke={l1.color} strokeWidth={2} strokeLinecap="round" />
+              <circle cx={l1cx} cy={l1cy} r={10} fill={l1.color} />
+            </g>
+          )
+        })}
+        <circle cx={cx} cy={cy} r={rootR} fill={rootFill} />
+      </svg>
+    )
+  }
+
+  // ── Fishbone ─────────────────────────────────────────────────────
+  if (type === 'fishbone') {
+    const spineY = H / 2
+
+    return (
+      <svg viewBox={VB} style={{ width: '100%', height: '100%' }} overflow="hidden">
+        <rect x={-P} y={-P} width={W + P * 2} height={H + P * 2} fill={canvasBg} />
+        <line x1={14} y1={spineY} x2={W - 24} y2={spineY} stroke={spineFill} strokeWidth={2.5} strokeLinecap="round" />
+        <rect x={W - 26} y={spineY - 13} width={26} height={26} rx={5} fill={rootFill} />
+        {l1s.map((l1, i) => {
+          const above = i % 2 === 0
+          const x = W - 48 - Math.floor(i / 2) * 38
+          if (x < 30) return null
+          const tipX = x - 26, tipY = above ? spineY - 28 : spineY + 28
+          return (
+            <g key={l1.id}>
+              <line x1={x} y1={spineY} x2={tipX} y2={tipY} stroke={l1.color} strokeWidth={1.8} strokeLinecap="round" />
+              <rect x={tipX - 14} y={tipY - 7} width={28} height={14} rx={3} fill={l1.color} />
+            </g>
+          )
+        })}
+      </svg>
+    )
+  }
+
+  // ── Timeline ─────────────────────────────────────────────────────
+  if (type === 'timeline') {
+    const spineY = H / 2, n = l1s.length
+    const step = (W - 28) / Math.max(n, 1)
+
+    return (
+      <svg viewBox={VB} style={{ width: '100%', height: '100%' }} overflow="hidden">
+        <rect x={-P} y={-P} width={W + P * 2} height={H + P * 2} fill={canvasBg} />
+        <line x1={14} y1={spineY} x2={W - 14} y2={spineY} stroke={spineFill} strokeWidth={2} strokeLinecap="round" />
+        {l1s.map((l1, i) => {
+          const x = 18 + i * step + step / 2
+          const above = i % 2 === 0
+          const boxY = above ? spineY - 34 : spineY + 12
+          return (
+            <g key={l1.id}>
+              <circle cx={x} cy={spineY} r={4} fill={l1.color} />
+              <line x1={x} y1={above ? spineY - 4 : spineY + 4} x2={x} y2={above ? boxY + 14 : boxY} stroke={l1.color} strokeWidth={1.5} />
+              <rect x={x - 16} y={boxY} width={32} height={14} rx={3} fill={l1.color} opacity={0.9} />
+            </g>
+          )
+        })}
+      </svg>
+    )
+  }
+
+  // ── Tree vertical ────────────────────────────────────────────────
+  if (type === 'tree-vertical') {
+    const n = l1s.length, step = (W - 20) / Math.max(n, 1)
+    return (
+      <svg viewBox={VB} style={{ width: '100%', height: '100%' }} overflow="hidden">
+        <rect x={-P} y={-P} width={W + P * 2} height={H + P * 2} fill={canvasBg} />
+        <rect x={W / 2 - 24} y={8} width={48} height={20} rx={5} fill={rootFill} />
+        {l1s.map((l1, i) => {
+          const x = 10 + i * step + step / 2
+          return (
+            <g key={l1.id}>
+              <line x1={W / 2} y1={28} x2={x} y2={72} stroke={l1.color} strokeWidth={1.5} />
+              <rect x={x - 16} y={72} width={32} height={16} rx={4} fill={l1.color} />
+            </g>
+          )
+        })}
+      </svg>
+    )
+  }
+
+  // ── Tree horizontal (default fallback) ───────────────────────────
+  const n2 = l1s.length, step2 = (H - 16) / Math.max(n2, 1)
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: '100%' }} overflow="hidden">
+      <rect x={0} y={0} width={W} height={H} fill={canvasBg} />
+      <rect x={12} y={H / 2 - 16} width={24} height={32} rx={5} fill={rootFill} />
+      {l1s.map((l1, i) => {
+        const y = 8 + i * step2 + step2 / 2
+        return (
+          <g key={l1.id}>
+            <line x1={36} y1={H / 2} x2={64} y2={y} stroke={l1.color} strokeWidth={1.5} />
+            <rect x={64} y={y - 8} width={56} height={16} rx={4} fill={l1.color} />
+          </g>
+        )
+      })}
+    </svg>
   )
 }
 
 // ── DiagramCard ────────────────────────────────────────────────────────────
+
+const TYPE_ICON: Record<string, LucideIcon> = {
+  'logic-chart': Workflow,
+  'mindmap': Network,
+  'fishbone': Fish,
+  'timeline': Milestone,
+  'tree-vertical': GitMerge,
+  'tree-horizontal': GitFork,
+}
 
 function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isFav, onToggleFav }: {
   diagram: DiagramMeta; timeAgo: string; onOpen: () => void; onDelete: () => void
@@ -414,7 +521,7 @@ function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isFav, onToggleFav }:
       onMouseLeave={() => setHovered(false)}
       style={{
         background: '#fff',
-        border: `2px solid ${hovered ? '#6366f1' : '#e8edf5'}`,
+        border: `1px solid ${hovered ? '#6366f1' : '#e2e8f0'}`,
         borderRadius: 16, overflow: 'hidden', cursor: 'pointer',
         transition: 'border-color 0.15s, box-shadow 0.15s, transform 0.15s',
         boxShadow: hovered ? '0 8px 24px rgba(99,102,241,0.15)' : '0 1px 4px rgba(0,0,0,0.05)',
@@ -423,7 +530,16 @@ function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isFav, onToggleFav }:
       onClick={onOpen}
     >
       {/* Header — name + count pill (left) + time (right) */}
-      <div style={{ padding: '12px 14px 10px', borderBottom: '1px solid #eef2f8', display: 'flex', alignItems: 'center', gap: 6 }}>
+      <div style={{ padding: '12px 14px 10px', display: 'flex', alignItems: 'center', gap: 6 }}>
+        {(() => { const Icon = TYPE_ICON[diagram.type]; return Icon ? (
+          <span style={{
+            width: 20, height: 20, borderRadius: '50%',
+            background: '#ede9fe', flexShrink: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <Icon size={11} color="#6366f1" strokeWidth={2.2} />
+          </span>
+        ) : null })()}
         <div style={{ fontSize: 13, fontWeight: 600, color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
           {diagram.name}
         </div>
@@ -433,8 +549,8 @@ function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isFav, onToggleFav }:
       </div>
 
       {/* Thumbnail */}
-      <div style={{ height: 110, background: 'linear-gradient(145deg, #f8faff 0%, #f1f5ff 100%)', position: 'relative' }}>
-        <DiagramMinimap id={diagram.id} />
+      <div style={{ height: 110, background: '#f8fafc', position: 'relative' }}>
+        <DiagramMinimap id={diagram.id} type={diagram.type} />
         {hovered && (
           <>
             <button onClick={e => { e.stopPropagation(); onToggleFav() }} title={isFav ? 'Unfavorite' : 'Favorite'}

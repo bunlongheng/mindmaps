@@ -168,7 +168,7 @@ export const useIdeaStore = create<IdeaStore>()(
     isDirty: false,
     diagramType: 'logic-chart',
     lineStyle: 'orthogonal',
-    themeId: localStorage.getItem('ideas:themeId') ?? 'default',
+    themeId: localStorage.getItem('mindmaps:themeId') ?? 'default',
     showOrderNumbers: true,
     isImporting: false,
     resizePreview: null,
@@ -179,12 +179,26 @@ export const useIdeaStore = create<IdeaStore>()(
     setPasteImportFn: (fn) => set({ pasteImportFn: fn }),
 
     setActiveIdea: (d) => {
-      // Re-run layout on load so node sizes always reflect current title text
-      const nodes = runLayout(d.nodes, d.type)
+      // Re-run layout on load: reset widths → compute auto-widths → normalize per depth → final layout
+      const freshNodes = d.nodes.map(n => {
+        if (n.depth !== 0) return { ...n, width: 0, height: 0, manuallyPositioned: false }
+        // Fix root: if title is long (≥15 chars) but stored as a circle, convert to pill
+        if (n.title.length >= 15 && n.width === n.height) {
+          const fontSize = 28
+          const textW = n.title.length * fontSize * 0.55
+          return { ...n, width: Math.max(240, Math.round(textW + 72)), height: 90 }
+        }
+        return n
+      })
+      const withWidths = runLayout(freshNodes, d.type)
+      const nodes = runLayout(normalizeWidthsPerDepth(withWidths), d.type)
+      const themeId = d.themeId ?? localStorage.getItem('mindmaps:themeId') ?? 'default'
+      localStorage.setItem('mindmaps:themeId', themeId)
       set({
         activeIdea: { ...d, nodes },
         diagramType: d.type,
         lineStyle: d.lineStyle,
+        themeId,
         showOrderNumbers: d.showOrderNumbers ?? true,
         past: [],
         future: [],
@@ -197,9 +211,13 @@ export const useIdeaStore = create<IdeaStore>()(
     setDiagramType: (t) => {
       const state = get()
       if (!state.activeIdea) return
-      // Clear manual positions so every layout starts fresh
-      const resetNodes = state.activeIdea.nodes.map(n => ({ ...n, manuallyPositioned: false }))
-      const newNodes = runLayout(resetNodes, t)
+      // Clear manual positions AND reset dimensions so every layout starts fresh with correct sizes for the target type
+      const resetNodes = state.activeIdea.nodes.map(n =>
+        n.depth === 0 ? { ...n, manuallyPositioned: false } : { ...n, manuallyPositioned: false, width: 0, height: 0 }
+      )
+      // Run layout once to get auto-computed widths, normalize per depth, then re-layout for correct positions
+      const withWidths = runLayout(resetNodes, t)
+      const newNodes = runLayout(normalizeWidthsPerDepth(withWidths), t)
       set({
         diagramType: t,
         activeIdea: { ...state.activeIdea, type: t, nodes: newNodes },
@@ -224,7 +242,7 @@ export const useIdeaStore = create<IdeaStore>()(
     setIsDirty: (v) => set({ isDirty: v }),
 
     setTheme: (id) => {
-      localStorage.setItem('ideas:themeId', id)
+      localStorage.setItem('mindmaps:themeId', id)
       const state = get()
       const palette = getTheme(id).colors
       // Re-color all L1 nodes (depth === 1) using the new theme palette
@@ -247,7 +265,12 @@ export const useIdeaStore = create<IdeaStore>()(
           return getInheritedColor(parent)
         }
         const recolored = nodes.map(n => n.depth > 1 ? { ...n, color: getInheritedColor(n) } : n)
-        set({ themeId: id, activeIdea: { ...state.activeIdea, nodes: recolored }, isDirty: true })
+        const updatedDiagram = { ...state.activeIdea, themeId: id, nodes: recolored }
+        set({ themeId: id, activeIdea: updatedDiagram, isDirty: true })
+        // Immediately update localStorage cache so homepage minimap reflects new colors instantly
+        try {
+          localStorage.setItem(`mindmaps:diagram:${updatedDiagram.id}`, JSON.stringify(updatedDiagram))
+        } catch { /* quota errors are non-fatal */ }
       } else {
         set({ themeId: id })
       }
@@ -285,7 +308,7 @@ export const useIdeaStore = create<IdeaStore>()(
       }
       // Strip manuallyPositioned so the layout is always clean when adding nodes
       const reset = [...state.activeIdea.nodes, newNode].map(n => ({ ...n, manuallyPositioned: false }))
-      const laid = runLayout(reset, state.diagramType)
+      const laid = runLayout(normalizeWidthsPerDepth(reset), state.diagramType)
       const newNodes = rebalanceColors(laid, palette)
       set({
         activeIdea: { ...state.activeIdea, nodes: newNodes },

@@ -1,21 +1,30 @@
 import type { IdeaNode } from '../../types'
 
-const ROOT_RADIUS = 180  // distance from root center to L1 center
-const L1_EXTRA = 200     // additional distance from L1 to L2
-const L2_EXTRA = 160     // additional distance from L2 to L3
-const V_SPREAD = 0.45    // minimum angular spread (radians) per sibling
+const ROOT_RADIUS = 275   // root center → L1 center (25% longer stems)
+const L1_EXTRA   = 160   // L1 center → L2 center
+const L2_EXTRA   = 120   // L2 center → L3 center
+const MIN_ARC    = 0.52  // minimum arc (radians) reserved per child node
 
-/** Slightly reduced font sizes for mindmap to prevent branch overlap (~18% smaller) */
 const FONT_SIZES: Record<number, number> = { 1: 18, 2: 13, 3: 11 }
 const DEFAULT_FONT_SIZE = 11
 
 function autoW(node: IdeaNode, depth: number): number {
   const fontSize = FONT_SIZES[depth] ?? DEFAULT_FONT_SIZE
-  const hasVisual = !!(node.icon || node.emoji)
+  const hasVisual = !!(node.icon || node.emoji) && depth < 2
   const textW = node.title.length * fontSize * 0.64 + 24
   const total = hasVisual ? Math.ceil(textW / 0.78) : textW
-  const min = depth === 1 ? 100 : depth === 2 ? 80 : 60
-  return Math.max(min, Math.min(360, Math.ceil(total)))
+  const min = depth === 3 ? 80 : 60
+  return Math.max(min, Math.min(320, Math.ceil(total)))
+}
+
+const L1_CIRCLE_SIZE = 88
+const L2_CIRCLE_SIZE = 60
+
+/** Count total leaf+internal nodes in subtree (used to weight arc allocation) */
+function subtreeWeight(nodeId: string, nodes: IdeaNode[]): number {
+  const children = nodes.filter(n => n.parentId === nodeId)
+  if (children.length === 0) return 1
+  return children.reduce((s, c) => s + subtreeWeight(c.id, nodes), 0)
 }
 
 function placeSubtree(
@@ -23,8 +32,8 @@ function placeSubtree(
   depth: number,
   cx: number,
   cy: number,
-  angle: number,        // direction from parent
-  arcSpread: number,    // total arc available to this subtree
+  angle: number,
+  arcSpread: number,
   nodes: IdeaNode[],
   result: IdeaNode[],
 ) {
@@ -32,8 +41,9 @@ function placeSubtree(
   if (!node) return
 
   const fontSize = FONT_SIZES[depth] ?? DEFAULT_FONT_SIZE
-  const w = autoW(node, depth)
-  const h = depth === 1 ? 40 : depth === 2 ? 32 : 28
+  const isCircle = depth === 1 || depth === 2
+  const w = isCircle ? (depth === 1 ? L1_CIRCLE_SIZE : L2_CIRCLE_SIZE) : (node.width > 0 ? node.width : autoW(node, depth))
+  const h = isCircle ? (depth === 1 ? L1_CIRCLE_SIZE : L2_CIRCLE_SIZE) : (depth <= 3 ? 36 : 30)
 
   if (!node.manuallyPositioned) {
     result.push({ ...node, x: cx - w / 2, y: cy - h / 2, width: w, height: h, fontSize })
@@ -44,20 +54,27 @@ function placeSubtree(
   const children = nodes
     .filter(n => n.parentId === nodeId)
     .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
-
   if (children.length === 0) return
 
   const extra = depth === 1 ? L1_EXTRA : L2_EXTRA
   const childR = extra + Math.max(w, h) / 2
-  const totalSpread = Math.max(arcSpread, children.length * V_SPREAD)
-  const step = totalSpread / Math.max(children.length - 1, 1)
-  const startAngle = children.length === 1 ? angle : angle - totalSpread / 2
 
+  // Arc this subtree actually uses: at least MIN_ARC per child, at most what was allocated
+  const minArc = children.length * MIN_ARC
+  const totalArc = Math.max(arcSpread, minArc)
+
+  // Distribute arc proportionally by subtree weight
+  const weights = children.map(c => subtreeWeight(c.id, nodes))
+  const totalWeight = weights.reduce((s, w) => s + w, 0)
+
+  let cursor = angle - totalArc / 2
   children.forEach((child, i) => {
-    const childAngle = children.length === 1 ? angle : startAngle + i * step
+    const childArc = (weights[i] / totalWeight) * totalArc
+    const childAngle = cursor + childArc / 2
+    cursor += childArc
     const childCX = cx + childR * Math.cos(childAngle)
     const childCY = cy + childR * Math.sin(childAngle)
-    placeSubtree(child.id, depth + 1, childCX, childCY, childAngle, totalSpread / Math.max(children.length, 1), nodes, result)
+    placeSubtree(child.id, depth + 1, childCX, childCY, childAngle, childArc, nodes, result)
   })
 }
 
@@ -66,13 +83,11 @@ export function computeMindmapLayout(nodes: IdeaNode[]): IdeaNode[] {
   if (!root) return nodes
 
   const rw = root.width > 0 && root.width === root.height ? root.width : 160
-  const rh = rw
-  const cx = 0
-  const cy = 0
+  const cx = 0, cy = 0
 
   const result: IdeaNode[] = []
   if (!root.manuallyPositioned) {
-    result.push({ ...root, x: cx - rw / 2, y: cy - rh / 2, width: rw, height: rh })
+    result.push({ ...root, x: cx - rw / 2, y: cy - rw / 2, width: rw, height: rw })
   } else {
     result.push(root)
   }
@@ -80,17 +95,17 @@ export function computeMindmapLayout(nodes: IdeaNode[]): IdeaNode[] {
   const l1s = nodes
     .filter(n => n.parentId === root.id)
     .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
-
   if (l1s.length === 0) return result
 
+  const l1PlacementR = rw / 2 + ROOT_RADIUS
   const angleStep = (2 * Math.PI) / l1s.length
-  const startAngle = -Math.PI / 2  // start at top
+  const startAngle = -Math.PI / 2
 
   l1s.forEach((l1, i) => {
     const angle = startAngle + i * angleStep
-    const l1CX = cx + (rw / 2 + ROOT_RADIUS) * Math.cos(angle)
-    const l1CY = cy + (rh / 2 + ROOT_RADIUS) * Math.sin(angle)
-    placeSubtree(l1.id, 1, l1CX, l1CY, angle, angleStep * 0.85, nodes, result)
+    const l1CX = cx + l1PlacementR * Math.cos(angle)
+    const l1CY = cy + l1PlacementR * Math.sin(angle)
+    placeSubtree(l1.id, 1, l1CX, l1CY, angle, angleStep * 0.88, nodes, result)
   })
 
   const placed = new Set(result.map(n => n.id))

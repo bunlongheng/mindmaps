@@ -504,7 +504,7 @@ export function SidePanel({ nodeId, onClose, onImport, onDelete }: SidePanelProp
       {/* ── Map tab ── */}
       {tab === 'map' && (
         <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
-          <SBlock title="Diagram Type">
+          <SBlock title="Type">
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
               {DIAGRAM_TYPES.map(({ value, label }) => {
                 const active = diagramType === value
@@ -529,7 +529,7 @@ export function SidePanel({ nodeId, onClose, onImport, onDelete }: SidePanelProp
           {diagramType !== 'fishbone' && diagramType !== 'timeline' && (
             <>
               <HR />
-              <SBlock title="Line Style">
+              <SBlock title="Line">
                 <div style={{ display: 'flex', gap: 6 }}>
                   {([
                     { value: 'curved' as LineStyle,     label: 'Brace',    d: 'M1,2 L5,2 M1,5 L5,5 M1,8 L5,8 M5,2 L5,8 L9,5' },
