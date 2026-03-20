@@ -216,7 +216,7 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
             pointerEvents: 'none',
           }}>
-            <div style={{ opacity: 0.25, marginBottom: 16 }}><MindmapsLogo size={40} color="#64748b" /></div>
+            <div style={{ opacity: 0.25, marginBottom: 16 }}><MindmapsLogo size={40} /></div>
             <p style={{ fontSize: 15, color: '#94a3b8', fontWeight: 600, margin: 0 }}>No maps yet</p>
             <p style={{ fontSize: 13, color: '#cbd5e1', marginTop: 6 }}>Tap + to create your first map</p>
           </div>
