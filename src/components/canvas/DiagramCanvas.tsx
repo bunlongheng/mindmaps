@@ -148,6 +148,7 @@ export function DiagramCanvas({ onNodeSelect, readOnly, onDelete, isFav, onToggl
   // Pinch-to-zoom state
   const activePointers = useRef<Map<number, { x: number; y: number }>>(new Map())
   const lastPinchDist = useRef<number | null>(null)
+  const touchPanRef = useRef<{ x: number; y: number } | null>(null)
 
   // Drag-reorder state: snap line between siblings
   const [, setSnapLine] = useState<{ x1: number; x2: number; y: number } | null>(null)
@@ -201,7 +202,10 @@ export function DiagramCanvas({ onNodeSelect, readOnly, onDelete, isFav, onToggl
       return
     }
     isDragging.current = false
-    if (e.pointerType !== 'mouse') return  // touch devices: no rubber-band select
+    if (e.pointerType !== 'mouse') {
+      touchPanRef.current = { x: e.clientX, y: e.clientY }
+      return
+    }
     const { x, y } = screenToCanvas(e.clientX, e.clientY)
     selStart.current = { cx: x, cy: y }
     setSelBox({ x, y, w: 0, h: 0 })
@@ -209,6 +213,14 @@ export function DiagramCanvas({ onNodeSelect, readOnly, onDelete, isFav, onToggl
 
   const handleBgPointerMove = useCallback((e: React.PointerEvent) => {
     activePointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+    // Single-finger touch pan
+    if (activePointers.current.size === 1 && e.pointerType !== 'mouse' && touchPanRef.current) {
+      const dx = e.clientX - touchPanRef.current.x
+      const dy = e.clientY - touchPanRef.current.y
+      setPan(p => ({ x: p.x + dx, y: p.y + dy }))
+      touchPanRef.current = { x: e.clientX, y: e.clientY }
+      return
+    }
     // Pinch-to-zoom with two fingers
     if (activePointers.current.size === 2) {
       const [p1, p2] = Array.from(activePointers.current.values())
@@ -244,6 +256,7 @@ export function DiagramCanvas({ onNodeSelect, readOnly, onDelete, isFav, onToggl
   const handleBgPointerUp = useCallback((e: React.PointerEvent) => {
     activePointers.current.delete(e.pointerId)
     if (activePointers.current.size < 2) lastPinchDist.current = null
+    if (activePointers.current.size === 0) touchPanRef.current = null
     // Only act if the drag started on the background (selStart was set)
     if (selStart.current && !isDragging.current) {
       setSelectedNodeIds([])
@@ -477,8 +490,16 @@ export function DiagramCanvas({ onNodeSelect, readOnly, onDelete, isFav, onToggl
       })()}
 
       {/* Bottom bar */}
-      <div style={{
-        position: 'absolute', bottom: 0, left: 0, right: 0, height: 28,
+      <style>{`
+        .canvas-bottom-bar { height: 28px !important; }
+        .canvas-bottom-btn { height: 20px !important; font-size: 11px !important; }
+        @media (max-width: 768px) {
+          .canvas-bottom-bar { height: 48px !important; }
+          .canvas-bottom-btn { height: 34px !important; padding: 0 14px !important; font-size: 13px !important; border-radius: 8px !important; }
+        }
+      `}</style>
+      <div className="canvas-bottom-bar" style={{
+        position: 'absolute', bottom: 0, left: 0, right: 0,
         background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(8px)',
         borderTop: '1px solid #e8eaed',
         display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center',
@@ -493,6 +514,7 @@ export function DiagramCanvas({ onNodeSelect, readOnly, onDelete, isFav, onToggl
             <button
               onClick={() => exportDiagramAsPdf(activeMindmap.name)}
               title="Download PDF"
+              className="canvas-bottom-btn"
               style={{
                 height: 20, padding: '0 8px', border: '1px solid #e2e8f0', borderRadius: 5,
                 background: 'transparent', cursor: 'pointer', fontSize: 11, fontWeight: 500,
@@ -506,6 +528,7 @@ export function DiagramCanvas({ onNodeSelect, readOnly, onDelete, isFav, onToggl
               <button
                 onClick={onToggleFav}
                 title={isFav ? 'Unfavorite' : 'Favorite'}
+                className="canvas-bottom-btn"
                 style={{
                   height: 20, padding: '0 8px', border: '1px solid #e2e8f0', borderRadius: 5,
                   background: 'transparent', cursor: 'pointer', fontSize: 11, fontWeight: 500,
@@ -520,6 +543,7 @@ export function DiagramCanvas({ onNodeSelect, readOnly, onDelete, isFav, onToggl
               <button
                 onClick={onDelete}
                 title="Delete map"
+                className="canvas-bottom-btn"
                 style={{
                   height: 20, padding: '0 8px', border: '1px solid #fecaca', borderRadius: 5,
                   background: 'transparent', cursor: 'pointer', fontSize: 11, fontWeight: 500,
