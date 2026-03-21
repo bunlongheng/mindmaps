@@ -173,7 +173,7 @@ export default function App() {
       <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
     </div>
   )
-  if (hasSupabase && !user && view !== 'viewer' && !isLocal) return <LoginPage />
+  if (hasSupabase && !user && view !== 'viewer') return <LoginPage />
 
   // If editor has no diagram (e.g. bad URL), fall back to home
   if (view === 'editor' && !activeMindmap && !authLoading) {
