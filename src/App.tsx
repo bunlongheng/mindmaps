@@ -168,6 +168,8 @@ export default function App() {
     await loadDiagram(id)
     setView('editor')
     window.history.pushState({}, '', `?map=${id}`)
+    const name = useMindmapStore.getState().activeMindmap?.name
+    if (name) setTimeout(() => showToast(name, { color: '#6366f1', confetti: false }), 150)
   }, [loadDiagram])
 
   const handleBack = useCallback(() => {
