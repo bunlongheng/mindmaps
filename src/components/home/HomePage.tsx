@@ -120,10 +120,10 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
       <header style={{
         background: 'rgba(238,240,245,0.88)', backdropFilter: 'blur(16px)',
         borderBottom: `1px solid ${BORDER}`,
-        padding: '0 24px', height: 56,
+        height: 56,
         display: 'flex', alignItems: 'center', gap: 16,
         position: 'sticky', top: 0, zIndex: 10,
-      }}>
+      }} className="home-header">
         {/* Logo + name */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
           <MindmapsLogo size={28} />
@@ -131,7 +131,7 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
         </div>
 
         {/* Search */}
-        <div style={{ position: 'relative', width: 220 }}>
+        <div style={{ position: 'relative' }} className="home-search">
           <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
           <input
             value={search}
@@ -207,7 +207,7 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
         )}
       </header>
 
-      <main style={{ maxWidth: '100%', padding: '32px 24px' }}>
+      <main style={{ maxWidth: '100%' }} className="home-main">
 
         {filtered.length === 0 && (
           <div style={{
@@ -231,7 +231,7 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
             <div style={{ position: 'relative' }}>
               <div ref={favScrollRef} style={{ display: 'flex', gap: 16, overflowX: 'auto', overflowY: 'visible', paddingBottom: 12, paddingTop: 4, scrollbarWidth: 'none' }}>
                 {favDiagrams.map(d => (
-                  <div key={d.id} style={{ flexShrink: 0, width: 220 }}>
+                  <div key={d.id} style={{ flexShrink: 0, width: 'min(220px, 72vw)' }}>
                     <DiagramCard
                       diagram={d} timeAgo={timeAgo(d.updatedAt)}
                       onOpen={() => onOpen(d.id)} onDelete={() => deleteDiagram(d.id, d.name)}
@@ -256,7 +256,7 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
                 : <><LayoutGrid size={11} color={TEXT_MUTED} /> All Maps</>}
               <span style={{ fontSize: 13, fontWeight: 800, color: '#6366f1' }}>{recentDiagrams.length}</span>
             </h2>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 12 }}>
+            <div className="home-grid">
               {recentDiagrams.map(d => (
                 <DiagramCard
                   key={d.id} diagram={d} timeAgo={timeAgo(d.updatedAt)}
@@ -292,6 +292,21 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
           50%       { box-shadow: 0 4px 40px rgba(99,102,241,0.75); transform: scale(1.06); }
         }
         input::placeholder { color: #94a3b8 !important; }
+        .home-grid {
+          display: grid;
+          gap: 12px;
+          grid-template-columns: repeat(2, 1fr);
+        }
+        @media (min-width: 480px)  { .home-grid { grid-template-columns: repeat(3, 1fr); } }
+        @media (min-width: 768px)  { .home-grid { grid-template-columns: repeat(4, 1fr); } }
+        @media (min-width: 1024px) { .home-grid { grid-template-columns: repeat(5, 1fr); } }
+        @media (min-width: 1280px) { .home-grid { grid-template-columns: repeat(6, 1fr); } }
+        .home-header { padding: 0 16px !important; }
+        @media (min-width: 640px) { .home-header { padding: 0 24px !important; } }
+        .home-search { width: 160px !important; }
+        @media (min-width: 640px) { .home-search { width: 220px !important; } }
+        .home-main { padding: 24px 16px !important; }
+        @media (min-width: 640px) { .home-main { padding: 32px 24px !important; } }
       `}</style>
 
       {/* Create modal */}
@@ -302,7 +317,7 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
           backdropFilter: 'blur(4px)',
         }} onClick={() => setShowCreate(false)}>
           <div style={{
-            background: SURFACE, borderRadius: 16, padding: 24, width: 360,
+            background: SURFACE, borderRadius: 16, padding: 24, width: 'min(360px, 90vw)',
             boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
           }} onClick={e => e.stopPropagation()}>
             <h3 style={{ fontSize: 16, fontWeight: 700, color: TEXT_PRIMARY, marginBottom: 16 }}>New Map</h3>

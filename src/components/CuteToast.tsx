@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { Bot } from 'lucide-react'
 
 export interface ToastOptions {
   color?: string
@@ -105,11 +106,12 @@ export function CuteToast() {
           color: '#fff',
         }}>
           <span style={{
-            width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
-            border: '1.5px solid rgba(255,255,255,0.35)', borderTopColor: '#fff',
-            display: 'inline-block',
-            animation: 'cuteSpin 0.7s linear infinite',
-          }} />
+            width: 20, height: 20, borderRadius: '50%', flexShrink: 0,
+            background: 'rgba(255,255,255,0.2)',
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <Bot size={12} strokeWidth={2} color="#fff" />
+          </span>
           <span style={{
             fontFamily: 'Inter, system-ui, sans-serif',
             fontSize: 8, fontWeight: 900, letterSpacing: '0.08em',

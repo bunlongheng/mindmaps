@@ -43,8 +43,23 @@ export default function App() {
       setUser(data.session?.user ?? null)
       setAuthLoading(false)
     })
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT') {
+        const farewells = ["Later!", "See ya!", "Peace out!", "Catch you later!", "Adios!", "So long!", "Bye for now!", "Take care!", "Until next time!"]
+        const farewell = farewells[Math.floor(Math.random() * farewells.length)]
+        setUser(null)
+        setTimeout(() => {
+          showToast(farewell, { color: '#64748b' })
+          setTimeout(() => window.location.reload(), 1800)
+        }, 150)
+      } else {
+        setUser(session?.user ?? null)
+      }
+      if (event === 'SIGNED_IN') {
+        const greetings = ["Let's build something cool.", "Welcome back, boss.", "Let's do it. One diagram at a time.", "Good to see you.", "Ready when you are.", "Let's make it count.", "Diagrams standing by.", "Ready, set, go.", "All systems initiated.", "Let's make something great."]
+        const greeting = greetings[Math.floor(Math.random() * greetings.length)]
+        setTimeout(() => showToast(greeting, { color: '#6366f1', confetti: true }), 150)
+      }
     })
     return () => subscription.unsubscribe()
   }, [])
@@ -173,7 +188,7 @@ export default function App() {
       <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
     </div>
   )
-  if (hasSupabase && !user && view !== 'viewer') return <LoginPage />
+  if (hasSupabase && !user && view !== 'viewer') return <><CuteToast /><LoginPage /></>
 
   // If editor has no diagram (e.g. bad URL), fall back to home
   if (view === 'editor' && !activeMindmap && !authLoading) {
