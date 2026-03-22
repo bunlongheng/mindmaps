@@ -359,10 +359,7 @@ export function EdgeLayer({ nodes, lineStyle, diagramType }: EdgeLayerProps) {
 
           return (
             <g key={`branch-${l1.id}`}>
-              {/* Vertical tick: spine → L1 edge */}
-              <line x1={branchX} y1={spineY} x2={branchX} y2={l1SpineEdge}
-                stroke={l1.color} strokeWidth={2} strokeLinecap="round" />
-              {/* Vertical branch through all descendants */}
+              {/* Vertical branch from L1 edge through all descendants */}
               {descendants.length > 0 && (
                 <line x1={branchX} y1={l1SpineEdge} x2={branchX} y2={farY}
                   stroke={l1.color} strokeWidth={1.8} strokeLinecap="round" />

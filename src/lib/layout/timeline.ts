@@ -5,7 +5,7 @@ const ROOT_X = 80
 const V_GAP = 12      // vertical gap between stacked L2/L3 nodes
 const BRANCH_GAP = 20 // vertical gap between L1 edge and nearest L2
 const L1_SEG = 64     // horizontal gap between L1 nodes
-const BRANCH_INDENT = 20 // horizontal offset from branch line to node left edge
+const BRANCH_INDENT = 30 // horizontal offset from branch line to node left edge
 
 /** Estimate rendered width from title text and font size */
 function autoWidth(title: string, fontSize: number, hasIconOrEmoji: boolean, minW: number): number {

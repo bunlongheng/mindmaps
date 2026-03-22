@@ -215,8 +215,7 @@ export function SidePanel({ nodeId, onClose, onImport, onDelete }: SidePanelProp
   const [tab, setTab] = useState<Tab>('style')
   const [copied, setCopied] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
-  const rootNode = activeMindmap?.nodes.find(n => n.parentId === null)
-  const node = (nodeId ? activeMindmap?.nodes.find(n => n.id === nodeId) : null) ?? rootNode ?? null
+  const node = nodeId ? (activeMindmap?.nodes.find(n => n.id === nodeId) ?? null) : null
   const [title, setTitle] = useState(node?.title ?? '')
 
   useEffect(() => { setTitle(node?.title ?? '') }, [nodeId, node?.title])
