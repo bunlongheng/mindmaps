@@ -351,10 +351,11 @@ export function EdgeLayer({ nodes, lineStyle, diagramType }: EdgeLayerProps) {
           const above = descendants.length > 0 && descendants.some(n => n.y + n.height < spineY)
           const l1SpineEdge = above ? l1.y : l1.y + l1.height
 
+          // Use node centers so branch ends flush with the outermost connector, not beyond it
           const farY = descendants.length > 0
             ? above
-              ? Math.min(...descendants.map(n => n.y))
-              : Math.max(...descendants.map(n => n.y + n.height))
+              ? Math.min(...descendants.map(n => n.y + n.height / 2))
+              : Math.max(...descendants.map(n => n.y + n.height / 2))
             : l1SpineEdge
 
           return (
