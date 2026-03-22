@@ -27,6 +27,9 @@ function getMapParam(search = window.location.search) {
   const p = new URLSearchParams(search)
   return p.get('map') ?? p.get('id') ?? null
 }
+function getShareParam(search = window.location.search) {
+  return new URLSearchParams(search).get('share') ?? null
+}
 
 // Skip auth gate when running locally (dev server or local IP)
 const isLocal = import.meta.env.DEV ||
@@ -71,6 +74,7 @@ export default function App() {
   const { activeMindmap, isDirty, setActiveMindmap, addNode, selectedNodeIds, setSelectedNodeIds, setPasteImportFn } = useMindmapStore()
   const [view, setView] = useState<View>(() => {
     if (decodeShareURL()) return 'viewer'
+    if (getShareParam()) return 'viewer'
     if (getMapParam()) return 'editor'
     return 'home'
   })
@@ -98,6 +102,8 @@ export default function App() {
     didLoad.current = true
     const shared = decodeShareURL()
     if (shared) { setActiveMindmap(shared); return }
+    const shareId = getShareParam()
+    if (shareId) { loadDiagram(shareId); return }
     const mapId = getMapParam()
     if (mapId) {
       // Normalize ?id= → ?map= in the URL

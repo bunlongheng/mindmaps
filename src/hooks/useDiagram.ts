@@ -87,7 +87,7 @@ export function useDiagram(userId: string | null = null) {
     }
     const { data, error } = await supabase
       .from('mindmaps')
-      .select('id, name, type, updated_at, nodes')
+      .select('id, name, type, updated_at, nodes, sharing_enabled')
       .eq('user_id', userId)
       .order('updated_at', { ascending: false })
     if (error) { console.error(error); setDiagrams(lsGetList()); return }
@@ -136,7 +136,7 @@ export function useDiagram(userId: string | null = null) {
     }
 
     setDiagrams((data ?? []).map(d => ({
-      id: d.id, name: d.name, type: d.type, updatedAt: d.updated_at,
+      id: d.id, name: d.name, type: d.type, updatedAt: d.updated_at, isPublic: d.sharing_enabled ?? false,
     })))
   }, [setDiagrams, userId])
 

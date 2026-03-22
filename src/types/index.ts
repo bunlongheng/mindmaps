@@ -42,4 +42,5 @@ export interface DiagramMeta {
   name: string
   type: DiagramType
   updatedAt: string
+  isPublic?: boolean
 }

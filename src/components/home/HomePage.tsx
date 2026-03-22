@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useMindmapStore } from '../../store/mindmapStore'
 import { useDiagram } from '../../hooks/useDiagram'
 import type { DiagramMeta, MindmapNode } from '../../types'
-import { Plus, Search, Clock, Trash2, Star, LayoutGrid } from 'lucide-react'
+import { Plus, Search, Clock, Trash2, Star, LayoutGrid, Globe } from 'lucide-react'
 import { MindmapsLogo } from '../MindmapsLogo'
 import { getTheme } from '../../lib/themes'
 
@@ -235,7 +235,7 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
                     <DiagramCard
                       diagram={d} timeAgo={timeAgo(d.updatedAt)}
                       onOpen={() => onOpen(d.id)} onDelete={() => deleteDiagram(d.id, d.name)}
-                      isFav={true} onToggleFav={() => toggleFav(d.id)}
+                      isFav={true} onToggleFav={() => toggleFav(d.id)} isPublic={d.isPublic}
                     />
                   </div>
                 ))}
@@ -261,7 +261,7 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
                 <DiagramCard
                   key={d.id} diagram={d} timeAgo={timeAgo(d.updatedAt)}
                   onOpen={() => onOpen(d.id)} onDelete={() => deleteDiagram(d.id, d.name)}
-                  isFav={false} onToggleFav={() => toggleFav(d.id)}
+                  isFav={false} onToggleFav={() => toggleFav(d.id)} isPublic={d.isPublic}
                 />
               ))}
             </div>
@@ -552,9 +552,9 @@ function DiagramMinimap({ id, type }: { id: string; type: string }) {
 
 // ── DiagramCard ────────────────────────────────────────────────────────────
 
-function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isFav, onToggleFav }: {
+function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isFav, onToggleFav, isPublic }: {
   diagram: DiagramMeta; timeAgo: string; onOpen: () => void; onDelete: () => void
-  isFav: boolean; onToggleFav: () => void
+  isFav: boolean; onToggleFav: () => void; isPublic?: boolean
 }) {
   const [hovered, setHovered] = useState(false)
   return (
@@ -578,6 +578,7 @@ function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isFav, onToggleFav }:
         <div style={{ fontSize: 12, fontWeight: 600, color: '#475569', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
           {diagram.name}
         </div>
+        {isPublic && <Globe size={11} color="#6366f1" title="Shared publicly" style={{ flexShrink: 0 }} />}
         <div style={{ fontSize: 10, color: '#94a3b8', flexShrink: 0 }}>
           {timeAgo}
         </div>

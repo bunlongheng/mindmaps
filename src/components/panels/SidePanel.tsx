@@ -232,7 +232,7 @@ export function SidePanel({ nodeId, onClose, onImport, onDelete }: SidePanelProp
 
 
   const shareUrl = activeMindmap
-    ? `${window.location.origin}${window.location.pathname}?map=${activeMindmap.id}`
+    ? `${window.location.origin}${window.location.pathname}?share=${activeMindmap.id}`
     : ''
 
 
