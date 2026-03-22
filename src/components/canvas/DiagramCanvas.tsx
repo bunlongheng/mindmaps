@@ -367,7 +367,7 @@ export function DiagramCanvas({ onNodeSelect, readOnly, onDelete, isFav, onToggl
         onPointerMove={handleBgPointerMove}
         onPointerUp={handleBgPointerUp}
         onPointerCancel={handleBgPointerUp}
-        style={{ userSelect: 'none' }}
+        style={{ userSelect: 'none', touchAction: 'none' }}
       >
         <g ref={gRef} transform={`translate(${pan.x},${pan.y}) scale(${zoom})`}>
           <EdgeLayer nodes={activeMindmap.nodes} lineStyle={lineStyle} diagramType={diagramType} />
