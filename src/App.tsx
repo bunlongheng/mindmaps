@@ -12,14 +12,6 @@ import { decodeShareURL } from './lib/export/share'
 import { supabase, hasSupabase } from './lib/supabase'
 import { ArrowLeft, SlidersHorizontal } from 'lucide-react'
 
-const LS_FAVS = 'mindmaps:favorites'
-function loadFavs(): Set<string> {
-  try { return new Set(JSON.parse(localStorage.getItem(LS_FAVS) ?? '[]')) } catch { return new Set() }
-}
-function saveFavs(favs: Set<string>) {
-  localStorage.setItem(LS_FAVS, JSON.stringify([...favs]))
-}
-
 type View = 'home' | 'editor' | 'viewer'
 
 // Accept both ?map= and ?id= as the diagram param
@@ -70,8 +62,8 @@ export default function App() {
   // Local dev: fall back to the hardcoded dev user ID so Supabase queries work without auth.
   // Triple-locked: only when (1) isLocal, (2) no real session, (3) env var is set.
   const effectiveUserId = user?.id ?? (isLocal ? (import.meta.env.VITE_LOCAL_USER_ID ?? null) : null)
-  const { loadDiagramList, loadDiagram, saveDiagram, createDiagramFromNodes, deleteDiagram } = useDiagram(effectiveUserId)
-  const { activeMindmap, isDirty, setActiveMindmap, addNode, selectedNodeIds, setSelectedNodeIds, setPasteImportFn } = useMindmapStore()
+  const { loadDiagramList, loadDiagram, saveDiagram, createDiagramFromNodes, deleteDiagram, toggleFavorite } = useDiagram(effectiveUserId)
+  const { activeMindmap, isDirty, setActiveMindmap, addNode, selectedNodeIds, setSelectedNodeIds, setPasteImportFn, diagrams } = useMindmapStore()
   const [view, setView] = useState<View>(() => {
     if (decodeShareURL()) return 'viewer'
     if (getShareParam()) return 'viewer'
@@ -82,17 +74,9 @@ export default function App() {
   const [showPanel, setShowPanel] = useState(false)
   const [showImport, setShowImport] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
-  const [favs, setFavs] = useState<Set<string>>(loadFavs)
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  function toggleFav(id: string) {
-    setFavs(prev => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id); else next.add(id)
-      saveFavs(next)
-      return next
-    })
-  }
+  const isFav = activeMindmap ? (diagrams.find(d => d.id === activeMindmap.id)?.isFav ?? false) : false
 
   // Load diagram or list once auth is ready
   const didLoad = useRef(false)
@@ -250,8 +234,8 @@ export default function App() {
       <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
         <DiagramCanvas
           onNodeSelect={handleNodeSelect}
-          isFav={activeMindmap ? favs.has(activeMindmap.id) : false}
-          onToggleFav={activeMindmap ? () => toggleFav(activeMindmap.id) : undefined}
+          isFav={isFav}
+          onToggleFav={activeMindmap ? () => toggleFavorite(activeMindmap.id) : undefined}
           onDelete={activeMindmap ? () => setShowDeleteConfirm(true) : undefined}
         />
 

@@ -28,7 +28,8 @@ function lsSaveDiagram(d: Diagram) {
   localStorage.setItem(lsKey(d.id), JSON.stringify(d))
   const list = lsGetList()
   const idx = list.findIndex(m => m.id === d.id)
-  const meta: DiagramMeta = { id: d.id, name: d.name, type: d.type, updatedAt: new Date().toISOString() }
+  const existingMeta = list.find(m => m.id === d.id)
+  const meta: DiagramMeta = { id: d.id, name: d.name, type: d.type, updatedAt: new Date().toISOString(), isFav: existingMeta?.isFav }
   if (idx >= 0) list[idx] = meta; else list.unshift(meta)
   lsSaveList(list)
 }
@@ -87,7 +88,7 @@ export function useDiagram(userId: string | null = null) {
     }
     const { data, error } = await supabase
       .from('mindmaps')
-      .select('id, name, type, updated_at, nodes, sharing_enabled')
+      .select('id, name, type, updated_at, nodes, sharing_enabled, is_favorite')
       .eq('user_id', userId)
       .order('updated_at', { ascending: false })
     if (error) { console.error(error); setDiagrams(lsGetList()); return }
@@ -128,15 +129,16 @@ export function useDiagram(userId: string | null = null) {
       showToast(`✦ ${missing.length} map${missing.length > 1 ? 's' : ''} restored`, { color: '#22c55e', confetti: true })
       const { data: fresh } = await supabase
         .from('mindmaps')
-        .select('id, name, type, updated_at')
+        .select('id, name, type, updated_at, sharing_enabled, is_favorite')
         .eq('user_id', userId)
         .order('updated_at', { ascending: false })
-      setDiagrams((fresh ?? []).map((d: { id: string; name: string; type: string; updated_at: string }) => ({ id: d.id, name: d.name, type: d.type as DiagramMeta['type'], updatedAt: d.updated_at })))
+      setDiagrams((fresh ?? []).map((d: { id: string; name: string; type: string; updated_at: string; sharing_enabled?: boolean; is_favorite?: boolean }) => ({ id: d.id, name: d.name, type: d.type as DiagramMeta['type'], updatedAt: d.updated_at, isPublic: d.sharing_enabled ?? false, isFav: d.is_favorite ?? false })))
       return
     }
 
     setDiagrams((data ?? []).map(d => ({
-      id: d.id, name: d.name, type: d.type, updatedAt: d.updated_at, isPublic: d.sharing_enabled ?? false,
+      id: d.id, name: d.name, type: d.type, updatedAt: d.updated_at,
+      isPublic: d.sharing_enabled ?? false, isFav: d.is_favorite ?? false,
     })))
   }, [setDiagrams, userId])
 
@@ -283,5 +285,20 @@ export function useDiagram(userId: string | null = null) {
     showToast(`"${name ?? 'Map'}" deleted`, { color: '#1a1d2e' })
   }, [loadDiagramList, setDiagrams, userId])
 
-  return { loadDiagramList, loadDiagram, saveDiagram, createDiagram, createDiagramFromNodes, deleteDiagram }
+  const toggleFavorite = useCallback(async (id: string) => {
+    const { diagrams } = useMindmapStore.getState()
+    const current = diagrams.find(d => d.id === id)
+    const next = !(current?.isFav ?? false)
+    // Optimistic update in store
+    setDiagrams(diagrams.map(d => d.id === id ? { ...d, isFav: next } : d))
+    // Persist to localStorage
+    const list = lsGetList()
+    lsSaveList(list.map(m => m.id === id ? { ...m, isFav: next } : m))
+    // Persist to Supabase
+    if (hasSupabase && supabase && userId) {
+      await supabase.from('mindmaps').update({ is_favorite: next }).eq('id', id).eq('user_id', userId)
+    }
+  }, [setDiagrams, userId])
+
+  return { loadDiagramList, loadDiagram, saveDiagram, createDiagram, createDiagramFromNodes, deleteDiagram, toggleFavorite }
 }

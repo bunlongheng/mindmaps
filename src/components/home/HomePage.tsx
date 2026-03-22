@@ -6,14 +6,6 @@ import { Plus, Search, Clock, Trash2, Star, LayoutGrid, Globe } from 'lucide-rea
 import { MindmapsLogo } from '../MindmapsLogo'
 import { getTheme } from '../../lib/themes'
 
-const LS_FAVS = 'mindmaps:favorites'
-function loadFavs(): Set<string> {
-  try { return new Set(JSON.parse(localStorage.getItem(LS_FAVS) ?? '[]')) } catch { return new Set() }
-}
-function saveFavs(favs: Set<string>) {
-  localStorage.setItem(LS_FAVS, JSON.stringify([...favs]))
-}
-
 interface HomePageProps {
   onOpen: (id: string) => void
   user?: import('@supabase/supabase-js').User | null
@@ -22,12 +14,11 @@ interface HomePageProps {
 
 export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
   const { diagrams } = useMindmapStore()
-  const { loadDiagramList, createDiagram, deleteDiagram } = useDiagram(user?.id ?? null)
+  const { loadDiagramList, createDiagram, deleteDiagram, toggleFavorite } = useDiagram(user?.id ?? null)
   const [search, setSearch] = useState('')
   const [creating, setCreating] = useState(false)
   const [newName, setNewName] = useState('')
   const [showCreate, setShowCreate] = useState(false)
-  const [favs, setFavs] = useState<Set<string>>(loadFavs)
   const [showUserMenu, setShowUserMenu] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const favScrollRef = useRef<HTMLDivElement>(null)
@@ -57,19 +48,12 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
     return () => document.removeEventListener('mousedown', onClick)
   }, [])
 
-  function toggleFav(id: string) {
-    const next = new Set(favs)
-    if (next.has(id)) next.delete(id); else next.add(id)
-    saveFavs(next)
-    setFavs(next)
-  }
-
   const filtered = diagrams.filter(d =>
     d.name.toLowerCase().includes(search.toLowerCase())
   )
 
-  const favDiagrams = filtered.filter(d => favs.has(d.id))
-  const recentDiagrams = filtered.filter(d => !favs.has(d.id))
+  const favDiagrams = filtered.filter(d => d.isFav)
+  const recentDiagrams = filtered.filter(d => !d.isFav)
 
   async function handleCreate() {
     const name = newName.trim() || 'Untitled'
@@ -235,7 +219,7 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
                     <DiagramCard
                       diagram={d} timeAgo={timeAgo(d.updatedAt)}
                       onOpen={() => onOpen(d.id)} onDelete={() => deleteDiagram(d.id, d.name)}
-                      isFav={true} onToggleFav={() => toggleFav(d.id)} isPublic={d.isPublic}
+                      isFav={true} onToggleFav={() => toggleFavorite(d.id)} isPublic={d.isPublic}
                     />
                   </div>
                 ))}
@@ -261,7 +245,7 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
                 <DiagramCard
                   key={d.id} diagram={d} timeAgo={timeAgo(d.updatedAt)}
                   onOpen={() => onOpen(d.id)} onDelete={() => deleteDiagram(d.id, d.name)}
-                  isFav={false} onToggleFav={() => toggleFav(d.id)} isPublic={d.isPublic}
+                  isFav={false} onToggleFav={() => toggleFavorite(d.id)} isPublic={d.isPublic}
                 />
               ))}
             </div>
