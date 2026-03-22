@@ -578,7 +578,7 @@ function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isFav, onToggleFav, i
         <div style={{ fontSize: 12, fontWeight: 600, color: '#475569', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
           {diagram.name}
         </div>
-        {isPublic && <Globe size={11} color="#6366f1" title="Shared publicly" style={{ flexShrink: 0 }} />}
+        {isPublic && <Globe size={11} color="#6366f1" style={{ flexShrink: 0 }} />}
         <div style={{ fontSize: 10, color: '#94a3b8', flexShrink: 0 }}>
           {timeAgo}
         </div>
