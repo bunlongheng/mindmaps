@@ -924,8 +924,8 @@ function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isFav, onToggleFav, i
           <div style={{ display: 'flex', gap: 4, marginTop: 5, flexWrap: 'wrap' }}>
             {currentTags.slice(0, 4).map(t => (
               <span key={t} style={{
-                fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 10,
-                background: tagBg(t, tagColorMap), color: '#fff', letterSpacing: '0.04em',
+                fontSize: 7, fontWeight: 700, padding: '1px 5px', borderRadius: 6,
+                background: tagBg(t, tagColorMap), color: '#fff', letterSpacing: '0.03em',
               }}>{t}</span>
             ))}
           </div>
