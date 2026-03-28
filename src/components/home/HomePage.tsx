@@ -5,8 +5,21 @@ import type { DiagramMeta, MindmapNode } from '../../types'
 import { Plus, Search, Clock, Trash2, Star, LayoutGrid, Globe, Sparkles, Loader2 } from 'lucide-react'
 import { MindmapsLogo } from '../MindmapsLogo'
 import { getTheme } from '../../lib/themes'
+import { AIThinkingOverlay } from '../AIThinkingOverlay'
 
 const MINDMAP_API_KEY = 'REDACTED_ROTATED_KEY'
+const MINDMAP_API_BASE = 'https://mindmaps-bheng.vercel.app'
+
+const PRESET_TAGS = ['AI', 'Work', 'Personal', 'Research'] as const
+const TAG_COLORS: Record<string, { bg: string; text: string }> = {
+  AI:       { bg: '#6366f1', text: '#fff' },
+  Work:     { bg: '#3b82f6', text: '#fff' },
+  Personal: { bg: '#22c55e', text: '#fff' },
+  Research: { bg: '#f97316', text: '#fff' },
+}
+function tagColor(tag: string) {
+  return TAG_COLORS[tag] ?? { bg: '#64748b', text: '#fff' }
+}
 
 interface HomePageProps {
   onOpen: (id: string) => void
@@ -24,6 +37,7 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
   const [aiPrompt, setAiPrompt] = useState('')
   const [aiLoading, setAiLoading] = useState(false)
   const [aiError, setAiError] = useState('')
+  const [activeTag, setActiveTag] = useState<string | null>(null)
   const [showUserMenu, setShowUserMenu] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const favScrollRef = useRef<HTMLDivElement>(null)
@@ -53,9 +67,17 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
     return () => document.removeEventListener('mousedown', onClick)
   }, [])
 
-  const filtered = diagrams.filter(d =>
-    d.name.toLowerCase().includes(search.toLowerCase())
-  )
+  // Collect all unique tags across diagrams (preset + custom)
+  const allTags = Array.from(new Set([
+    ...PRESET_TAGS,
+    ...diagrams.flatMap(d => d.tags ?? []),
+  ]))
+
+  const filtered = diagrams.filter(d => {
+    const matchSearch = d.name.toLowerCase().includes(search.toLowerCase())
+    const matchTag = activeTag === null || (d.tags ?? []).includes(activeTag)
+    return matchSearch && matchTag
+  })
 
   const favDiagrams = filtered.filter(d => d.isFav)
   const recentDiagrams = filtered.filter(d => !d.isFav)
@@ -76,7 +98,7 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
     setAiLoading(true)
     setAiError('')
     try {
-      const res = await fetch('/api/ai/generate-mindmap', {
+      const res = await fetch(`${MINDMAP_API_BASE}/api/ai/generate-mindmap`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${MINDMAP_API_KEY}`,
@@ -89,10 +111,8 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
       })
       const data = await res.json() as { id?: string; error?: string }
       if (!res.ok || !data.id) throw new Error(data.error ?? 'Generation failed')
-      setShowCreate(false)
-      setAiPrompt('')
-      await loadDiagramList()
-      onOpen(data.id)
+      // Skip home — go straight to the new diagram with confetti flag
+      window.location.href = `/?id=${data.id}&imported=1`
     } catch (e) {
       setAiError(e instanceof Error ? e.message : 'Something went wrong')
     } finally {
@@ -133,6 +153,9 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
 
   return (
     <div style={{ minHeight: '100vh', background: BG, fontFamily: 'Inter, system-ui, sans-serif' }}>
+
+      {/* AI thinking canvas overlay */}
+      {aiLoading && <AIThinkingOverlay />}
 
       {/* Top nav */}
       <header style={{
@@ -225,6 +248,41 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
         )}
       </header>
 
+      {/* Tag filter bar */}
+      <div style={{
+        display: 'flex', gap: 6, overflowX: 'auto', padding: '10px 16px',
+        borderBottom: `1px solid ${BORDER}`, background: SURFACE,
+        scrollbarWidth: 'none',
+      }}>
+        <button
+          onClick={() => setActiveTag(null)}
+          style={{
+            padding: '5px 14px', borderRadius: 20, fontSize: 12, fontWeight: 600,
+            fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+            border: activeTag === null ? 'none' : `1px solid ${BORDER}`,
+            background: activeTag === null ? '#1e293b' : 'transparent',
+            color: activeTag === null ? '#fff' : TEXT_MUTED,
+            transition: 'all 0.15s',
+          }}
+        >All</button>
+        {allTags.map(tag => {
+          const tc = tagColor(tag)
+          const isActive = activeTag === tag
+          return (
+            <button key={tag} onClick={() => setActiveTag(isActive ? null : tag)}
+              style={{
+                padding: '5px 14px', borderRadius: 20, fontSize: 12, fontWeight: 600,
+                fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+                border: isActive ? 'none' : `1px solid ${BORDER}`,
+                background: isActive ? tc.bg : 'transparent',
+                color: isActive ? tc.text : TEXT_MUTED,
+                transition: 'all 0.15s',
+              }}
+            >{tag}</button>
+          )
+        })}
+      </div>
+
       <main style={{ maxWidth: '100%' }} className="home-main">
 
         {filtered.length === 0 && (
@@ -254,6 +312,7 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
                       diagram={d} timeAgo={timeAgo(d.updatedAt)}
                       onOpen={() => onOpen(d.id)} onDelete={() => deleteDiagram(d.id, d.name)}
                       isFav={true} onToggleFav={() => toggleFavorite(d.id)} isPublic={d.isPublic}
+                      tags={d.tags}
                     />
                   </div>
                 ))}
@@ -280,6 +339,7 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
                   key={d.id} diagram={d} timeAgo={timeAgo(d.updatedAt)}
                   onOpen={() => onOpen(d.id)} onDelete={() => deleteDiagram(d.id, d.name)}
                   isFav={false} onToggleFav={() => toggleFavorite(d.id)} isPublic={d.isPublic}
+                  tags={d.tags}
                 />
               ))}
             </div>
@@ -653,9 +713,9 @@ function DiagramMinimap({ id, type }: { id: string; type: string }) {
 
 // ── DiagramCard ────────────────────────────────────────────────────────────
 
-function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isFav, onToggleFav, isPublic }: {
+function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isFav, onToggleFav, isPublic, tags }: {
   diagram: DiagramMeta; timeAgo: string; onOpen: () => void; onDelete: () => void
-  isFav: boolean; onToggleFav: () => void; isPublic?: boolean
+  isFav: boolean; onToggleFav: () => void; isPublic?: boolean; tags?: string[]
 }) {
   const [hovered, setHovered] = useState(false)
   return (
@@ -675,14 +735,27 @@ function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isFav, onToggleFav, i
       onClick={onOpen}
     >
       {/* Header */}
-      <div style={{ padding: '11px 13px 9px', display: 'flex', alignItems: 'center', gap: 6, background: '#f8fafc', borderBottom: '1px solid #eef0f5' }}>
-        <div style={{ fontSize: 12, fontWeight: 600, color: '#475569', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
-          {diagram.name}
+      <div style={{ padding: '10px 13px 8px', background: '#f8fafc', borderBottom: '1px solid #eef0f5' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: '#475569', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+            {diagram.name}
+          </div>
+          {isPublic && <Globe size={11} color="#6366f1" style={{ flexShrink: 0 }} />}
+          <div style={{ fontSize: 10, color: '#94a3b8', flexShrink: 0 }}>{timeAgo}</div>
         </div>
-        {isPublic && <Globe size={11} color="#6366f1" style={{ flexShrink: 0 }} />}
-        <div style={{ fontSize: 10, color: '#94a3b8', flexShrink: 0 }}>
-          {timeAgo}
-        </div>
+        {tags && tags.length > 0 && (
+          <div style={{ display: 'flex', gap: 4, marginTop: 5, flexWrap: 'wrap' }}>
+            {tags.slice(0, 3).map(t => {
+              const tc = TAG_COLORS[t] ?? { bg: '#64748b', text: '#fff' }
+              return (
+                <span key={t} style={{
+                  fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 10,
+                  background: tc.bg, color: tc.text, letterSpacing: '0.04em',
+                }}>{t}</span>
+              )
+            })}
+          </div>
+        )}
       </div>
 
       {/* Thumbnail */}

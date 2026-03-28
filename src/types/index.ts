@@ -35,6 +35,7 @@ export interface Diagram {
   sharingEnabled?: boolean
   showOrderNumbers?: boolean
   themeId?: string
+  tags?: string[]
 }
 
 export interface DiagramMeta {
@@ -44,4 +45,5 @@ export interface DiagramMeta {
   updatedAt: string
   isPublic?: boolean
   isFav?: boolean
+  tags?: string[]
 }

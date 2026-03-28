@@ -87,6 +87,7 @@ function BracketConnector({ parent, children, goRight = true, showOrderNumbers =
 
 export function EdgeLayer({ nodes, lineStyle, diagramType }: EdgeLayerProps) {
   const showOrderNumbers = useMindmapStore(s => s.showOrderNumbers)
+  const hideDetails = useMindmapStore(s => s.hideDetails)
   const nodeMap = new Map(nodes.map(n => [n.id, n]))
 
   // ── Logic Chart ───────────────────────────────────────────────────────────
@@ -182,7 +183,7 @@ export function EdgeLayer({ nodes, lineStyle, diagramType }: EdgeLayerProps) {
 
           const isL1 = n.depth === 1
           const isL2 = n.depth === 2
-          const isCircleStem = isL1 || isL2
+          const isCircleStem = isL1
           let labelAngle = 0
           const dx = x2 - x1, dy = y2 - y1
           const len = Math.hypot(dx, dy) || 1
@@ -203,14 +204,18 @@ export function EdgeLayer({ nodes, lineStyle, diagramType }: EdgeLayerProps) {
             labelAngle = rawAngle > 90 || rawAngle <= -90 ? rawAngle + 180 : rawAngle
           }
 
+          const edgePath = lineStyle === 'straight'
+            ? `M ${x1} ${y1} L ${x2} ${y2}`
+            : `M ${x1} ${y1} Q ${mx} ${my} ${x2} ${y2}`
+
           return (
             <g key={n.id}>
               <path
-                d={`M ${x1} ${y1} Q ${mx} ${my} ${x2} ${y2}`}
+                d={edgePath}
                 stroke={n.color} strokeWidth={isL1 ? 3 : isL2 ? 2.5 : 2}
                 fill="none" strokeLinecap="round"
               />
-              {isCircleStem && (() => {
+              {isCircleStem && !hideDetails && (() => {
                 const fs = isL1 ? 12 : 10
                 const pillH = fs + 10
                 const pillR = pillH / 2
@@ -222,6 +227,30 @@ export function EdgeLayer({ nodes, lineStyle, diagramType }: EdgeLayerProps) {
                       fill="white" stroke={n.color} strokeWidth={1.2} opacity={0.96}
                     />
                     <text x={tx} y={ty}
+                      textAnchor="middle" dominantBaseline="central"
+                      fontSize={fs} fontWeight="700"
+                      fontFamily="Inter, system-ui, sans-serif"
+                      fill={n.color}
+                      style={{ pointerEvents: 'none' }}
+                    >{n.title}</text>
+                  </g>
+                )
+              })()}
+              {isL2 && !hideDetails && (() => {
+                const fs = 10
+                const pillH = fs + 8
+                const pillR = pillH / 2
+                const estW = Math.ceil(n.title.length * fs * 0.58) + 16
+                const offset = childR + pillH / 2 + 6
+                const plx = x2 + ux * offset
+                const ply = y2 + uy * offset
+                return (
+                  <g style={{ pointerEvents: 'none' }}>
+                    <rect x={plx - estW / 2} y={ply - pillH / 2} width={estW} height={pillH}
+                      rx={pillR} ry={pillR}
+                      fill="white" stroke={n.color} strokeWidth={1.2} opacity={0.96}
+                    />
+                    <text x={plx} y={ply}
                       textAnchor="middle" dominantBaseline="central"
                       fontSize={fs} fontWeight="700"
                       fontFamily="Inter, system-ui, sans-serif"

@@ -208,7 +208,8 @@ export function SidePanel({ nodeId, onClose, onImport, onDelete }: SidePanelProp
   const {
     activeMindmap, updateNode, batchUpdateNodes, selectedNodeIds,
     lineStyle, setLineStyle, diagramType, setDiagramType, rerunLayout, setShareEnabled,
-    themeId, setTheme, showOrderNumbers, setShowOrderNumbers, autoAssignIcons,
+    themeId, setTheme, showOrderNumbers, setShowOrderNumbers, hideDetails, setHideDetails, autoAssignIcons,
+    resizeNodeDepth,
   } = useMindmapStore()
   const themeColors = getTheme(themeId).colors
 
@@ -328,15 +329,28 @@ export function SidePanel({ nodeId, onClose, onImport, onDelete }: SidePanelProp
                 <PRow label="Fill">
                   <ColorField color={node.color} onChange={c => save({ color: c })} swatches={themeColors} />
                 </PRow>
+                {node.depth >= 1 && !(diagramType === 'mindmap' && node.depth <= 2) && (
+                  <PRow label="Width">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <input type="range" min={80} max={500} step={4}
+                        value={node.width}
+                        onChange={e => resizeNodeDepth(node.depth, parseInt(e.target.value))}
+                        style={{ flex: 1, accentColor: '#3b82f6' }}
+                      />
+                      <span style={{ fontSize: 11, color: '#6b7280', minWidth: 26, textAlign: 'right' }}>{node.width}</span>
+                    </div>
+                  </PRow>
+                )}
               </SBlock>
               <HR />
 
-              {/* Icon */}
+              {/* Visual: Icon / Emoji / Text tabs */}
               {node.depth >= 1 && (
                 <>
-                  <IconPickerBlock
-                    selected={node.icon}
-                    onSelect={name => save({ icon: name || undefined })}
+                  <VisualPickerBlock
+                    icon={node.icon}
+                    emoji={node.emoji}
+                    onSave={save}
                   />
                   <HR />
                 </>
@@ -557,7 +571,7 @@ export function SidePanel({ nodeId, onClose, onImport, onDelete }: SidePanelProp
           )}
           <HR />
           <SBlock title="Display">
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
               <span style={{ fontSize: 12, color: '#374151' }}>Show order #</span>
               <button
                 onClick={() => setShowOrderNumbers(!showOrderNumbers)}
@@ -569,6 +583,23 @@ export function SidePanel({ nodeId, onClose, onImport, onDelete }: SidePanelProp
               >
                 <span style={{
                   position: 'absolute', top: 3, left: showOrderNumbers ? 20 : 3,
+                  width: 16, height: 16, borderRadius: '50%', background: '#fff',
+                  transition: 'left 0.2s', display: 'block',
+                }} />
+              </button>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: 12, color: '#374151' }}>Hide details</span>
+              <button
+                onClick={() => setHideDetails(!hideDetails)}
+                style={{
+                  width: 40, height: 22, borderRadius: 11, border: 'none', cursor: 'pointer', padding: 0,
+                  background: hideDetails ? '#1a1d2e' : '#d1d5db',
+                  position: 'relative', transition: 'background 0.2s', flexShrink: 0,
+                }}
+              >
+                <span style={{
+                  position: 'absolute', top: 3, left: hideDetails ? 20 : 3,
                   width: 16, height: 16, borderRadius: '50%', background: '#fff',
                   transition: 'left 0.2s', display: 'block',
                 }} />
@@ -797,93 +828,205 @@ function ColorField({ color, onChange, allowNone, swatches }: {
   const isNone = color === 'none'
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-        <label style={{
-          width: 32, height: 24, borderRadius: 6, cursor: 'pointer', flexShrink: 0,
-          background: isNone ? '#fff' : color,
-          border: isNone ? '1.5px dashed #d1d5db' : '1px solid rgba(0,0,0,0.12)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden',
-        }}>
-          {isNone && <span style={{ fontSize: 10, color: '#9ca3af' }}>—</span>}
-          <input ref={inputRef} type="color"
-            value={isNone ? '#6366f1' : (color.startsWith('#') ? color : '#6366f1')}
-            onChange={e => onChange(e.target.value)}
-            style={{ opacity: 0, position: 'absolute', width: '100%', height: '100%', cursor: 'pointer', padding: 0, border: 'none' }}
-          />
-        </label>
-        {allowNone && (
-          <button onClick={() => onChange('none')} style={{
-            width: 32, height: 24, borderRadius: 6, cursor: 'pointer', flexShrink: 0,
-            background: 'transparent', border: isNone ? '1.5px solid #3b82f6' : '1.5px dashed #d1d5db',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 10, color: isNone ? '#3b82f6' : '#9ca3af',
-          }}>✕</button>
-        )}
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 5 }}>
-        {(swatches ?? []).slice(0, 12).map(c => (
-          <button key={c} onClick={() => onChange(c)} style={{
-            width: 20, height: 20, borderRadius: 5, border: 'none',
-            background: c, cursor: 'pointer', padding: 0,
-            outline: color === c ? `2.5px solid ${c === '#ffffff' ? '#94a3b8' : c}` : 'none', outlineOffset: 1.5,
-            boxShadow: color === c ? '0 0 0 1.5px #fff inset' : (c === '#ffffff' || c === '#f1f5f9' ? '0 0 0 1px #d1d5db inset' : '0 1px 2px rgba(0,0,0,0.15)'),
-            transform: color === c ? 'scale(1.1)' : 'scale(1)', transition: 'all 0.1s',
-          }} />
-        ))}
-      </div>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 5 }}>
+      {(swatches ?? []).slice(0, 12).map(c => (
+        <button key={c} onClick={() => onChange(c)} style={{
+          width: '100%', aspectRatio: '1', borderRadius: 5, border: 'none',
+          background: c, cursor: 'pointer', padding: 0,
+          outline: !isNone && color === c ? `2.5px solid ${c === '#ffffff' ? '#94a3b8' : c}` : 'none', outlineOffset: 1.5,
+          boxShadow: !isNone && color === c ? '0 0 0 1.5px #fff inset' : (c === '#ffffff' || c === '#f1f5f9' ? '0 0 0 1px #d1d5db inset' : '0 1px 2px rgba(0,0,0,0.15)'),
+          transform: !isNone && color === c ? 'scale(1.1)' : 'scale(1)', transition: 'all 0.1s',
+        }} />
+      ))}
+      {/* Custom color picker as last tile */}
+      <label title="Custom color" style={{
+        width: '100%', aspectRatio: '1', borderRadius: 5, cursor: 'pointer',
+        border: '1.5px dashed #d1d5db', display: 'flex', alignItems: 'center',
+        justifyContent: 'center', position: 'relative', overflow: 'hidden',
+        background: '#fafafa',
+      }}>
+        <span style={{ fontSize: 13, color: '#9ca3af', lineHeight: 1, pointerEvents: 'none' }}>+</span>
+        <input ref={inputRef} type="color"
+          value={color.startsWith('#') ? color : '#6366f1'}
+          onChange={e => onChange(e.target.value)}
+          style={{ opacity: 0, position: 'absolute', width: '100%', height: '100%', cursor: 'pointer', padding: 0, border: 'none' }}
+        />
+      </label>
+      {allowNone && (
+        <button onClick={() => onChange('none')} style={{
+          width: '100%', aspectRatio: '1', borderRadius: 5, cursor: 'pointer',
+          background: 'transparent', border: isNone ? '1.5px solid #3b82f6' : '1.5px dashed #d1d5db',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 10, color: isNone ? '#3b82f6' : '#9ca3af',
+        }}>✕</button>
+      )}
     </div>
   )
 }
 
-function IconPickerBlock({ selected, onSelect }: { selected?: string; onSelect: (name: string) => void }) {
+const COMMON_EMOJIS = [
+  '⭐','🔥','💡','✅','❌','⚠️','🎯','🚀','💎','🏆',
+  '📌','📎','🔑','🔒','🔓','💰','📊','📈','📉','🗂️',
+  '🧠','💪','👋','👍','❤️','🎉','🌟','⚡','🌈','🎨',
+  '🏠','🏢','🌍','🔬','🎓','🛠️','📱','💻','🎵','🍎',
+]
+
+function VisualPickerBlock({ icon, emoji, onSave }: {
+  icon?: string; emoji?: string;
+  onSave: (updates: { icon?: string | undefined; emoji?: string | undefined }) => void
+}) {
+  const isText = !!emoji && /^[\x20-\x7E]{1,3}$/.test(emoji)
+  const defaultTab = icon ? 'icon' : emoji ? (isText ? 'text' : 'emoji') : 'icon'
+  const [tab, setTab] = useState<'icon' | 'emoji' | 'text'>(defaultTab)
   const [search, setSearch] = useState('')
+  const [textDraft, setTextDraft] = useState(isText ? emoji : '')
+  const [emojiDraft, setEmojiDraft] = useState(!isText && emoji ? emoji : '')
+
   const filtered = useMemo(() =>
     search.trim() ? NODE_ICONS.filter(e => e.label.includes(search.toLowerCase())) : NODE_ICONS
   , [search])
 
+  // Sync tab when node changes externally
+  useEffect(() => {
+    const isT = !!emoji && /^[\x20-\x7E]{1,3}$/.test(emoji)
+    setTab(icon ? 'icon' : emoji ? (isT ? 'text' : 'emoji') : 'icon')
+    setTextDraft(isT ? emoji! : '')
+    setEmojiDraft(!isT && emoji ? emoji : '')
+  }, [icon, emoji])
+
+  const tabBtn = (t: 'icon' | 'emoji' | 'text', label: string) => (
+    <button onClick={() => setTab(t)} style={{
+      flex: 1, height: 28, border: 'none', borderRadius: 6,
+      background: tab === t ? '#1a1d2e' : 'transparent',
+      color: tab === t ? '#fff' : '#6b7280',
+      fontSize: 11, fontWeight: tab === t ? 600 : 500,
+      cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s',
+    }}>{label}</button>
+  )
+
+  const hasAny = !!(icon || emoji)
+
   return (
-    <SBlock title="Icon">
-      {/* Search */}
-      <input
-        value={search}
-        onChange={e => setSearch(e.target.value)}
-        placeholder="Search… (user, db, bot…)"
-        style={{
-          width: '100%', boxSizing: 'border-box', fontSize: 11,
-          border: '1px solid #e0e2e7', borderRadius: 7, padding: '5px 8px',
-          outline: 'none', fontFamily: 'inherit', color: '#374151',
-          background: '#fff', marginBottom: 8,
-        }}
-        onFocus={e => (e.target.style.borderColor = '#3b82f6')}
-        onBlur={e => (e.target.style.borderColor = '#e0e2e7')}
-      />
-      {/* Clear */}
-      {selected && (
-        <button onClick={() => onSelect('')} style={{
-          width: '100%', padding: '5px', borderRadius: 6, border: '1px dashed #e0e2e7',
-          background: 'transparent', cursor: 'pointer', fontSize: 10,
-          color: '#9ca3af', fontFamily: 'inherit', marginBottom: 6,
-        }}>Remove icon</button>
-      )}
-      {/* Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4, maxHeight: 220, overflowY: 'auto' }}>
-        {filtered.map(({ name, label, Icon }) => {
-          const active = selected === name
-          return (
-            <button key={name} onClick={() => onSelect(name)} title={label} style={{
-              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
-              padding: '7px 4px 5px', borderRadius: 7, border: 'none',
-              background: active ? '#eff6ff' : 'transparent',
-              outline: active ? '1.5px solid #3b82f6' : 'none',
-              cursor: 'pointer',
-            }}>
-              <Icon style={{ width: 18, height: 18, color: active ? '#3b82f6' : '#6b7280', strokeWidth: 1.6 }} />
-              <span style={{ fontSize: 9, color: active ? '#3b82f6' : '#9ca3af', fontFamily: 'inherit', lineHeight: 1 }}>{label}</span>
-            </button>
-          )
-        })}
+    <SBlock title="Visual">
+      {/* Tabs */}
+      <div style={{ display: 'flex', gap: 3, background: '#f3f4f6', borderRadius: 8, padding: 3, marginBottom: 10 }}>
+        {tabBtn('icon', '⬡ Icon')}
+        {tabBtn('emoji', '😊 Emoji')}
+        {tabBtn('text', 'Aa Text')}
       </div>
+
+      {/* Current value preview */}
+      {hasAny && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+          <div style={{ fontSize: 22, lineHeight: 1, minWidth: 28, textAlign: 'center' }}>
+            {icon
+              ? (() => { const found = NODE_ICONS.find(n => n.name === icon); return found ? <found.Icon style={{ width: 22, height: 22, color: '#3b82f6' }} /> : null })()
+              : emoji}
+          </div>
+          <button onClick={() => onSave({ icon: undefined, emoji: undefined })} style={{
+            fontSize: 10, color: '#9ca3af', background: 'none', border: '1px dashed #e0e2e7',
+            borderRadius: 5, padding: '3px 8px', cursor: 'pointer', fontFamily: 'inherit',
+          }}>Clear</button>
+        </div>
+      )}
+
+      {/* Icon tab */}
+      {tab === 'icon' && (
+        <>
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search… (user, db, bot…)"
+            style={{
+              width: '100%', boxSizing: 'border-box', fontSize: 11,
+              border: '1px solid #e0e2e7', borderRadius: 7, padding: '5px 8px',
+              outline: 'none', fontFamily: 'inherit', color: '#374151',
+              background: '#fff', marginBottom: 8,
+            }}
+            onFocus={e => (e.target.style.borderColor = '#3b82f6')}
+            onBlur={e => (e.target.style.borderColor = '#e0e2e7')}
+          />
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4, maxHeight: 180, overflowY: 'auto' }}>
+            {filtered.map(({ name, label, Icon: Ic }) => {
+              const active = icon === name
+              return (
+                <button key={name} onClick={() => onSave({ icon: name, emoji: undefined })} title={label} style={{
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+                  padding: '7px 4px 5px', borderRadius: 7, border: 'none',
+                  background: active ? '#eff6ff' : 'transparent',
+                  outline: active ? '1.5px solid #3b82f6' : 'none',
+                  cursor: 'pointer',
+                }}>
+                  <Ic style={{ width: 18, height: 18, color: active ? '#3b82f6' : '#6b7280', strokeWidth: 1.6 }} />
+                  <span style={{ fontSize: 9, color: active ? '#3b82f6' : '#9ca3af', fontFamily: 'inherit', lineHeight: 1 }}>{label}</span>
+                </button>
+              )
+            })}
+          </div>
+        </>
+      )}
+
+      {/* Emoji tab */}
+      {tab === 'emoji' && (
+        <>
+          <input
+            value={emojiDraft}
+            onChange={e => {
+              setEmojiDraft(e.target.value)
+              if (e.target.value) onSave({ emoji: e.target.value, icon: undefined })
+            }}
+            placeholder="Paste or type an emoji…"
+            style={{
+              width: '100%', boxSizing: 'border-box', fontSize: 18, textAlign: 'center',
+              border: '1px solid #e0e2e7', borderRadius: 7, padding: '6px 8px',
+              outline: 'none', fontFamily: 'inherit', color: '#374151',
+              background: '#fff', marginBottom: 8,
+            }}
+            onFocus={e => (e.target.style.borderColor = '#3b82f6')}
+            onBlur={e => (e.target.style.borderColor = '#e0e2e7')}
+          />
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', gap: 3 }}>
+            {COMMON_EMOJIS.map(em => (
+              <button key={em} onClick={() => { setEmojiDraft(em); onSave({ emoji: em, icon: undefined }) }}
+                style={{
+                  fontSize: 16, lineHeight: 1, padding: '5px 2px', border: 'none',
+                  background: emoji === em ? '#eff6ff' : 'transparent',
+                  outline: emoji === em ? '1.5px solid #3b82f6' : 'none',
+                  borderRadius: 6, cursor: 'pointer',
+                }}>
+                {em}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* Text tab */}
+      {tab === 'text' && (
+        <>
+          <p style={{ fontSize: 11, color: '#9ca3af', margin: '0 0 8px', lineHeight: 1.4 }}>
+            Enter 1–3 characters to use as a label icon (e.g. L, A1, ✓)
+          </p>
+          <input
+            value={textDraft}
+            maxLength={3}
+            onChange={e => {
+              setTextDraft(e.target.value)
+              if (e.target.value) onSave({ emoji: e.target.value, icon: undefined })
+            }}
+            placeholder="L"
+            style={{
+              width: '100%', boxSizing: 'border-box', fontSize: 22, textAlign: 'center',
+              fontWeight: 700,
+              border: '1px solid #e0e2e7', borderRadius: 7, padding: '8px',
+              outline: 'none', fontFamily: 'Inter, system-ui, sans-serif', color: '#374151',
+              background: '#fff',
+            }}
+            onFocus={e => (e.target.style.borderColor = '#3b82f6')}
+            onBlur={e => (e.target.style.borderColor = '#e0e2e7')}
+          />
+        </>
+      )}
     </SBlock>
   )
 }

@@ -29,7 +29,7 @@ function lsSaveDiagram(d: Diagram) {
   const list = lsGetList()
   const idx = list.findIndex(m => m.id === d.id)
   const existingMeta = list.find(m => m.id === d.id)
-  const meta: DiagramMeta = { id: d.id, name: d.name, type: d.type, updatedAt: new Date().toISOString(), isFav: existingMeta?.isFav }
+  const meta: DiagramMeta = { id: d.id, name: d.name, type: d.type, updatedAt: new Date().toISOString(), isFav: existingMeta?.isFav, tags: d.tags ?? existingMeta?.tags ?? [] }
   if (idx >= 0) list[idx] = meta; else list.unshift(meta)
   lsSaveList(list)
 }
@@ -71,7 +71,8 @@ function rowToDiagram(row: Record<string, unknown>): Diagram {
     createdAt:      row.created_at as string,
     updatedAt:      row.updated_at as string,
     sharingEnabled: (row.sharing_enabled ?? false) as boolean,
-    themeId: (row.theme_id as string | undefined) ?? 'default',
+    themeId:        (row.theme_id as string | undefined) ?? 'default',
+    tags:           (row.tags as string[] | undefined) ?? [],
     nodes,
   }
 }
@@ -88,7 +89,7 @@ export function useDiagram(userId: string | null = null) {
     }
     const { data, error } = await supabase
       .from('mindmaps')
-      .select('id, name, type, updated_at, nodes, sharing_enabled, is_favorite')
+      .select('id, name, type, updated_at, nodes, sharing_enabled, is_favorite, tags')
       .eq('user_id', userId)
       .order('updated_at', { ascending: false })
     if (error) { console.error(error); setDiagrams(lsGetList()); return }
@@ -139,6 +140,7 @@ export function useDiagram(userId: string | null = null) {
     setDiagrams((data ?? []).map(d => ({
       id: d.id, name: d.name, type: d.type, updatedAt: d.updated_at,
       isPublic: d.sharing_enabled ?? false, isFav: d.is_favorite ?? false,
+      tags: (d as Record<string, unknown>).tags as string[] ?? [],
     })))
   }, [setDiagrams, userId])
 

@@ -11,6 +11,7 @@ import { useMindmapStore } from './store/mindmapStore'
 import { decodeShareURL } from './lib/export/share'
 import { supabase, hasSupabase } from './lib/supabase'
 import { ArrowLeft, SlidersHorizontal } from 'lucide-react'
+import { Confetti } from './components/Confetti'
 
 type View = 'home' | 'editor' | 'viewer'
 
@@ -34,12 +35,20 @@ export default function App() {
 
   useEffect(() => {
     if (!hasSupabase || !supabase) { setAuthLoading(false); return }
-    supabase.auth.getSession().then(({ data }) => {
-      setUser(data.session?.user ?? null)
-      setAuthLoading(false)
-    })
+    // INITIAL_SESSION fires immediately with the stored session on every page load —
+    // this is the earliest possible moment to know if the user is logged in,
+    // so we never show a login flash for returning users.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_OUT') {
+      if (event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') {
+        setUser(session?.user ?? null)
+        setAuthLoading(false)
+      } else if (event === 'SIGNED_IN') {
+        setUser(session?.user ?? null)
+        setAuthLoading(false)
+        const greetings = ["Let's build something cool.", "Welcome back, boss.", "Let's do it. One diagram at a time.", "Good to see you.", "Ready when you are.", "Let's make it count.", "Diagrams standing by.", "Ready, set, go.", "All systems initiated.", "Let's make something great."]
+        const greeting = greetings[Math.floor(Math.random() * greetings.length)]
+        setTimeout(() => showToast(greeting, { color: '#6366f1', confetti: true }), 150)
+      } else if (event === 'SIGNED_OUT') {
         const farewells = ["Later!", "See ya!", "Peace out!", "Catch you later!", "Adios!", "So long!", "Bye for now!", "Take care!", "Until next time!"]
         const farewell = farewells[Math.floor(Math.random() * farewells.length)]
         setUser(null)
@@ -47,13 +56,6 @@ export default function App() {
           showToast(farewell, { color: '#64748b' })
           setTimeout(() => window.location.reload(), 1800)
         }, 150)
-      } else {
-        setUser(session?.user ?? null)
-      }
-      if (event === 'SIGNED_IN') {
-        const greetings = ["Let's build something cool.", "Welcome back, boss.", "Let's do it. One diagram at a time.", "Good to see you.", "Ready when you are.", "Let's make it count.", "Diagrams standing by.", "Ready, set, go.", "All systems initiated.", "Let's make something great."]
-        const greeting = greetings[Math.floor(Math.random() * greetings.length)]
-        setTimeout(() => showToast(greeting, { color: '#6366f1', confetti: true }), 150)
       }
     })
     return () => subscription.unsubscribe()
@@ -74,6 +76,7 @@ export default function App() {
   const [showPanel, setShowPanel] = useState(false)
   const [showImport, setShowImport] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [showConfetti, setShowConfetti] = useState(() => new URLSearchParams(window.location.search).has('imported'))
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const isFav = activeMindmap ? (diagrams.find(d => d.id === activeMindmap.id)?.isFav ?? false) : false
@@ -230,6 +233,17 @@ export default function App() {
   return (
     <div style={{ display: 'flex', height: '100vh', width: '100vw', overflow: 'hidden', fontFamily: 'Inter, system-ui, sans-serif' }}>
       <CuteToast />
+      {/* Confetti on first load after AI generation */}
+      {showConfetti && (
+        <Confetti onDone={() => {
+          setShowConfetti(false)
+          // Clean ?imported from URL without navigating
+          const p = new URLSearchParams(window.location.search)
+          p.delete('imported')
+          const next = p.toString() ? `?${p}` : window.location.pathname
+          window.history.replaceState({}, '', next)
+        }} />
+      )}
       {/* Canvas */}
       <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
         <DiagramCanvas

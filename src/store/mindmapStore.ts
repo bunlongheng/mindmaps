@@ -114,6 +114,7 @@ interface MindmapStore {
   lineStyle: LineStyle
   themeId: string
   showOrderNumbers: boolean
+  hideDetails: boolean
   isImporting: boolean
   resizePreview: { depth: number; width: number } | null
   // History
@@ -139,6 +140,7 @@ interface MindmapStore {
   rerunLayout: () => void
   setShareEnabled: (enabled: boolean) => void
   setShowOrderNumbers: (v: boolean) => void
+  setHideDetails: (v: boolean) => void
   setIsImporting: (v: boolean) => void
   setResizePreview: (v: { depth: number; width: number } | null) => void
   undo: () => void
@@ -170,6 +172,7 @@ export const useMindmapStore = create<MindmapStore>()(
     lineStyle: 'orthogonal',
     themeId: localStorage.getItem('mindmaps:themeId') ?? 'default',
     showOrderNumbers: true,
+    hideDetails: false,
     isImporting: false,
     resizePreview: null,
     past: [],
@@ -521,6 +524,8 @@ export const useMindmapStore = create<MindmapStore>()(
       if (!state.activeMindmap) return
       set({ showOrderNumbers: v, activeMindmap: { ...state.activeMindmap, showOrderNumbers: v }, isDirty: true })
     },
+
+    setHideDetails: (v) => set({ hideDetails: v }),
 
     setNodePositions: (positions) => {
       const state = get()

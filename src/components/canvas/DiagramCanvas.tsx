@@ -16,7 +16,7 @@ interface DiagramCanvasProps {
 }
 
 export function DiagramCanvas({ onNodeSelect, readOnly, onDelete, isFav, onToggleFav }: DiagramCanvasProps) {
-  const { activeMindmap, selectedNodeIds, setSelectedNodeIds, diagramType, lineStyle, themeId, addNode, reorderNode, isImporting } = useMindmapStore()
+  const { activeMindmap, selectedNodeIds, setSelectedNodeIds, diagramType, lineStyle, themeId, addNode, reorderNode, isImporting, hideDetails } = useMindmapStore()
   const canvasBg = getTheme(themeId).canvasBg
   const svgRef = useRef<SVGSVGElement>(null!)
   const gRef = useRef<SVGGElement>(null!)
@@ -370,8 +370,8 @@ export function DiagramCanvas({ onNodeSelect, readOnly, onDelete, isFav, onToggl
         style={{ userSelect: 'none', touchAction: 'none' }}
       >
         <g ref={gRef} transform={`translate(${pan.x},${pan.y}) scale(${zoom})`}>
-          <EdgeLayer nodes={activeMindmap.nodes} lineStyle={lineStyle} diagramType={diagramType} />
-          {activeMindmap.nodes.map(node => (
+          <EdgeLayer nodes={hideDetails ? activeMindmap.nodes.filter(n => n.depth <= 2) : activeMindmap.nodes} lineStyle={lineStyle} diagramType={diagramType} />
+          {(hideDetails ? activeMindmap.nodes.filter(n => n.depth <= 2) : activeMindmap.nodes).map(node => (
             <Node
               key={node.id}
               node={node}
