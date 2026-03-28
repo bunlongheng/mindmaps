@@ -201,7 +201,7 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
   return (
     <div style={{ minHeight: '100vh', background: BG, fontFamily: 'Inter, system-ui, sans-serif' }}>
 
-      {showImport && <ImportModal onClose={() => setShowImport(false)} />}
+      {showImport && <ImportModal onClose={() => setShowImport(false)} userId={user?.id} />}
 
       {/* AI thinking canvas overlay */}
       {aiLoading && <AIThinkingOverlay />}
@@ -276,19 +276,6 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
                   </div>
                   <div style={{ fontSize: 11, color: TEXT_MUTED, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 2 }}>
                     {user.email}
-                  </div>
-                  <div
-                    title="Click to copy user ID"
-                    onClick={() => navigator.clipboard?.writeText(user.id).then(() => {})}
-                    style={{
-                      fontSize: 10, color: '#94a3b8', marginTop: 5, cursor: 'pointer',
-                      fontFamily: '"JetBrains Mono", monospace',
-                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                      background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 4,
-                      padding: '2px 5px',
-                    }}
-                  >
-                    {user.id}
                   </div>
                 </div>
                 <button
