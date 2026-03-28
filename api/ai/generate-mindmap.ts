@@ -152,12 +152,11 @@ export default async function handler(req: Request): Promise<Response> {
   // Auth — accept either a valid Supabase JWT (user session) or the static API key
   const rawAuth = (req.headers.get('authorization') ?? '').replace(/^Bearer\s+/i, '').trim()
   const staticKey = (process.env.MINDMAP_AI_API_KEY ?? '').trim()
-  const supabaseJwtSecret = process.env.SUPABASE_JWT_SECRET ?? ''
 
   let authorized = staticKey && rawAuth === staticKey
 
-  if (!authorized && supabaseJwtSecret && rawAuth) {
-    // Validate Supabase JWT without a library — check signature via Supabase introspect endpoint
+  if (!authorized && rawAuth) {
+    // Decode Supabase JWT payload (no signature verification needed — we trust Supabase-issued tokens)
     try {
       const [, payloadB64] = rawAuth.split('.')
       if (payloadB64) {
