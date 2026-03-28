@@ -80,6 +80,7 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
   const [showImport, setShowImport] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const favScrollRef = useRef<HTMLDivElement>(null)
+  const pasteRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => { loadDiagramList() }, [])
 
@@ -116,50 +117,30 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
     return () => useMindmapStore.getState().setPasteImportFn(null)
   }, [createDiagramFromNodes, onOpen])
 
+  function tryImport(text: string) {
+    const trimmed = text.trim()
+    if (!trimmed) return
+    const isJson = trimmed.startsWith('{') || trimmed.startsWith('[')
+    const lines = trimmed.split('\n').filter(l => l.trim())
+    const hasIndent = lines.some(l => /^(\s{4}|\t)/.test(l))
+    if (isJson || (lines.length >= 2 && hasIndent)) {
+      useMindmapStore.getState().loadFromOutline(trimmed)
+    } else {
+      showToast('Incompatible format — paste JSON or indented outline', { color: '#ef4444', duration: 3000 })
+    }
+  }
+
+  // Keep the hidden textarea focused whenever no real input is active
   useEffect(() => {
-    function tryImport(text: string) {
-      const trimmed = text.trim()
-      if (!trimmed) return
-      const isJson = trimmed.startsWith('{') || trimmed.startsWith('[')
-      const lines = trimmed.split('\n').filter(l => l.trim())
-      const hasIndent = lines.some(l => /^(\s{4}|\t)/.test(l))
-      if (isJson || (lines.length >= 2 && hasIndent)) {
-        useMindmapStore.getState().loadFromOutline(trimmed)
-      } else {
-        showToast('Incompatible format — paste JSON or indented outline', { color: '#ef4444', duration: 3000 })
-      }
-    }
-    // Hidden textarea absorbs Cmd+V without needing clipboard API (works on HTTP too)
-    const sink = document.createElement('textarea')
-    sink.setAttribute('aria-hidden', 'true')
-    sink.style.cssText = 'position:fixed;opacity:0;pointer-events:none;width:1px;height:1px;top:0;left:0;'
-    document.body.appendChild(sink)
-    function onPaste(e: ClipboardEvent) {
-      const tag = (e.target as HTMLElement).tagName.toLowerCase()
-      if (tag === 'input' || tag === 'textarea' && e.target !== sink) return
-      const text = e.clipboardData?.getData('text/plain') ?? ''
-      if (text.trim()) { e.preventDefault(); tryImport(text) }
-    }
-    function onKeyDown(e: KeyboardEvent) {
+    function refocus() {
       const active = document.activeElement
-      const isRealInput = active && active !== sink && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')
-      if (isRealInput) return
-      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key === 'v') {
-        sink.focus()
-        // After focus, browser will fire paste event on sink — handled above
-        // Fallback via clipboard API for HTTPS
-        if (window.isSecureContext && navigator.clipboard?.readText) {
-          navigator.clipboard.readText().then(tryImport).catch(() => {})
-        }
+      if (!active || active === document.body || active === pasteRef.current) {
+        pasteRef.current?.focus()
       }
     }
-    window.addEventListener('keydown', onKeyDown)
-    window.addEventListener('paste', onPaste)
-    return () => {
-      window.removeEventListener('keydown', onKeyDown)
-      window.removeEventListener('paste', onPaste)
-      document.body.removeChild(sink)
-    }
+    refocus()
+    document.addEventListener('click', refocus)
+    return () => document.removeEventListener('click', refocus)
   }, [])
 
   // All unique tags for filter bar (preset + any used in diagrams)
@@ -257,6 +238,17 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
 
   return (
     <div style={{ minHeight: '100vh', background: BG, fontFamily: 'Inter, system-ui, sans-serif' }}>
+      {/* Hidden paste sink — stays focused when no real input is active */}
+      <textarea
+        ref={pasteRef}
+        aria-hidden="true"
+        readOnly={false}
+        style={{ position: 'fixed', opacity: 0, pointerEvents: 'none', width: 1, height: 1, top: 0, left: 0, zIndex: -1 }}
+        onPaste={e => {
+          const text = e.clipboardData?.getData('text/plain') ?? ''
+          if (text.trim()) { e.preventDefault(); tryImport(text) }
+        }}
+      />
 
       {showImport && <ImportModal onClose={() => setShowImport(false)} userId={user?.id} />}
 
