@@ -77,6 +77,19 @@ export default function App() {
     return () => subscription.unsubscribe()
   }, [])
 
+  // Prevent iOS Safari viewport zoom (ignores user-scalable=no) so fixed UI stays put
+  useEffect(() => {
+    const prevent = (e: Event) => e.preventDefault()
+    document.addEventListener('gesturestart', prevent, { passive: false })
+    document.addEventListener('gesturechange', prevent, { passive: false })
+    document.addEventListener('gestureend', prevent, { passive: false })
+    return () => {
+      document.removeEventListener('gesturestart', prevent)
+      document.removeEventListener('gesturechange', prevent)
+      document.removeEventListener('gestureend', prevent)
+    }
+  }, [])
+
   // Subscribe to real-time push notifications (toast broadcasts from /api/notify)
   useEffect(() => {
     if (!hasSupabase || !supabase) return
@@ -287,7 +300,7 @@ export default function App() {
   )
 
   return (
-    <div style={{ display: 'flex', height: '100vh', width: '100vw', overflow: 'hidden', fontFamily: 'Inter, system-ui, sans-serif' }}>
+    <div style={{ display: 'flex', height: '100vh', width: '100vw', overflow: 'hidden', fontFamily: 'Inter, system-ui, sans-serif', touchAction: 'pan-x pan-y' }}>
       <CuteToast />
       {/* Confetti on first load after AI generation */}
       {showConfetti && (
