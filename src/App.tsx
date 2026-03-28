@@ -122,6 +122,7 @@ export default function App() {
   const [showImport, setShowImport] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [showConfetti, setShowConfetti] = useState(() => new URLSearchParams(window.location.search).has('imported'))
+  const importedToastFired = useRef(false)
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const isFav = activeMindmap ? (diagrams.find(d => d.id === activeMindmap.id)?.isFav ?? false) : false
@@ -158,6 +159,14 @@ export default function App() {
     })
     return () => setPasteImportFn(null)
   }, [createDiagramFromNodes, setPasteImportFn])
+
+  // Show map title toast after AI-generated redirect (?imported=1)
+  useEffect(() => {
+    if (!activeMindmap || importedToastFired.current) return
+    if (!new URLSearchParams(window.location.search).has('imported')) return
+    importedToastFired.current = true
+    setTimeout(() => showToast(`🤖 ${activeMindmap.name}`, { color: '#1a1d2e' }), 400)
+  }, [activeMindmap])
 
   useEffect(() => {
     if (!isDirty || !activeMindmap) return
