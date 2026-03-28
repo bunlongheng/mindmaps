@@ -69,6 +69,10 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
   const [activeTag, setActiveTag] = useState<string | null>(null) // null=All, '__no_tag__'=untagged, else tag name
   const [tagModalId, setTagModalId] = useState<string | null>(null)
   const [tagModalInput, setTagModalInput] = useState('')
+  const [bgLevel, setBgLevel] = useState<0|1|2>(() => {
+    const saved = localStorage.getItem('mindmaps:bgLevel')
+    return (saved === '1' ? 1 : saved === '2' ? 2 : 0) as 0|1|2
+  })
   const [showUserMenu, setShowUserMenu] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const favScrollRef = useRef<HTMLDivElement>(null)
@@ -183,9 +187,10 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
     return localStorage.getItem('mindmaps:displayName') ?? ''
   })()
 
-  const BG = '#eef0f5'
-  const SURFACE = '#ffffff'
-  const BORDER = '#dde2ec'
+  const BG_LEVELS = ['#eef0f5', '#e0e3ec', '#d0d4e0'] as const
+  const BG = BG_LEVELS[bgLevel]
+  const SURFACE = bgLevel === 0 ? '#ffffff' : bgLevel === 1 ? '#f4f5fb' : '#e8ebf5'
+  const BORDER = bgLevel === 0 ? '#dde2ec' : bgLevel === 1 ? '#ced4e4' : '#bec5d8'
   const BORDER_HOVER = '#a5b4fc'
   const TEXT_PRIMARY = '#1e293b'
   const TEXT_MUTED = '#94a3b8'
@@ -229,6 +234,20 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
         <div style={{ flex: 1 }} />
 
         {/* Avatar + dropdown */}
+        {/* BG level toggle */}
+        <div style={{ display: 'flex', gap: 5, alignItems: 'center', flexShrink: 0 }}>
+          {(['#eef0f5','#e0e3ec','#d0d4e0'] as const).map((c, i) => (
+            <button key={i} onClick={() => { setBgLevel(i as 0|1|2); localStorage.setItem('mindmaps:bgLevel', String(i)) }}
+              title={['Light','Darker','Darkest'][i]}
+              style={{
+                width: 16, height: 16, borderRadius: '50%', border: bgLevel === i ? '2px solid #6366f1' : '1.5px solid #c8cedc',
+                background: c, cursor: 'pointer', padding: 0, flexShrink: 0,
+                boxShadow: bgLevel === i ? '0 0 0 2px #fff, 0 0 0 4px #6366f1' : 'none',
+                transition: 'box-shadow 0.15s',
+              }} />
+          ))}
+        </div>
+
         {user && (
           <div ref={menuRef} style={{ position: 'relative' }}>
             <button
