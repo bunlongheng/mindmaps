@@ -1,5 +1,6 @@
+export const config = { runtime: 'edge' }
+
 import { createClient } from '@supabase/supabase-js'
-import { randomUUID } from 'crypto'
 
 const BRANCH_COLORS = [
   '#6366f1', '#8b5cf6', '#ec4899', '#ef4444',
@@ -62,7 +63,6 @@ function computeWidth(title: string, depth: number): number {
 
 function parseJsonOutline(json: unknown): { title: string; nodes: MindmapNode[] } | null {
   if (typeof json !== 'object' || json === null || Array.isArray(json)) return null
-
   const entries = Object.entries(json as Record<string, unknown>)
   if (!entries.length) return null
 
@@ -71,7 +71,7 @@ function parseJsonOutline(json: unknown): { title: string; nodes: MindmapNode[] 
   let branchColorIdx = 0
   const colorById = new Map<string, string>()
 
-  const rootId = randomUUID()
+  const rootId = crypto.randomUUID()
   colorById.set(rootId, BRANCH_COLORS[0])
   nodes.push({
     id: rootId, title: rootKey.trim(), parentId: null, depth: 0,
@@ -89,13 +89,11 @@ function parseJsonOutline(json: unknown): { title: string; nodes: MindmapNode[] 
     const parentColor = colorById.get(parentId) ?? BRANCH_COLORS[0]
 
     if (typeof obj === 'string') {
-      const id = randomUUID()
+      const id = crypto.randomUUID()
       colorById.set(id, parentColor)
       nodes.push({
         id, title: obj.trim(), parentId, depth,
-        x: 0, y: 0,
-        width: computeWidth(obj.trim(), depth),
-        height: 40,
+        x: 0, y: 0, width: computeWidth(obj.trim(), depth), height: 40,
         color: parentColor, sortOrder, manuallyPositioned: false,
       })
       return
@@ -105,9 +103,7 @@ function parseJsonOutline(json: unknown): { title: string; nodes: MindmapNode[] 
     if (!titleKey) return
 
     const icon = obj.icon as string | undefined
-    const id = randomUUID()
-
-    // L1 gets its own branch color; deeper nodes inherit from parent
+    const id = crypto.randomUUID()
     const color = depth === 1
       ? BRANCH_COLORS[branchColorIdx++ % BRANCH_COLORS.length]
       : parentColor
@@ -115,11 +111,8 @@ function parseJsonOutline(json: unknown): { title: string; nodes: MindmapNode[] 
 
     nodes.push({
       id, title: titleKey.trim(), parentId, depth,
-      x: 0, y: 0,
-      width: computeWidth(titleKey.trim(), depth),
-      height: 40,
-      color, sortOrder, manuallyPositioned: false,
-      icon,
+      x: 0, y: 0, width: computeWidth(titleKey.trim(), depth), height: 40,
+      color, sortOrder, manuallyPositioned: false, icon,
     })
 
     const kids = obj[titleKey]
@@ -139,40 +132,38 @@ function parseJsonOutline(json: unknown): { title: string; nodes: MindmapNode[] 
   return { title: rootKey.trim(), nodes }
 }
 
-export default async function handler(req: Request): Promise<Response> {
-  const cors = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Authorization, Content-Type',
-  }
+const CORS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Authorization, Content-Type',
+}
 
-  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors })
-  if (req.method !== 'POST') return Response.json({ error: 'Method not allowed' }, { status: 405 })
+function json(data: unknown, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { ...CORS, 'Content-Type': 'application/json' },
+  })
+}
+
+export default async function handler(req: Request): Promise<Response> {
+  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS })
+  if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
 
   // Auth
-  const auth = req.headers.get('authorization') ?? ''
-  const token = auth.replace(/^Bearer\s+/i, '').trim()
+  const token = (req.headers.get('authorization') ?? '').replace(/^Bearer\s+/i, '').trim()
   const expectedToken = process.env.MINDMAP_AI_API_KEY
-  if (!expectedToken || token !== expectedToken) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401, headers: cors })
-  }
+  if (!expectedToken || token !== expectedToken) return json({ error: 'Unauthorized' }, 401)
 
   let body: { prompt?: string; userId?: string; type?: string; themeId?: string }
-  try { body = await req.json() } catch {
-    return Response.json({ error: 'Invalid JSON body' }, { status: 400, headers: cors })
-  }
+  try { body = await req.json() } catch { return json({ error: 'Invalid JSON body' }, 400) }
 
   const { prompt, userId = null, type = 'logic-chart', themeId = 'default' } = body
-  if (!prompt?.trim()) {
-    return Response.json({ error: 'prompt is required' }, { status: 400, headers: cors })
-  }
+  if (!prompt?.trim()) return json({ error: 'prompt is required' }, 400)
 
   const anthropicKey = process.env.ANTHROPIC_API_KEY
-  if (!anthropicKey) {
-    return Response.json({ error: 'Server misconfigured — missing ANTHROPIC_API_KEY' }, { status: 500, headers: cors })
-  }
+  if (!anthropicKey) return json({ error: 'Missing ANTHROPIC_API_KEY' }, 500)
 
-  // Call Claude
+  // Call Claude Haiku
   let aiRes: Response
   try {
     aiRes = await fetch('https://api.anthropic.com/v1/messages', {
@@ -190,63 +181,43 @@ export default async function handler(req: Request): Promise<Response> {
       }),
     })
   } catch (e) {
-    console.error('Anthropic fetch error:', e)
-    return Response.json({ error: 'Failed to reach AI service' }, { status: 502, headers: cors })
+    return json({ error: 'Failed to reach AI service', detail: String(e) }, 502)
   }
 
   if (!aiRes.ok) {
     const err = await aiRes.text()
-    console.error('Anthropic API error:', err)
-    return Response.json({ error: 'AI generation failed', detail: err.slice(0, 200) }, { status: 502, headers: cors })
+    return json({ error: 'AI generation failed', detail: err.slice(0, 200) }, 502)
   }
 
   const aiData = await aiRes.json() as { content: Array<{ type: string; text: string }> }
   let rawText = aiData.content?.find(b => b.type === 'text')?.text ?? ''
-
-  // Strip markdown code fences if present
   rawText = rawText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').trim()
 
   let parsed: unknown
   try { parsed = JSON.parse(rawText) } catch {
-    console.error('AI returned non-JSON:', rawText.slice(0, 300))
-    return Response.json({ error: 'AI returned invalid JSON' }, { status: 502, headers: cors })
+    return json({ error: 'AI returned invalid JSON', raw: rawText.slice(0, 200) }, 502)
   }
 
   const result = parseJsonOutline(parsed)
-  if (!result) {
-    return Response.json({ error: 'AI returned unexpected structure' }, { status: 502, headers: cors })
-  }
+  if (!result) return json({ error: 'AI returned unexpected structure' }, 502)
 
   const { title, nodes } = result
 
-  const supabaseUrl = process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL
+  const supabaseUrl = process.env.VITE_SUPABASE_URL
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!supabaseUrl || !serviceKey) {
-    return Response.json({ error: 'Server misconfigured — missing Supabase env vars' }, { status: 500, headers: cors })
-  }
+  if (!supabaseUrl || !serviceKey) return json({ error: 'Missing Supabase env vars' }, 500)
 
   const supabase = createClient(supabaseUrl, serviceKey)
-  const id = randomUUID()
+  const id = crypto.randomUUID()
 
   const { error: dbError } = await supabase.from('mindmaps').insert({
-    id,
-    user_id: userId,
-    name: title,
-    type,
-    line_style: 'orthogonal',
-    sharing_enabled: false,
-    theme_id: themeId,
-    nodes,
+    id, user_id: userId, name: title,
+    type, line_style: 'orthogonal',
+    sharing_enabled: false, theme_id: themeId, nodes,
   })
 
-  if (dbError) {
-    console.error('Supabase insert error:', dbError)
-    return Response.json({ error: dbError.message }, { status: 500, headers: cors })
-  }
+  if (dbError) return json({ error: dbError.message }, 500)
 
   const appUrl = process.env.MINDMAP_APP_URL ?? 'https://mindmaps-bheng.vercel.app'
-  return Response.json(
-    { id, title, url: `${appUrl}/?id=${id}`, nodeCount: nodes.length },
-    { status: 201, headers: cors },
-  )
+  return json({ id, title, url: `${appUrl}/?id=${id}`, nodeCount: nodes.length }, 201)
 }
