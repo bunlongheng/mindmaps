@@ -90,16 +90,16 @@ export function AIThinkingOverlay() {
 
       // ── Orb glow ─────────────────────────────────────────────────
       const outer = ctx.createRadialGradient(cx, cy, 0, cx, cy, orbR * 2.2)
-      outer.addColorStop(0,   'rgba(120,100,255,0.0)')
-      outer.addColorStop(0.3, 'rgba( 99,102,241,0.25)')
-      outer.addColorStop(1,   'rgba( 99,102,241,0)')
+      outer.addColorStop(0,   'rgba(60,60,80,0.0)')
+      outer.addColorStop(0.3, 'rgba(40,40,60,0.18)')
+      outer.addColorStop(1,   'rgba(20,20,40,0)')
       ctx.beginPath(); ctx.arc(cx, cy, orbR * 2.2, 0, Math.PI * 2)
       ctx.fillStyle = outer; ctx.fill()
 
       const inner = ctx.createRadialGradient(cx, cy, 0, cx, cy, orbR)
-      inner.addColorStop(0,   'rgba(200,195,255,0.98)')
-      inner.addColorStop(0.45,'rgba( 99,102,241,0.88)')
-      inner.addColorStop(1,   'rgba( 80, 60,200,0.45)')
+      inner.addColorStop(0,   'rgba(220,220,235,0.92)')
+      inner.addColorStop(0.45,'rgba(100,100,130,0.72)')
+      inner.addColorStop(1,   'rgba(30,30,50,0.40)')
       ctx.beginPath(); ctx.arc(cx, cy, orbR, 0, Math.PI * 2)
       ctx.fillStyle = inner; ctx.fill()
 
@@ -162,7 +162,7 @@ export function AIThinkingOverlay() {
   return (
     <div style={{
       position: 'fixed', inset: 0, zIndex: 200,
-      background: 'rgba(8,8,18,0.91)',
+      background: 'rgba(4,4,10,0.96)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
     }}>
       <canvas ref={canvasRef} style={{ position: 'absolute', inset: 0 }} />
@@ -171,7 +171,7 @@ export function AIThinkingOverlay() {
       <div key={phraseIdx} style={{
         position: 'absolute', bottom: 64,
         left: '50%', transform: 'translateX(-50%)',
-        color: '#a5b4fc', fontSize: 14, fontWeight: 500,
+        color: '#94a3b8', fontSize: 14, fontWeight: 500,
         fontFamily: 'Inter, system-ui, sans-serif',
         letterSpacing: '0.06em', whiteSpace: 'nowrap',
         animation: 'phraseIn 0.35s ease',

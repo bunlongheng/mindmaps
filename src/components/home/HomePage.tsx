@@ -97,11 +97,18 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
     if (!aiPrompt.trim() || aiLoading) return
     setAiLoading(true)
     setAiError('')
+    setShowCreate(false)
     try {
+      // Use the live Supabase session JWT if available, fall back to static key
+      const { supabase } = await import('../../lib/supabase')
+      const sessionToken = supabase
+        ? (await supabase.auth.getSession()).data.session?.access_token
+        : null
+
       const res = await fetch(`${MINDMAP_API_BASE}/api/ai/generate-mindmap`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${MINDMAP_API_KEY}`,
+          'Authorization': `Bearer ${sessionToken ?? MINDMAP_API_KEY}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({

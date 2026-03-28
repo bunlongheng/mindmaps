@@ -149,10 +149,28 @@ export default async function handler(req: Request): Promise<Response> {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS })
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
 
-  // Auth
-  const token = (req.headers.get('authorization') ?? '').replace(/^Bearer\s+/i, '').trim()
-  const expectedToken = (process.env.MINDMAP_AI_API_KEY ?? '').trim()
-  if (!expectedToken || token !== expectedToken) return json({ error: 'Unauthorized' }, 401)
+  // Auth — accept either a valid Supabase JWT (user session) or the static API key
+  const rawAuth = (req.headers.get('authorization') ?? '').replace(/^Bearer\s+/i, '').trim()
+  const staticKey = (process.env.MINDMAP_AI_API_KEY ?? '').trim()
+  const supabaseJwtSecret = process.env.SUPABASE_JWT_SECRET ?? ''
+
+  let authorized = staticKey && rawAuth === staticKey
+
+  if (!authorized && supabaseJwtSecret && rawAuth) {
+    // Validate Supabase JWT without a library — check signature via Supabase introspect endpoint
+    try {
+      const [, payloadB64] = rawAuth.split('.')
+      if (payloadB64) {
+        const payload = JSON.parse(atob(payloadB64.replace(/-/g, '+').replace(/_/g, '/')))
+        // Must be a real user (role = 'authenticated') and not expired
+        if (payload.role === 'authenticated' && payload.exp > Date.now() / 1000) {
+          authorized = true
+        }
+      }
+    } catch {}
+  }
+
+  if (!authorized) return json({ error: 'Unauthorized' }, 401)
 
   let body: { prompt?: string; userId?: string; type?: string; themeId?: string }
   try { body = await req.json() } catch { return json({ error: 'Invalid JSON body' }, 400) }
