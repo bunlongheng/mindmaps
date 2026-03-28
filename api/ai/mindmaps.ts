@@ -8,7 +8,7 @@ const BRANCH_COLORS = [
   '#3b82f6', '#06b6d4',
 ]
 
-const META_KEYS = new Set(['icon', 'emoji', 'bold', 'italic', 'fontSize', 'textAlign', 'title', 'name', 'children', 'type', 'lineStyle'])
+const META_KEYS = new Set(['icon', 'emoji', 'bold', 'italic', 'fontSize', 'textAlign', 'title', 'name', 'children', 'type', 'lineStyle', 'color'])
 
 interface MindmapNode {
   id: string; title: string; parentId: string | null; depth: number
@@ -118,7 +118,8 @@ function parseJsonOutline(json: unknown): { title: string; nodes: MindmapNode[] 
     const titleKey = Object.keys(obj).find(k => !META_KEYS.has(k))
     if (!titleKey) return
     const id = crypto.randomUUID()
-    const color = depth === 1 ? BRANCH_COLORS[branchColorIdx++ % BRANCH_COLORS.length] : parentColor
+    const autoColor = depth === 1 ? BRANCH_COLORS[branchColorIdx++ % BRANCH_COLORS.length] : parentColor
+    const color = (typeof obj.color === 'string' && obj.color.trim()) ? obj.color.trim() : autoColor
     colorById.set(id, color)
     nodes.push({ id, title: titleKey.trim(), parentId, depth, x: 0, y: 0, width: computeWidth(titleKey.trim(), depth), height: 40, color, sortOrder, manuallyPositioned: false, icon: obj.icon as string | undefined, emoji: obj.emoji as string | undefined })
     const kids = obj[titleKey]
@@ -147,10 +148,15 @@ export default async function handler(req: Request): Promise<Response> {
   const expectedToken = (process.env.MINDMAP_AI_API_KEY ?? '').trim()
   if (!expectedToken || token !== expectedToken) return json({ error: 'Unauthorized' }, 401)
 
-  let body: { title?: string; outline?: string; type?: string; themeId?: string; lineStyle?: string; userId?: string; isFavorite?: boolean }
+  let body: { title?: string; outline?: string; type?: string; themeId?: string; lineStyle?: string; userId?: string; isFavorite?: boolean; colors?: string[] }
   try { body = await req.json() } catch { return json({ error: 'Invalid JSON body' }, 400) }
 
-  const { title, outline, type = 'logic-chart', themeId = 'default', lineStyle = 'orthogonal', userId = null, isFavorite = false } = body
+  const { title, outline, type = 'logic-chart', themeId = 'default', lineStyle = 'orthogonal', userId = null, isFavorite = false, colors } = body
+
+  // Allow caller to override the branch color palette
+  if (Array.isArray(colors) && colors.length > 0) {
+    colors.forEach((c, i) => { if (typeof c === 'string') BRANCH_COLORS[i % BRANCH_COLORS.length] = c })
+  }
   if (!title) return json({ error: 'title is required' }, 400)
 
   const supabaseUrl = process.env.VITE_SUPABASE_URL
