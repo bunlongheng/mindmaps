@@ -173,6 +173,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
     didDrag.current = false
     onSelect(node.id, e.metaKey || e.ctrlKey || e.shiftKey)
     if (!canDrag) return
+    if (e.pointerType !== 'mouse') return // touch = pinch/pan, not drag
     const pt = getSVGPoint(e)
     if (!pt) return
     dragStart.current = { x: pt.x, y: pt.y, nodeX: node.x, nodeY: node.y }
