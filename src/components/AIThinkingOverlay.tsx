@@ -23,7 +23,7 @@ const PHRASES = [
   'Assembling…','Almost there…',
 ]
 
-const RAND_CHARS = '01ABCDEFxyz!@#[]{}|<>?/*+-=~'
+const RAND_CHARS = '01ABCDEFxyz!@#[]{}|<>?/*+-=~'.split('')
 
 function pick<T>(arr: T[]): T { return arr[Math.floor(Math.random() * arr.length)] }
 
@@ -66,8 +66,8 @@ export function AIThinkingOverlay() {
     const ctx = canvas.getContext('2d')!
 
     function resize() {
-      canvas.width = window.innerWidth
-      canvas.height = window.innerHeight
+      canvas!.width = window.innerWidth
+      canvas!.height = window.innerHeight
     }
     resize()
     window.addEventListener('resize', resize)
@@ -81,7 +81,7 @@ export function AIThinkingOverlay() {
     function frame(now: number) {
       const dt = Math.min((now - last) / 1000, 0.05)
       last = now
-      const W = canvas.width, H = canvas.height
+      const W = canvas!.width, H = canvas!.height
       const cx = W / 2, cy = H / 2
       const t = now / 1000
       const orbR = 75 + 18 * Math.sin(t * Math.PI)

@@ -47,7 +47,7 @@ export function Confetti({ onDone }: { onDone?: () => void }) {
       function draw(now: number) {
         const elapsed = now - start
         const prog = elapsed / DURATION
-        ctx.clearRect(0, 0, canvas.width, canvas.height)
+        ctx.clearRect(0, 0, canvas!.width, canvas!.height)
 
         for (const f of flakes) {
           f.x += f.vx
@@ -85,7 +85,7 @@ export function Confetti({ onDone }: { onDone?: () => void }) {
         if (elapsed < DURATION) {
           raf = requestAnimationFrame(draw)
         } else {
-          ctx.clearRect(0, 0, canvas.width, canvas.height)
+          ctx.clearRect(0, 0, canvas!.width, canvas!.height)
           onDone?.()
         }
       }
