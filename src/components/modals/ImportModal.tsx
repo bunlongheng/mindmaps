@@ -139,7 +139,7 @@ export function ImportModal({ onClose, userId }: ImportModalProps) {
       }} onClick={e => e.stopPropagation()}>
 
         {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 20px 12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '22px 32px 16px' }}>
           <div>
             <h3 style={{ fontSize: 16, fontWeight: 700, color: '#1e293b', margin: 0 }}>Import Formats</h3>
             <p style={{ fontSize: 12, color: '#94a3b8', margin: '3px 0 0' }}>
@@ -167,7 +167,7 @@ export function ImportModal({ onClose, userId }: ImportModalProps) {
         <div style={{ height: 1, background: '#f1f5f9' }} />
 
         {/* Body */}
-        <div style={{ overflowY: 'auto', padding: '20px 20px' }}>
+        <div style={{ overflowY: 'auto', padding: '24px 32px' }}>
 
           <Row title="Paste — Indented outline" badge="⌘V on canvas" badgeColor="#22c55e">
             <CodeBlock copyable code={`Root Topic
