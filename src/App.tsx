@@ -147,9 +147,10 @@ export default function App() {
     if (shareId) { loadDiagram(shareId); return }
     const mapId = getMapParam()
     if (mapId) {
-      // Normalize ?id= → ?map= in the URL
+      // Normalize ?id= → ?map= in the URL, preserving ?imported
       if (!new URLSearchParams(window.location.search).has('map')) {
-        window.history.replaceState({}, '', `?map=${mapId}`)
+        const isImported = new URLSearchParams(window.location.search).has('imported')
+        window.history.replaceState({}, '', `?map=${mapId}${isImported ? '&imported=1' : ''}`)
       }
       loadDiagram(mapId)
     } else {
