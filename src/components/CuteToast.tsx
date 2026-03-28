@@ -4,6 +4,7 @@ import { Bot } from 'lucide-react'
 export interface ToastOptions {
   color?: string
   confetti?: boolean
+  duration?: number
 }
 
 interface ToastState {
@@ -11,14 +12,15 @@ interface ToastState {
   msg: string
   color: string
   confetti: boolean
+  duration: number
 }
 
 type Listener = (state: ToastState | null) => void
 const listeners = new Set<Listener>()
 let _id = 0
 
-export function showToast(msg: string, { color = '#6366f1', confetti = false }: ToastOptions = {}) {
-  const state: ToastState = { id: ++_id, msg, color, confetti }
+export function showToast(msg: string, { color = '#6366f1', confetti = false, duration = 3000 }: ToastOptions = {}) {
+  const state: ToastState = { id: ++_id, msg, color, confetti, duration }
   listeners.forEach(fn => fn(state))
 }
 
@@ -48,7 +50,7 @@ export function CuteToast() {
     const handler = (state: ToastState | null) => {
       setToast(state)
       if (timerRef.current) clearTimeout(timerRef.current)
-      if (state) timerRef.current = setTimeout(() => setToast(null), 3000)
+      if (state) timerRef.current = setTimeout(() => setToast(null), state.duration)
     }
     listeners.add(handler)
     return () => { listeners.delete(handler) }
@@ -93,7 +95,7 @@ export function CuteToast() {
         style={{
           position: 'fixed', left: '50%', top: 8, zIndex: 100002,
           pointerEvents: 'none',
-          animation: 'cuteToastInOut 3s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+          animation: `cuteToastInOut ${toast.duration / 1000}s cubic-bezier(0.16, 1, 0.3, 1) forwards`,
         }}
       >
         <div style={{

@@ -207,6 +207,7 @@ export function useDiagram(userId: string | null = null) {
     }
     lsSaveDiagram(diagram) // keep localStorage cache fresh for minimap
     setIsDirty(false)
+    showToast('✓ Saved', { color: '#1a1d2e', duration: 1500 })
   }, [setIsDirty, userId])
 
   const createDiagram = useCallback(async (name: string) => {
