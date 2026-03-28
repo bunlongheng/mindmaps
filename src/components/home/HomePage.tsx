@@ -62,6 +62,8 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
   const [aiLoading, setAiLoading] = useState(false)
   const [aiError, setAiError] = useState('')
   const [activeTag, setActiveTag] = useState<string | null>(null) // null=All, '__no_tag__'=untagged, else tag name
+  const [tagModalId, setTagModalId] = useState<string | null>(null)
+  const [tagModalInput, setTagModalInput] = useState('')
   const [showUserMenu, setShowUserMenu] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const favScrollRef = useRef<HTMLDivElement>(null)
@@ -379,8 +381,8 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
                       diagram={d} timeAgo={timeAgo(d.updatedAt)}
                       onOpen={() => onOpen(d.id)} onDelete={() => deleteDiagram(d.id, d.name)}
                       isFav={true} onToggleFav={() => toggleFavorite(d.id)} isPublic={d.isPublic}
-                      tags={d.tags} tagColorMap={tagColorMap} allTags={allTags}
-                      onUpdateTags={tags => updateTags(d.id, tags)}
+                      tags={d.tags} tagColorMap={tagColorMap}
+                      onTagEdit={() => { setTagModalId(d.id); setTagModalInput('') }}
                     />
                   </div>
                 ))}
@@ -407,8 +409,8 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
                   key={d.id} diagram={d} timeAgo={timeAgo(d.updatedAt)}
                   onOpen={() => onOpen(d.id)} onDelete={() => deleteDiagram(d.id, d.name)}
                   isFav={false} onToggleFav={() => toggleFavorite(d.id)} isPublic={d.isPublic}
-                  tags={d.tags} tagColorMap={tagColorMap} allTags={allTags}
-                  onUpdateTags={tags => updateTags(d.id, tags)}
+                  tags={d.tags} tagColorMap={tagColorMap}
+                  onTagEdit={() => { setTagModalId(d.id); setTagModalInput('') }}
                 />
               ))}
             </div>
@@ -579,6 +581,109 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
       <style>{`
         :root { --card-bg: ${SURFACE}; --card-border: ${BORDER}; --card-border-hover: ${BORDER_HOVER}; }
       `}</style>
+
+      {/* Tag edit modal */}
+      {tagModalId && (() => {
+        const d = diagrams.find(x => x.id === tagModalId)
+        if (!d) return null
+        const currentTags = d.tags ?? []
+        const available = allTags.filter(t => !currentTags.includes(t))
+        function addTag(tag: string) {
+          const t = tag.trim()
+          if (!t || currentTags.includes(t)) return
+          updateTags(tagModalId!, [...currentTags, t])
+          setTagModalInput('')
+        }
+        function removeTag(tag: string) {
+          updateTags(tagModalId!, currentTags.filter(t => t !== tag))
+        }
+        return (
+          <div style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200,
+            backdropFilter: 'blur(6px)',
+          }} onClick={() => setTagModalId(null)}>
+            <div style={{
+              background: '#fff', borderRadius: 20, padding: 24, width: 'min(380px, 92vw)',
+              boxShadow: '0 24px 64px rgba(0,0,0,0.2)',
+            }} onClick={e => e.stopPropagation()}>
+
+              {/* Header */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                <div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: TEXT_PRIMARY }}>{d.name}</div>
+                  <div style={{ fontSize: 12, color: TEXT_MUTED, marginTop: 2 }}>Edit tags</div>
+                </div>
+                <button onClick={() => setTagModalId(null)}
+                  style={{ width: 30, height: 30, borderRadius: 8, border: `1px solid ${BORDER}`, background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: TEXT_MUTED }}>
+                  <X size={14} />
+                </button>
+              </div>
+
+              {/* Current tags */}
+              {currentTags.length > 0 && (
+                <div style={{ marginBottom: 14 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: TEXT_MUTED, marginBottom: 8 }}>Current tags</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {currentTags.map(t => (
+                      <button key={t} onClick={() => removeTag(t)}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 5,
+                          fontSize: 12, fontWeight: 700, padding: '5px 12px', borderRadius: 999,
+                          background: tagBg(t, tagColorMap), color: '#fff',
+                          border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+                        }}>
+                        {t} <X size={10} strokeWidth={3} />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Add tags */}
+              {available.length > 0 && (
+                <div style={{ marginBottom: 14 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: TEXT_MUTED, marginBottom: 8 }}>Add tag</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {available.map(t => (
+                      <button key={t} onClick={() => addTag(t)}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 5,
+                          fontSize: 12, fontWeight: 600, padding: '5px 12px', borderRadius: 999,
+                          background: `${tagBg(t, tagColorMap)}15`, color: tagBg(t, tagColorMap),
+                          border: `1.5px solid ${tagBg(t, tagColorMap)}55`,
+                          cursor: 'pointer', fontFamily: 'inherit',
+                        }}>
+                        <TagIcon tag={t} size={11} /> {t}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Custom tag input */}
+              <div style={{ fontSize: 11, fontWeight: 600, color: TEXT_MUTED, marginBottom: 8 }}>Custom tag</div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input
+                  autoFocus
+                  value={tagModalInput}
+                  onChange={e => setTagModalInput(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') addTag(tagModalInput) }}
+                  placeholder="Type and press Enter…"
+                  style={{
+                    flex: 1, fontSize: 13, padding: '9px 13px', border: `1px solid ${BORDER}`,
+                    borderRadius: 10, outline: 'none', fontFamily: 'inherit', color: TEXT_PRIMARY,
+                  }}
+                />
+                <button onClick={() => addTag(tagModalInput)}
+                  style={{ padding: '9px 16px', background: '#6366f1', color: '#fff', border: 'none', borderRadius: 10, cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}>
+                  Add
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }
@@ -782,46 +887,22 @@ function DiagramMinimap({ id, type }: { id: string; type: string }) {
 
 // ── DiagramCard ────────────────────────────────────────────────────────────
 
-function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isFav, onToggleFav, isPublic, tags, tagColorMap, allTags, onUpdateTags }: {
+function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isFav, onToggleFav, isPublic, tags, tagColorMap, onTagEdit }: {
   diagram: DiagramMeta; timeAgo: string; onOpen: () => void; onDelete: () => void
   isFav: boolean; onToggleFav: () => void; isPublic?: boolean; tags?: string[]
-  tagColorMap: Map<string, string>; allTags: string[]; onUpdateTags: (tags: string[]) => void
+  tagColorMap: Map<string, string>; onTagEdit: () => void
 }) {
   const [hovered, setHovered] = useState(false)
-  const [showTagPicker, setShowTagPicker] = useState(false)
-  const [tagInput, setTagInput] = useState('')
-  const pickerRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!showTagPicker) return
-    function onDown(e: MouseEvent) {
-      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) setShowTagPicker(false)
-    }
-    document.addEventListener('mousedown', onDown)
-    return () => document.removeEventListener('mousedown', onDown)
-  }, [showTagPicker])
-
   const currentTags = tags ?? []
-  const available = allTags.filter(t => !currentTags.includes(t))
-
-  function addTag(tag: string) {
-    const t = tag.trim()
-    if (!t || currentTags.includes(t)) return
-    onUpdateTags([...currentTags, t])
-    setTagInput('')
-  }
-  function removeTag(tag: string) {
-    onUpdateTags(currentTags.filter(t => t !== tag))
-  }
 
   return (
     <div
       onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => { setHovered(false) }}
+      onMouseLeave={() => setHovered(false)}
       style={{
         background: 'var(--card-bg)',
         border: `1px solid ${hovered ? 'var(--card-border-hover)' : 'var(--card-border)'}`,
-        borderRadius: 16, overflow: 'visible', cursor: 'pointer', position: 'relative',
+        borderRadius: 16, overflow: 'hidden', cursor: 'pointer', position: 'relative',
         transition: 'border-color 0.2s, box-shadow 0.2s, transform 0.2s',
         boxShadow: hovered
           ? '0 0 0 3px rgba(99,102,241,0.08), 0 0 20px rgba(99,102,241,0.14), 0 4px 16px rgba(0,0,0,0.07)'
@@ -831,7 +912,7 @@ function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isFav, onToggleFav, i
       onClick={onOpen}
     >
       {/* Header */}
-      <div style={{ padding: '10px 13px 8px', background: '#f8fafc', borderBottom: '1px solid #eef0f5', borderRadius: '16px 16px 0 0', overflow: 'hidden' }}>
+      <div style={{ padding: '10px 13px 8px', background: '#f8fafc', borderBottom: '1px solid #eef0f5' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <div style={{ fontSize: 12, fontWeight: 600, color: '#475569', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
             {diagram.name}
@@ -839,24 +920,20 @@ function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isFav, onToggleFav, i
           {isPublic && <Globe size={11} color="#6366f1" style={{ flexShrink: 0 }} />}
           <div style={{ fontSize: 10, color: '#94a3b8', flexShrink: 0 }}>{timeAgo}</div>
         </div>
-        {/* Tag pills */}
-        <div style={{ display: 'flex', gap: 4, marginTop: currentTags.length > 0 ? 5 : 0, flexWrap: 'wrap', minHeight: currentTags.length > 0 ? 18 : 0 }}>
-          {currentTags.slice(0, 4).map(t => (
-            <span key={t} onClick={e => { e.stopPropagation(); removeTag(t) }}
-              title="Remove tag"
-              style={{
-                fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 10,
+        {currentTags.length > 0 && (
+          <div style={{ display: 'flex', gap: 4, marginTop: 5, flexWrap: 'wrap' }}>
+            {currentTags.slice(0, 4).map(t => (
+              <span key={t} style={{
+                fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 10,
                 background: tagBg(t, tagColorMap), color: '#fff', letterSpacing: '0.04em',
-                cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3,
-              }}>
-              {t}<X size={7} strokeWidth={3} />
-            </span>
-          ))}
-        </div>
+              }}>{t}</span>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Thumbnail */}
-      <div style={{ height: 110, background: 'transparent', position: 'relative', borderRadius: '0 0 16px 16px', overflow: 'hidden' }}>
+      <div style={{ height: 110, background: 'transparent', position: 'relative' }}>
         <DiagramMinimap id={diagram.id} type={diagram.type} />
         {hovered && (
           <>
@@ -864,8 +941,7 @@ function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isFav, onToggleFav, i
               style={{ position: 'absolute', top: 8, left: 8, width: 28, height: 28, borderRadius: 8, border: isFav ? '1px solid #fde68a' : '1px solid #e2e8f0', background: 'rgba(255,255,255,0.92)', cursor: 'pointer', color: isFav ? '#eab308' : '#94a3b8', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(8px)' }}>
               <Star size={13} fill={isFav ? '#eab308' : 'none'} />
             </button>
-            {/* Tag button */}
-            <button onClick={e => { e.stopPropagation(); setShowTagPicker(p => !p) }} title="Edit tags"
+            <button onClick={e => { e.stopPropagation(); onTagEdit() }} title="Edit tags"
               style={{ position: 'absolute', top: 8, left: 44, width: 28, height: 28, borderRadius: 8, border: '1px solid #e2e8f0', background: 'rgba(255,255,255,0.92)', cursor: 'pointer', color: '#94a3b8', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(8px)' }}>
               <Tag size={13} />
             </button>
@@ -876,49 +952,6 @@ function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isFav, onToggleFav, i
           </>
         )}
       </div>
-
-      {/* Tag picker popover */}
-      {showTagPicker && (
-        <div ref={pickerRef} onClick={e => e.stopPropagation()}
-          style={{
-            position: 'absolute', top: '100%', left: 0, marginTop: 6, zIndex: 100,
-            background: '#fff', borderRadius: 12, padding: 12,
-            boxShadow: '0 8px 32px rgba(0,0,0,0.14), 0 0 0 1px #e2e8f0',
-            width: 200, display: 'flex', flexDirection: 'column', gap: 8,
-          }}>
-          {/* Available tags to add */}
-          {available.length > 0 && (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-              {available.map(t => (
-                <button key={t} onClick={() => addTag(t)}
-                  style={{
-                    fontSize: 10, fontWeight: 700, padding: '3px 9px', borderRadius: 10,
-                    background: `${tagBg(t, tagColorMap)}22`, color: tagBg(t, tagColorMap),
-                    border: `1px solid ${tagBg(t, tagColorMap)}55`,
-                    cursor: 'pointer', fontFamily: 'inherit',
-                  }}>{t}</button>
-              ))}
-            </div>
-          )}
-          {/* Custom tag input */}
-          <div style={{ display: 'flex', gap: 5 }}>
-            <input
-              value={tagInput}
-              onChange={e => setTagInput(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') { addTag(tagInput); e.preventDefault() } }}
-              placeholder="Custom tag…"
-              style={{
-                flex: 1, fontSize: 11, padding: '5px 8px', border: '1px solid #e2e8f0',
-                borderRadius: 8, outline: 'none', fontFamily: 'inherit', color: '#1e293b',
-              }}
-            />
-            <button onClick={() => addTag(tagInput)}
-              style={{ padding: '5px 8px', background: '#6366f1', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 11, fontFamily: 'inherit' }}>
-              +
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
