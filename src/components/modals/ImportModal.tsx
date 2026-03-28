@@ -136,17 +136,7 @@ tree-horizontal  |  fishbone  |  timeline`} />
   }'`} />
           </Row>
 
-          <Row title="API — AI Generate" badge="POST /api/ai/generate-mindmap" badgeColor="#8b5cf6">
-            <CodeBlock copyable code={`curl -X POST https://mindmaps-bheng.vercel.app/api/ai/generate-mindmap \\
-  -H "Authorization: Bearer ${API_KEY}" \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "prompt": "Machine learning fundamentals",
-    "userId": "${uid}"
-  }'`} />
-          </Row>
-
-        </div>
+</div>
       </div>
     </div>
   )
