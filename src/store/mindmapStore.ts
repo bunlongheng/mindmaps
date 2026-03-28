@@ -580,7 +580,7 @@ export const useMindmapStore = create<MindmapStore>()(
       if (!state.activeMindmap && !state.pasteImportFn) return
 
       // --- Flat item type used internally ---
-      type FlatItem = { title: string; indent: number; icon?: string; emoji?: string }
+      type FlatItem = { title: string; indent: number; icon?: string; emoji?: string; color?: string }
       let parsed: FlatItem[] = []
 
       // Normalize icon names from any source (HeroIcons, etc.) to our Lucide names
@@ -656,23 +656,24 @@ export const useMindmapStore = create<MindmapStore>()(
         try {
           const json = JSON.parse(trimmed)
           // Flatten recursive { title, icon?, children? } tree into indent list
-          const META_KEYS = new Set(['icon', 'emoji', 'bold', 'italic', 'fontSize', 'textAlign', 'title', 'name', 'children', 'type', 'lineStyle'])
-          function flattenJson(node: Record<string, unknown> | string, depth: number) {
-            if (typeof node === 'string') { parsed.push({ title: node.trim(), indent: depth }); return }
+          const META_KEYS = new Set(['icon', 'emoji', 'bold', 'italic', 'fontSize', 'textAlign', 'title', 'name', 'children', 'type', 'lineStyle', 'color'])
+          function flattenJson(node: Record<string, unknown> | string, depth: number, inheritColor?: string) {
+            if (typeof node === 'string') { parsed.push({ title: node.trim(), indent: depth, color: inheritColor }); return }
             // New format: title is the non-metadata key, its value is children array
             const titleKey = Object.keys(node).find(k => !META_KEYS.has(k))
+            const nodeColor = (typeof node.color === 'string' && node.color.trim()) ? node.color.trim() : inheritColor
             if (titleKey) {
-              parsed.push({ title: titleKey, indent: depth, icon: normalizeIcon(node.icon as string | undefined), emoji: node.emoji as string | undefined })
+              parsed.push({ title: titleKey, indent: depth, icon: normalizeIcon(node.icon as string | undefined), emoji: node.emoji as string | undefined, color: nodeColor })
               const kids = node[titleKey]
-              if (Array.isArray(kids)) for (const child of kids) flattenJson(child as Record<string, unknown> | string, depth + 1)
+              if (Array.isArray(kids)) for (const child of kids) flattenJson(child as Record<string, unknown> | string, depth + 1, nodeColor)
               return
             }
             // Legacy format: { title/name, icon, emoji, children }
             const title = ((node.title ?? node.name) as string | undefined ?? '').trim()
             if (!title) return
-            parsed.push({ title, indent: depth, icon: normalizeIcon(node.icon as string | undefined), emoji: node.emoji as string | undefined })
+            parsed.push({ title, indent: depth, icon: normalizeIcon(node.icon as string | undefined), emoji: node.emoji as string | undefined, color: nodeColor })
             if (Array.isArray(node.children)) {
-              for (const child of node.children) flattenJson(child as Record<string, unknown> | string, depth + 1)
+              for (const child of node.children) flattenJson(child as Record<string, unknown> | string, depth + 1, nodeColor)
             }
           }
           const roots = Array.isArray(json) ? json : [json]
@@ -732,9 +733,9 @@ export const useMindmapStore = create<MindmapStore>()(
       }
 
       const palette = getTheme(state.themeId).colors
+      const hasExplicitColors = parsed.some(p => p.color)
       const rawNodes: MindmapNode[] = parsed.map((p, i) => {
         const depth = depths[i]
-        
         const icon = depth <= 2 ? p.icon : undefined
         const emoji = depth <= 2 ? p.emoji : undefined
         const hasVisualZone = !!(icon || emoji)
@@ -744,7 +745,7 @@ export const useMindmapStore = create<MindmapStore>()(
           parentId: parentIds[i],
           depth,
           sortOrder: sortOrders[i],
-          color: palette[0],
+          color: p.color ?? palette[0],
           x: 0, y: 0,
           width: depth === 0 ? 180 : computeNodeWidth(p.title, depth, hasVisualZone),
           height: depth === 0 ? 180 : (emoji ? 48 : 40),
@@ -756,7 +757,7 @@ export const useMindmapStore = create<MindmapStore>()(
 
       set({ isImporting: true })
       const laid = runLayout(normalizeWidthsPerDepth(rawNodes), state.activeMindmap?.type ?? state.diagramType ?? 'logic-chart')
-      const nodes = rebalanceColors(laid, palette)
+      const nodes = hasExplicitColors ? laid : rebalanceColors(laid, palette)
       const name = parsed[0].title
 
       const { pasteImportFn } = get()
@@ -765,7 +766,7 @@ export const useMindmapStore = create<MindmapStore>()(
       } else {
         state.snapshotHistory()
         set({
-          activeMindmap: { ...state.activeMindmap, name, nodes },
+          activeMindmap: { ...state.activeMindmap!, name, nodes },
           selectedNodeIds: [],
           isDirty: true,
         })

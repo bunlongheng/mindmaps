@@ -3,6 +3,7 @@ import { showToast } from '../components/CuteToast'
 import { supabase, hasSupabase } from '../lib/supabase'
 import { useMindmapStore } from '../store/mindmapStore'
 import { ROOT_COLORS } from '../lib/color'
+import { soundCreate, soundDelete, soundSave, soundFavorite, soundError, soundPaste } from '../lib/sounds'
 import type { Diagram, DiagramMeta, MindmapNode } from '../types'
 
 // ── localStorage helpers ────────────────────────────────────────────────────
@@ -33,7 +34,7 @@ function lsSaveDiagram(d: Diagram) {
   if (idx >= 0) list[idx] = meta; else list.unshift(meta)
   lsSaveList(list)
 }
-function lsDeleteDiagram(id: string) {
+export function lsDeleteDiagram(id: string) {
   localStorage.removeItem(lsKey(id))
   lsSaveList(lsGetList().filter(m => m.id !== id))
 }
@@ -94,47 +95,14 @@ export function useDiagram(userId: string | null = null) {
       .order('updated_at', { ascending: false })
     if (error) { console.error(error); setDiagrams(lsGetList()); return }
 
-    // Cache all diagrams locally so minimap thumbnails are populated for every card
+    // Cache diagrams locally so minimap thumbnails are available instantly
     if (data && data.length > 0) {
+      const remoteIds = new Set(data.map((d: { id: string }) => d.id))
+      // Remove any local entries that no longer exist in Supabase (deleted on another machine)
+      lsSaveList(lsGetList().filter(m => remoteIds.has(m.id)))
       for (const row of data) {
         if (row.nodes) lsSaveDiagram(rowToDiagram(row as Record<string, unknown>))
       }
-    }
-
-    // ── Sync: upload any local diagrams missing from Supabase ──
-    const remoteIds = new Set((data ?? []).map((d: { id: string }) => d.id))
-    const localList = lsGetList()
-    const missing = localList
-      .filter(meta => !remoteIds.has(meta.id))
-      .map(meta => lsGetDiagram(meta.id))
-      .filter(Boolean) as Diagram[]
-    if (missing.length > 0) {
-      const { error: insertErr } = await supabase.from('mindmaps').upsert(
-        missing.map(d => ({
-          id:              d.id,
-          user_id:         userId,
-          name:            d.name,
-          type:            d.type,
-          line_style:      d.lineStyle ?? 'orthogonal',
-          sharing_enabled: d.sharingEnabled ?? false,
-          theme_id:        d.themeId ?? 'default',
-          nodes:           d.nodes,
-        }))
-      )
-      if (insertErr) {
-        console.error('Sync error:', insertErr)
-        showToast(`Sync failed: ${insertErr.message}`, { color: '#ef4444' })
-        setDiagrams(localList)
-        return
-      }
-      showToast(`✦ ${missing.length} map${missing.length > 1 ? 's' : ''} restored`, { color: '#22c55e', confetti: true })
-      const { data: fresh } = await supabase
-        .from('mindmaps')
-        .select('id, name, type, updated_at, sharing_enabled, is_favorite')
-        .eq('user_id', userId)
-        .order('updated_at', { ascending: false })
-      setDiagrams((fresh ?? []).map((d: { id: string; name: string; type: string; updated_at: string; sharing_enabled?: boolean; is_favorite?: boolean }) => ({ id: d.id, name: d.name, type: d.type as DiagramMeta['type'], updatedAt: d.updated_at, isPublic: d.sharing_enabled ?? false, isFav: d.is_favorite ?? false })))
-      return
     }
 
     setDiagrams((data ?? []).map(d => ({
@@ -203,10 +171,11 @@ export function useDiagram(userId: string | null = null) {
     if (error) {
       // On local dev without real auth, Supabase write is blocked by RLS — fall back to localStorage silently
       if (error.code === '42501') { lsSaveDiagram(diagram); setIsDirty(false); return }
-      console.error('save error:', error); showToast('Failed to save', { color: '#ef4444' }); return
+      console.error('save error:', error); soundError(); showToast('Failed to save', { color: '#ef4444' }); return
     }
     lsSaveDiagram(diagram) // keep localStorage cache fresh for minimap
     setIsDirty(false)
+    soundSave()
     showToast('✓ Saved', { color: '#1a1d2e', duration: 1500 })
   }, [setIsDirty, userId])
 
@@ -234,6 +203,7 @@ export function useDiagram(userId: string | null = null) {
       setActiveMindmap(diagram)
       localStorage.setItem('activeMindmapId', id)
       setDiagrams(lsGetList())
+      soundCreate()
       showToast(`✦ "${name}" created`, { color: '#6366f1', confetti: true })
       return
     }
@@ -241,9 +211,10 @@ export function useDiagram(userId: string | null = null) {
       id, user_id: userId, name, type: 'logic-chart', line_style: 'orthogonal',
       sharing_enabled: false, nodes: laid,
     })
-    if (error) { console.error(error); showToast('Failed to create map', { color: '#ef4444' }); return }
+    if (error) { console.error(error); soundError(); showToast('Failed to create map', { color: '#ef4444' }); return }
     await loadDiagram(id)
     await loadDiagramList()
+    soundCreate()
     showToast(`✦ "${name}" created`, { color: '#6366f1', confetti: true })
   }, [loadDiagram, loadDiagramList, setActiveMindmap, setDiagrams, userId])
 
@@ -262,6 +233,7 @@ export function useDiagram(userId: string | null = null) {
       setActiveMindmap(diagram)
       localStorage.setItem('activeMindmapId', id)
       setDiagrams(lsGetList())
+      soundPaste()
       showToast(`✦ "${finalName}" created`, { color: '#22c55e', confetti: true })
       return id
     }
@@ -269,22 +241,31 @@ export function useDiagram(userId: string | null = null) {
       id, user_id: userId, name: finalName, type: 'logic-chart', line_style: 'orthogonal',
       sharing_enabled: false, nodes,
     })
-    if (error) { console.error(error); showToast(`Failed: ${error.message}`, { color: '#ef4444' }); return null }
+    if (error) { console.error(error); soundError(); showToast(`Failed: ${error.message}`, { color: '#ef4444' }); return null }
     await loadDiagram(id)
     await loadDiagramList()
+    soundPaste()
     showToast(`✦ "${finalName}" created`, { color: '#22c55e', confetti: true })
     return id
   }, [loadDiagram, loadDiagramList, setActiveMindmap, setDiagrams, userId])
 
   const deleteDiagram = useCallback(async (id: string, name?: string) => {
+    // Clear active diagram immediately so any pending auto-save timer can't re-insert it
+    const store = useMindmapStore.getState()
+    if (store.activeMindmap?.id === id) {
+      store.setActiveMindmap(null as unknown as Diagram)
+      store.setIsDirty(false)
+    }
+    lsDeleteDiagram(id)
     if (!hasSupabase || !supabase || !userId) {
-      lsDeleteDiagram(id)
       setDiagrams(lsGetList())
+      soundDelete()
       showToast(`"${name ?? 'Map'}" deleted`, { color: '#1a1d2e' })
       return
     }
     await supabase.from('mindmaps').delete().eq('id', id).eq('user_id', userId)
     await loadDiagramList()
+    soundDelete()
     showToast(`"${name ?? 'Map'}" deleted`, { color: '#1a1d2e' })
   }, [loadDiagramList, setDiagrams, userId])
 
@@ -307,6 +288,7 @@ export function useDiagram(userId: string | null = null) {
     const { diagrams } = useMindmapStore.getState()
     const current = diagrams.find(d => d.id === id)
     const next = !(current?.isFav ?? false)
+    soundFavorite()
     // Optimistic update in store
     setDiagrams(diagrams.map(d => d.id === id ? { ...d, isFav: next } : d))
     // Persist to localStorage

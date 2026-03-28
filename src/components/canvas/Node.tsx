@@ -90,9 +90,9 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
     strokeColor = node.color
     strokeW = 2
   } else if (isMindmapCircle) {
-    // L1 mindmap circles: solid color fill
-    bg = node.color
-    textColor = '#ffffff'
+    // L1 mindmap circles: transparent fill with colored border
+    bg = 'transparent'
+    textColor = node.color
     strokeColor = node.color
     strokeW = 3
   } else {
@@ -107,7 +107,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   const iconColor = isRoot
     ? textColor
     : isMindmapCircle
-      ? '#ffffff'
+      ? node.color
       : node.depth === 1
         ? '#ffffff'
         : (node.color.startsWith('#') ? darkenColor(node.color, 0.35) : node.color)
@@ -356,9 +356,8 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
       ) : isMindmapCircle ? (
         <circle
           cx={displayW / 2} cy={node.height / 2} r={node.height / 2}
-          fill={bg} fillOpacity={bgOpacity}
-          stroke={strokeColor} strokeWidth={strokeW}
-          filter="drop-shadow(0 2px 8px rgba(0,0,0,0.18))"
+          fill={node.depth === 1 ? 'transparent' : bg} fillOpacity={node.depth === 1 ? 0 : bgOpacity}
+          stroke={strokeColor} strokeWidth={node.depth === 1 ? 2.5 : strokeW}
         />
       ) : (
         <rect

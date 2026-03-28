@@ -8,6 +8,7 @@ import { ImportModal } from '../modals/ImportModal'
 import { MindmapsLogo } from '../MindmapsLogo'
 import { getTheme } from '../../lib/themes'
 import { AIThinkingOverlay } from '../AIThinkingOverlay'
+import { soundHover, soundClick, soundCreate, soundPaste } from '../../lib/sounds'
 
 const MINDMAP_API_KEY = 'REDACTED_ROTATED_KEY'
 const MINDMAP_API_BASE = 'https://mindmaps-bheng.vercel.app'
@@ -72,7 +73,7 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
   const [activeTag, setActiveTag] = useState<string | null>(null) // null=All, '__no_tag__'=untagged, else tag name
   const [tagModalId, setTagModalId] = useState<string | null>(null)
   const [tagModalInput, setTagModalInput] = useState('')
-  const [bgLevel, setBgLevel] = useState<0|1|2>(() => {
+  const [bgLevel, _setBgLevel] = useState<0|1|2>(() => {
     const saved = localStorage.getItem('mindmaps:bgLevel')
     return (saved === '1' ? 1 : saved === '2' ? 2 : 0) as 0|1|2
   })
@@ -80,8 +81,6 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
   const [showImport, setShowImport] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const favScrollRef = useRef<HTMLDivElement>(null)
-  const pasteRef = useRef<HTMLTextAreaElement>(null)
-
   useEffect(() => { loadDiagramList() }, [])
 
   // Capture horizontal trackpad scroll on favorites row — prevent browser back/forward
@@ -124,23 +123,25 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
     const lines = trimmed.split('\n').filter(l => l.trim())
     const hasIndent = lines.some(l => /^(\s{4}|\t)/.test(l))
     if (isJson || (lines.length >= 2 && hasIndent)) {
+      soundPaste()
       useMindmapStore.getState().loadFromOutline(trimmed)
     } else {
       showToast('Incompatible format — paste JSON or indented outline', { color: '#ef4444', duration: 3000 })
     }
   }
 
-  // Keep the hidden textarea focused whenever no real input is active
+  // Capture paste anywhere on the page (no focus dependency)
   useEffect(() => {
-    function refocus() {
+    function onDocPaste(e: ClipboardEvent) {
       const active = document.activeElement
-      if (!active || active === document.body || active === pasteRef.current) {
-        pasteRef.current?.focus()
-      }
+      // Ignore if user is typing in a real input/textarea
+      if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) return
+      const text = e.clipboardData?.getData('text/plain') ?? ''
+      if (text.trim()) { e.preventDefault(); tryImport(text) }
     }
-    refocus()
-    document.addEventListener('click', refocus)
-    return () => document.removeEventListener('click', refocus)
+    document.addEventListener('paste', onDocPaste)
+    return () => document.removeEventListener('paste', onDocPaste)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // All unique tags for filter bar (preset + any used in diagrams)
@@ -161,6 +162,7 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
 
   async function handleCreate() {
     const name = newName.trim() || 'Untitled'
+    soundCreate()
     setCreating(true)
     await createDiagram(name)
     setNewName('')
@@ -238,18 +240,6 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
 
   return (
     <div style={{ minHeight: '100vh', background: BG, fontFamily: 'Inter, system-ui, sans-serif' }}>
-      {/* Hidden paste sink — stays focused when no real input is active */}
-      <textarea
-        ref={pasteRef}
-        aria-hidden="true"
-        readOnly={false}
-        style={{ position: 'fixed', opacity: 0, pointerEvents: 'none', width: 1, height: 1, top: 0, left: 0, zIndex: -1 }}
-        onPaste={e => {
-          const text = e.clipboardData?.getData('text/plain') ?? ''
-          if (text.trim()) { e.preventDefault(); tryImport(text) }
-        }}
-      />
-
       {showImport && <ImportModal onClose={() => setShowImport(false)} userId={user?.id} />}
 
       {/* AI thinking canvas overlay */}
@@ -988,7 +978,7 @@ function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isFav, onToggleFav, i
 
   return (
     <div
-      onMouseEnter={() => setHovered(true)}
+      onMouseEnter={() => { setHovered(true); soundHover() }}
       onMouseLeave={() => setHovered(false)}
       style={{
         background: 'var(--card-bg)',
@@ -1001,7 +991,7 @@ function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isFav, onToggleFav, i
           : '0 1px 4px rgba(0,0,0,0.06)',
         transform: hovered ? 'translateY(-2px)' : 'translateY(0)',
       }}
-      onClick={onOpen}
+      onClick={() => { soundClick(); onOpen() }}
     >
       {/* Header */}
       <div style={{ padding: '10px 13px 8px', background: '#f8fafc', borderBottom: '1px solid #eef0f5' }}>

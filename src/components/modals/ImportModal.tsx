@@ -83,16 +83,17 @@ Root Topic
     Branch B
         Item 3
 
-## Format 2 — JSON object with icons & emojis (paste on canvas with ⌘V)
-Any node at any depth can have an "icon" or "emoji" field.
+## Format 2 — JSON object with icons, emojis & colors (paste on canvas with ⌘V)
+Any node at any depth can have an optional "icon", "emoji", or "color" (hex) field.
+Colors are optional — children inherit parent color automatically.
 {
   "Root Title": [
-    { "icon": "brain", "Category": [
+    { "icon": "brain", "color": "#6366f1", "Category": [
         { "icon": "zap", "Sub Item": ["detail 1", "detail 2"] },
-        { "emoji": "🚀", "Another Sub": ["detail 3"] },
+        { "emoji": "🚀", "color": "#ec4899", "Another Sub": ["detail 3"] },
         "plain text leaf"
     ]},
-    { "emoji": "🎯", "Another Category": ["item 1", "item 2"] }
+    { "emoji": "🎯", "color": "#f97316", "Another Category": ["item 1", "item 2"] }
   ]
 }
 
@@ -112,7 +113,7 @@ Generate a mindmap outline for [TOPIC].
 Return JSON in this format:
 {
   "Root Title": [
-    { "icon": "<icon>", "Category Name": [
+    { "icon": "<icon>", "color": "<hex (optional)>", "Category Name": [
         { "icon": "<icon>", "Sub Category": ["leaf item", "leaf item"] },
         "plain leaf item"
     ]}
@@ -120,7 +121,9 @@ Return JSON in this format:
 }
 Use icons from this list: brain, zap, star, rocket, lightbulb, flame, code,
 database, globe, shield, chart, folder, settings, trophy, heart, flag, sparkles.
-Subcategories can also have icons or emojis. Minimum 3 items per node.
+color is optional (any hex value, e.g. "#6366f1"). If omitted, a default palette is used.
+Children inherit the parent's color. Subcategories can also have icons or emojis.
+Minimum 3 items per node.
 
 ## API — Outline import
 POST https://mindmaps-bheng.vercel.app/api/ai/mindmaps
@@ -205,14 +208,17 @@ export function ImportModal({ onClose, userId }: ImportModalProps) {
           <Row title="Paste — JSON object" badge="⌘V on canvas" badgeColor="#22c55e">
             <CodeBlock copyable code={`{
   "Root Title": [
-    { "icon": "brain", "Category": [
+    { "icon": "brain", "color": "#6366f1", "Category": [
         { "icon": "zap", "Sub Item": ["detail 1", "detail 2"] },
-        { "emoji": "🚀", "Another Sub": ["detail 3"] },
+        { "emoji": "🚀", "color": "#ec4899", "Another Sub": ["detail 3"] },
         "plain text leaf"
     ]},
-    { "emoji": "🎯", "Another Branch": ["item 1", "item 2"] }
+    { "emoji": "🎯", "color": "#f97316", "Another Branch": ["item 1", "item 2"] }
   ]
 }`} />
+            <p style={{ fontSize: 11, color: '#94a3b8', margin: '6px 0 0' }}>
+              <code style={{ background: '#f1f5f9', padding: '1px 5px', borderRadius: 3, fontSize: 10 }}>color</code> is optional — any hex value. Children inherit the parent's color automatically.
+            </p>
           </Row>
 
           <Row title="Supported icons" badge="icon field" badgeColor="#0ea5e9">
@@ -228,7 +234,7 @@ export function ImportModal({ onClose, userId }: ImportModalProps) {
             <CodeBlock copyable code={`Generate a mindmap for [TOPIC] as JSON:
 {
   "Root Title": [
-    { "icon": "<icon>", "Branch": [
+    { "icon": "<icon>", "color": "<hex>", "Branch": [
         { "icon": "<icon>", "Sub": ["leaf", "leaf"] },
         { "emoji": "🔥", "Sub2": ["leaf"] },
         "plain leaf"
@@ -237,6 +243,7 @@ export function ImportModal({ onClose, userId }: ImportModalProps) {
 }
 Icons (pick from): brain zap star rocket lightbulb flame code
 database globe shield chart folder settings trophy heart sparkles
+color is optional (any hex, e.g. "#6366f1"). Children inherit parent color.
 Sub-categories can also have icons or emojis. Min 3 items per node.`} />
           </Row>
 

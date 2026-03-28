@@ -4,6 +4,7 @@ import { getTheme } from '../../lib/themes'
 import { EdgeLayer } from './EdgeLayer'
 import { Node } from './Node'
 import { useKeyboard } from '../../hooks/useKeyboard'
+import { soundClick, soundCreate } from '../../lib/sounds'
 
 interface DiagramCanvasProps {
   onNodeSelect: (nodeId: string | null) => void
@@ -13,7 +14,7 @@ interface DiagramCanvasProps {
   onToggleFav?: () => void
 }
 
-export function DiagramCanvas({ onNodeSelect, readOnly, onDelete, isFav, onToggleFav }: DiagramCanvasProps) {
+export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
   const { activeMindmap, selectedNodeIds, setSelectedNodeIds, diagramType, lineStyle, themeId, addNode, reorderNode, isImporting, hideDetails } = useMindmapStore()
   const canvasBg = getTheme(themeId).canvasBg
   const svgRef = useRef<SVGSVGElement>(null!)
@@ -58,7 +59,7 @@ export function DiagramCanvas({ onNodeSelect, readOnly, onDelete, isFav, onToggl
     const maxX = Math.max(...nodes.map(n => n.x + n.width))
     const maxY = Math.max(...nodes.map(n => n.y + n.height))
     const pad = 80
-    const newZoom = Math.min((svgW - pad * 2) / (maxX - minX), (svgH - pad * 2) / (maxY - minY), MAX_ZOOM)
+    const newZoom = Math.min((svgW - pad * 2) / (maxX - minX), (svgH - pad * 2) / (maxY - minY), 1)
     const cx = (minX + maxX) / 2
     const cy = (minY + maxY) / 2
     setZoom(newZoom)
@@ -67,20 +68,6 @@ export function DiagramCanvas({ onNodeSelect, readOnly, onDelete, isFav, onToggl
     setPan({ x: svgW / 2 - cx * newZoom, y: svgH / 2 - cy * newZoom })
   }, [activeMindmap])
 
-  const setZoomLevel = useCallback((level: number) => {
-    const svg = svgRef.current
-    if (!svg) return
-    const { width: svgW, height: svgH } = svg.getBoundingClientRect()
-    setZoom(level)
-    zoomCurrentRef.current = level
-    zoomTargetRef.current = level
-    setPan(p => {
-      const cx = (svgW / 2 - p.x) / zoom
-      const cy = (svgH / 2 - p.y) / zoom
-      return { x: svgW / 2 - cx * level, y: svgH / 2 - cy * level }
-    })
-    flashZoomHud()
-  }, [zoom, flashZoomHud])
 
   // Auto-fit on initial diagram load or diagram type switch
   useEffect(() => {
@@ -343,6 +330,7 @@ export function DiagramCanvas({ onNodeSelect, readOnly, onDelete, isFav, onToggl
   }, [])
 
   const handleSelect = useCallback((id: string, multi: boolean) => {
+    soundClick()
     if (multi) {
       const next = selectedNodeIds.includes(id) ? selectedNodeIds.filter(n => n !== id) : [...selectedNodeIds, id]
       setSelectedNodeIds(next)
@@ -378,7 +366,7 @@ export function DiagramCanvas({ onNodeSelect, readOnly, onDelete, isFav, onToggl
               onDragMove={handleDragMove}
               onRootDragOffset={handleRootDragOffset}
               onDoubleClick={n => { setSelectedNodeIds([n.id]); onNodeSelect(n.id) }}
-              onAddChild={id => addNode(id)}
+              onAddChild={id => { soundCreate(); addNode(id) }}
               svgRef={svgRef}
               readOnly={readOnly}
               l1Colors={node.depth === 0 ? activeMindmap.nodes.filter(n => n.depth === 1).map(n => n.color) : undefined}
