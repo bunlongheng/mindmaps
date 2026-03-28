@@ -295,7 +295,7 @@ export default function App() {
           setShowConfetti(false)
           // Show map name toast after confetti finishes
           const name = useMindmapStore.getState().activeMindmap?.name
-          if (name) showToast(`🤖 ${name}`, { color: '#1a1d2e' })
+          if (name) showToast(name, { color: '#1a1d2e' })
           // Clean ?imported from URL without navigating
           const p = new URLSearchParams(window.location.search)
           p.delete('imported')
