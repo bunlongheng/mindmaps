@@ -231,7 +231,7 @@ export default async function handler(req: Request): Promise<Response> {
     id, user_id: userId, name: title,
     type, line_style: 'orthogonal',
     sharing_enabled: false, theme_id: themeId, nodes,
-    tags: ['AI', 'API'],
+    tags: ['AI'],
   })
 
   if (dbError) return json({ error: dbError.message }, 500)
