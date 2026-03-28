@@ -95,9 +95,28 @@ export function ImportModal({ onClose, userId }: ImportModalProps) {
         {/* Body */}
         <div style={{ overflowY: 'auto', padding: '20px 20px' }}>
 
-          <Row title="Paste JSON" badge="Auto-saves on paste" badgeColor="#22c55e">
-            <CodeBlock code={`# Press ⌘V / Ctrl+V anywhere on the canvas
-# Paste exported JSON → auto-creates a new map`} />
+          <Row title="Paste — Indented outline" badge="⌘V on canvas" badgeColor="#22c55e">
+            <CodeBlock copyable code={`Root Topic
+    Branch A
+        Item 1
+        Item 2
+    Branch B
+        Item 3`} />
+          </Row>
+
+          <Row title="Paste — JSON object" badge="⌘V on canvas" badgeColor="#22c55e">
+            <CodeBlock copyable code={`{
+  "Root Title": [
+    { "icon": "brain", "Category": ["item 1", "item 2"] }
+  ]
+}`} />
+          </Row>
+
+          <Row title="Paste — AI prompt template" badge="copy & use" badgeColor="#6366f1">
+            <CodeBlock copyable code={`Generate a mindmap outline for [TOPIC].
+Format as plain indented text: root topic on line 1,
+main branches indented 4 spaces, sub-items 8 spaces.
+Minimum 3 sub-items per branch. No bullets, no numbers.`} />
           </Row>
 
           <Row title="Supported diagram types" badge="type field">
