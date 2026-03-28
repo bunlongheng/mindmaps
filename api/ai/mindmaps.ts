@@ -144,7 +144,7 @@ export default async function handler(req: Request): Promise<Response> {
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
 
   const token = (req.headers.get('authorization') ?? '').replace(/^Bearer\s+/i, '').trim()
-  const expectedToken = process.env.MINDMAP_AI_API_KEY
+  const expectedToken = (process.env.MINDMAP_AI_API_KEY ?? '').trim()
   if (!expectedToken || token !== expectedToken) return json({ error: 'Unauthorized' }, 401)
 
   let body: { title?: string; outline?: string; type?: string; themeId?: string; lineStyle?: string; userId?: string; isFavorite?: boolean }

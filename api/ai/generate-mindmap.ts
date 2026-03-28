@@ -151,7 +151,7 @@ export default async function handler(req: Request): Promise<Response> {
 
   // Auth
   const token = (req.headers.get('authorization') ?? '').replace(/^Bearer\s+/i, '').trim()
-  const expectedToken = process.env.MINDMAP_AI_API_KEY
+  const expectedToken = (process.env.MINDMAP_AI_API_KEY ?? '').trim()
   if (!expectedToken || token !== expectedToken) return json({ error: 'Unauthorized' }, 401)
 
   let body: { prompt?: string; userId?: string; type?: string; themeId?: string }
