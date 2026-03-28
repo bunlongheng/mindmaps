@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import { useMindmapStore } from '../../store/mindmapStore'
 import { useDiagram } from '../../hooks/useDiagram'
 import type { DiagramMeta, MindmapNode } from '../../types'
-import { Plus, Search, Clock, Trash2, Star, LayoutGrid, Globe, Sparkles, Loader2, Tag, X } from 'lucide-react'
+import { Plus, Search, Clock, Trash2, Star, LayoutGrid, Globe, Sparkles, Loader2, Tag, X, Bot, Briefcase, User, BookOpen, Zap, GraduationCap, FlaskConical, Beaker, type LucideIcon } from 'lucide-react'
 import { MindmapsLogo } from '../MindmapsLogo'
 import { getTheme } from '../../lib/themes'
 import { AIThinkingOverlay } from '../AIThinkingOverlay'
@@ -30,6 +30,15 @@ function tagBg(tag: string, colorMap: Map<string, string>): string {
   return colorMap.get(tag) ?? '#64748b'
 }
 
+const TAG_ICONS: Record<string, LucideIcon> = {
+  AI: Bot, Work: Briefcase, Personal: User, Research: FlaskConical,
+  Learning: GraduationCap, API: Zap, Science: Beaker, Study: BookOpen,
+}
+function TagIcon({ tag, size = 11 }: { tag: string; size?: number }) {
+  const Icon = TAG_ICONS[tag] ?? Tag
+  return <Icon size={size} />
+}
+
 interface HomePageProps {
   onOpen: (id: string) => void
   user?: import('@supabase/supabase-js').User | null
@@ -52,7 +61,7 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
   const [aiPrompt, setAiPrompt] = useState('')
   const [aiLoading, setAiLoading] = useState(false)
   const [aiError, setAiError] = useState('')
-  const [activeTag, setActiveTag] = useState<string | null>(null)
+  const [activeTag, setActiveTag] = useState<string | null>(null) // null=All, '__no_tag__'=untagged, else tag name
   const [showUserMenu, setShowUserMenu] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const favScrollRef = useRef<HTMLDivElement>(null)
@@ -88,7 +97,10 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
   const filtered = diagrams.filter(d => {
     const matchSearch = d.name.toLowerCase().includes(search.toLowerCase())
     const tags = d.tags ?? []
-    const matchTag = activeTag === null ? tags.length === 0 : tags.includes(activeTag)
+    const matchTag =
+      activeTag === null ? true :
+      activeTag === '__no_tag__' ? tags.length === 0 :
+      tags.includes(activeTag)
     return matchSearch && matchTag
   })
 
@@ -270,37 +282,72 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
 
       {/* Tag filter bar */}
       <div style={{
-        display: 'flex', gap: 6, overflowX: 'auto', padding: '10px 16px',
+        display: 'flex', gap: 6, overflowX: 'auto', padding: '8px 16px',
         borderBottom: `1px solid ${BORDER}`, background: SURFACE,
-        scrollbarWidth: 'none',
+        scrollbarWidth: 'none', alignItems: 'center',
       }}>
-        <button
-          onClick={() => setActiveTag(null)}
-          style={{
-            padding: '5px 14px', borderRadius: 20, fontSize: 12, fontWeight: 600,
-            fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
-            border: activeTag === null ? 'none' : `1px solid ${BORDER}`,
-            background: activeTag === null ? '#1e293b' : 'transparent',
-            color: activeTag === null ? '#fff' : TEXT_MUTED,
-            transition: 'all 0.15s',
-          }}
-        >All</button>
+        {/* All */}
+        {(() => {
+          const isActive = activeTag === null
+          return (
+            <button onClick={() => setActiveTag(null)} style={{
+              display: 'flex', alignItems: 'center', gap: 5,
+              padding: '5px 13px', borderRadius: 999, fontSize: 12, fontWeight: 600,
+              fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+              border: isActive ? '1.5px solid #1e293b' : `1.5px solid ${BORDER}`,
+              background: isActive ? '#1e293b' : '#fff',
+              color: isActive ? '#fff' : TEXT_MUTED,
+              transition: 'all 0.15s',
+            }}>
+              All
+              <span style={{ fontSize: 11, fontWeight: 700, opacity: 0.7 }}>{diagrams.length}</span>
+            </button>
+          )
+        })()}
+
+        {/* Tag pills */}
         {allTags.map(tag => {
           const bg = tagBg(tag, tagColorMap)
           const isActive = activeTag === tag
+          const count = diagrams.filter(d => (d.tags ?? []).includes(tag)).length
           return (
             <button key={tag} onClick={() => setActiveTag(isActive ? null : tag)}
               style={{
-                padding: '5px 14px', borderRadius: 20, fontSize: 12, fontWeight: 600,
+                display: 'flex', alignItems: 'center', gap: 5,
+                padding: '5px 13px', borderRadius: 999, fontSize: 12, fontWeight: 600,
                 fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
-                border: isActive ? 'none' : `1px solid ${bg}44`,
-                background: isActive ? bg : `${bg}18`,
+                border: isActive ? `1.5px solid ${bg}` : `1.5px solid ${bg}55`,
+                background: isActive ? bg : `${bg}12`,
                 color: isActive ? '#fff' : bg,
                 transition: 'all 0.15s',
-              }}
-            >{tag}</button>
+              }}>
+              <TagIcon tag={tag} size={11} />
+              {tag}
+              <span style={{ fontSize: 11, fontWeight: 700, opacity: isActive ? 0.85 : 0.6 }}>{count}</span>
+            </button>
           )
         })}
+
+        {/* No Tag */}
+        {(() => {
+          const isActive = activeTag === '__no_tag__'
+          const count = diagrams.filter(d => (d.tags ?? []).length === 0).length
+          return (
+            <button onClick={() => setActiveTag(isActive ? null : '__no_tag__')} style={{
+              display: 'flex', alignItems: 'center', gap: 5,
+              padding: '5px 13px', borderRadius: 999, fontSize: 12, fontWeight: 600,
+              fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+              border: isActive ? '1.5px solid #64748b' : `1.5px solid ${BORDER}`,
+              background: isActive ? '#64748b' : '#fff',
+              color: isActive ? '#fff' : TEXT_MUTED,
+              transition: 'all 0.15s',
+            }}>
+              <Tag size={11} />
+              No Tag
+              <span style={{ fontSize: 11, fontWeight: 700, opacity: 0.7 }}>{count}</span>
+            </button>
+          )
+        })()}
       </div>
 
       <main style={{ maxWidth: '100%' }} className="home-main">
