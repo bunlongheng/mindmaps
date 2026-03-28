@@ -294,7 +294,7 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
       </header>
 
       {/* Tag filter bar */}
-      <div style={{ borderBottom: `1px solid ${BORDER}`, background: SURFACE }}>
+      <div style={{ borderBottom: '1px solid #b0b8cc', background: SURFACE }}>
       <div style={{
         display: 'flex', gap: 6, overflowX: 'auto', padding: '8px 16px',
         scrollbarWidth: 'none', alignItems: 'center',
