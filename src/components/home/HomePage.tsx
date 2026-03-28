@@ -204,7 +204,7 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
 
       {/* Top nav */}
       <header style={{
-        background: 'rgba(238,240,245,0.88)', backdropFilter: 'blur(16px)',
+        background: '#fff',
         borderBottom: `1px solid ${BORDER}`,
         height: 56,
         position: 'sticky', top: 0, zIndex: 10,
@@ -233,21 +233,6 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
         </div>
 
         <div style={{ flex: 1 }} />
-
-        {/* Avatar + dropdown */}
-        {/* BG level toggle */}
-        <div style={{ display: 'flex', gap: 5, alignItems: 'center', flexShrink: 0 }}>
-          {(['#eef0f5','#e0e3ec','#d0d4e0'] as const).map((c, i) => (
-            <button key={i} onClick={() => { setBgLevel(i as 0|1|2); localStorage.setItem('mindmaps:bgLevel', String(i)) }}
-              title={['Light','Darker','Darkest'][i]}
-              style={{
-                width: 16, height: 16, borderRadius: '50%', border: bgLevel === i ? '2px solid #6366f1' : '1.5px solid #c8cedc',
-                background: c, cursor: 'pointer', padding: 0, flexShrink: 0,
-                boxShadow: bgLevel === i ? '0 0 0 2px #fff, 0 0 0 4px #6366f1' : 'none',
-                transition: 'box-shadow 0.15s',
-              }} />
-          ))}
-        </div>
 
         {user && (
           <div ref={menuRef} style={{ position: 'relative' }}>
