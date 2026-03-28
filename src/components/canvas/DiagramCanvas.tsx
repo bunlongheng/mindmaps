@@ -4,8 +4,6 @@ import { getTheme } from '../../lib/themes'
 import { EdgeLayer } from './EdgeLayer'
 import { Node } from './Node'
 import { useKeyboard } from '../../hooks/useKeyboard'
-import { exportDiagramAsPdf } from '../../lib/export/exportPdf'
-import { FileDown, Trash2, Star } from 'lucide-react'
 
 interface DiagramCanvasProps {
   onNodeSelect: (nodeId: string | null) => void
@@ -35,7 +33,6 @@ export function DiagramCanvas({ onNodeSelect, readOnly, onDelete, isFav, onToggl
     }
   }, [activeMindmap?.id])
 
-  const [showZoomMenu, setShowZoomMenu] = useState(false)
   const [showZoomHud, setShowZoomHud] = useState(false)
   const zoomHudTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isZoomingRef = useRef(false)
@@ -489,125 +486,6 @@ export function DiagramCanvas({ onNodeSelect, readOnly, onDelete, isFav, onToggl
         )
       })()}
 
-      {/* Bottom bar */}
-      <style>{`
-        .canvas-bottom-bar { height: 28px !important; }
-        .canvas-bottom-btn { height: 20px !important; font-size: 11px !important; }
-        @media (max-width: 768px) {
-          .canvas-bottom-bar { height: 48px !important; }
-          .canvas-bottom-btn { height: 34px !important; padding: 0 14px !important; font-size: 13px !important; border-radius: 8px !important; }
-        }
-      `}</style>
-      <div className="canvas-bottom-bar" style={{
-        position: 'absolute', bottom: 38, left: 0, right: 0,
-        background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(8px)',
-        borderTop: '1px solid #e8eaed',
-        display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center',
-        padding: '0 8px',
-      }}>
-        {/* Left: empty */}
-        <div />
-
-        {/* Center: PDF + Fav + Delete */}
-        {activeMindmap ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <button
-              onClick={() => exportDiagramAsPdf(activeMindmap.name)}
-              title="Download PDF"
-              className="canvas-bottom-btn"
-              style={{
-                height: 20, padding: '0 8px', border: '1px solid #e2e8f0', borderRadius: 5,
-                background: 'transparent', cursor: 'pointer', fontSize: 11, fontWeight: 500,
-                color: '#64748b', fontFamily: 'Inter, system-ui, sans-serif',
-                display: 'flex', alignItems: 'center', gap: 4,
-              }}
-            >
-              <FileDown size={11} /> PDF
-            </button>
-            {onToggleFav && (
-              <button
-                onClick={onToggleFav}
-                title={isFav ? 'Unfavorite' : 'Favorite'}
-                className="canvas-bottom-btn"
-                style={{
-                  height: 20, padding: '0 8px', border: '1px solid #e2e8f0', borderRadius: 5,
-                  background: 'transparent', cursor: 'pointer', fontSize: 11, fontWeight: 500,
-                  color: isFav ? '#eab308' : '#94a3b8', fontFamily: 'Inter, system-ui, sans-serif',
-                  display: 'flex', alignItems: 'center', gap: 4,
-                }}
-              >
-                <Star size={10} fill={isFav ? '#eab308' : 'none'} /> Star
-              </button>
-            )}
-            {onDelete && (
-              <button
-                onClick={onDelete}
-                title="Delete map"
-                className="canvas-bottom-btn"
-                style={{
-                  height: 20, padding: '0 8px', border: '1px solid #fecaca', borderRadius: 5,
-                  background: 'transparent', cursor: 'pointer', fontSize: 11, fontWeight: 500,
-                  color: '#ef4444', fontFamily: 'Inter, system-ui, sans-serif',
-                  display: 'flex', alignItems: 'center', gap: 4,
-                }}
-              >
-                <Trash2 size={10} /> Delete
-              </button>
-            )}
-          </div>
-        ) : <div />}
-
-        {/* Right: Zoom */}
-        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-
-        {/* Zoom button */}
-        <div style={{ position: 'relative' }}>
-          <button
-            onClick={() => setShowZoomMenu(m => !m)}
-            style={{
-              height: 20, padding: '0 8px', border: '1px solid #e2e8f0', borderRadius: 5,
-              background: showZoomMenu ? '#f1f5f9' : 'transparent',
-              cursor: 'pointer', fontSize: 11, fontWeight: 500, color: '#64748b',
-              fontFamily: 'Inter, system-ui, sans-serif', display: 'flex', alignItems: 'center', gap: 4,
-            }}
-          >
-            {Math.round(zoom * 100)}% ▾
-          </button>
-
-          {showZoomMenu && (
-            <div
-              style={{
-                position: 'absolute', bottom: 26, right: 0,
-                background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8,
-                boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
-                padding: '4px 0', minWidth: 110, zIndex: 50,
-              }}
-              onMouseLeave={() => setShowZoomMenu(false)}
-            >
-              {([
-                { label: 'Fit', action: () => { fitView(); setShowZoomMenu(false) }, isFit: true },
-                { label: '200%', action: () => { setZoomLevel(2); setShowZoomMenu(false) } },
-                { label: '150%', action: () => { setZoomLevel(1.5); setShowZoomMenu(false) } },
-                { label: '100%', action: () => { setZoomLevel(1); setShowZoomMenu(false) } },
-                { label: '75%',  action: () => { setZoomLevel(0.75); setShowZoomMenu(false) } },
-                { label: '50%',  action: () => { setZoomLevel(0.5); setShowZoomMenu(false) } },
-                { label: '25%',  action: () => { setZoomLevel(0.25); setShowZoomMenu(false) } },
-              ] as { label: string; action: () => void; isFit?: boolean }[]).map(({ label, action, isFit }) => (
-                <button key={label} onClick={action} style={{
-                  display: 'block', width: '100%', padding: '6px 12px',
-                  border: 'none', background: 'transparent', cursor: 'pointer',
-                  fontSize: 12, textAlign: 'left', fontFamily: 'inherit',
-                  color: isFit ? '#3b82f6' : '#374151', fontWeight: isFit ? 600 : 400,
-                }}
-                  onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
-                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                >{label}</button>
-              ))}
-            </div>
-          )}
-        </div>
-        </div>
-      </div>
     </div>
   )
 }

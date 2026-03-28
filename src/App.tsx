@@ -10,7 +10,8 @@ import { useDiagram } from './hooks/useDiagram'
 import { useMindmapStore } from './store/mindmapStore'
 import { decodeShareURL } from './lib/export/share'
 import { supabase, hasSupabase } from './lib/supabase'
-import { ArrowLeft, SlidersHorizontal, Tag, X } from 'lucide-react'
+import { ArrowLeft, SlidersHorizontal, Tag, X, FileDown, Star, Trash2 } from 'lucide-react'
+import { exportDiagramAsPdf } from './lib/export/exportPdf'
 import { Confetti } from './components/Confetti'
 
 // 8 cohesive colors — all Tailwind-500 level, same saturation family
@@ -452,6 +453,34 @@ export default function App() {
             }}>
               + Tag
             </button>
+
+            {/* Spacer */}
+            <div style={{ flex: 1 }} />
+
+            {/* PDF / Star / Delete */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+              <button onClick={() => exportDiagramAsPdf(activeMindmap!.name)} title="Download PDF" style={{
+                height: 22, padding: '0 8px', border: '1px solid #e2e8f0', borderRadius: 6,
+                background: 'transparent', cursor: 'pointer', fontSize: 11, fontWeight: 500,
+                color: '#64748b', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 4,
+              }}>
+                <FileDown size={11} /> PDF
+              </button>
+              <button onClick={() => toggleFavorite(activeMindmap!.id)} title={isFav ? 'Unfavorite' : 'Favorite'} style={{
+                height: 22, padding: '0 8px', border: '1px solid #e2e8f0', borderRadius: 6,
+                background: 'transparent', cursor: 'pointer', fontSize: 11, fontWeight: 500,
+                color: isFav ? '#eab308' : '#94a3b8', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 4,
+              }}>
+                <Star size={11} fill={isFav ? '#eab308' : 'none'} /> Star
+              </button>
+              <button onClick={() => setShowDeleteConfirm(true)} title="Delete map" style={{
+                height: 22, padding: '0 8px', border: '1px solid #fecaca', borderRadius: 6,
+                background: 'transparent', cursor: 'pointer', fontSize: 11, fontWeight: 500,
+                color: '#ef4444', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 4,
+              }}>
+                <Trash2 size={11} /> Delete
+              </button>
+            </div>
 
             {/* Tag picker popover */}
             {showTagFooter && (
