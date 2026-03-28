@@ -425,7 +425,7 @@ export default function App() {
             position: 'fixed', bottom: 0, left: 0, right: showPanel ? 256 : 0,
             zIndex: 15, background: 'rgba(255,255,255,0.94)', backdropFilter: 'blur(12px)',
             borderTop: '1px solid #e8eaed',
-            display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '6px 14px',
             minHeight: 38,
           }}>
             {/* Tag icon */}
@@ -453,9 +453,6 @@ export default function App() {
             }}>
               + Tag
             </button>
-
-            {/* Spacer */}
-            <div style={{ flex: 1 }} />
 
             {/* PDF / Star / Delete */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
