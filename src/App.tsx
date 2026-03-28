@@ -77,6 +77,18 @@ export default function App() {
     return () => subscription.unsubscribe()
   }, [])
 
+  // Subscribe to real-time push notifications (toast broadcasts from /api/notify)
+  useEffect(() => {
+    if (!hasSupabase || !supabase) return
+    const ch = supabase
+      .channel('app-notifications')
+      .on('broadcast', { event: 'toast' }, ({ payload }) => {
+        showToast(payload.message, { color: payload.color ?? '#6366f1', confetti: payload.confetti ?? false })
+      })
+      .subscribe()
+    return () => { supabase!.removeChannel(ch) }
+  }, [])
+
   // Local dev: fall back to the hardcoded dev user ID so Supabase queries work without auth.
   // Triple-locked: only when (1) isLocal, (2) no real session, (3) env var is set.
   const effectiveUserId = user?.id ?? (isLocal ? (import.meta.env.VITE_LOCAL_USER_ID ?? null) : null)
