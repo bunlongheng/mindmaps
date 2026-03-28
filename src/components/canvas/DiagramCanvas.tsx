@@ -499,7 +499,7 @@ export function DiagramCanvas({ onNodeSelect, readOnly, onDelete, isFav, onToggl
         }
       `}</style>
       <div className="canvas-bottom-bar" style={{
-        position: 'absolute', bottom: 0, left: 0, right: 0,
+        position: 'absolute', bottom: 38, left: 0, right: 0,
         background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(8px)',
         borderTop: '1px solid #e8eaed',
         display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center',
