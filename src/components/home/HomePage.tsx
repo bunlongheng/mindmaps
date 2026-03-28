@@ -87,7 +87,8 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
 
   const filtered = diagrams.filter(d => {
     const matchSearch = d.name.toLowerCase().includes(search.toLowerCase())
-    const matchTag = activeTag === null || (d.tags ?? []).includes(activeTag)
+    const tags = d.tags ?? []
+    const matchTag = activeTag === null ? tags.length === 0 : tags.includes(activeTag)
     return matchSearch && matchTag
   })
 
