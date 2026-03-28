@@ -231,10 +231,22 @@ export default async function handler(req: Request): Promise<Response> {
     id, user_id: userId, name: title,
     type, line_style: 'orthogonal',
     sharing_enabled: false, theme_id: themeId, nodes,
-    tags: ['AI'],
+    tags: ['AI', 'API'],
   })
 
   if (dbError) return json({ error: dbError.message }, 500)
+
+  // Broadcast to all connected clients so they get a live toast + card flash
+  await fetch(`${supabaseUrl}/realtime/v1/api/broadcast`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${serviceKey}`, 'Content-Type': 'application/json', 'apikey': serviceKey },
+    body: JSON.stringify({
+      messages: [{ topic: 'realtime:app-notifications', event: 'broadcast', payload: {
+        type: 'broadcast', event: 'diagram-created',
+        payload: { id, title, nodeCount: nodes.length },
+      }}],
+    }),
+  }).catch(() => {/* non-fatal */})
 
   const appUrl = process.env.MINDMAP_APP_URL ?? 'https://mindmaps-bheng.vercel.app'
   return json({ id, title, url: `${appUrl}/?id=${id}`, nodeCount: nodes.length }, 201)

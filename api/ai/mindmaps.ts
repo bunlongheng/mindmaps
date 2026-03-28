@@ -169,8 +169,20 @@ export default async function handler(req: Request): Promise<Response> {
     if (!nodes.length) nodes = parseOutline(outline)
   }
 
-  const { error } = await supabase.from('mindmaps').insert({ id, user_id: userId, name: title, type, line_style: lineStyle, sharing_enabled: true, theme_id: themeId, nodes, is_favorite: isFavorite })
+  const { error } = await supabase.from('mindmaps').insert({ id, user_id: userId, name: title, type, line_style: lineStyle, sharing_enabled: true, theme_id: themeId, nodes, is_favorite: isFavorite, tags: ['API'] })
   if (error) return json({ error: error.message }, 500)
+
+  // Broadcast to all connected clients so they get a live toast + card flash
+  await fetch(`${supabaseUrl}/realtime/v1/api/broadcast`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${serviceKey}`, 'Content-Type': 'application/json', 'apikey': serviceKey },
+    body: JSON.stringify({
+      messages: [{ topic: 'realtime:app-notifications', event: 'broadcast', payload: {
+        type: 'broadcast', event: 'diagram-created',
+        payload: { id, title, nodeCount: nodes.length },
+      }}],
+    }),
+  }).catch(() => {/* non-fatal */})
 
   const appUrl = process.env.MINDMAP_APP_URL ?? 'https://mindmaps-bheng.vercel.app'
   return json({ id, url: `${appUrl}/?id=${id}`, nodeCount: nodes.length }, 201)

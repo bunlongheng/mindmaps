@@ -84,6 +84,12 @@ export default function App() {
       .on('broadcast', { event: 'toast' }, ({ payload }) => {
         showToast(payload.message, { color: payload.color ?? '#6366f1', confetti: payload.confetti ?? false })
       })
+      .on('broadcast', { event: 'diagram-created' }, ({ payload }) => {
+        showToast(`✦ "${payload.title}" added`, { color: '#6366f1' })
+        setFlashDiagramId(payload.id)
+        loadDiagramList()
+        setTimeout(() => setFlashDiagramId(null), 3500)
+      })
       .subscribe()
     return () => { supabase!.removeChannel(ch) }
   }, [])
@@ -93,6 +99,7 @@ export default function App() {
   const effectiveUserId = user?.id ?? (isLocal ? (import.meta.env.VITE_LOCAL_USER_ID ?? null) : null)
   const { loadDiagramList, loadDiagram, saveDiagram, createDiagramFromNodes, deleteDiagram, toggleFavorite, updateTags } = useDiagram(effectiveUserId)
   const { activeMindmap, isDirty, setActiveMindmap, addNode, selectedNodeIds, setSelectedNodeIds, setPasteImportFn, diagrams } = useMindmapStore()
+  const [flashDiagramId, setFlashDiagramId] = useState<string | null>(null)
   const [showTagFooter, setShowTagFooter] = useState(false)
   const [tagInput, setTagInput] = useState('')
   const tagFooterRef = useRef<HTMLDivElement>(null)
@@ -252,7 +259,7 @@ export default function App() {
   if (view === 'home') return (
     <>
       <CuteToast />
-      <HomePage onOpen={handleOpenDiagram} user={user} onSignOut={handleSignOut} />
+      <HomePage onOpen={handleOpenDiagram} user={user} onSignOut={handleSignOut} flashId={flashDiagramId} />
     </>
   )
 

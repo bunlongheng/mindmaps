@@ -48,9 +48,10 @@ interface HomePageProps {
   onOpen: (id: string) => void
   user?: import('@supabase/supabase-js').User | null
   onSignOut?: () => void
+  flashId?: string | null
 }
 
-export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
+export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
   const { diagrams } = useMindmapStore()
   const { loadDiagramList, createDiagram, deleteDiagram, toggleFavorite, updateTags } = useDiagram(user?.id ?? null)
 
@@ -410,6 +411,7 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
                       isFav={true} onToggleFav={() => toggleFavorite(d.id)} isPublic={d.isPublic}
                       tags={d.tags} tagColorMap={tagColorMap}
                       onTagEdit={() => { setTagModalId(d.id); setTagModalInput('') }}
+                      flash={flashId === d.id}
                     />
                   </div>
                 ))}
@@ -438,6 +440,7 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
                   isFav={false} onToggleFav={() => toggleFavorite(d.id)} isPublic={d.isPublic}
                   tags={d.tags} tagColorMap={tagColorMap}
                   onTagEdit={() => { setTagModalId(d.id); setTagModalInput('') }}
+                  flash={flashId === d.id}
                 />
               ))}
             </div>
@@ -466,6 +469,12 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
         @keyframes fabPulse {
           0%, 100% { box-shadow: 0 4px 24px rgba(99,102,241,0.5); transform: scale(1); }
           50%       { box-shadow: 0 4px 40px rgba(99,102,241,0.75); transform: scale(1.06); }
+        }
+        @keyframes cardFlash {
+          0%   { box-shadow: 0 0 0 2px #6366f1, 0 0 24px rgba(99,102,241,0.6); border-color: #6366f1; }
+          40%  { box-shadow: 0 0 0 4px #6366f1, 0 0 40px rgba(99,102,241,0.8); border-color: #6366f1; }
+          70%  { box-shadow: 0 0 0 2px #6366f1, 0 0 20px rgba(99,102,241,0.5); border-color: #6366f1; }
+          100% { box-shadow: 0 1px 4px rgba(0,0,0,0.06); border-color: var(--card-border); }
         }
         input::placeholder { color: #94a3b8 !important; }
         .home-grid {
@@ -917,10 +926,10 @@ function DiagramMinimap({ id, type }: { id: string; type: string }) {
 
 // ── DiagramCard ────────────────────────────────────────────────────────────
 
-function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isFav, onToggleFav, isPublic, tags, tagColorMap, onTagEdit }: {
+function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isFav, onToggleFav, isPublic, tags, tagColorMap, onTagEdit, flash }: {
   diagram: DiagramMeta; timeAgo: string; onOpen: () => void; onDelete: () => void
   isFav: boolean; onToggleFav: () => void; isPublic?: boolean; tags?: string[]
-  tagColorMap: Map<string, string>; onTagEdit: () => void
+  tagColorMap: Map<string, string>; onTagEdit: () => void; flash?: boolean
 }) {
   const [hovered, setHovered] = useState(false)
   const currentTags = tags ?? []
@@ -931,10 +940,11 @@ function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isFav, onToggleFav, i
       onMouseLeave={() => setHovered(false)}
       style={{
         background: 'var(--card-bg)',
-        border: `1px solid ${hovered ? 'var(--card-border-hover)' : 'var(--card-border)'}`,
+        border: `1px solid ${flash ? '#6366f1' : hovered ? 'var(--card-border-hover)' : 'var(--card-border)'}`,
         borderRadius: 16, overflow: 'hidden', cursor: 'pointer', position: 'relative',
-        transition: 'border-color 0.2s, box-shadow 0.2s, transform 0.2s',
-        boxShadow: hovered
+        transition: flash ? 'none' : 'border-color 0.2s, box-shadow 0.2s, transform 0.2s',
+        animation: flash ? 'cardFlash 3s ease-out forwards' : undefined,
+        boxShadow: hovered && !flash
           ? '0 0 0 3px rgba(99,102,241,0.08), 0 0 20px rgba(99,102,241,0.14), 0 4px 16px rgba(0,0,0,0.07)'
           : '0 1px 4px rgba(0,0,0,0.06)',
         transform: hovered ? 'translateY(-2px)' : 'translateY(0)',
