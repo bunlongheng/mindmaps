@@ -25,6 +25,9 @@ const PHRASES = [
 
 const RAND_CHARS = '01ABCDEFxyz!@#[]{}|<>?/*+-=~'.split('')
 
+// Pick random font size for the big center word
+const BIG_SIZES = [96, 120, 144, 160, 180]
+
 function pick<T>(arr: T[]): T { return arr[Math.floor(Math.random() * arr.length)] }
 
 interface Particle {
@@ -53,10 +56,21 @@ export function AIThinkingOverlay() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const rafRef = useRef(0)
   const [phraseIdx, setPhraseIdx] = useState(0)
+  const [centerIdx, setCenterIdx] = useState(() => Math.floor(Math.random() * AI_WORDS.length))
+  const [centerSize, setCenterSize] = useState(() => pick(BIG_SIZES))
 
   // Rotate phrase every 1.3s
   useEffect(() => {
     const t = setInterval(() => setPhraseIdx(i => (i + 1) % PHRASES.length), 1300)
+    return () => clearInterval(t)
+  }, [])
+
+  // Rotate big center word every 1.1s (slightly faster, different rhythm)
+  useEffect(() => {
+    const t = setInterval(() => {
+      setCenterIdx(Math.floor(Math.random() * AI_WORDS.length))
+      setCenterSize(pick(BIG_SIZES))
+    }, 1100)
     return () => clearInterval(t)
   }, [])
 
@@ -82,26 +96,8 @@ export function AIThinkingOverlay() {
       const dt = Math.min((now - last) / 1000, 0.05)
       last = now
       const W = canvas!.width, H = canvas!.height
-      const cx = W / 2, cy = H / 2
-      const t = now / 1000
-      const orbR = 75 + 18 * Math.sin(t * Math.PI)
 
       ctx.clearRect(0, 0, W, H)
-
-      // ── Orb glow ─────────────────────────────────────────────────
-      const outer = ctx.createRadialGradient(cx, cy, 0, cx, cy, orbR * 2.2)
-      outer.addColorStop(0,   'rgba(60,60,80,0.0)')
-      outer.addColorStop(0.3, 'rgba(40,40,60,0.18)')
-      outer.addColorStop(1,   'rgba(20,20,40,0)')
-      ctx.beginPath(); ctx.arc(cx, cy, orbR * 2.2, 0, Math.PI * 2)
-      ctx.fillStyle = outer; ctx.fill()
-
-      const inner = ctx.createRadialGradient(cx, cy, 0, cx, cy, orbR)
-      inner.addColorStop(0,   'rgba(220,220,235,0.92)')
-      inner.addColorStop(0.45,'rgba(100,100,130,0.72)')
-      inner.addColorStop(1,   'rgba(30,30,50,0.40)')
-      ctx.beginPath(); ctx.arc(cx, cy, orbR, 0, Math.PI * 2)
-      ctx.fillStyle = inner; ctx.fill()
 
       // ── Particles ────────────────────────────────────────────────
       for (const p of particles) {
@@ -113,16 +109,6 @@ export function AIThinkingOverlay() {
           p.color  = pick(VIVID_COLORS)
           p.flipIn = 0.6 + Math.random() * 1.4
           p.opacity = 0.25 + Math.random() * 0.6
-        }
-
-        // Repel from orb
-        const dx = p.x - cx, dy = p.y - cy
-        const dist = Math.hypot(dx, dy)
-        const repelR = orbR + 28
-        if (dist < repelR && dist > 0.5) {
-          const f = ((repelR - dist) / repelR) * 2.4
-          p.vx += (dx / dist) * f * dt * 12
-          p.vy += (dy / dist) * f * dt * 12
         }
 
         // Damp + clamp
@@ -138,9 +124,6 @@ export function AIThinkingOverlay() {
         else if (p.x > W + 60) p.x = -60
         if (p.y < -60) p.y = H + 60
         else if (p.y > H + 60) p.y = -60
-
-        // Skip inside orb
-        if (dist < orbR + 2) continue
 
         ctx.globalAlpha = p.opacity
         ctx.fillStyle = p.color
@@ -167,8 +150,29 @@ export function AIThinkingOverlay() {
     }}>
       <canvas ref={canvasRef} style={{ position: 'absolute', inset: 0 }} />
 
-      {/* Rotating phrase — remount on phraseIdx change triggers fade-in */}
-      <div key={phraseIdx} style={{
+      {/* Big center word */}
+      <div key={`w-${centerIdx}`} style={{
+        position: 'absolute',
+        left: '50%', top: '50%',
+        transform: 'translate(-50%, -50%)',
+        fontSize: centerSize,
+        fontWeight: 900,
+        fontFamily: '"JetBrains Mono", "Fira Mono", monospace',
+        color: '#fff',
+        opacity: 0.92,
+        letterSpacing: '-0.04em',
+        whiteSpace: 'nowrap',
+        animation: 'wordPop 0.18s ease-out',
+        zIndex: 1,
+        userSelect: 'none',
+        pointerEvents: 'none',
+        textShadow: '0 0 60px rgba(255,255,255,0.08)',
+      }}>
+        {AI_WORDS[centerIdx]}
+      </div>
+
+      {/* Rotating phrase at bottom */}
+      <div key={`p-${phraseIdx}`} style={{
         position: 'absolute', bottom: 64,
         left: '50%', transform: 'translateX(-50%)',
         color: '#94a3b8', fontSize: 14, fontWeight: 500,
@@ -181,6 +185,10 @@ export function AIThinkingOverlay() {
       </div>
 
       <style>{`
+        @keyframes wordPop {
+          from { opacity: 0; transform: translate(-50%, -50%) scale(0.88); }
+          to   { opacity: 0.92; transform: translate(-50%, -50%) scale(1); }
+        }
         @keyframes phraseIn {
           from { opacity: 0; transform: translateX(-50%) translateY(6px); }
           to   { opacity: 1; transform: translateX(-50%) translateY(0); }
