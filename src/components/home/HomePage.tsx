@@ -117,23 +117,37 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
   }, [createDiagramFromNodes, onOpen])
 
   useEffect(() => {
-    function onPaste(e: ClipboardEvent) {
-      const tag = (e.target as HTMLElement).tagName.toLowerCase()
-      if (tag === 'input' || tag === 'textarea') return
-      const text = e.clipboardData?.getData('text/plain')?.trim() ?? ''
-      if (!text) return
-      const isJson = text.startsWith('{') || text.startsWith('[')
-      const lines = text.split('\n').filter(l => l.trim())
+    function tryImport(text: string) {
+      const trimmed = text.trim()
+      if (!trimmed) return
+      const isJson = trimmed.startsWith('{') || trimmed.startsWith('[')
+      const lines = trimmed.split('\n').filter(l => l.trim())
       const hasIndent = lines.some(l => /^(\s{4}|\t)/.test(l))
       if (isJson || (lines.length >= 2 && hasIndent)) {
-        e.preventDefault()
-        useMindmapStore.getState().loadFromOutline(text)
+        useMindmapStore.getState().loadFromOutline(trimmed)
       } else {
         showToast('Incompatible format — paste JSON or indented outline', { color: '#ef4444', duration: 3000 })
       }
     }
+    function onKeyDown(e: KeyboardEvent) {
+      const tag = (e.target as HTMLElement).tagName.toLowerCase()
+      if (tag === 'input' || tag === 'textarea') return
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key === 'v') {
+        navigator.clipboard?.readText().then(tryImport).catch(() => {})
+      }
+    }
+    function onPaste(e: ClipboardEvent) {
+      const tag = (e.target as HTMLElement).tagName.toLowerCase()
+      if (tag === 'input' || tag === 'textarea') return
+      const text = e.clipboardData?.getData('text/plain') ?? ''
+      if (text.trim()) { e.preventDefault(); tryImport(text) }
+    }
+    window.addEventListener('keydown', onKeyDown)
     window.addEventListener('paste', onPaste)
-    return () => window.removeEventListener('paste', onPaste)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('paste', onPaste)
+    }
   }, [])
 
   // All unique tags for filter bar (preset + any used in diagrams)
