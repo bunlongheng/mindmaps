@@ -12,11 +12,16 @@ const MINDMAP_API_BASE = 'https://mindmaps-bheng.vercel.app'
 
 const PRESET_TAGS = ['AI', 'Work', 'Personal', 'Research']
 
-// 12 unique palette colors — each tag gets one by sorted position
+// 8 cohesive colors — all Tailwind-500 level, same saturation family
 const TAG_PALETTE = [
-  '#6366f1','#ec4899','#f97316','#22c55e',
-  '#14b8a6','#3b82f6','#eab308','#ef4444',
-  '#8b5cf6','#06b6d4','#84cc16','#f43f5e',
+  '#6366f1', // indigo
+  '#14b8a6', // teal
+  '#ec4899', // rose
+  '#f59e0b', // amber
+  '#22c55e', // emerald
+  '#3b82f6', // blue
+  '#f97316', // orange
+  '#8b5cf6', // violet
 ]
 
 function buildTagColorMap(allTags: string[]): Map<string, string> {
@@ -196,9 +201,9 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
         background: 'rgba(238,240,245,0.88)', backdropFilter: 'blur(16px)',
         borderBottom: `1px solid ${BORDER}`,
         height: 56,
-        display: 'flex', alignItems: 'center', gap: 16,
         position: 'sticky', top: 0, zIndex: 10,
-      }} className="home-header">
+      }}>
+      <div style={{ maxWidth: 1600, margin: '0 auto', height: '100%', display: 'flex', alignItems: 'center', gap: 16 }} className="home-header">
         {/* Logo + name */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
           <MindmapsLogo size={28} />
@@ -280,13 +285,15 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
             )}
           </div>
         )}
+        </div>{/* end home-inner */}
       </header>
 
       {/* Tag filter bar */}
+      <div style={{ borderBottom: `1px solid ${BORDER}`, background: SURFACE }}>
       <div style={{
         display: 'flex', gap: 6, overflowX: 'auto', padding: '8px 16px',
-        borderBottom: `1px solid ${BORDER}`, background: SURFACE,
         scrollbarWidth: 'none', alignItems: 'center',
+        maxWidth: 1600, margin: '0 auto',
       }}>
         {/* All */}
         {(() => {
@@ -350,7 +357,8 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
             </button>
           )
         })()}
-      </div>
+      </div>{/* inner */}
+      </div>{/* tag bar outer */}
 
       <main style={{ maxWidth: '100%' }} className="home-main">
 
@@ -450,12 +458,15 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
         @media (min-width: 768px)  { .home-grid { grid-template-columns: repeat(4, 1fr); } }
         @media (min-width: 1024px) { .home-grid { grid-template-columns: repeat(5, 1fr); } }
         @media (min-width: 1280px) { .home-grid { grid-template-columns: repeat(6, 1fr); } }
+        @media (min-width: 1600px) { .home-grid { grid-template-columns: repeat(7, 1fr); } }
         .home-header { padding: 0 16px !important; }
         @media (min-width: 640px) { .home-header { padding: 0 24px !important; } }
         .home-search { width: 160px !important; }
         @media (min-width: 640px) { .home-search { width: 220px !important; } }
-        .home-main { padding: 24px 16px !important; }
+        .home-main { padding: 24px 16px !important; max-width: 1600px !important; margin: 0 auto !important; }
         @media (min-width: 640px) { .home-main { padding: 32px 24px !important; } }
+        .home-inner { max-width: 1600px; margin: 0 auto; padding: 0 16px; }
+        @media (min-width: 640px) { .home-inner { padding: 0 24px; } }
       `}</style>
 
       {/* Create modal */}
@@ -626,7 +637,7 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
                   <div style={{ fontSize: 11, fontWeight: 600, color: TEXT_MUTED, marginBottom: 8 }}>Current tags</div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                     {currentTags.map(t => (
-                      <button key={t} onClick={() => removeTag(t)}
+                      <button key={t} onClick={() => { removeTag(t); setTagModalId(null) }}
                         style={{
                           display: 'flex', alignItems: 'center', gap: 5,
                           fontSize: 12, fontWeight: 700, padding: '5px 12px', borderRadius: 999,
@@ -646,7 +657,7 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
                   <div style={{ fontSize: 11, fontWeight: 600, color: TEXT_MUTED, marginBottom: 8 }}>Add tag</div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                     {available.map(t => (
-                      <button key={t} onClick={() => addTag(t)}
+                      <button key={t} onClick={() => { addTag(t); setTagModalId(null) }}
                         style={{
                           display: 'flex', alignItems: 'center', gap: 5,
                           fontSize: 12, fontWeight: 600, padding: '5px 12px', borderRadius: 999,

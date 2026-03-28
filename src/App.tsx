@@ -13,11 +13,10 @@ import { supabase, hasSupabase } from './lib/supabase'
 import { ArrowLeft, SlidersHorizontal, Tag, X } from 'lucide-react'
 import { Confetti } from './components/Confetti'
 
-// ── Tag color system (12 unique palette colors by sorted position) ──────────
+// 8 cohesive colors — all Tailwind-500 level, same saturation family
 const TAG_PALETTE = [
-  '#6366f1','#ec4899','#f97316','#22c55e',
-  '#14b8a6','#3b82f6','#eab308','#ef4444',
-  '#8b5cf6','#06b6d4','#84cc16','#f43f5e',
+  '#6366f1', '#14b8a6', '#ec4899', '#f59e0b',
+  '#22c55e', '#3b82f6', '#f97316', '#8b5cf6',
 ]
 const PRESET_TAGS = ['AI', 'Work', 'Personal', 'Research']
 
