@@ -192,18 +192,11 @@ export function ImportModal({ onClose, userId }: ImportModalProps) {
           </Row>
 
           <Row title="Supported icons" badge="icon field" badgeColor="#0ea5e9">
-            <CodeBlock code={`user  bot  server  database  zap  plug  git-branch  globe
-brain  settings  folder  cloud  mail  lock  key  search
-star  rocket  lightbulb  flame  check-circle  map-pin  trophy
-message  phone  wrench  chart  eye  heart  flag  shield
-flask  trending  paint  sparkles  smile  home  building
-briefcase  graduate  clock  calendar  file  code  terminal
-package  layers  bell  cpu  link  refresh  download  share`} />
-            <p style={{ fontSize: 11, color: '#94a3b8', margin: '6px 0 0' }}>
-              Browse all icons at{' '}
+            <p style={{ fontSize: 12, color: '#64748b', margin: 0 }}>
+              Browse at{' '}
               <a href="https://lucide.dev/icons" target="_blank" rel="noreferrer"
                 style={{ color: '#6366f1', fontWeight: 600 }}>lucide.dev/icons</a>
-              {' '}— use the kebab-case name (e.g. <code style={{ fontSize: 10, background: '#f1f5f9', padding: '1px 4px', borderRadius: 3 }}>arrow-right</code>)
+              {' '}— use the kebab-case name (e.g. <code style={{ fontSize: 11, background: '#f1f5f9', padding: '1px 5px', borderRadius: 3 }}>arrow-right</code>)
             </p>
           </Row>
 
