@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { CuteToast, showToast } from './components/CuteToast'
 import { DiagramCanvas } from './components/canvas/DiagramCanvas'
@@ -10,8 +10,24 @@ import { useDiagram } from './hooks/useDiagram'
 import { useMindmapStore } from './store/mindmapStore'
 import { decodeShareURL } from './lib/export/share'
 import { supabase, hasSupabase } from './lib/supabase'
-import { ArrowLeft, SlidersHorizontal } from 'lucide-react'
+import { ArrowLeft, SlidersHorizontal, Tag, X } from 'lucide-react'
 import { Confetti } from './components/Confetti'
+
+// ── Tag color system (12 unique palette colors by sorted position) ──────────
+const TAG_PALETTE = [
+  '#6366f1','#ec4899','#f97316','#22c55e',
+  '#14b8a6','#3b82f6','#eab308','#ef4444',
+  '#8b5cf6','#06b6d4','#84cc16','#f43f5e',
+]
+const PRESET_TAGS = ['AI', 'Work', 'Personal', 'Research']
+
+function buildTagColorMap(allTags: string[]): Map<string, string> {
+  const sorted = [...new Set(allTags)].sort()
+  return new Map(sorted.map((tag, i) => [tag, TAG_PALETTE[i % TAG_PALETTE.length]]))
+}
+function tagBg(tag: string, colorMap: Map<string, string>): string {
+  return colorMap.get(tag) ?? '#64748b'
+}
 
 type View = 'home' | 'editor' | 'viewer'
 
@@ -64,8 +80,26 @@ export default function App() {
   // Local dev: fall back to the hardcoded dev user ID so Supabase queries work without auth.
   // Triple-locked: only when (1) isLocal, (2) no real session, (3) env var is set.
   const effectiveUserId = user?.id ?? (isLocal ? (import.meta.env.VITE_LOCAL_USER_ID ?? null) : null)
-  const { loadDiagramList, loadDiagram, saveDiagram, createDiagramFromNodes, deleteDiagram, toggleFavorite } = useDiagram(effectiveUserId)
+  const { loadDiagramList, loadDiagram, saveDiagram, createDiagramFromNodes, deleteDiagram, toggleFavorite, updateTags } = useDiagram(effectiveUserId)
   const { activeMindmap, isDirty, setActiveMindmap, addNode, selectedNodeIds, setSelectedNodeIds, setPasteImportFn, diagrams } = useMindmapStore()
+  const [showTagFooter, setShowTagFooter] = useState(false)
+  const [tagInput, setTagInput] = useState('')
+  const tagFooterRef = useRef<HTMLDivElement>(null)
+
+  const tagColorMap = useMemo(() => {
+    const all = [...new Set([...PRESET_TAGS, ...diagrams.flatMap(d => d.tags ?? [])])]
+    return buildTagColorMap(all)
+  }, [diagrams])
+
+  // Close tag footer on outside click
+  useEffect(() => {
+    if (!showTagFooter) return
+    function onDown(e: MouseEvent) {
+      if (tagFooterRef.current && !tagFooterRef.current.contains(e.target as Node)) setShowTagFooter(false)
+    }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [showTagFooter])
   const [view, setView] = useState<View>(() => {
     if (decodeShareURL()) return 'viewer'
     if (getShareParam()) return 'viewer'
@@ -343,6 +377,93 @@ export default function App() {
       )}
 
       {showImport && <ImportModal onClose={() => setShowImport(false)} />}
+
+      {/* ── Tag footer bar ── */}
+      {activeMindmap && (() => {
+        const currentTags = activeMindmap.tags ?? []
+        const allTagsList = [...new Set([...PRESET_TAGS, ...diagrams.flatMap(d => d.tags ?? [])])]
+        const available = allTagsList.filter(t => !currentTags.includes(t))
+        function addTag(tag: string) {
+          const t = tag.trim()
+          if (!t || currentTags.includes(t)) return
+          updateTags(activeMindmap!.id, [...currentTags, t])
+          setTagInput('')
+        }
+        function removeTag(tag: string) {
+          updateTags(activeMindmap!.id, currentTags.filter(t => t !== tag))
+        }
+        return (
+          <div ref={tagFooterRef} style={{
+            position: 'fixed', bottom: 0, left: 0, right: showPanel ? 256 : 0,
+            zIndex: 15, background: 'rgba(255,255,255,0.94)', backdropFilter: 'blur(12px)',
+            borderTop: '1px solid #e8eaed',
+            display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px',
+            minHeight: 38,
+          }}>
+            {/* Tag icon */}
+            <Tag size={13} color="#94a3b8" style={{ flexShrink: 0 }} />
+
+            {/* Current tags */}
+            {currentTags.map(t => (
+              <span key={t} style={{
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+                fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 10,
+                background: tagBg(t, tagColorMap), color: '#fff',
+                cursor: 'pointer',
+              }} onClick={() => removeTag(t)} title="Remove tag">
+                {t} <X size={8} strokeWidth={3} />
+              </span>
+            ))}
+
+            {/* Add tag toggle */}
+            <button onClick={() => setShowTagFooter(p => !p)} style={{
+              fontSize: 11, fontWeight: 600, padding: '3px 9px', borderRadius: 10,
+              background: showTagFooter ? '#1e293b' : '#f1f5f9',
+              color: showTagFooter ? '#fff' : '#64748b',
+              border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+              display: 'flex', alignItems: 'center', gap: 4,
+            }}>
+              + Tag
+            </button>
+
+            {/* Tag picker popover */}
+            {showTagFooter && (
+              <div style={{
+                position: 'absolute', bottom: '100%', left: 14, marginBottom: 6,
+                background: '#fff', borderRadius: 12, padding: 12,
+                boxShadow: '0 -4px 24px rgba(0,0,0,0.12), 0 0 0 1px #e2e8f0',
+                display: 'flex', flexDirection: 'column', gap: 8, width: 240,
+              }}>
+                {available.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                    {available.map(t => (
+                      <button key={t} onClick={() => { addTag(t); setShowTagFooter(false) }}
+                        style={{
+                          fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 10,
+                          background: `${tagBg(t, tagColorMap)}22`, color: tagBg(t, tagColorMap),
+                          border: `1px solid ${tagBg(t, tagColorMap)}55`,
+                          cursor: 'pointer', fontFamily: 'inherit',
+                        }}>{t}</button>
+                    ))}
+                  </div>
+                )}
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <input value={tagInput} onChange={e => setTagInput(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') { addTag(tagInput); setShowTagFooter(false); e.preventDefault() } }}
+                    placeholder="Custom tag…"
+                    style={{ flex: 1, fontSize: 12, padding: '6px 10px', border: '1px solid #e2e8f0', borderRadius: 8, outline: 'none', fontFamily: 'inherit', color: '#1e293b' }}
+                    autoFocus
+                  />
+                  <button onClick={() => { addTag(tagInput); setShowTagFooter(false) }}
+                    style={{ padding: '6px 12px', background: '#6366f1', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontFamily: 'inherit', fontWeight: 600 }}>
+                    Add
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )
+      })()}
     </div>
   )
 }

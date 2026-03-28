@@ -287,6 +287,21 @@ export function useDiagram(userId: string | null = null) {
     showToast(`"${name ?? 'Map'}" deleted`, { color: '#1a1d2e' })
   }, [loadDiagramList, setDiagrams, userId])
 
+  const updateTags = useCallback(async (id: string, tags: string[]) => {
+    // Optimistic update in store
+    const { diagrams, activeMindmap, setActiveMindmap } = useMindmapStore.getState()
+    setDiagrams(diagrams.map(d => d.id === id ? { ...d, tags } : d))
+    if (activeMindmap?.id === id) setActiveMindmap({ ...activeMindmap, tags })
+    // Persist to localStorage
+    lsSaveList(lsGetList().map(m => m.id === id ? { ...m, tags } : m))
+    const cached = lsGetDiagram(id)
+    if (cached) lsSaveDiagram({ ...cached, tags })
+    // Persist to Supabase
+    if (hasSupabase && supabase && userId) {
+      await supabase.from('mindmaps').update({ tags }).eq('id', id).eq('user_id', userId)
+    }
+  }, [setDiagrams, userId])
+
   const toggleFavorite = useCallback(async (id: string) => {
     const { diagrams } = useMindmapStore.getState()
     const current = diagrams.find(d => d.id === id)
@@ -302,5 +317,5 @@ export function useDiagram(userId: string | null = null) {
     }
   }, [setDiagrams, userId])
 
-  return { loadDiagramList, loadDiagram, saveDiagram, createDiagram, createDiagramFromNodes, deleteDiagram, toggleFavorite }
+  return { loadDiagramList, loadDiagram, saveDiagram, createDiagram, createDiagramFromNodes, deleteDiagram, toggleFavorite, updateTags }
 }
