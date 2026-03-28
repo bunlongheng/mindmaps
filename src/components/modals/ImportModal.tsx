@@ -61,8 +61,47 @@ function Row({ title, badge, badgeColor, children }: {
   )
 }
 
+const ALL_INSTRUCTIONS = `# Mindmaps Import Guide
+
+## Format 1 — Indented outline (paste on canvas with ⌘V)
+Root Topic
+    Branch A
+        Item 1
+        Item 2
+    Branch B
+        Item 3
+
+## Format 2 — JSON object (paste on canvas with ⌘V)
+{
+  "Root Title": [
+    { "icon": "brain", "Category": ["item 1", "item 2"] }
+  ]
+}
+
+## Supported diagram types (use as "type" field)
+logic-chart | mindmap | tree-vertical | tree-horizontal | fishbone | timeline
+
+## Prompt template to generate a compatible outline
+Generate a mindmap outline for [TOPIC].
+Format as plain indented text: root topic on line 1,
+main branches indented 4 spaces, sub-items 8 spaces.
+Minimum 3 sub-items per branch. No bullets, no numbers.
+
+## API — Outline import
+POST https://mindmaps-bheng.vercel.app/api/ai/mindmaps
+Body: { "title": "My Map", "outline": "Root\\n  Branch 1\\n    Item A", "type": "logic-chart", "userId": "<your-user-id>" }
+`
+
 export function ImportModal({ onClose, userId }: ImportModalProps) {
   const uid = userId ?? '<your-user-id>'
+  const [copiedAll, setCopiedAll] = useState(false)
+
+  function copyAll() {
+    navigator.clipboard?.writeText(ALL_INSTRUCTIONS).then(() => {
+      setCopiedAll(true)
+      setTimeout(() => setCopiedAll(false), 1800)
+    })
+  }
 
   return (
     <div style={{
@@ -84,10 +123,22 @@ export function ImportModal({ onClose, userId }: ImportModalProps) {
               Paste any JSON on the canvas to auto-import. Use <kbd style={{ background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: 4, padding: '1px 5px', fontSize: 10 }}>⌘S</kbd> to save edits.
             </p>
           </div>
-          <button onClick={onClose} style={{
-            width: 28, height: 28, borderRadius: 8, border: '1px solid #e2e8f0',
-            background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b',
-          }}><X size={14} /></button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button onClick={copyAll} title="Copy all instructions for AI" style={{
+              display: 'flex', alignItems: 'center', gap: 5,
+              padding: '5px 10px', borderRadius: 8, border: '1px solid #e2e8f0',
+              background: copiedAll ? '#f0fdf4' : '#fff', cursor: 'pointer',
+              fontSize: 11, fontWeight: 600, fontFamily: 'inherit',
+              color: copiedAll ? '#22c55e' : '#64748b',
+            }}>
+              {copiedAll ? <Check size={11} /> : <Copy size={11} />}
+              {copiedAll ? 'Copied!' : 'Copy for AI'}
+            </button>
+            <button onClick={onClose} style={{
+              width: 28, height: 28, borderRadius: 8, border: '1px solid #e2e8f0',
+              background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b',
+            }}><X size={14} /></button>
+          </div>
         </div>
 
         <div style={{ height: 1, background: '#f1f5f9' }} />
