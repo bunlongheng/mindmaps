@@ -422,9 +422,11 @@ export default function App() {
         }
         return (
           <div ref={tagFooterRef} style={{
-            position: 'fixed', bottom: 0, left: 0, right: showPanel ? 256 : 0,
-            zIndex: 15, background: 'rgba(255,255,255,0.94)', backdropFilter: 'blur(12px)',
-            borderTop: '1px solid #e8eaed',
+            position: 'fixed', bottom: 12, left: '50%', transform: 'translateX(-50%)',
+            zIndex: 15, background: 'rgba(255,255,255,0.96)', backdropFilter: 'blur(12px)',
+            border: '1px solid #e2e8f0',
+            borderRadius: 14,
+            boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '6px 14px',
             minHeight: 38,
           }}>
