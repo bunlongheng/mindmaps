@@ -2,9 +2,11 @@ import { useState, useEffect, useRef } from 'react'
 import { useMindmapStore } from '../../store/mindmapStore'
 import { useDiagram } from '../../hooks/useDiagram'
 import type { DiagramMeta, MindmapNode } from '../../types'
-import { Plus, Search, Clock, Trash2, Star, LayoutGrid, Globe } from 'lucide-react'
+import { Plus, Search, Clock, Trash2, Star, LayoutGrid, Globe, Sparkles, Loader2 } from 'lucide-react'
 import { MindmapsLogo } from '../MindmapsLogo'
 import { getTheme } from '../../lib/themes'
+
+const MINDMAP_API_KEY = 'REDACTED_ROTATED_KEY'
 
 interface HomePageProps {
   onOpen: (id: string) => void
@@ -19,6 +21,9 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
   const [creating, setCreating] = useState(false)
   const [newName, setNewName] = useState('')
   const [showCreate, setShowCreate] = useState(false)
+  const [aiPrompt, setAiPrompt] = useState('')
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiError, setAiError] = useState('')
   const [showUserMenu, setShowUserMenu] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const favScrollRef = useRef<HTMLDivElement>(null)
@@ -64,6 +69,35 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
     setCreating(false)
     const fresh = useMindmapStore.getState().diagrams[0]
     if (fresh) onOpen(fresh.id)
+  }
+
+  async function handleAiGenerate() {
+    if (!aiPrompt.trim() || aiLoading) return
+    setAiLoading(true)
+    setAiError('')
+    try {
+      const res = await fetch('/api/ai/generate-mindmap', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${MINDMAP_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          prompt: aiPrompt.trim(),
+          userId: user?.id ?? null,
+        }),
+      })
+      const data = await res.json() as { id?: string; error?: string }
+      if (!res.ok || !data.id) throw new Error(data.error ?? 'Generation failed')
+      setShowCreate(false)
+      setAiPrompt('')
+      await loadDiagramList()
+      onOpen(data.id)
+    } catch (e) {
+      setAiError(e instanceof Error ? e.message : 'Something went wrong')
+    } finally {
+      setAiLoading(false)
+    }
   }
 
   function timeAgo(iso: string) {
@@ -296,41 +330,121 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
       {/* Create modal */}
       {showCreate && (
         <div style={{
-          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.25)',
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50,
-          backdropFilter: 'blur(4px)',
-        }} onClick={() => setShowCreate(false)}>
+          backdropFilter: 'blur(6px)',
+        }} onClick={() => { if (!aiLoading) { setShowCreate(false); setAiError('') } }}>
           <div style={{
-            background: SURFACE, borderRadius: 16, padding: 24, width: 'min(360px, 90vw)',
-            boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
+            background: SURFACE, borderRadius: 20, padding: 28, width: 'min(420px, 92vw)',
+            boxShadow: '0 24px 64px rgba(0,0,0,0.18), 0 0 0 1px rgba(99,102,241,0.1)',
           }} onClick={e => e.stopPropagation()}>
-            <h3 style={{ fontSize: 16, fontWeight: 700, color: TEXT_PRIMARY, marginBottom: 16 }}>New Map</h3>
-            <input
-              autoFocus
-              value={newName}
-              onChange={e => setNewName(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleCreate()}
-              placeholder="Map name…"
-              style={{
-                width: '100%', padding: '10px 14px', fontSize: 14,
-                border: `1px solid ${BORDER}`, borderRadius: 10, outline: 'none',
-                fontFamily: 'inherit', marginBottom: 16, boxSizing: 'border-box',
-                background: '#f8fafc', color: TEXT_PRIMARY,
-              }}
-            />
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <button onClick={() => setShowCreate(false)}
-                style={{ padding: '8px 16px', border: `1px solid ${BORDER}`, borderRadius: 9, background: 'none', cursor: 'pointer', fontSize: 13, fontFamily: 'inherit', color: TEXT_MUTED }}>
-                Cancel
-              </button>
-              <button onClick={handleCreate} disabled={creating}
-                style={{ padding: '8px 18px', background: '#6366f1', color: '#fff', border: 'none', borderRadius: 9, cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}>
-                {creating ? 'Creating…' : 'Create'}
-              </button>
+
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
+              <div style={{
+                width: 32, height: 32, borderRadius: 10,
+                background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+              }}>
+                <Sparkles size={16} color="#fff" />
+              </div>
+              <h3 style={{ fontSize: 16, fontWeight: 700, color: TEXT_PRIMARY, margin: 0 }}>Create with AI</h3>
             </div>
+
+            {/* AI prompt area */}
+            {aiLoading ? (
+              <div style={{
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                gap: 12, padding: '32px 0',
+              }}>
+                <div style={{ animation: 'spin 1s linear infinite', display: 'flex' }}>
+                  <Loader2 size={28} color="#6366f1" />
+                </div>
+                <p style={{ fontSize: 13, color: TEXT_MUTED, margin: 0 }}>Generating your mindmap…</p>
+              </div>
+            ) : (
+              <>
+                <label style={{ fontSize: 12, fontWeight: 600, color: TEXT_MUTED, display: 'block', marginBottom: 8 }}>
+                  Describe what you want to map
+                </label>
+                <textarea
+                  autoFocus
+                  value={aiPrompt}
+                  onChange={e => { setAiPrompt(e.target.value); setAiError('') }}
+                  onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleAiGenerate() }}
+                  placeholder={'e.g. "Business plan for a SaaS startup"\n"Software architecture layers"\n"Marketing strategy for a mobile app"'}
+                  rows={4}
+                  style={{
+                    width: '100%', padding: '12px 14px', fontSize: 13,
+                    border: `1.5px solid ${aiError ? '#fca5a5' : BORDER}`,
+                    borderRadius: 12, outline: 'none', resize: 'none',
+                    fontFamily: 'inherit', boxSizing: 'border-box',
+                    background: '#f8fafc', color: TEXT_PRIMARY, lineHeight: 1.6,
+                    transition: 'border-color 0.15s',
+                  }}
+                  onFocus={e => { e.currentTarget.style.borderColor = '#a5b4fc' }}
+                  onBlur={e => { e.currentTarget.style.borderColor = aiError ? '#fca5a5' : BORDER }}
+                />
+                {aiError && (
+                  <p style={{ fontSize: 12, color: '#ef4444', margin: '6px 0 0', lineHeight: 1.4 }}>{aiError}</p>
+                )}
+
+                {/* Generate button */}
+                <button
+                  onClick={handleAiGenerate}
+                  disabled={!aiPrompt.trim()}
+                  style={{
+                    width: '100%', marginTop: 12, padding: '11px 0',
+                    background: aiPrompt.trim()
+                      ? 'linear-gradient(135deg, #6366f1, #8b5cf6)'
+                      : '#e2e8f0',
+                    color: aiPrompt.trim() ? '#fff' : '#94a3b8',
+                    border: 'none', borderRadius: 11, cursor: aiPrompt.trim() ? 'pointer' : 'not-allowed',
+                    fontSize: 14, fontWeight: 600, fontFamily: 'inherit',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+                    transition: 'opacity 0.15s',
+                  }}
+                >
+                  <Sparkles size={15} />
+                  Generate Mindmap
+                </button>
+
+                {/* Divider */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '18px 0 14px' }}>
+                  <div style={{ flex: 1, height: 1, background: BORDER }} />
+                  <span style={{ fontSize: 11, color: TEXT_MUTED, fontWeight: 500 }}>or create blank</span>
+                  <div style={{ flex: 1, height: 1, background: BORDER }} />
+                </div>
+
+                {/* Blank create */}
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input
+                    value={newName}
+                    onChange={e => setNewName(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleCreate()}
+                    placeholder="Map name…"
+                    style={{
+                      flex: 1, padding: '9px 13px', fontSize: 13,
+                      border: `1px solid ${BORDER}`, borderRadius: 10, outline: 'none',
+                      fontFamily: 'inherit', background: '#f8fafc', color: TEXT_PRIMARY,
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                  <button onClick={handleCreate} disabled={creating}
+                    style={{
+                      padding: '9px 16px', background: '#f1f5f9', color: TEXT_PRIMARY,
+                      border: `1px solid ${BORDER}`, borderRadius: 10, cursor: 'pointer',
+                      fontSize: 13, fontWeight: 500, fontFamily: 'inherit', whiteSpace: 'nowrap',
+                    }}>
+                    {creating ? 'Creating…' : 'Create'}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
 
       {/* Dark mode vars */}
       <style>{`
@@ -448,17 +562,20 @@ function DiagramMinimap({ id, type }: { id: string; type: string }) {
   // ── Fishbone ─────────────────────────────────────────────────────
   if (type === 'fishbone') {
     const spineY = H / 2
+    const rootEndX = 30
 
     return (
       <svg viewBox={VB} style={{ width: '100%', height: '100%' }} overflow="hidden">
         <rect x={-P} y={-P} width={W + P * 2} height={H + P * 2} fill={canvasBg} />
-        <line x1={14} y1={spineY} x2={W - 24} y2={spineY} stroke={spineFill} strokeWidth={2.5} strokeLinecap="round" />
-        <rect x={W - 26} y={spineY - 13} width={26} height={26} rx={5} fill={rootFill} />
+        {/* Root on the LEFT */}
+        <rect x={4} y={spineY - 13} width={26} height={26} rx={5} fill={rootFill} />
+        {/* Spine from root rightward */}
+        <line x1={rootEndX} y1={spineY} x2={W - 14} y2={spineY} stroke={spineFill} strokeWidth={2.5} strokeLinecap="round" />
         {l1s.map((l1, i) => {
           const above = i % 2 === 0
-          const x = W - 48 - Math.floor(i / 2) * 38
-          if (x < 30) return null
-          const tipX = x - 26, tipY = above ? spineY - 28 : spineY + 28
+          const x = rootEndX + 26 + Math.floor(i / 2) * 38
+          if (x > W - 24) return null
+          const tipX = x + 22, tipY = above ? spineY - 28 : spineY + 28
           return (
             <g key={l1.id}>
               <line x1={x} y1={spineY} x2={tipX} y2={tipY} stroke={l1.color} strokeWidth={1.8} strokeLinecap="round" />
