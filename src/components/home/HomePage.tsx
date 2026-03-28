@@ -2,7 +2,8 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import { useMindmapStore } from '../../store/mindmapStore'
 import { useDiagram } from '../../hooks/useDiagram'
 import type { DiagramMeta, MindmapNode } from '../../types'
-import { Plus, Search, Clock, Trash2, Star, LayoutGrid, Globe, Sparkles, Loader2, Tag, X, Bot, Briefcase, User, BookOpen, Zap, GraduationCap, FlaskConical, Beaker, type LucideIcon } from 'lucide-react'
+import { Plus, Search, Clock, Trash2, Star, LayoutGrid, Globe, Sparkles, Loader2, Tag, X, Bot, Briefcase, User, BookOpen, Zap, GraduationCap, FlaskConical, Beaker, FileInput, type LucideIcon } from 'lucide-react'
+import { ImportModal } from '../modals/ImportModal'
 import { MindmapsLogo } from '../MindmapsLogo'
 import { getTheme } from '../../lib/themes'
 import { AIThinkingOverlay } from '../AIThinkingOverlay'
@@ -75,6 +76,7 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
     return (saved === '1' ? 1 : saved === '2' ? 2 : 0) as 0|1|2
   })
   const [showUserMenu, setShowUserMenu] = useState(false)
+  const [showImport, setShowImport] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const favScrollRef = useRef<HTMLDivElement>(null)
 
@@ -199,6 +201,8 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
   return (
     <div style={{ minHeight: '100vh', background: BG, fontFamily: 'Inter, system-ui, sans-serif' }}>
 
+      {showImport && <ImportModal onClose={() => setShowImport(false)} />}
+
       {/* AI thinking canvas overlay */}
       {aiLoading && <AIThinkingOverlay />}
 
@@ -274,6 +278,20 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
                     {user.email}
                   </div>
                 </div>
+                <button
+                  onClick={() => { setShowUserMenu(false); setShowImport(true) }}
+                  style={{
+                    width: '100%', padding: '10px 14px', textAlign: 'left',
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    fontSize: 13, color: TEXT_PRIMARY, fontFamily: 'inherit', fontWeight: 500,
+                    display: 'flex', alignItems: 'center', gap: 8,
+                    borderBottom: `1px solid ${BORDER}`,
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                >
+                  <FileInput size={14} color="#64748b" /> Import formats
+                </button>
                 <button
                   onClick={() => { setShowUserMenu(false); onSignOut?.() }}
                   style={{
