@@ -71,21 +71,44 @@ Root Topic
     Branch B
         Item 3
 
-## Format 2 — JSON object (paste on canvas with ⌘V)
+## Format 2 — JSON object with icons & emojis (paste on canvas with ⌘V)
+Any node at any depth can have an "icon" or "emoji" field.
 {
   "Root Title": [
-    { "icon": "brain", "Category": ["item 1", "item 2"] }
+    { "icon": "brain", "Category": [
+        { "icon": "zap", "Sub Item": ["detail 1", "detail 2"] },
+        { "emoji": "🚀", "Another Sub": ["detail 3"] },
+        "plain text leaf"
+    ]},
+    { "emoji": "🎯", "Another Category": ["item 1", "item 2"] }
   ]
 }
+
+## Supported icons (use in "icon" field)
+user, bot, server, database, zap, plug, git-branch, globe, brain, settings,
+folder, cloud, mail, lock, key, search, star, rocket, lightbulb, flame,
+check-circle, map-pin, trophy, message, phone, wrench, chart, eye, music,
+heart, flag, shield, flask, trending, paint, sparkles, smile, home, building,
+briefcase, graduate, gift, clock, calendar, file, cog, cpu, link, code,
+terminal, package, layers, bell, alert, info, help, refresh, share, download
 
 ## Supported diagram types (use as "type" field)
 logic-chart | mindmap | tree-vertical | tree-horizontal | fishbone | timeline
 
 ## Prompt template to generate a compatible outline
 Generate a mindmap outline for [TOPIC].
-Format as plain indented text: root topic on line 1,
-main branches indented 4 spaces, sub-items 8 spaces.
-Minimum 3 sub-items per branch. No bullets, no numbers.
+Return JSON in this format:
+{
+  "Root Title": [
+    { "icon": "<icon>", "Category Name": [
+        { "icon": "<icon>", "Sub Category": ["leaf item", "leaf item"] },
+        "plain leaf item"
+    ]}
+  ]
+}
+Use icons from this list: brain, zap, star, rocket, lightbulb, flame, code,
+database, globe, shield, chart, folder, settings, trophy, heart, flag, sparkles.
+Subcategories can also have icons or emojis. Minimum 3 items per node.
 
 ## API — Outline import
 POST https://mindmaps-bheng.vercel.app/api/ai/mindmaps
@@ -158,16 +181,46 @@ export function ImportModal({ onClose, userId }: ImportModalProps) {
           <Row title="Paste — JSON object" badge="⌘V on canvas" badgeColor="#22c55e">
             <CodeBlock copyable code={`{
   "Root Title": [
-    { "icon": "brain", "Category": ["item 1", "item 2"] }
+    { "icon": "brain", "Category": [
+        { "icon": "zap", "Sub Item": ["detail 1", "detail 2"] },
+        { "emoji": "🚀", "Another Sub": ["detail 3"] },
+        "plain text leaf"
+    ]},
+    { "emoji": "🎯", "Another Branch": ["item 1", "item 2"] }
   ]
 }`} />
           </Row>
 
+          <Row title="Supported icons" badge="icon field" badgeColor="#0ea5e9">
+            <CodeBlock code={`user  bot  server  database  zap  plug  git-branch  globe
+brain  settings  folder  cloud  mail  lock  key  search
+star  rocket  lightbulb  flame  check-circle  map-pin  trophy
+message  phone  wrench  chart  eye  heart  flag  shield
+flask  trending  paint  sparkles  smile  home  building
+briefcase  graduate  clock  calendar  file  code  terminal
+package  layers  bell  cpu  link  refresh  download  share`} />
+            <p style={{ fontSize: 11, color: '#94a3b8', margin: '6px 0 0' }}>
+              Browse all icons at{' '}
+              <a href="https://lucide.dev/icons" target="_blank" rel="noreferrer"
+                style={{ color: '#6366f1', fontWeight: 600 }}>lucide.dev/icons</a>
+              {' '}— use the kebab-case name (e.g. <code style={{ fontSize: 10, background: '#f1f5f9', padding: '1px 4px', borderRadius: 3 }}>arrow-right</code>)
+            </p>
+          </Row>
+
           <Row title="Paste — AI prompt template" badge="copy & use" badgeColor="#6366f1">
-            <CodeBlock copyable code={`Generate a mindmap outline for [TOPIC].
-Format as plain indented text: root topic on line 1,
-main branches indented 4 spaces, sub-items 8 spaces.
-Minimum 3 sub-items per branch. No bullets, no numbers.`} />
+            <CodeBlock copyable code={`Generate a mindmap for [TOPIC] as JSON:
+{
+  "Root Title": [
+    { "icon": "<icon>", "Branch": [
+        { "icon": "<icon>", "Sub": ["leaf", "leaf"] },
+        { "emoji": "🔥", "Sub2": ["leaf"] },
+        "plain leaf"
+    ]}
+  ]
+}
+Icons (pick from): brain zap star rocket lightbulb flame code
+database globe shield chart folder settings trophy heart sparkles
+Sub-categories can also have icons or emojis. Min 3 items per node.`} />
           </Row>
 
           <Row title="Supported diagram types" badge="type field">
