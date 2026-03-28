@@ -110,14 +110,14 @@ export default function App() {
     return buildTagColorMap(all)
   }, [diagrams])
 
-  // Close tag footer on outside click
+  // Close tag footer on outside click (capture phase to catch SVG canvas events)
   useEffect(() => {
     if (!showTagFooter) return
     function onDown(e: MouseEvent) {
       if (tagFooterRef.current && !tagFooterRef.current.contains(e.target as Node)) setShowTagFooter(false)
     }
-    document.addEventListener('mousedown', onDown)
-    return () => document.removeEventListener('mousedown', onDown)
+    document.addEventListener('mousedown', onDown, true)
+    return () => document.removeEventListener('mousedown', onDown, true)
   }, [showTagFooter])
   const [view, setView] = useState<View>(() => {
     if (decodeShareURL()) return 'viewer'
