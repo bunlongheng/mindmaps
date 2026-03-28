@@ -132,10 +132,22 @@ export function ImportModal({ onClose, userId }: ImportModalProps) {
   const [copiedAll, setCopiedAll] = useState(false)
 
   function copyAll() {
-    navigator.clipboard?.writeText(ALL_INSTRUCTIONS).then(() => {
-      setCopiedAll(true)
-      setTimeout(() => setCopiedAll(false), 1800)
-    })
+    const done = () => { setCopiedAll(true); setTimeout(() => setCopiedAll(false), 1800) }
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(ALL_INSTRUCTIONS).then(done).catch(() => fallback())
+    } else {
+      fallback()
+    }
+    function fallback() {
+      const el = document.createElement('textarea')
+      el.value = ALL_INSTRUCTIONS
+      el.style.cssText = 'position:fixed;opacity:0'
+      document.body.appendChild(el)
+      el.select()
+      document.execCommand('copy')
+      document.body.removeChild(el)
+      done()
+    }
   }
 
   return (
