@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useMindmapStore } from '../../store/mindmapStore'
 import { useDiagram } from '../../hooks/useDiagram'
+import { showToast } from '../CuteToast'
 import type { DiagramMeta, MindmapNode } from '../../types'
 import { Plus, Search, Clock, Trash2, Star, LayoutGrid, Globe, Sparkles, Loader2, Tag, X, Bot, Briefcase, User, BookOpen, Zap, GraduationCap, FlaskConical, Beaker, FileInput, type LucideIcon } from 'lucide-react'
 import { ImportModal } from '../modals/ImportModal'
@@ -54,7 +55,7 @@ interface HomePageProps {
 
 export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
   const { diagrams } = useMindmapStore()
-  const { loadDiagramList, createDiagram, deleteDiagram, toggleFavorite, updateTags } = useDiagram(user?.id ?? null)
+  const { loadDiagramList, createDiagram, createDiagramFromNodes, deleteDiagram, toggleFavorite, updateTags } = useDiagram(user?.id ?? null)
 
   // Compute a unique color per tag (sorted alphabetically → palette index)
   const tagColorMap = useMemo(() => {
@@ -103,6 +104,36 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
     }
     document.addEventListener('mousedown', onClick)
     return () => document.removeEventListener('mousedown', onClick)
+  }, [])
+
+  // Paste on home page — create new diagram from JSON or indented outline
+  useEffect(() => {
+    const { setPasteImportFn } = useMindmapStore.getState()
+    setPasteImportFn(async (name: string, nodes: MindmapNode[]) => {
+      const id = await createDiagramFromNodes(name, nodes)
+      if (id) onOpen(id)
+    })
+    return () => useMindmapStore.getState().setPasteImportFn(null)
+  }, [createDiagramFromNodes, onOpen])
+
+  useEffect(() => {
+    function onPaste(e: ClipboardEvent) {
+      const tag = (e.target as HTMLElement).tagName.toLowerCase()
+      if (tag === 'input' || tag === 'textarea') return
+      const text = e.clipboardData?.getData('text/plain')?.trim() ?? ''
+      if (!text) return
+      const isJson = text.startsWith('{') || text.startsWith('[')
+      const lines = text.split('\n').filter(l => l.trim())
+      const hasIndent = lines.some(l => /^(\s{4}|\t)/.test(l))
+      if (isJson || (lines.length >= 2 && hasIndent)) {
+        e.preventDefault()
+        useMindmapStore.getState().loadFromOutline(text)
+      } else {
+        showToast('Incompatible format — paste JSON or indented outline', { color: '#ef4444', duration: 3000 })
+      }
+    }
+    window.addEventListener('paste', onPaste)
+    return () => window.removeEventListener('paste', onPaste)
   }, [])
 
   // All unique tags for filter bar (preset + any used in diagrams)

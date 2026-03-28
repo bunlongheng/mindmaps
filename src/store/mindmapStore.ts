@@ -577,7 +577,7 @@ export const useMindmapStore = create<MindmapStore>()(
 
     loadFromOutline: (text: string) => {
       const state = get()
-      if (!state.activeMindmap) return
+      if (!state.activeMindmap && !state.pasteImportFn) return
 
       // --- Flat item type used internally ---
       type FlatItem = { title: string; indent: number; icon?: string; emoji?: string }
@@ -755,7 +755,7 @@ export const useMindmapStore = create<MindmapStore>()(
       })
 
       set({ isImporting: true })
-      const laid = runLayout(normalizeWidthsPerDepth(rawNodes), state.diagramType)
+      const laid = runLayout(normalizeWidthsPerDepth(rawNodes), state.activeMindmap?.type ?? state.diagramType ?? 'logic-chart')
       const nodes = rebalanceColors(laid, palette)
       const name = parsed[0].title
 
