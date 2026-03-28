@@ -129,24 +129,36 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
         showToast('Incompatible format — paste JSON or indented outline', { color: '#ef4444', duration: 3000 })
       }
     }
-    function onKeyDown(e: KeyboardEvent) {
-      const tag = (e.target as HTMLElement).tagName.toLowerCase()
-      if (tag === 'input' || tag === 'textarea') return
-      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key === 'v') {
-        navigator.clipboard?.readText().then(tryImport).catch(() => {})
-      }
-    }
+    // Hidden textarea absorbs Cmd+V without needing clipboard API (works on HTTP too)
+    const sink = document.createElement('textarea')
+    sink.setAttribute('aria-hidden', 'true')
+    sink.style.cssText = 'position:fixed;opacity:0;pointer-events:none;width:1px;height:1px;top:0;left:0;'
+    document.body.appendChild(sink)
     function onPaste(e: ClipboardEvent) {
       const tag = (e.target as HTMLElement).tagName.toLowerCase()
-      if (tag === 'input' || tag === 'textarea') return
+      if (tag === 'input' || tag === 'textarea' && e.target !== sink) return
       const text = e.clipboardData?.getData('text/plain') ?? ''
       if (text.trim()) { e.preventDefault(); tryImport(text) }
+    }
+    function onKeyDown(e: KeyboardEvent) {
+      const active = document.activeElement
+      const isRealInput = active && active !== sink && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')
+      if (isRealInput) return
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key === 'v') {
+        sink.focus()
+        // After focus, browser will fire paste event on sink — handled above
+        // Fallback via clipboard API for HTTPS
+        if (window.isSecureContext && navigator.clipboard?.readText) {
+          navigator.clipboard.readText().then(tryImport).catch(() => {})
+        }
+      }
     }
     window.addEventListener('keydown', onKeyDown)
     window.addEventListener('paste', onPaste)
     return () => {
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('paste', onPaste)
+      document.body.removeChild(sink)
     }
   }, [])
 
