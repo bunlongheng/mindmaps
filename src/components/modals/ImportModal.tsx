@@ -133,7 +133,7 @@ export function ImportModal({ onClose, userId }: ImportModalProps) {
       backdropFilter: 'blur(4px)',
     }} onClick={onClose}>
       <div style={{
-        background: '#fff', borderRadius: 16, width: 'min(580px, 95vw)',
+        background: '#fff', borderRadius: 16, width: 'min(720px, 95vw)',
         maxHeight: '90vh', display: 'flex', flexDirection: 'column',
         boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
       }} onClick={e => e.stopPropagation()}>
