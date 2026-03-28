@@ -18,10 +18,22 @@ function Badge({ label, color }: { label: string; color?: string }) {
 function CodeBlock({ code, copyable }: { code: string; copyable?: boolean }) {
   const [copied, setCopied] = useState(false)
   function copy() {
-    navigator.clipboard?.writeText(code).then(() => {
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1800)
-    })
+    const done = () => { setCopied(true); setTimeout(() => setCopied(false), 1800) }
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(code).then(done).catch(() => fallback())
+    } else {
+      fallback()
+    }
+    function fallback() {
+      const el = document.createElement('textarea')
+      el.value = code
+      el.style.cssText = 'position:fixed;opacity:0'
+      document.body.appendChild(el)
+      el.select()
+      document.execCommand('copy')
+      document.body.removeChild(el)
+      done()
+    }
   }
   return (
     <div style={{ position: 'relative' }}>
@@ -217,7 +229,7 @@ Sub-categories can also have icons or emojis. Min 3 items per node.`} />
           </Row>
 
           <Row title="Supported diagram types" badge="type field">
-            <CodeBlock code={`logic-chart  |  mindmap  |  tree-vertical
+            <CodeBlock copyable code={`logic-chart  |  mindmap  |  tree-vertical
 tree-horizontal  |  fishbone  |  timeline`} />
           </Row>
 
