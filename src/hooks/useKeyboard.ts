@@ -14,6 +14,8 @@ export function useKeyboard() {
       if (isJson || (lines.length >= 2 && hasIndent)) {
         useMindmapStore.getState().loadFromOutline(text)
         showToast('Loaded diagram', { color: '#22c55e', confetti: true })
+      } else {
+        showToast('Incompatible format — paste JSON or indented outline', { color: '#ef4444', duration: 3000 })
       }
     }
 
