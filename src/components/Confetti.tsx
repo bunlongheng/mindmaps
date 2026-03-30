@@ -26,7 +26,7 @@ export function Confetti({ onDone, count }: { onDone?: () => void; count?: numbe
       canvas.width = window.innerWidth
       canvas.height = window.innerHeight
 
-      const N = Math.min(Math.max(count ?? 160, 60), 2000)
+      const N = Math.max(count ?? 160, 60)
       const flakes: Flake[] = Array.from({ length: N }, (_, i) => ({
         x: (i / N) * canvas.width + (Math.random() - 0.5) * 80,
         y: -10 - Math.random() * 60,

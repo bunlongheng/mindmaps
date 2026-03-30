@@ -492,7 +492,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
         const cy2 = node.height / 2
         const iconS = emojiR * 1.4
         return (
-          <g style={{ pointerEvents: 'none' }}>
+          <g style={{ pointerEvents: 'none', animation: 'iconPop 0.4s cubic-bezier(0.34,1.56,0.64,1)', transformBox: 'fill-box', transformOrigin: `${cx2}px ${cy2}px` }}>
             <circle cx={cx2} cy={cy2} r={emojiR} fill={node.color} stroke="white" strokeWidth={1.5} />
             {hasEmoji && resolvedEmoji
               ? <text x={cx2} y={cy2} textAnchor="middle" dominantBaseline="central"

@@ -4,6 +4,7 @@ import { useMindmapStore } from '../../store/mindmapStore'
 import { getTheme, THEMES } from '../../lib/themes'
 import { X, AlignLeft, AlignCenter, AlignRight, Copy, Check, RefreshCw, Download, Upload, FileDown, Trash2, Sparkles } from 'lucide-react'
 import { getLucideIcon } from '../canvas/NodeIcon'
+import { showToast } from '../CuteToast'
 import type { LineStyle, DiagramType } from '../../types'
 import { QRCodeSVG } from 'qrcode.react'
 import { downloadJSON } from '../../lib/export/json'
@@ -109,83 +110,6 @@ function DiagramTypeIcon({ value, color }: { value: string; color: string }) {
 
 type Tab = 'style' | 'map' | 'share'
 
-const AI_OVERLAY_COLORS = ['#6366f1','#ec4899','#f97316','#22c55e','#eab308','#3b82f6','#8b5cf6','#14b8a6','#ef4444','#f43f5e','#84cc16']
-const ALPHABET = 'abcdefghijklmnopqrstuvwxyz'
-
-function AIIconsOverlay() {
-  const particles = useMemo(() => {
-    const N = 32
-    return Array.from({ length: N }, (_, i) => {
-      const angle = (i / N) * 2 * Math.PI
-      const radius = 100 + (i % 4) * 18
-      return {
-        letter: ALPHABET[i % 26],
-        color: AI_OVERLAY_COLORS[i % AI_OVERLAY_COLORS.length],
-        x: Math.round(Math.cos(angle) * radius),
-        y: Math.round(Math.sin(angle) * radius),
-        dur: 1.6 + (i % 6) * 0.25,
-        delay: i * 0.06,
-        size: 9 + (i % 5) * 2,
-        opacity: 0.7 + (i % 3) * 0.1,
-      }
-    })
-  }, [])
-
-  return (
-    <>
-      <style>{`
-        @keyframes _aiBob { 0%,100%{transform:translateY(0)scale(1)}50%{transform:translateY(-7px)scale(1.15)} }
-        @keyframes _aiSpin { to{transform:rotate(360deg)} }
-      `}</style>
-      <div style={{
-        position: 'fixed', inset: 0, zIndex: 9998,
-        background: 'rgba(8,8,18,0.82)',
-        backdropFilter: 'blur(3px)',
-      }}>
-        {/* Letters orbiting the center */}
-        <div style={{ position: 'absolute', top: '50%', left: '50%' }}>
-          {particles.map((p, i) => (
-            <span key={i} style={{
-              position: 'absolute',
-              left: p.x,
-              top: p.y,
-              color: p.color,
-              fontSize: p.size,
-              fontWeight: 800,
-              fontFamily: 'monospace',
-              lineHeight: 1,
-              opacity: p.opacity,
-              animation: `_aiBob ${p.dur}s ${p.delay}s ease-in-out infinite`,
-              userSelect: 'none',
-              pointerEvents: 'none',
-              transform: 'translate(-50%,-50%)',
-            }}>
-              {p.letter}
-            </span>
-          ))}
-        </div>
-        {/* Toast */}
-        <div style={{
-          position: 'absolute', top: '50%', left: '50%',
-          transform: 'translate(-50%,-50%)',
-          background: '#1a1d2e',
-          borderRadius: 14,
-          padding: '15px 22px',
-          display: 'flex', alignItems: 'center', gap: 11,
-          boxShadow: '0 8px 40px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.07)',
-          whiteSpace: 'nowrap',
-        }}>
-          <div style={{ animation: '_aiSpin 1.1s linear infinite', display: 'flex', alignItems: 'center' }}>
-            <Sparkles size={17} color="#a5b4fc" />
-          </div>
-          <span style={{ color: '#fff', fontSize: 13, fontWeight: 500, letterSpacing: 0.2 }}>
-            Assigning icons…
-          </span>
-        </div>
-      </div>
-    </>
-  )
-}
 
 export function SidePanel({ nodeId, onClose, onImport, onDelete }: SidePanelProps) {
   const {
@@ -229,6 +153,7 @@ export function SidePanel({ nodeId, onClose, onImport, onDelete }: SidePanelProp
       return FALLBACK_POOL[h % FALLBACK_POOL.length]
     }
 
+    showToast('✦ Assigning icons…', { color: '#1a1d2e', duration: 8000 })
     try {
       const nodeList = nodes.map(n => ({ id: n.id, title: n.title, depth: n.depth }))
       const prompt = `You are an icon assignment expert. For each mindmap node, pick the single best icon name.\n\nYou may use ANY icon from Lucide (lucide.dev) or Heroicons (heroicons.com) — use kebab-case names like: academic-cap, adjustments-horizontal, arrow-trending-up, banknotes, beaker, bolt, book-open, briefcase, building-office, calendar-days, chart-bar, chat-bubble-left, check-circle, chip, clock, cloud, code-bracket, cog, command-line, cpu-chip, credit-card, cube, currency-dollar, device-phone-mobile, document, eye, fire, flag, folder, gift, globe-alt, heart, home, key, light-bulb, link, lock-closed, magnifying-glass, map, map-pin, microphone, moon, musical-note, paint-brush, paper-airplane, photo, puzzle-piece, rocket-launch, server, shield-check, shopping-cart, signal, sparkles, star, sun, tag, trophy, user, video-camera, wifi, wrench, or any other valid lucide/heroicons icon name.\n\nRules:\n- You MUST assign an icon to EVERY node in the list. No exceptions.\n- Pick the most contextually relevant icon.\n- Respond ONLY with a valid JSON array, no explanation: [{\"id\":\"...\",\"icon\":\"...\"}, ...]\n\nNodes:\n${JSON.stringify(nodeList)}`
@@ -244,20 +169,26 @@ export function SidePanel({ nodeId, onClose, onImport, onDelete }: SidePanelProp
       const assignments: { id: string; icon: string }[] = JSON.parse(match[0])
 
       const assigned = new Set<string>()
-      assignments.forEach(({ id, icon }) => {
-        if (!id) return
-        // Validate icon resolves — accept any Lucide or Heroicons name
+      // Stagger icon pop-ins so user sees them appear one by one
+      for (let i = 0; i < assignments.length; i++) {
+        const { id, icon } = assignments[i]
+        if (!id) continue
         const valid = icon && getLucideIcon(icon) ? icon : forcedIcon(nodes.find(n => n.id === id)?.title ?? '')
         updateNode(id, { icon: valid })
         assigned.add(id)
-      })
-      // Any node AI missed → force an icon too
-      nodes.forEach(n => {
-        if (!assigned.has(n.id)) updateNode(n.id, { icon: forcedIcon(n.title) })
-      })
+        await new Promise(r => setTimeout(r, 60))
+      }
+      // Any node AI missed → force an icon with stagger too
+      const missed = nodes.filter(n => !assigned.has(n.id))
+      for (const n of missed) {
+        updateNode(n.id, { icon: forcedIcon(n.title) })
+        await new Promise(r => setTimeout(r, 60))
+      }
       useMindmapStore.getState().setIsDirty(true)
     } catch {
-      autoAssignIcons()
+      // Fallback: force icons on ALL nodes immediately
+      nodes.forEach(n => updateNode(n.id, { icon: forcedIcon(n.title) }))
+      useMindmapStore.getState().setIsDirty(true)
     } finally {
       setIconLoading(false)
     }
@@ -602,7 +533,9 @@ export function SidePanel({ nodeId, onClose, onImport, onDelete }: SidePanelProp
             }}
               onMouseEnter={e => { if (!iconLoading) e.currentTarget.style.background = '#f3f4f6' }}
               onMouseLeave={e => { if (!iconLoading) e.currentTarget.style.background = '#fff' }}>
-              {iconLoading ? '⏳ Thinking...' : '✦ Auto Icons (AI)'}
+              {iconLoading
+                ? <><span style={{ display: 'inline-flex', animation: '_aiSpin 1s linear infinite' }}><Sparkles size={13} /></span> Thinking…</>
+                : '✦ Auto Icons (AI)'}
             </button>
           </SBlock>
           <HR />
@@ -768,7 +701,6 @@ export function SidePanel({ nodeId, onClose, onImport, onDelete }: SidePanelProp
           )}
         </div>
       )}
-      {iconLoading && <AIIconsOverlay />}
     </div>
   )
 }

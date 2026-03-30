@@ -3,3 +3,10 @@
 * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
 input, textarea { user-select: text; -webkit-user-select: text; }
 body { font-family: 'Inter', system-ui, sans-serif; background: #ffffff; color: #1e293b; }
+
+@keyframes iconPop {
+  0%   { transform: scale(0) rotate(-20deg); opacity: 0; }
+  60%  { transform: scale(1.35) rotate(5deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+@keyframes _aiSpin { to { transform: rotate(360deg); } }
