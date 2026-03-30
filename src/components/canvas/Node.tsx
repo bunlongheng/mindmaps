@@ -62,8 +62,12 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
       : undefined
   )
   const canDrag = (isRoot && diagramType !== 'mindmap') || diagramType === 'logic-chart'
-  // Root becomes a pill when title is long (≥15 chars) or when stored dims are non-square
-  const isRootPill = isRoot && (node.title.length >= 15 || node.width !== node.height)
+  // Root shape: user-set overrides auto; auto = pill if title ≥15 chars or dims non-square
+  const isRootPill = isRoot && (
+    node.shape === 'pill' ? true :
+    node.shape === 'circle' ? false :
+    (node.title.length >= 15 || node.width !== node.height)
+  )
   const isMindmapCircle = diagramType === 'mindmap' && node.depth === 1
   const isMindmapL2Plus = diagramType === 'mindmap' && node.depth >= 2
   const previewW = (!isRoot && resizePreview?.depth === node.depth) ? resizePreview.width : null

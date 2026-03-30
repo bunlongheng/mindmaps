@@ -22,6 +22,7 @@ export interface MindmapNode {
   icon?: string
   emoji?: string
   branchGap?: number
+  shape?: 'circle' | 'pill'
 }
 
 export interface Diagram {

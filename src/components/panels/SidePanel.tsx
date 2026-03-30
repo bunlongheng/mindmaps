@@ -116,7 +116,7 @@ export function SidePanel({ nodeId, onClose, onImport, onDelete }: SidePanelProp
   const {
     activeMindmap, updateNode, batchUpdateNodes, selectedNodeIds,
     lineStyle, setLineStyle, diagramType, setDiagramType, setShareEnabled,
-    themeId, setTheme, showOrderNumbers, setShowOrderNumbers, hideDetails, setHideDetails, autoAssignIcons,
+    themeId, setTheme, showOrderNumbers, setShowOrderNumbers, autoAssignIcons,
     resizeNodeDepth,
   } = useMindmapStore()
   const themeColors = getTheme(themeId).colors
@@ -338,6 +338,37 @@ export function SidePanel({ nodeId, onClose, onImport, onDelete }: SidePanelProp
 
               {/* Branch — root only */}
               {node.depth === 0 && <SBlock title="Branch">
+                <PRow label="Shape">
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    {([
+                      { value: 'circle' as const, label: 'Circle', icon: (active: boolean) => (
+                        <svg width="32" height="22" viewBox="0 0 32 22" fill="none">
+                          <circle cx="16" cy="11" r="8" fill={active ? '#1a1d2e' : 'none'} stroke={active ? '#1a1d2e' : '#94a3b8'} strokeWidth="2"/>
+                        </svg>
+                      )},
+                      { value: 'pill' as const, label: 'Pill', icon: (active: boolean) => (
+                        <svg width="32" height="22" viewBox="0 0 32 22" fill="none">
+                          <rect x="3" y="6" width="26" height="10" rx="5" fill={active ? '#1a1d2e' : 'none'} stroke={active ? '#1a1d2e' : '#94a3b8'} strokeWidth="2"/>
+                        </svg>
+                      )},
+                    ]).map(({ value, label, icon }) => {
+                      const currentShape = node.shape ?? (node.title.length >= 15 || node.width !== node.height ? 'pill' : 'circle')
+                      const active = currentShape === value
+                      return (
+                        <button key={value} onClick={() => save({ shape: value })}
+                          style={{
+                            flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
+                            gap: 5, padding: '8px 4px', borderRadius: 8, cursor: 'pointer',
+                            border: `1.5px solid ${active ? '#1a1d2e' : '#e0e2e7'}`,
+                            background: active ? '#f1f5f9' : '#fff', fontFamily: 'inherit',
+                          }}>
+                          {icon(active)}
+                          <span style={{ fontSize: 9, fontWeight: active ? 600 : 500, color: active ? '#1a1d2e' : '#64748b' }}>{label}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </PRow>
                 <PRow label="Line">
                   <div style={{ display: 'flex', gap: 6 }}>
                     {([
@@ -495,23 +526,6 @@ export function SidePanel({ nodeId, onClose, onImport, onDelete }: SidePanelProp
               >
                 <span style={{
                   position: 'absolute', top: 3, left: showOrderNumbers ? 20 : 3,
-                  width: 16, height: 16, borderRadius: '50%', background: '#fff',
-                  transition: 'left 0.2s', display: 'block',
-                }} />
-              </button>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: 12, color: '#374151' }}>Hide details</span>
-              <button
-                onClick={() => setHideDetails(!hideDetails)}
-                style={{
-                  width: 40, height: 22, borderRadius: 11, border: 'none', cursor: 'pointer', padding: 0,
-                  background: hideDetails ? '#1a1d2e' : '#d1d5db',
-                  position: 'relative', transition: 'background 0.2s', flexShrink: 0,
-                }}
-              >
-                <span style={{
-                  position: 'absolute', top: 3, left: hideDetails ? 20 : 3,
                   width: 16, height: 16, borderRadius: '50%', background: '#fff',
                   transition: 'left 0.2s', display: 'block',
                 }} />
