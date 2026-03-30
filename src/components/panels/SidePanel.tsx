@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { NODE_ICONS } from '../../lib/icons'
 import { useMindmapStore } from '../../store/mindmapStore'
 import { getTheme, THEMES } from '../../lib/themes'
-import { X, AlignLeft, AlignCenter, AlignRight, Copy, Check, RefreshCw, Download, Upload, FileDown, Trash2, Sparkles } from 'lucide-react'
+import { X, AlignLeft, AlignCenter, AlignRight, Copy, Check, Download, Upload, FileDown, Trash2, Sparkles } from 'lucide-react'
 import { getLucideIcon } from '../canvas/NodeIcon'
 import { showToast, dismissToast } from '../CuteToast'
 import { soundChaChing } from '../../lib/sounds'
@@ -115,7 +115,7 @@ type Tab = 'style' | 'map' | 'share'
 export function SidePanel({ nodeId, onClose, onImport, onDelete }: SidePanelProps) {
   const {
     activeMindmap, updateNode, batchUpdateNodes, selectedNodeIds,
-    lineStyle, setLineStyle, diagramType, setDiagramType, rerunLayout, setShareEnabled,
+    lineStyle, setLineStyle, diagramType, setDiagramType, setShareEnabled,
     themeId, setTheme, showOrderNumbers, setShowOrderNumbers, hideDetails, setHideDetails, autoAssignIcons,
     resizeNodeDepth,
   } = useMindmapStore()
@@ -520,17 +520,6 @@ export function SidePanel({ nodeId, onClose, onImport, onDelete }: SidePanelProp
           </SBlock>
           <HR />
           <SBlock title="Layout">
-            <button onClick={rerunLayout} style={{
-              width: '100%', padding: '9px 12px', borderRadius: 8, marginBottom: 6,
-              border: '1px solid #e0e2e7', background: '#fff',
-              cursor: 'pointer', fontSize: 12, fontWeight: 500,
-              color: '#374151', fontFamily: 'inherit',
-              display: 'flex', alignItems: 'center', gap: 8,
-            }}
-              onMouseEnter={e => (e.currentTarget.style.background = '#f3f4f6')}
-              onMouseLeave={e => (e.currentTarget.style.background = '#fff')}>
-              <RefreshCw size={13} /> Re-run Layout
-            </button>
             <button onClick={runAIIcons} disabled={iconLoading} style={{
               width: '100%', padding: '9px 12px', borderRadius: 8,
               border: '1px solid #e0e2e7', background: iconLoading ? '#f3f4f6' : '#fff',
