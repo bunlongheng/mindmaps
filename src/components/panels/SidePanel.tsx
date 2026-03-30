@@ -115,7 +115,7 @@ type Tab = 'style' | 'map' | 'share'
 export function SidePanel({ nodeId, onClose, onImport, onDelete }: SidePanelProps) {
   const {
     activeMindmap, updateNode, batchUpdateNodes, selectedNodeIds,
-    lineStyle, setLineStyle, diagramType, setDiagramType, setShareEnabled,
+    lineStyle, setLineStyle, diagramType, setDiagramType, setShareEnabled, rerunLayout,
     themeId, setTheme, showOrderNumbers, setShowOrderNumbers, autoAssignIcons,
     resizeNodeDepth,
   } = useMindmapStore()
@@ -355,7 +355,13 @@ export function SidePanel({ nodeId, onClose, onImport, onDelete }: SidePanelProp
                       const currentShape = node.shape ?? (node.title.length >= 15 || node.width !== node.height ? 'pill' : 'circle')
                       const active = currentShape === value
                       return (
-                        <button key={value} onClick={() => save({ shape: value })}
+                        <button key={value} onClick={() => {
+                          if (!node) return
+                          const h = 64
+                          const w = value === 'circle' ? h : Math.max(120, Math.ceil(node.title.length * 13 * 0.64 + 48))
+                          save({ shape: value, width: w, height: value === 'circle' ? w : h })
+                          setTimeout(() => rerunLayout(), 0)
+                        }}
                           style={{
                             flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
                             gap: 5, padding: '8px 4px', borderRadius: 8, cursor: 'pointer',

@@ -62,7 +62,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
       : undefined
   )
   const childCount = useMindmapStore(s =>
-    diagramType === 'mindmap' && node.depth === 1
+    diagramType === 'mindmap' && node.depth >= 1
       ? (s.activeMindmap?.nodes.filter(n => n.parentId === node.id).length ?? 0)
       : 0
   )
@@ -240,7 +240,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   // Use live preview width during resize drag, otherwise committed node width
   const displayW = previewW ?? node.width
   void ((hasIcon || hasEmoji) ? displayW * 0.2 : 0) // iconZoneW — reserved for future use
-  const label = (diagramType === 'mindmap' && node.depth === 1 && childCount > 0)
+  const label = (diagramType === 'mindmap' && node.depth >= 1 && childCount > 0)
     ? `${node.title} (${childCount})`
     : node.title
   // All coordinates are relative to (node.x, node.y)
