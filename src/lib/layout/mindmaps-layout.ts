@@ -21,10 +21,15 @@ function autoWidth(node: MindmapNode, depth: number): number {
   return Math.max(min, Math.min(400, Math.ceil(total)))
 }
 
-/** Effective size: root uses stored circle size; all others use stored width (respects resize + normalisation) */
+/** Effective size: root respects stored shape/dims; all others use stored width */
 function nodeSize(node: MindmapNode, depth: number) {
   if (depth === 0) {
     if (node.width > 0 && node.height > 0) return { w: node.width, h: node.height }
+    // Default: pill if title is long, otherwise circle
+    if (node.shape === 'pill' || node.title.length >= 15) {
+      const w = Math.max(160, Math.min(400, Math.ceil(node.title.length * 28 * 0.6 + 72)))
+      return { w, h: 64 }
+    }
     return SIZES[0]
   }
   const w = node.width > 0 ? node.width : autoWidth(node, depth)
