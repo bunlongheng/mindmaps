@@ -24,6 +24,10 @@ export function showToast(msg: string, { color = '#6366f1', confetti = false, du
   listeners.forEach(fn => fn(state))
 }
 
+export function dismissToast() {
+  listeners.forEach(fn => fn(null))
+}
+
 const KEYFRAMES = `
 @keyframes cuteToastInOut {
   0%   { opacity: 0; transform: translateX(-50%) translateY(-10px) scale(0.72); }

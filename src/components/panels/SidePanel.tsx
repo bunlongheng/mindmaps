@@ -4,7 +4,8 @@ import { useMindmapStore } from '../../store/mindmapStore'
 import { getTheme, THEMES } from '../../lib/themes'
 import { X, AlignLeft, AlignCenter, AlignRight, Copy, Check, RefreshCw, Download, Upload, FileDown, Trash2, Sparkles } from 'lucide-react'
 import { getLucideIcon } from '../canvas/NodeIcon'
-import { showToast } from '../CuteToast'
+import { showToast, dismissToast } from '../CuteToast'
+import { soundChaChing } from '../../lib/sounds'
 import type { LineStyle, DiagramType } from '../../types'
 import { QRCodeSVG } from 'qrcode.react'
 import { downloadJSON } from '../../lib/export/json'
@@ -153,7 +154,8 @@ export function SidePanel({ nodeId, onClose, onImport, onDelete }: SidePanelProp
       return FALLBACK_POOL[h % FALLBACK_POOL.length]
     }
 
-    showToast('✦ Assigning icons…', { color: '#1a1d2e', duration: 8000 })
+    showToast('✦ Assigning icons…', { color: '#1a1d2e', duration: 120000 })
+    let tokenCount = 0
     try {
       const nodeList = nodes.map(n => ({ id: n.id, title: n.title, depth: n.depth }))
       const prompt = `You are an icon assignment expert. For each mindmap node, pick the single best icon name.\n\nYou may use ANY icon from Lucide (lucide.dev) or Heroicons (heroicons.com) — use kebab-case names like: academic-cap, adjustments-horizontal, arrow-trending-up, banknotes, beaker, bolt, book-open, briefcase, building-office, calendar-days, chart-bar, chat-bubble-left, check-circle, chip, clock, cloud, code-bracket, cog, command-line, cpu-chip, credit-card, cube, currency-dollar, device-phone-mobile, document, eye, fire, flag, folder, gift, globe-alt, heart, home, key, light-bulb, link, lock-closed, magnifying-glass, map, map-pin, microphone, moon, musical-note, paint-brush, paper-airplane, photo, puzzle-piece, rocket-launch, server, shield-check, shopping-cart, signal, sparkles, star, sun, tag, trophy, user, video-camera, wifi, wrench, or any other valid lucide/heroicons icon name.\n\nRules:\n- You MUST assign an icon to EVERY node in the list. No exceptions.\n- Pick the most contextually relevant icon.\n- Respond ONLY with a valid JSON array, no explanation: [{\"id\":\"...\",\"icon\":\"...\"}, ...]\n\nNodes:\n${JSON.stringify(nodeList)}`
@@ -163,6 +165,7 @@ export function SidePanel({ nodeId, onClose, onImport, onDelete }: SidePanelProp
         body: JSON.stringify({ prompt, mode: 'icons' }),
       })
       const data = await res.json()
+      tokenCount = data.usage?.total_tokens ?? data.tokens ?? 0
       const raw = data.outline ?? data.result ?? data.content ?? ''
       const match = raw.match(/\[[\s\S]*\]/)
       if (!match) throw new Error('No JSON array in response')
@@ -190,6 +193,10 @@ export function SidePanel({ nodeId, onClose, onImport, onDelete }: SidePanelProp
       nodes.forEach(n => updateNode(n.id, { icon: forcedIcon(n.title) }))
       useMindmapStore.getState().setIsDirty(true)
     } finally {
+      dismissToast()
+      soundChaChing()
+      const label = tokenCount > 0 ? `✦ ${tokenCount.toLocaleString()} tokens` : '✦ Icons ready!'
+      showToast(label, { color: '#1a1d2e', confetti: true, duration: 3500 })
       setIconLoading(false)
     }
   }, [activeMindmap, iconLoading, updateNode, autoAssignIcons])

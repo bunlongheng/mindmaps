@@ -133,6 +133,37 @@ export function soundCopy() {
   } catch {}
 }
 
+/** Cha-ching! — coins dropping, celebratory */
+export function soundChaChing() {
+  try {
+    const c = ac(); const now = c.currentTime
+    // "Cha" — low thud
+    ;(() => {
+      const g = gain(c, 0.22)
+      g.gain.exponentialRampToValueAtTime(0.0001, now + 0.18)
+      const o = c.createOscillator()
+      o.type = 'triangle'
+      o.frequency.setValueAtTime(280, now)
+      o.frequency.exponentialRampToValueAtTime(140, now + 0.16)
+      o.connect(g); o.start(now); o.stop(now + 0.18)
+    })()
+    // "Ching" — bright metallic ring
+    ;[0.12, 0.22, 0.30].forEach((offset, i) => {
+      const freq = [1318, 1760, 2093][i]
+      const g = gain(c, 0.16 - i * 0.03)
+      g.gain.exponentialRampToValueAtTime(0.0001, now + offset + 0.35)
+      osc(c, 'sine', freq, g, now + offset, now + offset + 0.35)
+    })
+    // Coin shimmer — rapid high notes
+    ;[0.14, 0.18, 0.23, 0.28, 0.34].forEach((offset, i) => {
+      const freqs = [2637, 3136, 2794, 3520, 2637]
+      const g = gain(c, 0.06)
+      g.gain.exponentialRampToValueAtTime(0.0001, now + offset + 0.1)
+      osc(c, 'sine', freqs[i], g, now + offset, now + offset + 0.1)
+    })
+  } catch {}
+}
+
 /** Error buzz */
 export function soundError() {
   try {
