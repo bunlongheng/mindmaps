@@ -73,7 +73,6 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
   const [aiError, setAiError] = useState('')
   const [activeTag, setActiveTag] = useState<string | null>(null) // null=All, '__no_tag__'=untagged, else tag name
   const [tagModalId, setTagModalId] = useState<string | null>(null)
-  const [tagModalInput, setTagModalInput] = useState('')
   const [bgLevel, _setBgLevel] = useState<0|1|2>(() => {
     const saved = localStorage.getItem('mindmaps:bgLevel')
     return (saved === '1' ? 1 : saved === '2' ? 2 : 0) as 0|1|2
@@ -745,25 +744,6 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
                 </div>
               )}
 
-              {/* Custom tag input */}
-              <div style={{ fontSize: 11, fontWeight: 600, color: TEXT_MUTED, marginBottom: 8 }}>Custom tag</div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <input
-                  autoFocus
-                  value={tagModalInput}
-                  onChange={e => setTagModalInput(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') addTag(tagModalInput) }}
-                  placeholder="Type and press Enter…"
-                  style={{
-                    flex: 1, fontSize: 13, padding: '9px 13px', border: `1px solid ${BORDER}`,
-                    borderRadius: 10, outline: 'none', fontFamily: 'inherit', color: TEXT_PRIMARY,
-                  }}
-                />
-                <button onClick={() => addTag(tagModalInput)}
-                  style={{ padding: '9px 16px', background: '#6366f1', color: '#fff', border: 'none', borderRadius: 10, cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}>
-                  Add
-                </button>
-              </div>
             </div>
           </div>
         )
