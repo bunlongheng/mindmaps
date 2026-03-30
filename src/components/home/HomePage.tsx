@@ -57,6 +57,7 @@ interface HomePageProps {
 export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
   const { diagrams } = useMindmapStore()
   const { loadDiagramList, createDiagram, createDiagramFromNodes, deleteDiagram, toggleFavorite, updateTags } = useDiagram(user?.id ?? null)
+  const isMobile = window.innerWidth <= 768
 
   // Compute a unique color per tag (sorted alphabetically → palette index)
   const tagColorMap = useMemo(() => {
@@ -195,10 +196,11 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
           userId: user?.id ?? null,
         }),
       })
-      const data = await res.json() as { id?: string; error?: string }
+      const data = await res.json() as { id?: string; error?: string; usage?: { total_tokens?: number }; tokens?: number }
       if (!res.ok || !data.id) throw new Error(data.error ?? 'Generation failed')
+      const tokens = data.usage?.total_tokens ?? data.tokens ?? 500
       // Skip home — go straight to the new diagram with confetti flag
-      window.location.href = `/?id=${data.id}&imported=1`
+      window.location.href = `/?id=${data.id}&imported=1&tokens=${tokens}`
     } catch (e) {
       setAiError(e instanceof Error ? e.message : 'Something went wrong')
     } finally {
@@ -370,7 +372,8 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
               color: isActive ? '#fff' : TEXT_MUTED,
               transition: 'all 0.15s',
             }}>
-              All
+              {!isMobile && 'All'}
+              {isMobile && <LayoutGrid size={11} />}
               <span style={{ fontSize: 11, fontWeight: 700, opacity: 0.7 }}>{diagrams.length}</span>
             </button>
           )
@@ -393,7 +396,7 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
                 transition: 'all 0.15s',
               }}>
               <TagIcon tag={tag} size={11} />
-              {tag}
+              {!isMobile && tag}
               <span style={{ fontSize: 11, fontWeight: 700, opacity: isActive ? 0.85 : 0.6 }}>{count}</span>
             </button>
           )
@@ -414,7 +417,7 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
               transition: 'all 0.15s',
             }}>
               <Tag size={11} />
-              No Tag
+              {!isMobile && 'No Tag'}
               <span style={{ fontSize: 11, fontWeight: 700, opacity: 0.7 }}>{count}</span>
             </button>
           )
@@ -452,7 +455,7 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
                       onOpen={() => onOpen(d.id)} onDelete={() => deleteDiagram(d.id, d.name)}
                       isFav={true} onToggleFav={() => toggleFavorite(d.id)} isPublic={d.isPublic}
                       tags={d.tags} tagColorMap={tagColorMap}
-                      onTagEdit={() => { setTagModalId(d.id); setTagModalInput('') }}
+                      isMobile={isMobile} onTagEdit={isMobile ? () => {} : () => { setTagModalId(d.id); setTagModalInput('') }}
                       flash={flashId === d.id}
                     />
                   </div>
@@ -481,7 +484,7 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
                   onOpen={() => onOpen(d.id)} onDelete={() => deleteDiagram(d.id, d.name)}
                   isFav={false} onToggleFav={() => toggleFavorite(d.id)} isPublic={d.isPublic}
                   tags={d.tags} tagColorMap={tagColorMap}
-                  onTagEdit={() => { setTagModalId(d.id); setTagModalInput('') }}
+                  isMobile={isMobile} onTagEdit={isMobile ? () => {} : () => { setTagModalId(d.id); setTagModalInput('') }}
                   flash={flashId === d.id}
                 />
               ))}
@@ -968,10 +971,10 @@ function DiagramMinimap({ id, type }: { id: string; type: string }) {
 
 // ── DiagramCard ────────────────────────────────────────────────────────────
 
-function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isFav, onToggleFav, isPublic, tags, tagColorMap, onTagEdit, flash }: {
+function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isFav, onToggleFav, isPublic, tags, tagColorMap, onTagEdit, flash, isMobile }: {
   diagram: DiagramMeta; timeAgo: string; onOpen: () => void; onDelete: () => void
   isFav: boolean; onToggleFav: () => void; isPublic?: boolean; tags?: string[]
-  tagColorMap: Map<string, string>; onTagEdit: () => void; flash?: boolean
+  tagColorMap: Map<string, string>; onTagEdit: () => void; flash?: boolean; isMobile?: boolean
 }) {
   const [hovered, setHovered] = useState(false)
   const currentTags = tags ?? []
@@ -1023,10 +1026,12 @@ function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isFav, onToggleFav, i
               style={{ position: 'absolute', top: 8, left: 8, width: 28, height: 28, borderRadius: 8, border: isFav ? '1px solid #fde68a' : '1px solid #e2e8f0', background: 'rgba(255,255,255,0.92)', cursor: 'pointer', color: isFav ? '#eab308' : '#94a3b8', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(8px)' }}>
               <Star size={13} fill={isFav ? '#eab308' : 'none'} />
             </button>
-            <button onClick={e => { e.stopPropagation(); onTagEdit() }} title="Edit tags"
-              style={{ position: 'absolute', top: 8, left: 44, width: 28, height: 28, borderRadius: 8, border: '1px solid #e2e8f0', background: 'rgba(255,255,255,0.92)', cursor: 'pointer', color: '#94a3b8', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(8px)' }}>
-              <Tag size={13} />
-            </button>
+            {!isMobile && (
+              <button onClick={e => { e.stopPropagation(); onTagEdit() }} title="Edit tags"
+                style={{ position: 'absolute', top: 8, left: 44, width: 28, height: 28, borderRadius: 8, border: '1px solid #e2e8f0', background: 'rgba(255,255,255,0.92)', cursor: 'pointer', color: '#94a3b8', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(8px)' }}>
+                <Tag size={13} />
+              </button>
+            )}
             <button onClick={e => { e.stopPropagation(); onDelete() }}
               style={{ position: 'absolute', top: 8, right: 8, width: 28, height: 28, borderRadius: 8, border: '1px solid #fecaca', background: 'rgba(255,255,255,0.92)', cursor: 'pointer', color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(8px)' }}>
               <Trash2 size={13} />

@@ -178,8 +178,6 @@ export function EdgeLayer({ nodes, lineStyle, diagramType }: EdgeLayerProps) {
           const y1 = parent.y + parent.height / 2
           const x2 = n.x + n.width / 2
           const y2 = n.y + n.height / 2
-          const mx = (x1 + x2) / 2
-          const my = (y1 + y2) / 2
 
           const isL1 = n.depth === 1
           const isL2 = n.depth === 2
@@ -188,25 +186,39 @@ export function EdgeLayer({ nodes, lineStyle, diagramType }: EdgeLayerProps) {
           const dx = x2 - x1, dy = y2 - y1
           const len = Math.hypot(dx, dy) || 1
           const ux = dx / len, uy = dy / len
-          // Number sits ON the line just past parent circle edge
-          const parentR = parent.width / 2
+
+          // Ellipse/circle perimeter intersection: r = 1/sqrt((ux/a)^2 + (uy/b)^2)
+          function edgeR(w: number, h: number) {
+            const a = w / 2, b = h / 2
+            const d = Math.sqrt((ux / a) ** 2 + (uy / b) ** 2)
+            return d === 0 ? a : 1 / d
+          }
+          const parentR = edgeR(parent.width, parent.height)
+          const childR  = n.width / 2  // child nodes are always circles
+
+          // Edge endpoints touch the node perimeter — no overlap, no gap
+          const sx = x1 + ux * parentR
+          const sy = y1 + uy * parentR
+          const ex = x2 - ux * childR
+          const ey = y2 - uy * childR
+          const mx = (sx + ex) / 2
+          const my = (sy + ey) / 2
+
           const numDist = parentR + 16
           const ox = x1 + ux * numDist
           const oy = y1 + uy * numDist
-          // L1: center pill in the *visible* segment (root edge → L1 edge), not center-to-center
-          // L2: midpoint of the full center-to-center line is fine
-          const childR = n.width / 2
-          const visMid = isL1 ? (parentR + (len - childR)) / 2 : len / 2
-          const tx = x1 + ux * visMid
-          const ty = y1 + uy * visMid
+          // Label pill: center in the visible segment between the two node edges
+          const visMidT = parentR + (len - parentR - childR) / 2
+          const tx = x1 + ux * visMidT
+          const ty = y1 + uy * visMidT
           if (isCircleStem) {
             const rawAngle = Math.atan2(dy, dx) * 180 / Math.PI
             labelAngle = rawAngle > 90 || rawAngle <= -90 ? rawAngle + 180 : rawAngle
           }
 
           const edgePath = lineStyle === 'straight'
-            ? `M ${x1} ${y1} L ${x2} ${y2}`
-            : `M ${x1} ${y1} Q ${mx} ${my} ${x2} ${y2}`
+            ? `M ${sx} ${sy} L ${ex} ${ey}`
+            : `M ${sx} ${sy} Q ${mx} ${my} ${ex} ${ey}`
 
           return (
             <g key={n.id}>
@@ -227,30 +239,6 @@ export function EdgeLayer({ nodes, lineStyle, diagramType }: EdgeLayerProps) {
                       fill="white" stroke={n.color} strokeWidth={1.2} opacity={0.96}
                     />
                     <text x={tx} y={ty}
-                      textAnchor="middle" dominantBaseline="central"
-                      fontSize={fs} fontWeight="700"
-                      fontFamily="Inter, system-ui, sans-serif"
-                      fill={n.color}
-                      style={{ pointerEvents: 'none' }}
-                    >{n.title}</text>
-                  </g>
-                )
-              })()}
-              {isL2 && !hideDetails && (() => {
-                const fs = 10
-                const pillH = fs + 8
-                const pillR = pillH / 2
-                const estW = Math.ceil(n.title.length * fs * 0.58) + 16
-                const offset = childR + pillH / 2 + 6
-                const plx = x2 + ux * offset
-                const ply = y2 + uy * offset
-                return (
-                  <g style={{ pointerEvents: 'none' }}>
-                    <rect x={plx - estW / 2} y={ply - pillH / 2} width={estW} height={pillH}
-                      rx={pillR} ry={pillR}
-                      fill="white" stroke={n.color} strokeWidth={1.2} opacity={0.96}
-                    />
-                    <text x={plx} y={ply}
                       textAnchor="middle" dominantBaseline="central"
                       fontSize={fs} fontWeight="700"
                       fontFamily="Inter, system-ui, sans-serif"

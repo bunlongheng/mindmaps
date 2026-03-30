@@ -55,8 +55,8 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   const canDrag = (isRoot && diagramType !== 'mindmap') || diagramType === 'logic-chart'
   // Root becomes a pill when title is long (≥15 chars) or when stored dims are non-square
   const isRootPill = isRoot && (node.title.length >= 15 || node.width !== node.height)
-  const isMindmapCircle = diagramType === 'mindmap' && (node.depth === 1 || node.depth === 2)
-  const isMindmapL2Plus = diagramType === 'mindmap' && node.depth >= 3
+  const isMindmapCircle = diagramType === 'mindmap' && node.depth === 1
+  const isMindmapL2Plus = diagramType === 'mindmap' && node.depth >= 2
   const previewW = (!isRoot && resizePreview?.depth === node.depth) ? resizePreview.width : null
 
   // For mindmap L2+ nodes: rotate along the edge direction
@@ -78,11 +78,6 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
     textColor = '#ffffff'
     strokeColor = '#1a1d2e'
     strokeW = 5
-  } else if (isMindmapCircle && node.depth === 2) {
-    bg = node.color
-    textColor = '#ffffff'
-    strokeColor = node.color
-    strokeW = 2
   } else if (isL2Plus) {
     const lightenAmt = node.depth === 2 ? 0.58 : node.depth === 3 ? 0.68 : 0.76
     bg = node.color.startsWith('#') ? lighten(node.color, lightenAmt) : '#f8fafc'
@@ -90,15 +85,15 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
     strokeColor = node.color
     strokeW = 2
   } else if (isMindmapCircle) {
-    // L1 mindmap circles: transparent fill with colored border
+    // L1 mindmap circles: transparent fill with colored border, black text
     bg = 'transparent'
-    textColor = node.color
+    textColor = '#1a1d2e'
     strokeColor = node.color
     strokeW = 3
   } else {
-    // L1 all other diagrams: solid color fill
+    // L1 all other diagrams: solid color fill, black text
     bg = node.color
-    textColor = '#ffffff'
+    textColor = '#1a1d2e'
     strokeColor = '#1a1d2e'
     strokeW = 3
   }
@@ -109,7 +104,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
     : isMindmapCircle
       ? node.color
       : node.depth === 1
-        ? '#ffffff'
+        ? '#1a1d2e'
         : (node.color.startsWith('#') ? darkenColor(node.color, 0.35) : node.color)
 
   // Node-level overrides from panel
@@ -169,7 +164,8 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
 
   function onPointerDown(e: React.PointerEvent) {
     if (editing || readOnly) return
-    e.stopPropagation()
+    // Touch: don't stop propagation — let canvas handle pan/pinch
+    if (e.pointerType === 'mouse') e.stopPropagation()
     didDrag.current = false
     onSelect(node.id, e.metaKey || e.ctrlKey || e.shiftKey)
     if (!canDrag) return
@@ -359,6 +355,8 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
           fill={node.depth === 1 ? 'transparent' : bg} fillOpacity={node.depth === 1 ? 0 : bgOpacity}
           stroke={strokeColor} strokeWidth={node.depth === 1 ? 2.5 : strokeW}
         />
+      ) : isMindmapL2Plus ? (
+        <rect x={0} y={0} width={displayW} height={node.height} fill="transparent" />
       ) : (
         <rect
           x={0} y={0} width={displayW} height={node.height}
@@ -507,6 +505,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
           </g>
         )
       })()}
+
 
       {/* Selection ring — always on top */}
       {isSelected && (isRoot ? (

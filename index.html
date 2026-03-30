@@ -49,8 +49,14 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
   </head>
-  <body>
+  <body style="touch-action: manipulation;">
     <div id="root"></div>
+    <!-- Block Safari native pinch/double-tap zoom — we handle zoom in canvas ourselves -->
+    <script>
+      document.addEventListener('gesturestart', function(e) { e.preventDefault(); }, { passive: false });
+      document.addEventListener('gesturechange', function(e) { e.preventDefault(); }, { passive: false });
+      document.addEventListener('gestureend', function(e) { e.preventDefault(); }, { passive: false });
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

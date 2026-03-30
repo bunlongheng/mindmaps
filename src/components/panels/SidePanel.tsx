@@ -1,13 +1,13 @@
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { NODE_ICONS } from '../../lib/icons'
 import { useMindmapStore } from '../../store/mindmapStore'
 import { getTheme, THEMES } from '../../lib/themes'
-import { X, AlignLeft, AlignCenter, AlignRight, Copy, Check, RefreshCw, Download, Upload, FileDown, Trash2 } from 'lucide-react'
+import { X, AlignLeft, AlignCenter, AlignRight, Copy, Check, RefreshCw, Download, Upload, FileDown, Trash2, Sparkles } from 'lucide-react'
+import { getLucideIcon } from '../canvas/NodeIcon'
 import type { LineStyle, DiagramType } from '../../types'
 import { QRCodeSVG } from 'qrcode.react'
 import { downloadJSON } from '../../lib/export/json'
 import { exportDiagramAsPdf } from '../../lib/export/exportPdf'
-import { showToast } from '../CuteToast'
 
 interface SidePanelProps {
   nodeId: string | null
@@ -109,100 +109,83 @@ function DiagramTypeIcon({ value, color }: { value: string; color: string }) {
 
 type Tab = 'style' | 'map' | 'share'
 
-// ── Dice word banks ─────────────────────────────────────────────────────────────
-const DICE_WORDS: Record<string, string[]> = {
-  user:         ['Alice','Bob','Carol','Dave','Grace','Hank','Ivy','Jack'],
-  bot:          ['ChatBot','AutoAgent','AI Helper','Smart Bot','NLP Engine','Copilot'],
-  server:       ['API Server','Web Server','Auth Service','Worker Node','Edge Node','Gateway'],
-  database:     ['Postgres DB','Redis Cache','Data Lake','MongoDB','Analytics DB','Firestore'],
-  zap:          ['Trigger','Event Hook','Webhook','Automation','Quick Action','Pipeline'],
-  plug:         ['Plugin','Extension','Connector','Integration','Add-on','Bridge'],
-  'git-branch': ['Feature Branch','Release v2','Hotfix','Dev Branch','Canary','Main'],
-  globe:        ['Public API','Web App','Global CDN','DNS Zone','Edge Network','Proxy'],
-  brain:        ['ML Model','Neural Net','AI Core','Decision Engine','Classifier','LLM'],
-  settings:     ['Config','Admin Panel','Control Center','Preferences','Feature Flags','Env'],
-  folder:       ['Assets','Resources','Archive','Media','Documents','Uploads'],
-  cloud:        ['AWS S3','Cloud Storage','GCP Bucket','Blob Store','Object Store','R2'],
-  mail:         ['Email Service','SMTP','Newsletter','Notification','Inbox','Digest'],
-  lock:         ['Auth Layer','Security Gate','SSO','Firewall','2FA','RBAC'],
-  key:          ['API Key','Secret Token','OAuth','JWT Auth','Credentials','PAT'],
-  search:       ['Search Index','Elastic','Full-Text','Query Engine','Discovery','Algolia'],
-  star:         ['Featured','Top Pick','Best Seller','Highlighted','Premium','Editor Pick'],
-  rocket:       ['Launch Plan','Go-Live','Deploy v1','MVP Sprint','Release Day','Ship It'],
-  lightbulb:    ['Idea Hub','Innovation','Brainstorm','Prototype','Concept','Experiment'],
-  flame:        ['Hot Feature','Trending','Viral Loop','Growth Hack','Momentum','FOMO'],
-  'check-circle':['Done','Complete','Verified','Shipped','Approved','Signed Off'],
-  'map-pin':    ['HQ','Office','Region','Location','Branch','Datacenter'],
-  trophy:       ['Top Goal','KPI Win','Milestone','Achievement','Record','OKR Hit'],
-  message:      ['Support Chat','Feedback','Comments','Discussion','Slack Thread','Forum'],
-  phone:        ['Mobile App','iOS App','Android','Push Notify','SMS','WhatsApp'],
-  wrench:       ['Maintenance','Fix Mode','Debug','Patch','Repair','Refactor'],
-  chart:        ['Analytics','Metrics','Dashboard','Reports','KPIs','Funnels'],
-  eye:          ['Monitoring','Observability','Alerting','Logs','Traces','Sentry'],
-  music:        ['Media Player','Audio Stream','Podcast','Soundtrack','Beats','Playlist'],
-  heart:        ['Favorites','Wishlist','Liked','Saved','Love','Reaction'],
-  flag:         ['Feature Flag','Milestone','Checkpoint','Sprint Goal','Launch Gate','Marker'],
-  shield:       ['Security','Protection','WAF','Rate Limit','Guard','Compliance'],
-  flask:        ['Lab Env','Experiment','A/B Test','Beta','Sandbox','Staging'],
-  trending:     ['Growth','Scaling','Momentum','Viral','Expanding','Hypergrowth'],
-  paint:        ['Design System','UI Kit','Figma','Style Guide','Brand','Tokens'],
-  sparkles:     ['Magic Feature','AI Polish','Premium UX','Delight','Wow Factor','Easter Egg'],
-  smile:        ['User Delight','Happy Path','NPS +10','Customer Joy','Onboarding','Flow'],
-  home:         ['Home Page','Landing','Dashboard','Overview','Portal','Hub'],
-  building:     ['Enterprise','Org Unit','HQ','Department','Division','Tenant'],
-  briefcase:    ['Project','Client Work','Contract','Engagement','Mandate','Proposal'],
-  graduate:     ['Onboarding','Training','Academy','Certification','Learning','Docs'],
-  gift:         ['Promo','Gift Card','Reward','Free Tier','Bonus','Perk'],
-  clock:        ['Scheduler','Cron Job','Timer','Reminder','Deadline','SLA'],
-  calendar:     ['Sprint Plan','Release Date','Roadmap','Q2 Plan','Milestone','Kickoff'],
-  file:         ['Report','Spec','Readme','Changelog','ADR','RFC'],
-  cog:          ['Background Job','Worker','Process','Daemon','Task','Queue'],
-  cpu:          ['Compute','Processing','VM','Container','Cluster','GPU Node'],
-  link:         ['Deep Link','Permalink','Shortlink','Redirect','URL','Alias'],
-  code:         ['Feature Code','Module','Library','Component','Hook','Utility'],
-  terminal:     ['CLI Tool','Shell Script','Dev Env','Console','Bash','Makefile'],
-  package:      ['npm Package','SDK','Library','Dependency','Bundle','Release'],
-  layers:       ['Stack','Layer','Tier','Platform','Infrastructure','Monolith'],
-  bell:         ['Notification','Alert','Reminder','Push','Ping','Pager'],
-  alert:        ['Warning','Error State','Critical Alert','P0 Issue','Incident','On-Call'],
-  info:         ['Help Text','Tooltip','Guide','FAQ','Hint','Annotation'],
-  help:         ['Support','FAQ','Helpdesk','Knowledge Base','Runbook','Escalation'],
-  refresh:      ['Sync','Reload','Update','Retry','Refresh Token','Poll'],
-  share:        ['Publish','Export','Broadcast','Post','Distribute','Syndicate'],
-  download:     ['Download','Export','Fetch','Pull','Backup','Archive'],
-  upload:       ['Upload','Push','Ingest','Submit','Deploy','Seed'],
-  image:        ['Banner','Thumbnail','Avatar','Cover Photo','Asset','Artwork'],
-  video:        ['Tutorial','Demo','Walkthrough','Webinar','Reel','Recording'],
-  mic:          ['Voice Input','Podcast','Audio Note','Recording','Speech','Transcript'],
-  headphones:   ['Support Audio','Podcast','Listen Mode','Playback','Music','Review'],
-  camera:       ['Screenshot','Photo Upload','Profile Pic','Snapshot','Vision','Capture'],
-  monitor:      ['Admin View','CMS','Control Panel','Screen','Command Center','Studio'],
-  wifi:         ['Network','Internet','Connectivity','Uptime','Connection','Edge'],
-  card:         ['Payment','Billing','Stripe','Credit Card','Checkout','Invoice'],
-  cart:         ['Shopping','E-commerce','Cart','Order','Checkout','Storefront'],
-  dollar:       ['Revenue','Pricing','Budget','Cost','MRR','ARR'],
-  pie:          ['Market Share','Breakdown','Allocation','Distribution','Segments','Split'],
-  activity:     ['Uptime','Health Check','Status','Pulse','Heartbeat','SLO'],
-  target:       ['OKR','Goal','KPI','North Star','Target Metric','Outcome'],
-  crosshair:    ['Focus Area','Priority','Objective','Aim','Precision','Sniper'],
-  compass:      ['Direction','Strategy','Vision','North Star','Roadmap','Charter'],
-  map:          ['Journey Map','Architecture','Sitemap','Flow','Diagram','Canvas'],
-  bookmark:     ['Saved','Reading List','Reference','Pinned','Favorite','Quick Link'],
-  tag:          ['Label','Category','Type','Badge','Segment','Attribute'],
-  hash:         ['Topic','Channel','Tag','Hashtag','Group','Thread'],
-  at:           ['Mention','Email','Contact','Handle','Alias','Address'],
-  send:         ['Dispatch','Notify','Push','Deliver','Emit','Trigger'],
+const AI_OVERLAY_COLORS = ['#6366f1','#ec4899','#f97316','#22c55e','#eab308','#3b82f6','#8b5cf6','#14b8a6','#ef4444','#f43f5e','#84cc16']
+const ALPHABET = 'abcdefghijklmnopqrstuvwxyz'
+
+function AIIconsOverlay() {
+  const particles = useMemo(() => {
+    const N = 32
+    return Array.from({ length: N }, (_, i) => {
+      const angle = (i / N) * 2 * Math.PI
+      const radius = 100 + (i % 4) * 18
+      return {
+        letter: ALPHABET[i % 26],
+        color: AI_OVERLAY_COLORS[i % AI_OVERLAY_COLORS.length],
+        x: Math.round(Math.cos(angle) * radius),
+        y: Math.round(Math.sin(angle) * radius),
+        dur: 1.6 + (i % 6) * 0.25,
+        delay: i * 0.06,
+        size: 9 + (i % 5) * 2,
+        opacity: 0.7 + (i % 3) * 0.1,
+      }
+    })
+  }, [])
+
+  return (
+    <>
+      <style>{`
+        @keyframes _aiBob { 0%,100%{transform:translateY(0)scale(1)}50%{transform:translateY(-7px)scale(1.15)} }
+        @keyframes _aiSpin { to{transform:rotate(360deg)} }
+      `}</style>
+      <div style={{
+        position: 'fixed', inset: 0, zIndex: 9998,
+        background: 'rgba(8,8,18,0.82)',
+        backdropFilter: 'blur(3px)',
+      }}>
+        {/* Letters orbiting the center */}
+        <div style={{ position: 'absolute', top: '50%', left: '50%' }}>
+          {particles.map((p, i) => (
+            <span key={i} style={{
+              position: 'absolute',
+              left: p.x,
+              top: p.y,
+              color: p.color,
+              fontSize: p.size,
+              fontWeight: 800,
+              fontFamily: 'monospace',
+              lineHeight: 1,
+              opacity: p.opacity,
+              animation: `_aiBob ${p.dur}s ${p.delay}s ease-in-out infinite`,
+              userSelect: 'none',
+              pointerEvents: 'none',
+              transform: 'translate(-50%,-50%)',
+            }}>
+              {p.letter}
+            </span>
+          ))}
+        </div>
+        {/* Toast */}
+        <div style={{
+          position: 'absolute', top: '50%', left: '50%',
+          transform: 'translate(-50%,-50%)',
+          background: '#1a1d2e',
+          borderRadius: 14,
+          padding: '15px 22px',
+          display: 'flex', alignItems: 'center', gap: 11,
+          boxShadow: '0 8px 40px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.07)',
+          whiteSpace: 'nowrap',
+        }}>
+          <div style={{ animation: '_aiSpin 1.1s linear infinite', display: 'flex', alignItems: 'center' }}>
+            <Sparkles size={17} color="#a5b4fc" />
+          </div>
+          <span style={{ color: '#fff', fontSize: 13, fontWeight: 500, letterSpacing: 0.2 }}>
+            Assigning icons…
+          </span>
+        </div>
+      </div>
+    </>
+  )
 }
-
-const GENERIC_DICE = [
-  'Core Module','Key Feature','Main Flow','Entry Point','Critical Path',
-  'Blue Ocean','Quick Win','Low Hanging','Game Changer','Differentiator',
-  'Alpha Phase','Beta Launch','MVP','Proof of Concept','Prototype',
-  'North Star','Big Bet','Moonshot','Stretch Goal','Baseline',
-  'Sprint 1','Backlog Item','Epic','User Story','Acceptance Test',
-]
-
-function pickRandom(arr: string[]) { return arr[Math.floor(Math.random() * arr.length)] }
 
 export function SidePanel({ nodeId, onClose, onImport, onDelete }: SidePanelProps) {
   const {
@@ -213,7 +196,8 @@ export function SidePanel({ nodeId, onClose, onImport, onDelete }: SidePanelProp
   } = useMindmapStore()
   const themeColors = getTheme(themeId).colors
 
-  const [tab, setTab] = useState<Tab>('style')
+  const [tab, setTab] = useState<Tab>('map')
+  const [iconLoading, setIconLoading] = useState(false)
   const [copied, setCopied] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const node = nodeId ? (activeMindmap?.nodes.find(n => n.id === nodeId) ?? null) : null
@@ -223,12 +207,61 @@ export function SidePanel({ nodeId, onClose, onImport, onDelete }: SidePanelProp
 
   // Auto-switch to style tab when a node is selected
   useEffect(() => { if (nodeId) setTab('style') }, [nodeId])
+  // Auto-switch to map tab when no node selected
+  useEffect(() => { if (!nodeId) setTab('map') }, [nodeId])
 
   function save(updates: Parameters<typeof updateNode>[1]) {
     const ids = selectedNodeIds.length > 1 ? selectedNodeIds : (nodeId ? [nodeId] : [])
     if (ids.length === 0) return
     batchUpdateNodes(ids, updates)
   }
+
+  const runAIIcons = useCallback(async () => {
+    if (!activeMindmap || iconLoading) return
+    const nodes = activeMindmap.nodes.filter(n => n.depth > 0)
+    if (nodes.length === 0) return
+    setIconLoading(true)
+
+    const FALLBACK_POOL = ['star','sparkles','zap','rocket','brain','lightbulb','heart','globe','folder','code','flame','trophy','target','compass','map','layers','cpu','shield','cloud','smile']
+    function forcedIcon(title: string): string {
+      // pick from fallback pool based on title hash so it's consistent
+      const h = (title ?? '').split('').reduce((a, c) => a + c.charCodeAt(0), 0)
+      return FALLBACK_POOL[h % FALLBACK_POOL.length]
+    }
+
+    try {
+      const nodeList = nodes.map(n => ({ id: n.id, title: n.title, depth: n.depth }))
+      const prompt = `You are an icon assignment expert. For each mindmap node, pick the single best icon name.\n\nYou may use ANY icon from Lucide (lucide.dev) or Heroicons (heroicons.com) — use kebab-case names like: academic-cap, adjustments-horizontal, arrow-trending-up, banknotes, beaker, bolt, book-open, briefcase, building-office, calendar-days, chart-bar, chat-bubble-left, check-circle, chip, clock, cloud, code-bracket, cog, command-line, cpu-chip, credit-card, cube, currency-dollar, device-phone-mobile, document, eye, fire, flag, folder, gift, globe-alt, heart, home, key, light-bulb, link, lock-closed, magnifying-glass, map, map-pin, microphone, moon, musical-note, paint-brush, paper-airplane, photo, puzzle-piece, rocket-launch, server, shield-check, shopping-cart, signal, sparkles, star, sun, tag, trophy, user, video-camera, wifi, wrench, or any other valid lucide/heroicons icon name.\n\nRules:\n- You MUST assign an icon to EVERY node in the list. No exceptions.\n- Pick the most contextually relevant icon.\n- Respond ONLY with a valid JSON array, no explanation: [{\"id\":\"...\",\"icon\":\"...\"}, ...]\n\nNodes:\n${JSON.stringify(nodeList)}`
+      const res = await fetch('https://mindmaps-bheng.vercel.app/api/ai/generate-mindmap', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer REDACTED_ROTATED_KEY' },
+        body: JSON.stringify({ prompt, mode: 'icons' }),
+      })
+      const data = await res.json()
+      const raw = data.outline ?? data.result ?? data.content ?? ''
+      const match = raw.match(/\[[\s\S]*\]/)
+      if (!match) throw new Error('No JSON array in response')
+      const assignments: { id: string; icon: string }[] = JSON.parse(match[0])
+
+      const assigned = new Set<string>()
+      assignments.forEach(({ id, icon }) => {
+        if (!id) return
+        // Validate icon resolves — accept any Lucide or Heroicons name
+        const valid = icon && getLucideIcon(icon) ? icon : forcedIcon(nodes.find(n => n.id === id)?.title ?? '')
+        updateNode(id, { icon: valid })
+        assigned.add(id)
+      })
+      // Any node AI missed → force an icon too
+      nodes.forEach(n => {
+        if (!assigned.has(n.id)) updateNode(n.id, { icon: forcedIcon(n.title) })
+      })
+      useMindmapStore.getState().setIsDirty(true)
+    } catch {
+      autoAssignIcons()
+    } finally {
+      setIconLoading(false)
+    }
+  }, [activeMindmap, iconLoading, updateNode, autoAssignIcons])
 
 
   const shareUrl = activeMindmap
@@ -258,7 +291,7 @@ export function SidePanel({ nodeId, onClose, onImport, onDelete }: SidePanelProp
         background: '#fff', flexShrink: 0,
         padding: '0 4px',
       }}>
-        {(['style', 'map', 'share'] as Tab[]).map(t => (
+        {(['map', 'style', 'share'] as Tab[]).map(t => (
           <button key={t} onClick={() => setTab(t)} style={{
             flex: 1, height: 42, border: 'none', background: 'transparent',
             cursor: 'pointer', fontSize: 12, fontWeight: tab === t ? 600 : 500,
@@ -288,73 +321,6 @@ export function SidePanel({ nodeId, onClose, onImport, onDelete }: SidePanelProp
           ) : (
             <>
 
-              {/* Root circle controls */}
-              {node.depth === 0 && diagramType === 'logic-chart' && (
-                <>
-                  <SBlock title="Circle">
-                    <PRow label="Radius">
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <input type="range" min={60} max={260} step={4}
-                          value={Math.round(node.width / 2)}
-                          onChange={e => {
-                            const d = parseInt(e.target.value) * 2
-                            updateNode(node.id, { width: d, height: d, manuallyPositioned: false })
-                            rerunLayout()
-                          }}
-                          style={{ flex: 1, accentColor: '#3b82f6' }}
-                        />
-                        <span style={{ fontSize: 11, color: '#6b7280', minWidth: 26, textAlign: 'right' }}>{Math.round(node.width / 2)}</span>
-                      </div>
-                    </PRow>
-                    <PRow label="Gap">
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <input type="range" min={40} max={999} step={10}
-                          value={node.branchGap ?? 120}
-                          onChange={e => {
-                            updateNode(node.id, { branchGap: parseInt(e.target.value) })
-                            rerunLayout()
-                          }}
-                          style={{ flex: 1, accentColor: '#3b82f6' }}
-                        />
-                        <span style={{ fontSize: 11, color: '#6b7280', minWidth: 26, textAlign: 'right' }}>{node.branchGap ?? 120}</span>
-                      </div>
-                    </PRow>
-                  </SBlock>
-                  <HR />
-                </>
-              )}
-
-              {/* Shape */}
-              <SBlock title="Shape">
-                <PRow label="Fill">
-                  <ColorField color={node.color} onChange={c => save({ color: c })} swatches={themeColors} />
-                </PRow>
-                {node.depth >= 1 && !(diagramType === 'mindmap' && node.depth <= 2) && (
-                  <PRow label="Width">
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <input type="range" min={80} max={500} step={4}
-                        value={node.width}
-                        onChange={e => resizeNodeDepth(node.depth, parseInt(e.target.value))}
-                        style={{ flex: 1, accentColor: '#3b82f6' }}
-                      />
-                      <span style={{ fontSize: 11, color: '#6b7280', minWidth: 26, textAlign: 'right' }}>{node.width}</span>
-                    </div>
-                  </PRow>
-                )}
-              </SBlock>
-              <HR />
-
-              {/* Visual: Icon / Emoji / Text tabs */}
-              {node.depth >= 1 && (
-                <>
-                  <VisualPickerBlock
-                    icon={node.icon}
-                    emoji={node.emoji}
-                    onSave={save}
-                  />
-                  <HR />
-                </>
-              )}
 
               {/* Text */}
               <SBlock title="Text">
@@ -399,6 +365,38 @@ export function SidePanel({ nodeId, onClose, onImport, onDelete }: SidePanelProp
                 </PRow>
               </SBlock>
               <HR />
+
+              {/* Shape */}
+              <SBlock title="Shape">
+                <PRow label="Fill">
+                  <ColorField color={node.color} onChange={c => save({ color: c })} swatches={themeColors} />
+                </PRow>
+                {node.depth >= 1 && !(diagramType === 'mindmap' && node.depth <= 2) && (
+                  <PRow label="Width">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <input type="range" min={80} max={500} step={4}
+                        value={node.width}
+                        onChange={e => resizeNodeDepth(node.depth, parseInt(e.target.value))}
+                        style={{ flex: 1, accentColor: '#3b82f6' }}
+                      />
+                      <span style={{ fontSize: 11, color: '#6b7280', minWidth: 26, textAlign: 'right' }}>{node.width}</span>
+                    </div>
+                  </PRow>
+                )}
+              </SBlock>
+              <HR />
+
+              {/* Visual: Icon / Emoji / Text tabs */}
+              {node.depth >= 1 && (
+                <>
+                  <VisualPickerBlock
+                    icon={node.icon}
+                    emoji={node.emoji}
+                    onSave={save}
+                  />
+                  <HR />
+                </>
+              )}
 
               {/* Branch — root only */}
               {node.depth === 0 && <SBlock title="Branch">
@@ -487,30 +485,6 @@ export function SidePanel({ nodeId, onClose, onImport, onDelete }: SidePanelProp
             </>
           )}
 
-          <HR />
-          <SBlock title="Feeling Lucky?">
-            <button
-              onClick={() => {
-                const { activeMindmap: a, updateNode: upd } = useMindmapStore.getState()
-                const nodes = a?.nodes
-                if (!nodes) return
-                nodes.filter(n => n.parentId !== null).forEach(n => {
-                  const icon = pickRandom(Object.keys(DICE_WORDS))
-                  const words = DICE_WORDS[icon] ?? GENERIC_DICE
-                  upd(n.id, { title: pickRandom(words), icon })
-                })
-                showToast('🎲 Rolled!', { color: '#6366f1', confetti: true })
-              }}
-              style={{
-                width: '100%', padding: '9px 12px', borderRadius: 8, border: '1.5px dashed #cbd5e1',
-                background: 'transparent', cursor: 'pointer', fontFamily: 'inherit',
-                fontSize: 12, fontWeight: 600, color: '#64748b',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-              }}
-              onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
-              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-            >🎲 Roll the Dice</button>
-          </SBlock>
         </div>
       )}
 
@@ -619,16 +593,16 @@ export function SidePanel({ nodeId, onClose, onImport, onDelete }: SidePanelProp
               onMouseLeave={e => (e.currentTarget.style.background = '#fff')}>
               <RefreshCw size={13} /> Re-run Layout
             </button>
-            <button onClick={autoAssignIcons} style={{
+            <button onClick={runAIIcons} disabled={iconLoading} style={{
               width: '100%', padding: '9px 12px', borderRadius: 8,
-              border: '1px solid #e0e2e7', background: '#fff',
-              cursor: 'pointer', fontSize: 12, fontWeight: 500,
-              color: '#374151', fontFamily: 'inherit',
+              border: '1px solid #e0e2e7', background: iconLoading ? '#f3f4f6' : '#fff',
+              cursor: iconLoading ? 'not-allowed' : 'pointer', fontSize: 12, fontWeight: 500,
+              color: iconLoading ? '#9ca3af' : '#374151', fontFamily: 'inherit',
               display: 'flex', alignItems: 'center', gap: 8,
             }}
-              onMouseEnter={e => (e.currentTarget.style.background = '#f3f4f6')}
-              onMouseLeave={e => (e.currentTarget.style.background = '#fff')}>
-              ✦ Auto Icons
+              onMouseEnter={e => { if (!iconLoading) e.currentTarget.style.background = '#f3f4f6' }}
+              onMouseLeave={e => { if (!iconLoading) e.currentTarget.style.background = '#fff' }}>
+              {iconLoading ? '⏳ Thinking...' : '✦ Auto Icons (AI)'}
             </button>
           </SBlock>
           <HR />
@@ -794,6 +768,7 @@ export function SidePanel({ nodeId, onClose, onImport, onDelete }: SidePanelProp
           )}
         </div>
       )}
+      {iconLoading && <AIIconsOverlay />}
     </div>
   )
 }

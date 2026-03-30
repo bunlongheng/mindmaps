@@ -170,9 +170,11 @@ export default function App() {
   })
   const [selectedPanelNodeId, setSelectedPanelNodeId] = useState<string | null>(null)
   const [showPanel, setShowPanel] = useState(false)
+  const isMobile = window.innerWidth <= 768
   const [showImport, setShowImport] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [showConfetti, setShowConfetti] = useState(() => new URLSearchParams(window.location.search).has('imported'))
+  const confettiCount = (() => { const t = new URLSearchParams(window.location.search).get('tokens'); return t ? parseInt(t) : 500 })()
 
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -261,7 +263,7 @@ export default function App() {
     setView('editor')
     window.history.pushState({}, '', `?map=${id}`)
     const name = useMindmapStore.getState().activeMindmap?.name
-    if (name) setTimeout(() => showToast(name, { color: '#6366f1', confetti: false }), 150)
+    if (name) setTimeout(() => showToast(name, { color: '#1a1d2e', confetti: false }), 150)
   }, [loadDiagram])
 
   const handleBack = useCallback(() => {
@@ -334,7 +336,7 @@ export default function App() {
       <CuteToast />
       {/* Confetti on first load after AI generation */}
       {showConfetti && (
-        <Confetti onDone={() => {
+        <Confetti count={confettiCount} onDone={() => {
           setShowConfetti(false)
           // Show map name toast after confetti finishes
           const name = useMindmapStore.getState().activeMindmap?.name
@@ -342,6 +344,7 @@ export default function App() {
           // Clean ?imported from URL without navigating
           const p = new URLSearchParams(window.location.search)
           p.delete('imported')
+          p.delete('tokens')
           const next = p.toString() ? `?${p}` : window.location.pathname
           window.history.replaceState({}, '', next)
         }} />
@@ -358,52 +361,16 @@ export default function App() {
         {/* Back button — top left */}
         <button onClick={handleBack} title="All maps" style={{
           position: 'fixed', top: 14, left: 14, zIndex: 20,
-          width: 36, height: 36, borderRadius: 10,
+          width: isMobile ? 48 : 36, height: isMobile ? 48 : 36, borderRadius: isMobile ? 14 : 10,
           background: '#fff', border: '1px solid #e2e8f0',
           boxShadow: '0 2px 10px rgba(0,0,0,0.07)',
           cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#475569',
         }}
           onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
           onMouseLeave={e => (e.currentTarget.style.background = '#fff')}>
-          <ArrowLeft size={16} />
+          <ArrowLeft size={isMobile ? 22 : 16} />
         </button>
 
-        {/* Delete confirm modal */}
-        {showDeleteConfirm && (
-          <div style={{
-            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.25)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200,
-          }} onClick={() => setShowDeleteConfirm(false)}>
-            <div style={{
-              background: '#fff', borderRadius: 16, padding: 24, width: 320,
-              boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
-            }} onClick={e => e.stopPropagation()}>
-              <h3 style={{ fontSize: 15, fontWeight: 700, color: '#1e293b', marginBottom: 8 }}>Delete map?</h3>
-              <p style={{ fontSize: 13, color: '#64748b', marginBottom: 20 }}>
-                "<strong>{activeMindmap?.name}</strong>" will be permanently deleted.
-              </p>
-              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                <button onClick={() => setShowDeleteConfirm(false)} style={{
-                  padding: '8px 16px', border: '1px solid #e2e8f0', borderRadius: 9,
-                  background: '#fff', cursor: 'pointer', fontSize: 13, fontFamily: 'inherit', color: '#64748b',
-                }}>Cancel</button>
-                <button onClick={() => {
-                  setShowDeleteConfirm(false)
-                  if (activeMindmap) {
-                    const name = activeMindmap.name
-                    deleteDiagram(activeMindmap.id, name).then(() => {
-                      handleBack()
-                      setTimeout(() => showToast(`"${name}" deleted`, { color: '#ef4444' }), 50)
-                    })
-                  }
-                }} style={{
-                  padding: '8px 18px', background: '#ef4444', color: '#fff',
-                  border: 'none', borderRadius: 9, cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
-                }}>Delete</button>
-              </div>
-            </div>
-          </div>
-        )}
 
 
         {/* Format toggle button — top right, only when a diagram is loaded */}
@@ -412,19 +379,22 @@ export default function App() {
           title="Format"
           style={{
             position: 'fixed', top: 14, right: 14, zIndex: 20,
-            height: 36, padding: '0 14px', borderRadius: 10,
+            width: isMobile ? 48 : undefined,
+            height: isMobile ? 48 : 36,
+            padding: isMobile ? 0 : '0 14px',
+            borderRadius: isMobile ? 14 : 10,
             background: showPanel ? '#1a1d2e' : '#fff',
             border: '1px solid #e2e8f0',
             boxShadow: '0 2px 10px rgba(0,0,0,0.07)',
-            cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7,
+            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: isMobile ? 0 : 7,
             color: showPanel ? '#fff' : '#475569',
             fontSize: 13, fontWeight: 500, fontFamily: 'inherit',
           }}
           onMouseEnter={e => { if (!showPanel) e.currentTarget.style.background = '#f8fafc' }}
           onMouseLeave={e => { if (!showPanel) e.currentTarget.style.background = '#fff' }}
         >
-          <SlidersHorizontal size={15} />
-          Format
+          <SlidersHorizontal size={isMobile ? 22 : 15} />
+          {!isMobile && 'Format'}
         </button>}
       </div>
 
@@ -445,6 +415,41 @@ export default function App() {
       )}
 
       {showImport && <ImportModal onClose={() => setShowImport(false)} />}
+
+      {/* Delete confirm modal — at root level so it's never clipped */}
+      {showDeleteConfirm && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.25)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 500,
+        }} onClick={() => setShowDeleteConfirm(false)}>
+          <div style={{
+            background: '#fff', borderRadius: 16, padding: 24, width: 320,
+            boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
+          }} onClick={e => e.stopPropagation()}>
+            <h3 style={{ fontSize: 15, fontWeight: 700, color: '#1e293b', marginBottom: 8 }}>Delete map?</h3>
+            <p style={{ fontSize: 13, color: '#64748b', marginBottom: 20 }}>
+              "<strong>{activeMindmap?.name}</strong>" will be permanently deleted.
+            </p>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button onClick={() => setShowDeleteConfirm(false)} style={{
+                padding: '8px 16px', border: '1px solid #e2e8f0', borderRadius: 9,
+                background: '#fff', cursor: 'pointer', fontSize: 13, fontFamily: 'inherit', color: '#64748b',
+              }}>Cancel</button>
+              <button onClick={() => {
+                setShowDeleteConfirm(false)
+                if (activeMindmap) {
+                  const id = activeMindmap.id
+                  const name = activeMindmap.name
+                  deleteDiagram(id, name).finally(() => handleBack())
+                }
+              }} style={{
+                padding: '8px 18px', background: '#ef4444', color: '#fff',
+                border: 'none', borderRadius: 9, cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
+              }}>Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Tag footer bar ── */}
       {activeMindmap && (() => {
@@ -485,8 +490,8 @@ export default function App() {
               </span>
             ))}
 
-            {/* Add tag toggle */}
-            <button onClick={() => setShowTagFooter(p => !p)} style={{
+            {/* Add tag toggle — hidden on mobile */}
+            {!isMobile && <button onClick={() => setShowTagFooter(p => !p)} style={{
               fontSize: 11, fontWeight: 600, padding: '3px 9px', borderRadius: 10,
               background: showTagFooter ? '#1e293b' : '#f1f5f9',
               color: showTagFooter ? '#fff' : '#64748b',
@@ -494,7 +499,7 @@ export default function App() {
               display: 'flex', alignItems: 'center', gap: 4,
             }}>
               + Tag
-            </button>
+            </button>}
 
             {/* PDF / Star / Delete */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
