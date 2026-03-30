@@ -357,7 +357,7 @@ export function SidePanel({ nodeId, onClose, onImport, onDelete }: SidePanelProp
                       return (
                         <button key={value} onClick={() => {
                           if (!node) return
-                          const h = value === 'circle' ? 140 : 64
+                          const h = value === 'circle' ? 180 : 64
                           const w = value === 'circle' ? h : Math.max(180, Math.min(500, Math.ceil(node.title.length * 28 * 0.62 + 80)))
                           save({ shape: value, width: w, height: value === 'circle' ? w : h })
                           setTimeout(() => rerunLayout(), 0)

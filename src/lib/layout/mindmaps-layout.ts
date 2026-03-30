@@ -1,7 +1,7 @@
 import type { MindmapNode } from '../../types'
 
 const SIZES: Record<number, { w: number; h: number }> = {
-  0: { w: 180, h: 180 },  // circle: w === h
+  0: { w: 200, h: 200 },  // circle: w === h
 }
 const DEFAULT_H: Record<number, number> = { 1: 54, 2: 38, 3: 34 }
 const DEFAULT_HEIGHT = 30
