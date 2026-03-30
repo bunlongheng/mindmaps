@@ -181,22 +181,20 @@ export function EdgeLayer({ nodes, lineStyle, diagramType }: EdgeLayerProps) {
 
           const isL1 = n.depth === 1
           const isL2 = n.depth === 2
-          const isCircleStem = isL1
-          let labelAngle = 0
           const dx = x2 - x1, dy = y2 - y1
           const len = Math.hypot(dx, dy) || 1
           const ux = dx / len, uy = dy / len
 
-          // Ellipse/circle perimeter intersection: r = 1/sqrt((ux/a)^2 + (uy/b)^2)
+          // Ellipse perimeter intersection: r = 1/sqrt((ux/a)^2 + (uy/b)^2)
           function edgeR(w: number, h: number) {
             const a = w / 2, b = h / 2
             const d = Math.sqrt((ux / a) ** 2 + (uy / b) ** 2)
             return d === 0 ? a : 1 / d
           }
           const parentR = edgeR(parent.width, parent.height)
-          const childR  = n.width / 2  // child nodes are always circles
+          const childR = edgeR(n.width, n.height)
 
-          // Edge endpoints touch the node perimeter — no overlap, no gap
+          // Edge endpoints touch the node perimeter
           const sx = x1 + ux * parentR
           const sy = y1 + uy * parentR
           const ex = x2 - ux * childR
@@ -207,14 +205,6 @@ export function EdgeLayer({ nodes, lineStyle, diagramType }: EdgeLayerProps) {
           const numDist = parentR + 16
           const ox = x1 + ux * numDist
           const oy = y1 + uy * numDist
-          // Label pill: center in the visible segment between the two node edges
-          const visMidT = parentR + (len - parentR - childR) / 2
-          const tx = x1 + ux * visMidT
-          const ty = y1 + uy * visMidT
-          if (isCircleStem) {
-            const rawAngle = Math.atan2(dy, dx) * 180 / Math.PI
-            labelAngle = rawAngle > 90 || rawAngle <= -90 ? rawAngle + 180 : rawAngle
-          }
 
           const edgePath = lineStyle === 'straight'
             ? `M ${sx} ${sy} L ${ex} ${ey}`
@@ -227,27 +217,6 @@ export function EdgeLayer({ nodes, lineStyle, diagramType }: EdgeLayerProps) {
                 stroke={n.color} strokeWidth={isL1 ? 3 : isL2 ? 2.5 : 2}
                 fill="none" strokeLinecap="round"
               />
-              {isCircleStem && !hideDetails && (() => {
-                const fs = isL1 ? 12 : 10
-                const pillH = fs + 10
-                const pillR = pillH / 2
-                const estW = Math.ceil(n.title.length * fs * 0.58) + 20
-                return (
-                  <g transform={`rotate(${labelAngle}, ${tx}, ${ty})`} style={{ pointerEvents: 'none' }}>
-                    <rect x={tx - estW / 2} y={ty - pillH / 2} width={estW} height={pillH}
-                      rx={pillR} ry={pillR}
-                      fill="white" stroke={n.color} strokeWidth={1.2} opacity={0.96}
-                    />
-                    <text x={tx} y={ty}
-                      textAnchor="middle" dominantBaseline="central"
-                      fontSize={fs} fontWeight="700"
-                      fontFamily="Inter, system-ui, sans-serif"
-                      fill={n.color}
-                      style={{ pointerEvents: 'none' }}
-                    >{n.title}</text>
-                  </g>
-                )
-              })()}
               {isL1 && showOrderNumbers && (
                 <g style={{ pointerEvents: 'none' }}>
                   <circle cx={ox} cy={oy} r={11} fill={n.color} />

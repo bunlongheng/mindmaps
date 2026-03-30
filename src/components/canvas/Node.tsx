@@ -94,11 +94,11 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
     strokeColor = node.color
     strokeW = 2
   } else if (isMindmapCircle) {
-    // L1 mindmap circles: transparent fill with colored border, black text
-    bg = 'transparent'
-    textColor = '#1a1d2e'
-    strokeColor = node.color
-    strokeW = 3
+    // L1 mindmap: solid black pill like root, white text
+    bg = '#1a1d2e'
+    textColor = '#ffffff'
+    strokeColor = '#1a1d2e'
+    strokeW = 0
   } else {
     // L1 all other diagrams: solid color fill, auto text, no border
     bg = node.color
@@ -111,7 +111,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   const iconColor = isRoot
     ? textColor
     : isMindmapCircle
-      ? node.color
+      ? '#ffffff'
       : node.depth === 1
         ? (isLight(node.color) ? '#1a1d2e' : '#ffffff')
         : (node.color.startsWith('#') ? darkenColor(node.color, 0.35) : node.color)
@@ -358,12 +358,6 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
           </ellipse>
           </>)})()}
         </>
-      ) : isMindmapCircle ? (
-        <circle
-          cx={displayW / 2} cy={node.height / 2} r={node.height / 2}
-          fill={node.depth === 1 ? 'transparent' : bg} fillOpacity={node.depth === 1 ? 0 : bgOpacity}
-          stroke={strokeColor} strokeWidth={node.depth === 1 ? 2.5 : strokeW}
-        />
       ) : isMindmapL2Plus ? (
         <rect x={0} y={0} width={displayW} height={node.height} fill="transparent" />
       ) : (
@@ -403,8 +397,8 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
           />
         </foreignObject>
       ) : (
-        <g clipPath={isRoot || isMindmapCircle ? undefined : `url(#${clipId})`}>
-          {hasEmoji && resolvedEmoji && !isMindmapCircle && !isMindmapL2Plus && (() => {
+        <g clipPath={isRoot ? undefined : `url(#${clipId})`}>
+          {hasEmoji && resolvedEmoji && !isMindmapL2Plus && (() => {
             const zoneW = displayW * 0.2
             const emojiSize = Math.min(node.height * 0.52, 22)
             const textAreaX = zoneW + (displayW - zoneW) / 2
@@ -434,7 +428,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
               </>
             )
           })()}
-          {hasIcon && resolvedIcon && !isMindmapCircle && !isMindmapL2Plus && (() => {
+          {hasIcon && resolvedIcon && !isMindmapL2Plus && (() => {
             const zoneW = displayW * 0.2
             const iconSize = Math.min(fontSize + 4, zoneW * 0.65)
             const iconX = (zoneW - iconSize) / 2
@@ -455,7 +449,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
               </>
             )
           })()}
-          {((!hasIcon && !hasEmoji) || isRoot || isMindmapL2Plus) && !isMindmapCircle && (
+          {((!hasIcon && !hasEmoji) || isRoot || isMindmapL2Plus) && (
             <text
               x={isRoot ? cx : isMindmapL2Plus ? ((hasEmoji || hasIcon) ? 26 : 12) : align === 'left' ? 12 : align === 'right' ? displayW - 12 : displayW / 2}
               y={isRoot ? cy + fontSize * 0.38 : node.height / 2 + fontSize * 0.38}
@@ -466,22 +460,11 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
               style={{ pointerEvents: 'none' }}
             >{label}</text>
           )}
-          {isMindmapCircle && (
-            <>
-              {hasIcon && resolvedIcon
-                ? <NodeIcon icon={resolvedIcon} x={(displayW - fontSize * 1.4) / 2} y={(node.height - fontSize * 1.4) / 2} size={fontSize * 1.4} color={iconColor} strokeWidth={2.2} />
-                : hasEmoji && resolvedEmoji
-                  ? <text x={displayW / 2} y={node.height / 2 + node.height * 0.18} textAnchor="middle" fontSize={node.height * 0.50} style={{ pointerEvents: 'none' }}>{resolvedEmoji}</text>
-                  : <text x={displayW / 2} y={node.height / 2 + fontSize * 0.38} textAnchor="middle" fontSize={Math.min(fontSize, Math.floor(displayW / (label.length * 0.6 + 1)))} fontWeight="700" fontFamily="Inter, system-ui, sans-serif" fill={textColor} style={{ pointerEvents: 'none' }}>{label}</text>
-              }
-              {/* label moved to stem in EdgeLayer */}
-            </>
-          )}
         </g>
       )}
 
       {/* Resize handle — right edge, non-root only, not mindmap circles */}
-      {!isRoot && !readOnly && !isMindmapCircle && (
+      {!isRoot && !readOnly && (
         <g style={{ cursor: 'ew-resize', userSelect: 'none' }}>
           {/* Hit area — all pointer events on this rect so capture works */}
           <rect

@@ -10,14 +10,15 @@ const DEFAULT_FONT_SIZE = 11
 
 function autoW(node: MindmapNode, depth: number): number {
   const fontSize = FONT_SIZES[depth] ?? DEFAULT_FONT_SIZE
-  const hasVisual = !!(node.icon || node.emoji) && depth < 2
-  const textW = node.title.length * fontSize * 0.64 + 24
+  const hasVisual = !!(node.icon || node.emoji) && depth <= 1
+  const padding = depth === 1 ? 36 : 24
+  const textW = node.title.length * fontSize * 0.64 + padding
   const total = hasVisual ? Math.ceil(textW / 0.78) : textW
-  const min = depth === 3 ? 80 : 60
+  const min = depth === 1 ? 100 : depth === 3 ? 80 : 60
   return Math.max(min, Math.min(320, Math.ceil(total)))
 }
 
-const L1_CIRCLE_SIZE = 88
+const L1_H = 44
 const L2_CIRCLE_SIZE = 60
 
 /** Count total leaf+internal nodes in subtree (used to weight arc allocation) */
@@ -41,9 +42,10 @@ function placeSubtree(
   if (!node) return
 
   const fontSize = FONT_SIZES[depth] ?? DEFAULT_FONT_SIZE
-  const isCircle = depth === 1 || depth === 2
-  const w = isCircle ? (depth === 1 ? L1_CIRCLE_SIZE : L2_CIRCLE_SIZE) : (node.width > 0 ? node.width : autoW(node, depth))
-  const h = isCircle ? (depth === 1 ? L1_CIRCLE_SIZE : L2_CIRCLE_SIZE) : (depth <= 3 ? 36 : 30)
+  const isL2Circle = depth === 2
+  const isL1Pill = depth === 1
+  const w = isL1Pill ? autoW(node, depth) : isL2Circle ? L2_CIRCLE_SIZE : (node.width > 0 ? node.width : autoW(node, depth))
+  const h = isL1Pill ? L1_H : isL2Circle ? L2_CIRCLE_SIZE : (depth <= 3 ? 36 : 30)
 
   if (!node.manuallyPositioned) {
     result.push({ ...node, x: cx - w / 2, y: cy - h / 2, width: w, height: h, fontSize })
