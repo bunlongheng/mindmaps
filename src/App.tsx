@@ -64,7 +64,7 @@ export default function App() {
         setAuthLoading(false)
         const greetings = ["Let's build something cool.", "Welcome back, boss.", "Let's do it. One diagram at a time.", "Good to see you.", "Ready when you are.", "Let's make it count.", "Diagrams standing by.", "Ready, set, go.", "All systems initiated.", "Let's make something great."]
         const greeting = greetings[Math.floor(Math.random() * greetings.length)]
-        setTimeout(() => showToast(greeting, { color: '#6366f1', confetti: true }), 150)
+        setTimeout(() => showToast(greeting, { color: '#1a1d2e', confetti: true }), 150)
       } else if (event === 'SIGNED_OUT') {
         const farewells = ["Later!", "See ya!", "Peace out!", "Catch you later!", "Adios!", "So long!", "Bye for now!", "Take care!", "Until next time!"]
         const farewell = farewells[Math.floor(Math.random() * farewells.length)]
@@ -100,7 +100,7 @@ export default function App() {
         showToast(payload.message, { color: payload.color ?? '#6366f1', confetti: payload.confetti ?? false })
       })
       .on('broadcast', { event: 'diagram-created' }, ({ payload }) => {
-        showToast(`✦ "${payload.title}" added`, { color: '#6366f1' })
+        showToast(`✦ "${payload.title}" added`, { color: '#1a1d2e' })
         setFlashDiagramId(payload.id)
         loadDiagramList()
         setTimeout(() => setFlashDiagramId(null), 3500)
@@ -124,7 +124,7 @@ export default function App() {
         const { diagrams } = useMindmapStore.getState()
         if (diagrams.find(d => d.id === row.id)) return
         soundIncoming()
-        showToast(`✦ "${row.name}" added`, { color: '#6366f1' })
+        showToast(`✦ "${row.name}" added`, { color: '#1a1d2e' })
         loadDiagramList()
       })
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'mindmaps', filter: `user_id=eq.${effectiveUserId}` }, (payload) => {

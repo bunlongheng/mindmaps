@@ -231,7 +231,7 @@ export const useMindmapStore = create<MindmapStore>()(
         'tree-vertical': 'Tree ↓', 'tree-horizontal': 'Tree →',
         'fishbone': 'Fishbone', 'timeline': 'Timeline',
       }
-      showToast(`✦ Switched to ${labels[t] ?? t}`, { color: '#6366f1' })
+      showToast(`✦ Switched to ${labels[t] ?? t}`, { color: '#1a1d2e' })
     },
     setLineStyle: (s) => {
       const state = get()

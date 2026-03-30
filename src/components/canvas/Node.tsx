@@ -61,6 +61,11 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
       ? s.activeMindmap?.nodes.find(n => n.id === node.parentId)
       : undefined
   )
+  const childCount = useMindmapStore(s =>
+    diagramType === 'mindmap' && node.depth === 1
+      ? (s.activeMindmap?.nodes.filter(n => n.parentId === node.id).length ?? 0)
+      : 0
+  )
   const canDrag = (isRoot && diagramType !== 'mindmap') || diagramType === 'logic-chart'
   // Root shape: user-set overrides auto; auto = pill if title ≥15 chars or dims non-square
   const isRootPill = isRoot && (
@@ -235,7 +240,9 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   // Use live preview width during resize drag, otherwise committed node width
   const displayW = previewW ?? node.width
   void ((hasIcon || hasEmoji) ? displayW * 0.2 : 0) // iconZoneW — reserved for future use
-  const label = node.title
+  const label = (diagramType === 'mindmap' && node.depth === 1 && childCount > 0)
+    ? `${node.title} (${childCount})`
+    : node.title
   // All coordinates are relative to (node.x, node.y)
   const cx = displayW / 2
   const cy = node.height / 2

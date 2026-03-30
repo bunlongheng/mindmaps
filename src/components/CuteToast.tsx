@@ -19,7 +19,7 @@ type Listener = (state: ToastState | null) => void
 const listeners = new Set<Listener>()
 let _id = 0
 
-export function showToast(msg: string, { color = '#6366f1', confetti = false, duration = 3000 }: ToastOptions = {}) {
+export function showToast(msg: string, { color = '#1a1d2e', confetti = false, duration = 3000 }: ToastOptions = {}) {
   const state: ToastState = { id: ++_id, msg, color, confetti, duration }
   listeners.forEach(fn => fn(state))
 }

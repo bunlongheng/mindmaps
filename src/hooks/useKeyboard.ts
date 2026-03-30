@@ -59,7 +59,7 @@ export function useKeyboard() {
       if (!startId) return
       if (startId === rootId) {
         e.clipboardData!.setData('text/plain', exportToJSON(activeMindmap))
-        showToast('Copied JSON', { color: '#6366f1' })
+        showToast('Copied JSON', { color: '#1a1d2e' })
         return
       }
       function buildText(nodeId: string, indent: number): string {

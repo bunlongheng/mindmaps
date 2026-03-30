@@ -203,7 +203,7 @@ export function useDiagram(userId: string | null = null) {
       localStorage.setItem('activeMindmapId', id)
       setDiagrams(lsGetList())
       soundCreate()
-      showToast(`✦ "${name}" created`, { color: '#6366f1', confetti: true })
+      showToast(`✦ "${name}" created`, { color: '#1a1d2e', confetti: true })
       return
     }
     const { error } = await supabase.from('mindmaps').insert({
@@ -214,7 +214,7 @@ export function useDiagram(userId: string | null = null) {
     await loadDiagram(id)
     await loadDiagramList()
     soundCreate()
-    showToast(`✦ "${name}" created`, { color: '#6366f1', confetti: true })
+    showToast(`✦ "${name}" created`, { color: '#1a1d2e', confetti: true })
   }, [loadDiagram, loadDiagramList, setActiveMindmap, setDiagrams, userId])
 
   const createDiagramFromNodes = useCallback(async (name: string, nodes: MindmapNode[]): Promise<string | null> => {

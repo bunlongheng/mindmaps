@@ -169,7 +169,7 @@ export function ControlPanel({ onAddNode, onImport, onShare, onBack, onDelete }:
             {/* Actions */}
             {[
               { icon: <RefreshCw size={13}/>, label: 'Re-run layout', onClick: () => { rerunLayout(); setShowMore(false) } },
-              { icon: <Copy size={13}/>, label: 'Copy JSON', onClick: () => { if (activeMindmap) { const clean = { ...activeMindmap, nodes: activeMindmap.nodes.map(({ fontSize: _fs, ...n }) => n) }; navigator.clipboard.writeText(JSON.stringify(clean, null, 2)).then(() => showToast('JSON copied', { color: '#6366f1' })) } setShowMore(false) } },
+              { icon: <Copy size={13}/>, label: 'Copy JSON', onClick: () => { if (activeMindmap) { const clean = { ...activeMindmap, nodes: activeMindmap.nodes.map(({ fontSize: _fs, ...n }) => n) }; navigator.clipboard.writeText(JSON.stringify(clean, null, 2)).then(() => showToast('JSON copied', { color: '#1a1d2e' })) } setShowMore(false) } },
               { icon: <Download size={13}/>, label: 'Export JSON', onClick: () => { activeMindmap && downloadJSON(activeMindmap); setShowMore(false) } },
               { icon: <Upload size={13}/>, label: 'Import JSON', onClick: () => { onImport(); setShowMore(false) } },
               { icon: <Share2 size={13}/>, label: 'Share link', onClick: () => { activeMindmap && onShare(encodeShareURL(activeMindmap)); setShowMore(false) } },
