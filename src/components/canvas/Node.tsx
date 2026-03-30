@@ -38,6 +38,15 @@ function darkenColor(hex: string, amount = 0.35): string {
   return `rgb(${nr},${ng},${nb})`
 }
 
+/** Returns true if the color is light enough that black text is readable */
+function isLight(hex: string): boolean {
+  if (!hex.startsWith('#')) return true
+  const [r,g,b] = hexToRgb(hex)
+  // Perceived luminance (WCAG formula)
+  const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b
+  return lum > 140
+}
+
 export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onDragMove, onRootDragOffset, svgRef, readOnly, l1Colors = [] }: NodeProps) {
   const isRoot = node.depth === 0
   const isL2Plus = node.depth >= 2
@@ -91,11 +100,11 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
     strokeColor = node.color
     strokeW = 3
   } else {
-    // L1 all other diagrams: solid color fill, black text
+    // L1 all other diagrams: solid color fill, auto text, no border
     bg = node.color
-    textColor = '#1a1d2e'
-    strokeColor = '#1a1d2e'
-    strokeW = 3
+    textColor = isLight(node.color) ? '#1a1d2e' : '#ffffff'
+    strokeColor = node.color
+    strokeW = 0
   }
 
   // Icon color: on white circles use node.color, on light text nodes use darkened color
@@ -104,7 +113,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
     : isMindmapCircle
       ? node.color
       : node.depth === 1
-        ? '#1a1d2e'
+        ? (isLight(node.color) ? '#1a1d2e' : '#ffffff')
         : (node.color.startsWith('#') ? darkenColor(node.color, 0.35) : node.color)
 
   // Node-level overrides from panel
