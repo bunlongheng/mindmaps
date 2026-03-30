@@ -237,8 +237,11 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   const hasEmoji = !!resolvedEmoji
   const resolvedIcon = isRoot ? undefined : (!hasEmoji ? node.icon : undefined)
   const hasIcon = !!resolvedIcon && !!getLucideIcon(resolvedIcon)
-  // Use live preview width during resize drag, otherwise committed node width
-  const displayW = previewW ?? node.width
+  // Root pill: always auto-size from title so it never relies on stale stored width
+  const autoPillW = isRootPill
+    ? Math.max(180, Math.min(500, Math.ceil(node.title.length * 28 * 0.62 + 80)))
+    : null
+  const displayW = previewW ?? (autoPillW ?? node.width)
   void ((hasIcon || hasEmoji) ? displayW * 0.2 : 0) // iconZoneW — reserved for future use
   const label = (diagramType === 'mindmap' && node.depth >= 1 && childCount > 0)
     ? `${node.title} (${childCount})`

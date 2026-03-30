@@ -358,8 +358,7 @@ export function SidePanel({ nodeId, onClose, onImport, onDelete }: SidePanelProp
                         <button key={value} onClick={() => {
                           if (!node) return
                           const h = value === 'circle' ? 140 : 64
-                          // Root font-size is 28px; 0.6 char-width ratio + generous padding
-                          const w = value === 'circle' ? h : Math.max(160, Math.min(400, Math.ceil(node.title.length * 28 * 0.6 + 72)))
+                          const w = value === 'circle' ? h : Math.max(180, Math.min(500, Math.ceil(node.title.length * 28 * 0.62 + 80)))
                           save({ shape: value, width: w, height: value === 'circle' ? w : h })
                           setTimeout(() => rerunLayout(), 0)
                         }}
