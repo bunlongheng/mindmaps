@@ -97,7 +97,7 @@ export function EdgeLayer({ nodes, lineStyle, diagramType }: EdgeLayerProps) {
 
     const l1Nodes = nodes.filter(n => n.parentId === root.id)
       .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
-    const rootRightX = root.x + root.width / 2
+    const rootRightX = root.x + root.width
     const rootCY = root.y + root.height / 2
     const l1LeftX = l1Nodes.length > 0 ? l1Nodes[0].x : rootRightX + 120
     const barX = l1LeftX - 60

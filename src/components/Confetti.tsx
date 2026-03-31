@@ -26,13 +26,13 @@ export function Confetti({ onDone, count }: { onDone?: () => void; count?: numbe
       canvas.width = window.innerWidth
       canvas.height = window.innerHeight
 
-      const N = Math.max(count ?? 160, 60)
+      const N = Math.max(count ?? 80, 40)
       const flakes: Flake[] = Array.from({ length: N }, (_, i) => ({
-        x: (i / N) * canvas.width + (Math.random() - 0.5) * 80,
-        y: -10 - Math.random() * 60,
-        vx: (Math.random() - 0.5) * 2.5,
-        vy: 4 + Math.random() * 5,
-        size: 6 + Math.random() * 10,
+        x: (i / N) * canvas.width + (Math.random() - 0.5) * (canvas.width / N) * 2,
+        y: -6 - Math.random() * 40,
+        vx: (Math.random() - 0.5) * 2,
+        vy: 3 + Math.random() * 4,
+        size: 3 + Math.random() * 5,
         color: COLORS[Math.floor(Math.random() * COLORS.length)],
         rot: Math.random() * Math.PI * 2,
         rotSpd: (Math.random() - 0.5) * 0.18,

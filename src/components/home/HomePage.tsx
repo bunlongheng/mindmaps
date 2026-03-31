@@ -3,7 +3,7 @@ import { useMindmapStore } from '../../store/mindmapStore'
 import { useDiagram } from '../../hooks/useDiagram'
 import { showToast } from '../CuteToast'
 import type { DiagramMeta, MindmapNode } from '../../types'
-import { Plus, Search, Clock, Trash2, Star, LayoutGrid, Globe, Sparkles, Loader2, Tag, X, Bot, Briefcase, User, BookOpen, Zap, GraduationCap, FlaskConical, Beaker, FileInput, type LucideIcon } from 'lucide-react'
+import { Plus, Search, Trash2, LayoutGrid, Globe, Sparkles, Loader2, Tag, X, Bot, Briefcase, User, BookOpen, Zap, GraduationCap, FlaskConical, Beaker, FileInput, type LucideIcon } from 'lucide-react'
 import { ImportModal } from '../modals/ImportModal'
 import { MindmapsLogo } from '../MindmapsLogo'
 import { getTheme } from '../../lib/themes'
@@ -56,7 +56,7 @@ interface HomePageProps {
 
 export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
   const { diagrams } = useMindmapStore()
-  const { loadDiagramList, createDiagram, createDiagramFromNodes, deleteDiagram, toggleFavorite, updateTags } = useDiagram(user?.id ?? null)
+  const { loadDiagramList, createDiagram, createDiagramFromNodes, deleteDiagram, updateTags } = useDiagram(user?.id ?? null)
   const isMobile = window.innerWidth <= 768
 
   // Compute a unique color per tag (sorted alphabetically → palette index)
@@ -80,22 +80,8 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
   const [showUserMenu, setShowUserMenu] = useState(false)
   const [showImport, setShowImport] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
-  const favScrollRef = useRef<HTMLDivElement>(null)
   useEffect(() => { loadDiagramList() }, [])
 
-  // Capture horizontal trackpad scroll on favorites row — prevent browser back/forward
-  useEffect(() => {
-    const el = favScrollRef.current
-    if (!el) return
-    function onWheel(e: WheelEvent) {
-      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
-        e.preventDefault()
-        el!.scrollLeft += e.deltaX
-      }
-    }
-    el.addEventListener('wheel', onWheel, { passive: false })
-    return () => el.removeEventListener('wheel', onWheel)
-  }, [])
 
   // Close user menu on outside click
   useEffect(() => {
@@ -157,19 +143,31 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
     return matchSearch && matchTag
   })
 
-  const favDiagrams = filtered.filter(d => d.isFav)
-  const recentDiagrams = filtered.filter(d => !d.isFav)
 
   async function handleCreate() {
+    if (creating) return
     const name = newName.trim() || 'Untitled'
-    soundCreate()
     setCreating(true)
-    await createDiagram(name)
-    setNewName('')
-    setShowCreate(false)
-    setCreating(false)
-    const fresh = useMindmapStore.getState().diagrams[0]
-    if (fresh) onOpen(fresh.id)
+    try {
+      const id = await createDiagram(name)
+      setNewName('')
+      setShowCreate(false)
+      if (id) onOpen(id)
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  const [newMapBusy, setNewMapBusy] = useState(false)
+  async function handleNewBlank() {
+    if (newMapBusy) return
+    setNewMapBusy(true)
+    try {
+      const id = await createDiagram('Untitled')
+      if (id) onOpen(id)
+    } finally {
+      setNewMapBusy(false)
+    }
   }
 
   async function handleAiGenerate() {
@@ -277,6 +275,23 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
         </div>
 
         <div style={{ flex: 1 }} />
+
+        {/* Quick blank map */}
+        <button
+          onClick={handleNewBlank}
+          disabled={newMapBusy}
+          title="New blank map"
+          style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            padding: '6px 14px', borderRadius: 9,
+            border: `1px solid ${BORDER}`, background: '#fff',
+            cursor: newMapBusy ? 'wait' : 'pointer', fontSize: 13, fontWeight: 500,
+            color: TEXT_PRIMARY, fontFamily: 'inherit', flexShrink: 0,
+            opacity: newMapBusy ? 0.6 : 1,
+          }}
+        >
+          {newMapBusy ? <Loader2 size={14} style={{ animation: 'spin 0.7s linear infinite' }} /> : <Plus size={14} strokeWidth={2.5} />} New
+        </button>
 
         {user && (
           <div ref={menuRef} style={{ position: 'relative' }}>
@@ -438,52 +453,20 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
           </div>
         )}
 
-        {/* Favorites row */}
-        {favDiagrams.length > 0 && (
-          <section style={{ marginBottom: 36 }}>
-            <h2 style={{ fontSize: 11, fontWeight: 600, color: TEXT_MUTED, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 6 }}>
-              <Star size={11} fill="#eab308" color="#eab308" /> Favorites
-              <span style={{ fontSize: 13, fontWeight: 800, color: '#eab308' }}>{favDiagrams.length}</span>
-            </h2>
-            <div style={{ position: 'relative' }}>
-              <div ref={favScrollRef} style={{ display: 'flex', gap: 16, overflowX: 'auto', overflowY: 'visible', paddingBottom: 12, paddingTop: 4, scrollbarWidth: 'none' }}>
-                {favDiagrams.map(d => (
-                  <div key={d.id} style={{ flexShrink: 0, width: 'min(220px, 72vw)' }}>
-                    <DiagramCard
-                      diagram={d} timeAgo={timeAgo(d.updatedAt)}
-                      onOpen={() => onOpen(d.id)} onDelete={() => deleteDiagram(d.id, d.name)}
-                      isFav={true} onToggleFav={() => toggleFavorite(d.id)} isPublic={d.isPublic}
-                      tags={d.tags} tagColorMap={tagColorMap}
-                      isMobile={isMobile} onTagEdit={isMobile ? () => {} : () => { setTagModalId(d.id); setTagModalInput('') }}
-                      flash={flashId === d.id}
-                    />
-                  </div>
-                ))}
-              </div>
-              {favDiagrams.length > 4 && (
-                <div style={{ position: 'absolute', right: 0, top: 0, bottom: 12, width: 80, background: `linear-gradient(to right, transparent, ${BG})`, pointerEvents: 'none' }} />
-              )}
-            </div>
-          </section>
-        )}
-
-        {/* All / Recent */}
-        {recentDiagrams.length > 0 && (
+        {/* All Maps */}
+        {filtered.length > 0 && (
           <section>
             <h2 style={{ fontSize: 11, fontWeight: 600, color: TEXT_MUTED, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 6 }}>
-              {favDiagrams.length > 0
-                ? <><Clock size={11} color={TEXT_MUTED} /> Recent</>
-                : <><LayoutGrid size={11} color={TEXT_MUTED} /> All Maps</>}
-              <span style={{ fontSize: 13, fontWeight: 800, color: '#6366f1' }}>{recentDiagrams.length}</span>
+              <LayoutGrid size={11} color={TEXT_MUTED} /> All Maps
+              <span style={{ fontSize: 13, fontWeight: 800, color: '#6366f1' }}>{filtered.length}</span>
             </h2>
             <div className="home-grid">
-              {recentDiagrams.map(d => (
+              {filtered.map(d => (
                 <DiagramCard
                   key={d.id} diagram={d} timeAgo={timeAgo(d.updatedAt)}
                   onOpen={() => onOpen(d.id)} onDelete={() => deleteDiagram(d.id, d.name)}
-                  isFav={false} onToggleFav={() => toggleFavorite(d.id)} isPublic={d.isPublic}
-                  tags={d.tags} tagColorMap={tagColorMap}
-                  isMobile={isMobile} onTagEdit={isMobile ? () => {} : () => { setTagModalId(d.id); setTagModalInput('') }}
+                  isPublic={d.isPublic} tags={d.tags} tagColorMap={tagColorMap}
+                  isMobile={isMobile} onTagEdit={isMobile ? () => {} : () => { setTagModalId(d.id) }}
                   flash={flashId === d.id}
                 />
               ))}
@@ -623,36 +606,6 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
                   Generate Mindmap
                 </button>
 
-                {/* Divider */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '18px 0 14px' }}>
-                  <div style={{ flex: 1, height: 1, background: BORDER }} />
-                  <span style={{ fontSize: 11, color: TEXT_MUTED, fontWeight: 500 }}>or create blank</span>
-                  <div style={{ flex: 1, height: 1, background: BORDER }} />
-                </div>
-
-                {/* Blank create */}
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <input
-                    value={newName}
-                    onChange={e => setNewName(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && handleCreate()}
-                    placeholder="Map name…"
-                    style={{
-                      flex: 1, padding: '9px 13px', fontSize: 13,
-                      border: `1px solid ${BORDER}`, borderRadius: 10, outline: 'none',
-                      fontFamily: 'inherit', background: '#f8fafc', color: TEXT_PRIMARY,
-                      boxSizing: 'border-box',
-                    }}
-                  />
-                  <button onClick={handleCreate} disabled={creating}
-                    style={{
-                      padding: '9px 16px', background: '#f1f5f9', color: TEXT_PRIMARY,
-                      border: `1px solid ${BORDER}`, borderRadius: 10, cursor: 'pointer',
-                      fontSize: 13, fontWeight: 500, fontFamily: 'inherit', whiteSpace: 'nowrap',
-                    }}>
-                    {creating ? 'Creating…' : 'Create'}
-                  </button>
-                </div>
               </>
             )}
           </div>
@@ -675,7 +628,6 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
           const t = tag.trim()
           if (!t || currentTags.includes(t)) return
           updateTags(tagModalId!, [...currentTags, t])
-          setTagModalInput('')
         }
         function removeTag(tag: string) {
           updateTags(tagModalId!, currentTags.filter(t => t !== tag))
@@ -834,25 +786,52 @@ function DiagramMinimap({ id, type }: { id: string; type: string }) {
 
   // ── Mindmap ──────────────────────────────────────────────────────
   if (type === 'mindmap') {
-    const cx = W / 2, cy = H / 2, rootR = 16
-    const stemLen = 36
-    const n = l1s.length
+    const isRootPill = root?.shape === 'pill' || (!root?.shape && (root?.title?.length ?? 0) >= 15)
+    // Root: fixed small pill or circle — always uniform size
+    const rootDot = 10   // circle radius (fixed, never changes)
+    const pillW = 36, pillH = 14
+    // Layout: root on left, L1 bars stacked on right
+    const rootX = isRootPill ? 18 : 28
+    const rootY = H / 2
+    const barX = rootX + (isRootPill ? pillW : rootDot) + 10
+    const barW = 80
+    const visible = l1s.slice(0, 6)
+    const vn = visible.length
+    const rowH = Math.min(14, Math.floor((H - 10) / Math.max(vn, 1)))
+    const totalH = vn * rowH - (rowH - 8)
+    const startY = rootY - totalH / 2 + rowH / 2
 
     return (
       <svg viewBox={VB} style={{ width: '100%', height: '100%' }} overflow="hidden">
         <rect x={-P} y={-P} width={W + P * 2} height={H + P * 2} fill={canvasBg} />
-        {l1s.map((l1, i) => {
-          const angle = (i / n) * Math.PI * 2 - Math.PI / 2
-          const l1cx = cx + stemLen * Math.cos(angle)
-          const l1cy = cy + stemLen * Math.sin(angle)
+        {/* Vertical trunk */}
+        {vn > 1 && (
+          <line
+            x1={barX} y1={startY}
+            x2={barX} y2={startY + (vn - 1) * rowH}
+            stroke={visible[Math.floor(vn / 2)].color} strokeWidth={2} strokeLinecap="round"
+          />
+        )}
+        {visible.map((l1, i) => {
+          const ly = startY + i * rowH
           return (
             <g key={l1.id}>
-              <line x1={cx} y1={cy} x2={l1cx} y2={l1cy} stroke={l1.color} strokeWidth={2} strokeLinecap="round" />
-              <circle cx={l1cx} cy={l1cy} r={10} fill={l1.color} />
+              <line x1={barX} y1={ly} x2={barX + 10} y2={ly} stroke={l1.color} strokeWidth={1.8} strokeLinecap="round" />
+              <rect x={barX + 10} y={ly - 4} width={barW} height={8} rx={4} fill={l1.color} />
             </g>
           )
         })}
-        <circle cx={cx} cy={cy} r={rootR} fill={rootFill} />
+        {/* Connector from root to trunk */}
+        <line
+          x1={rootX + (isRootPill ? pillW : rootDot)} y1={rootY}
+          x2={barX} y2={rootY}
+          stroke={rootFill} strokeWidth={2} strokeLinecap="round"
+        />
+        {/* Root shape */}
+        {isRootPill
+          ? <rect x={rootX} y={rootY - pillH / 2} width={pillW} height={pillH} rx={pillH / 2} fill={rootFill} />
+          : <circle cx={rootX} cy={rootY} r={rootDot} fill={rootFill} />
+        }
       </svg>
     )
   }
@@ -951,9 +930,9 @@ function DiagramMinimap({ id, type }: { id: string; type: string }) {
 
 // ── DiagramCard ────────────────────────────────────────────────────────────
 
-function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isFav, onToggleFav, isPublic, tags, tagColorMap, onTagEdit, flash, isMobile }: {
+function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isPublic, tags, tagColorMap, onTagEdit, flash, isMobile }: {
   diagram: DiagramMeta; timeAgo: string; onOpen: () => void; onDelete: () => void
-  isFav: boolean; onToggleFav: () => void; isPublic?: boolean; tags?: string[]
+  isPublic?: boolean; tags?: string[]
   tagColorMap: Map<string, string>; onTagEdit: () => void; flash?: boolean; isMobile?: boolean
 }) {
   const [hovered, setHovered] = useState(false)
@@ -1002,13 +981,9 @@ function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isFav, onToggleFav, i
         <DiagramMinimap id={diagram.id} type={diagram.type} />
         {hovered && (
           <>
-            <button onClick={e => { e.stopPropagation(); onToggleFav() }} title={isFav ? 'Unfavorite' : 'Favorite'}
-              style={{ position: 'absolute', top: 8, left: 8, width: 28, height: 28, borderRadius: 8, border: isFav ? '1px solid #fde68a' : '1px solid #e2e8f0', background: 'rgba(255,255,255,0.92)', cursor: 'pointer', color: isFav ? '#eab308' : '#94a3b8', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(8px)' }}>
-              <Star size={13} fill={isFav ? '#eab308' : 'none'} />
-            </button>
             {!isMobile && (
               <button onClick={e => { e.stopPropagation(); onTagEdit() }} title="Edit tags"
-                style={{ position: 'absolute', top: 8, left: 44, width: 28, height: 28, borderRadius: 8, border: '1px solid #e2e8f0', background: 'rgba(255,255,255,0.92)', cursor: 'pointer', color: '#94a3b8', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(8px)' }}>
+                style={{ position: 'absolute', top: 8, left: 8, width: 28, height: 28, borderRadius: 8, border: '1px solid #e2e8f0', background: 'rgba(255,255,255,0.92)', cursor: 'pointer', color: '#94a3b8', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(8px)' }}>
                 <Tag size={13} />
               </button>
             )}

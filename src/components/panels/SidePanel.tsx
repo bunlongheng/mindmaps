@@ -195,7 +195,8 @@ export function SidePanel({ nodeId, onClose, onImport, onDelete }: SidePanelProp
     } finally {
       dismissToast()
       soundChaChing()
-      const label = tokenCount > 0 ? `✦ ${tokenCount.toLocaleString()} tokens` : '✦ Icons ready!'
+      const tokLabel = tokenCount >= 1000 ? `${(tokenCount / 1000).toFixed(1)}k` : `${tokenCount}`
+      const label = tokenCount > 0 ? `✦ ${tokLabel} tokens` : '✦ Icons ready!'
       showToast(label, { color: '#1a1d2e', confetti: true, duration: 3500 })
       setIconLoading(false)
     }
@@ -599,7 +600,16 @@ export function SidePanel({ nodeId, onClose, onImport, onDelete }: SidePanelProp
                 {activeMindmap?.sharingEnabled ? 'Link active' : 'Link disabled'}
               </span>
               <button
-                onClick={() => setShareEnabled(!activeMindmap?.sharingEnabled)}
+                onClick={() => {
+                  const next = !activeMindmap?.sharingEnabled
+                  setShareEnabled(next)
+                  if (next) {
+                    navigator.clipboard.writeText(shareUrl).then(() => {
+                      setCopied(true)
+                      setTimeout(() => setCopied(false), 2000)
+                    })
+                  }
+                }}
                 style={{
                   width: 40, height: 22, borderRadius: 11, border: 'none', cursor: 'pointer', padding: 0,
                   background: activeMindmap?.sharingEnabled ? '#1a1d2e' : '#d1d5db',

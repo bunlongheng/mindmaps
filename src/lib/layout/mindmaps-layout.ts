@@ -18,7 +18,7 @@ function autoWidth(node: MindmapNode, depth: number): number {
   const textW = node.title.length * fontSize * 0.64 + 24
   const total = hasVisual ? Math.ceil(textW / 0.78) : textW
   const min = depth === 1 ? 160 : depth === 2 ? 110 : 90
-  return Math.max(min, Math.min(400, Math.ceil(total)))
+  return Math.max(min, Math.ceil(total))
 }
 
 /** Effective size: root pill always auto-sizes from title; circle uses stored or default */

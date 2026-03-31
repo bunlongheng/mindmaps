@@ -3,7 +3,7 @@ import { showToast } from '../components/CuteToast'
 import { supabase, hasSupabase } from '../lib/supabase'
 import { useMindmapStore } from '../store/mindmapStore'
 import { ROOT_COLORS } from '../lib/color'
-import { soundCreate, soundDelete, soundSave, soundFavorite, soundError, soundPaste } from '../lib/sounds'
+import { soundCreate, soundDelete, soundSave, soundError, soundPaste } from '../lib/sounds'
 import type { Diagram, DiagramMeta, MindmapNode } from '../types'
 
 // ── localStorage helpers ────────────────────────────────────────────────────
@@ -30,7 +30,7 @@ function lsSaveDiagram(d: Diagram) {
   const list = lsGetList()
   const idx = list.findIndex(m => m.id === d.id)
   const existingMeta = list.find(m => m.id === d.id)
-  const meta: DiagramMeta = { id: d.id, name: d.name, type: d.type, updatedAt: new Date().toISOString(), isFav: existingMeta?.isFav, tags: d.tags ?? existingMeta?.tags ?? [] }
+  const meta: DiagramMeta = { id: d.id, name: d.name, type: d.type, updatedAt: new Date().toISOString(), tags: d.tags ?? existingMeta?.tags ?? [] }
   if (idx >= 0) list[idx] = meta; else list.unshift(meta)
   lsSaveList(list)
 }
@@ -107,7 +107,7 @@ export function useDiagram(userId: string | null = null) {
 
     setDiagrams((data ?? []).map(d => ({
       id: d.id, name: d.name, type: d.type, updatedAt: d.updated_at,
-      isPublic: d.sharing_enabled ?? false, isFav: d.is_favorite ?? false,
+      isPublic: d.sharing_enabled ?? false,
       tags: (d as Record<string, unknown>).tags as string[] ?? [],
     })))
   }, [setDiagrams, userId])
@@ -178,7 +178,7 @@ export function useDiagram(userId: string | null = null) {
     soundSave()
   }, [setIsDirty, userId])
 
-  const createDiagram = useCallback(async (name: string) => {
+  const createDiagram = useCallback(async (name: string): Promise<string> => {
     const id = crypto.randomUUID()
     const rootId = crypto.randomUUID()
     const now = new Date().toISOString()
@@ -204,17 +204,18 @@ export function useDiagram(userId: string | null = null) {
       setDiagrams(lsGetList())
       soundCreate()
       showToast(`✦ "${name}" created`, { color: '#1a1d2e', confetti: true })
-      return
+      return id
     }
     const { error } = await supabase.from('mindmaps').insert({
       id, user_id: userId, name, type: 'logic-chart', line_style: 'orthogonal',
       sharing_enabled: false, nodes: laid,
     })
-    if (error) { console.error(error); soundError(); showToast('Failed to create map', { color: '#ef4444' }); return }
+    if (error) { console.error(error); soundError(); showToast('Failed to create map', { color: '#ef4444' }); return id }
     await loadDiagram(id)
     await loadDiagramList()
     soundCreate()
     showToast(`✦ "${name}" created`, { color: '#1a1d2e', confetti: true })
+    return id
   }, [loadDiagram, loadDiagramList, setActiveMindmap, setDiagrams, userId])
 
   const createDiagramFromNodes = useCallback(async (name: string, nodes: MindmapNode[]): Promise<string | null> => {
@@ -283,21 +284,5 @@ export function useDiagram(userId: string | null = null) {
     }
   }, [setDiagrams, userId])
 
-  const toggleFavorite = useCallback(async (id: string) => {
-    const { diagrams } = useMindmapStore.getState()
-    const current = diagrams.find(d => d.id === id)
-    const next = !(current?.isFav ?? false)
-    soundFavorite()
-    // Optimistic update in store
-    setDiagrams(diagrams.map(d => d.id === id ? { ...d, isFav: next } : d))
-    // Persist to localStorage
-    const list = lsGetList()
-    lsSaveList(list.map(m => m.id === id ? { ...m, isFav: next } : m))
-    // Persist to Supabase
-    if (hasSupabase && supabase && userId) {
-      await supabase.from('mindmaps').update({ is_favorite: next }).eq('id', id).eq('user_id', userId)
-    }
-  }, [setDiagrams, userId])
-
-  return { loadDiagramList, loadDiagram, saveDiagram, createDiagram, createDiagramFromNodes, deleteDiagram, toggleFavorite, updateTags }
+  return { loadDiagramList, loadDiagram, saveDiagram, createDiagram, createDiagramFromNodes, deleteDiagram, updateTags }
 }

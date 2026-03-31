@@ -10,8 +10,6 @@ interface DiagramCanvasProps {
   onNodeSelect: (nodeId: string | null) => void
   readOnly?: boolean
   onDelete?: () => void
-  isFav?: boolean
-  onToggleFav?: () => void
 }
 
 export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {

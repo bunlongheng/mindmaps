@@ -45,6 +45,5 @@ export interface DiagramMeta {
   type: DiagramType
   updatedAt: string
   isPublic?: boolean
-  isFav?: boolean
   tags?: string[]
 }

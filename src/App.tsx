@@ -11,7 +11,7 @@ import { soundIncoming, soundDelete } from './lib/sounds'
 import { useMindmapStore } from './store/mindmapStore'
 import { decodeShareURL } from './lib/export/share'
 import { supabase, hasSupabase } from './lib/supabase'
-import { ArrowLeft, SlidersHorizontal, Tag, X, FileDown, Star, Trash2 } from 'lucide-react'
+import { ArrowLeft, SlidersHorizontal, Tag, X, FileDown, Trash2 } from 'lucide-react'
 import { exportDiagramAsPdf } from './lib/export/exportPdf'
 import { Confetti } from './components/Confetti'
 
@@ -112,7 +112,7 @@ export default function App() {
   // Local dev: fall back to the hardcoded dev user ID so Supabase queries work without auth.
   // Triple-locked: only when (1) isLocal, (2) no real session, (3) env var is set.
   const effectiveUserId = user?.id ?? (isLocal ? (import.meta.env.VITE_LOCAL_USER_ID ?? null) : null)
-  const { loadDiagramList, loadDiagram, saveDiagram, createDiagramFromNodes, deleteDiagram, toggleFavorite, updateTags } = useDiagram(effectiveUserId)
+  const { loadDiagramList, loadDiagram, saveDiagram, createDiagramFromNodes, deleteDiagram, updateTags } = useDiagram(effectiveUserId)
 
   // Real-time DB sync — INSERT/DELETE on mindmaps table
   useEffect(() => {
@@ -174,11 +174,9 @@ export default function App() {
   const [showImport, setShowImport] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [showConfetti, setShowConfetti] = useState(() => new URLSearchParams(window.location.search).has('imported'))
-  const confettiCount = (() => { const t = new URLSearchParams(window.location.search).get('tokens'); return t ? parseInt(t) : 500 })()
+  const confettiCount = (() => { const t = new URLSearchParams(window.location.search).get('tokens'); return t ? Math.min(280, Math.max(40, Math.round(parseInt(t) / 1000 * 60))) : 60 })()
 
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  const isFav = activeMindmap ? (diagrams.find(d => d.id === activeMindmap.id)?.isFav ?? false) : false
 
   // Load diagram or list once auth is ready
   const didLoad = useRef(false)
@@ -353,8 +351,6 @@ export default function App() {
       <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
         <DiagramCanvas
           onNodeSelect={handleNodeSelect}
-          isFav={isFav}
-          onToggleFav={activeMindmap ? () => toggleFavorite(activeMindmap.id) : undefined}
           onDelete={activeMindmap ? () => setShowDeleteConfirm(true) : undefined}
         />
 
@@ -510,14 +506,7 @@ export default function App() {
               }}>
                 <FileDown size={11} /> PDF
               </button>
-              <button onClick={() => toggleFavorite(activeMindmap!.id)} title={isFav ? 'Unfavorite' : 'Favorite'} style={{
-                height: 22, padding: '0 8px', border: '1px solid #e2e8f0', borderRadius: 6,
-                background: 'transparent', cursor: 'pointer', fontSize: 11, fontWeight: 500,
-                color: isFav ? '#eab308' : '#94a3b8', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 4,
-              }}>
-                <Star size={11} fill={isFav ? '#eab308' : 'none'} /> Star
-              </button>
-              <button onClick={() => setShowDeleteConfirm(true)} title="Delete map" style={{
+<button onClick={() => setShowDeleteConfirm(true)} title="Delete map" style={{
                 height: 22, padding: '0 8px', border: '1px solid #fecaca', borderRadius: 6,
                 background: 'transparent', cursor: 'pointer', fontSize: 11, fontWeight: 500,
                 color: '#ef4444', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 4,
