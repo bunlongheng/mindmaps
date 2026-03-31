@@ -11,11 +11,12 @@ const DEFAULT_FONT_SIZE = 11
 function autoW(node: MindmapNode, depth: number): number {
   const fontSize = FONT_SIZES[depth] ?? DEFAULT_FONT_SIZE
   const hasVisual = !!(node.icon || node.emoji) && depth <= 1
-  const padding = depth === 1 ? 36 : 24
-  const textW = node.title.length * fontSize * 0.64 + padding
-  const total = hasVisual ? Math.ceil(textW / 0.78) : textW
+  // For L1 with icon/emoji: white square takes full node height, add that + gap
+  const iconSquareW = hasVisual && depth === 1 ? L1_H + 10 : 0
+  const padding = depth === 1 ? 32 : 24
+  const textW = node.title.length * fontSize * 0.64 + padding + iconSquareW
   const min = depth === 1 ? 100 : depth === 3 ? 80 : 60
-  return Math.max(min, Math.min(320, Math.ceil(total)))
+  return Math.max(min, Math.ceil(textW))
 }
 
 const L1_H = 44
@@ -99,6 +100,12 @@ export function computeMindmapLayout(nodes: MindmapNode[]): MindmapNode[] {
     .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
   if (l1s.length === 0) return result
 
+  // Uniform L1 width: all L1 nodes share the width of the widest one
+  const l1UniformW = Math.max(...l1s.map(n => autoW(n, 1)))
+  const nodesForLayout = nodes.map(n =>
+    l1s.some(l => l.id === n.id) ? { ...n, width: l1UniformW } : n
+  )
+
   const l1PlacementR = rw / 2 + ROOT_RADIUS
   const angleStep = (2 * Math.PI) / l1s.length
   const startAngle = -Math.PI / 2
@@ -107,7 +114,7 @@ export function computeMindmapLayout(nodes: MindmapNode[]): MindmapNode[] {
     const angle = startAngle + i * angleStep
     const l1CX = cx + l1PlacementR * Math.cos(angle)
     const l1CY = cy + l1PlacementR * Math.sin(angle)
-    placeSubtree(l1.id, 1, l1CX, l1CY, angle, angleStep * 0.88, nodes, result)
+    placeSubtree(l1.id, 1, l1CX, l1CY, angle, angleStep * 0.88, nodesForLayout, result)
   })
 
   const placed = new Set(result.map(n => n.id))

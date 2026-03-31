@@ -8,7 +8,7 @@ import { ImportModal } from '../modals/ImportModal'
 import { MindmapsLogo } from '../MindmapsLogo'
 import { getTheme } from '../../lib/themes'
 import { AIThinkingOverlay } from '../AIThinkingOverlay'
-import { soundHover, soundClick, soundCreate, soundPaste } from '../../lib/sounds'
+import { soundHover, soundClick, soundPaste } from '../../lib/sounds'
 
 const MINDMAP_API_KEY = 'REDACTED_ROTATED_KEY'
 const MINDMAP_API_BASE = 'https://mindmaps-bheng.vercel.app'
@@ -65,8 +65,6 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
     return buildTagColorMap(allTags)
   }, [diagrams])
   const [search, setSearch] = useState('')
-  const [creating, setCreating] = useState(false)
-  const [newName, setNewName] = useState('')
   const [showCreate, setShowCreate] = useState(false)
   const [aiPrompt, setAiPrompt] = useState('')
   const [aiLoading, setAiLoading] = useState(false)
@@ -143,20 +141,6 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
     return matchSearch && matchTag
   })
 
-
-  async function handleCreate() {
-    if (creating) return
-    const name = newName.trim() || 'Untitled'
-    setCreating(true)
-    try {
-      const id = await createDiagram(name)
-      setNewName('')
-      setShowCreate(false)
-      if (id) onOpen(id)
-    } finally {
-      setCreating(false)
-    }
-  }
 
   const [newMapBusy, setNewMapBusy] = useState(false)
   async function handleNewBlank() {
@@ -784,53 +768,40 @@ function DiagramMinimap({ id, type }: { id: string; type: string }) {
     )
   }
 
-  // ── Mindmap ──────────────────────────────────────────────────────
+  // ── Mindmap (radial) ─────────────────────────────────────────────
   if (type === 'mindmap') {
     const isRootPill = root?.shape === 'pill' || (!root?.shape && (root?.title?.length ?? 0) >= 15)
-    // Root: fixed small pill or circle — always uniform size
-    const rootDot = 10   // circle radius (fixed, never changes)
-    const pillW = 36, pillH = 14
-    // Layout: root on left, L1 bars stacked on right
-    const rootX = isRootPill ? 18 : 28
-    const rootY = H / 2
-    const barX = rootX + (isRootPill ? pillW : rootDot) + 10
-    const barW = 80
+    const cx = W / 2, cy = H / 2
+    const rootR = isRootPill ? 0 : 10
+    const pillW = 34, pillH = 12
+    const armLen = 38, barW = 30, barH = 7
     const visible = l1s.slice(0, 6)
     const vn = visible.length
-    const rowH = Math.min(14, Math.floor((H - 10) / Math.max(vn, 1)))
-    const totalH = vn * rowH - (rowH - 8)
-    const startY = rootY - totalH / 2 + rowH / 2
+    const angleStep = (2 * Math.PI) / Math.max(vn, 1)
+    const startAngle = -Math.PI / 2
 
     return (
       <svg viewBox={VB} style={{ width: '100%', height: '100%' }} overflow="hidden">
         <rect x={-P} y={-P} width={W + P * 2} height={H + P * 2} fill={canvasBg} />
-        {/* Vertical trunk */}
-        {vn > 1 && (
-          <line
-            x1={barX} y1={startY}
-            x2={barX} y2={startY + (vn - 1) * rowH}
-            stroke={visible[Math.floor(vn / 2)].color} strokeWidth={2} strokeLinecap="round"
-          />
-        )}
         {visible.map((l1, i) => {
-          const ly = startY + i * rowH
+          const angle = startAngle + i * angleStep
+          const x2 = cx + armLen * Math.cos(angle)
+          const y2 = cy + armLen * Math.sin(angle)
           return (
             <g key={l1.id}>
-              <line x1={barX} y1={ly} x2={barX + 10} y2={ly} stroke={l1.color} strokeWidth={1.8} strokeLinecap="round" />
-              <rect x={barX + 10} y={ly - 4} width={barW} height={8} rx={4} fill={l1.color} />
+              <line x1={cx} y1={cy} x2={x2} y2={y2} stroke={l1.color} strokeWidth={1.8} strokeLinecap="round" />
+              <rect
+                x={x2 - barW / 2} y={y2 - barH / 2}
+                width={barW} height={barH} rx={barH / 2}
+                fill={l1.color}
+              />
             </g>
           )
         })}
-        {/* Connector from root to trunk */}
-        <line
-          x1={rootX + (isRootPill ? pillW : rootDot)} y1={rootY}
-          x2={barX} y2={rootY}
-          stroke={rootFill} strokeWidth={2} strokeLinecap="round"
-        />
-        {/* Root shape */}
+        {/* Root shape on top */}
         {isRootPill
-          ? <rect x={rootX} y={rootY - pillH / 2} width={pillW} height={pillH} rx={pillH / 2} fill={rootFill} />
-          : <circle cx={rootX} cy={rootY} r={rootDot} fill={rootFill} />
+          ? <rect x={cx - pillW / 2} y={cy - pillH / 2} width={pillW} height={pillH} rx={pillH / 2} fill={rootFill} />
+          : <circle cx={cx} cy={cy} r={rootR} fill={rootFill} />
         }
       </svg>
     )

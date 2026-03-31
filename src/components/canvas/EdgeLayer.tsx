@@ -87,7 +87,6 @@ function BracketConnector({ parent, children, goRight = true, showOrderNumbers =
 
 export function EdgeLayer({ nodes, lineStyle, diagramType }: EdgeLayerProps) {
   const showOrderNumbers = useMindmapStore(s => s.showOrderNumbers)
-  const hideDetails = useMindmapStore(s => s.hideDetails)
   const nodeMap = new Map(nodes.map(n => [n.id, n]))
 
   // ── Logic Chart ───────────────────────────────────────────────────────────

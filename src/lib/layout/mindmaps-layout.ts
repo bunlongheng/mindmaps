@@ -15,10 +15,12 @@ function getHGap(depth: number) { return H_GAPS[depth] ?? DEFAULT_H_GAP }
 function autoWidth(node: MindmapNode, depth: number): number {
   const fontSize = depth === 1 ? 22 : depth === 2 ? 16 : depth === 3 ? 13 : 11
   const hasVisual = !!(node.icon || node.emoji)
-  const textW = node.title.length * fontSize * 0.64 + 24
-  const total = hasVisual ? Math.ceil(textW / 0.78) : textW
+  const h = DEFAULT_H[depth] ?? DEFAULT_HEIGHT
+  // For L1 with icon/emoji: white square takes full height, add that + gap to text width
+  const iconSquareW = hasVisual && depth === 1 ? h + 10 : 0
+  const textW = node.title.length * fontSize * 0.64 + 32 + iconSquareW
   const min = depth === 1 ? 160 : depth === 2 ? 110 : 90
-  return Math.max(min, Math.ceil(total))
+  return Math.max(min, Math.ceil(textW))
 }
 
 /** Effective size: root pill always auto-sizes from title; circle uses stored or default */
@@ -103,6 +105,15 @@ export function computeMindmapsLayout(nodes: MindmapNode[]): MindmapNode[] {
   const l1s = nodes.filter(n => n.parentId === root.id)
     .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
 
+  // ── Uniform L1 width: all L1 nodes share the width of the widest one ─────
+  const l1UniformW = l1s.length > 0
+    ? Math.max(...l1s.map(n => autoWidth(n, 1)))
+    : 160
+  // Inject uniform width so nodeSize() picks it up via node.width > 0
+  const nodesForLayout = nodes.map(n =>
+    l1s.some(l => l.id === n.id) ? { ...n, width: l1UniformW } : n
+  )
+
   const ROOT_X = 60
   const centerY = 340
   const { w: rw, h: rh } = nodeSize(root, 0)
@@ -112,11 +123,11 @@ export function computeMindmapsLayout(nodes: MindmapNode[]): MindmapNode[] {
 
   // anchorX stays at the original position so L1 column doesn't move
   const anchorX = 200 + rw + (root.branchGap ?? H_GAPS[0])
-  const totalH = l1s.reduce((s, l) => s + subtreeH(l.id, 1, nodes), 0) + Math.max(0, l1s.length - 1) * V_GAP
+  const totalH = l1s.reduce((s, l) => s + subtreeH(l.id, 1, nodesForLayout), 0) + Math.max(0, l1s.length - 1) * V_GAP
   let curY = centerY - totalH / 2
   for (const l1 of l1s) {
-    const h = subtreeH(l1.id, 1, nodes)
-    place(l1.id, 1, anchorX, curY + h / 2, nodes, result)
+    const h = subtreeH(l1.id, 1, nodesForLayout)
+    place(l1.id, 1, anchorX, curY + h / 2, nodesForLayout, result)
     curY += h + V_GAP
   }
 

@@ -116,14 +116,6 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
     strokeW = 0
   }
 
-  // Icon color: on white circles use node.color, on light text nodes use darkened color
-  const iconColor = isRoot
-    ? textColor
-    : isMindmapCircle
-      ? '#ffffff'
-      : node.depth === 1
-        ? (isLight(node.color) ? '#1a1d2e' : '#ffffff')
-        : (node.color.startsWith('#') ? darkenColor(node.color, 0.35) : node.color)
 
   // Node-level overrides from panel
   if (node.borderColor) { strokeColor = node.borderColor; strokeW = Math.max(strokeW, node.borderWidth ?? 1.5) }
@@ -301,7 +293,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
     {!isRoot && (
       <defs>
         <clipPath id={clipId}>
-          <rect x={0} y={0} width={displayW - 4} height={node.height} rx={rx} ry={rx} />
+          <rect x={0} y={0} width={displayW} height={node.height} rx={rx} ry={rx} />
         </clipPath>
       </defs>
     )}
@@ -375,12 +367,28 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
       ) : isMindmapL2Plus ? (
         <rect x={0} y={0} width={displayW} height={node.height} fill="transparent" />
       ) : (
-        <rect
-          x={0} y={0} width={displayW} height={node.height}
-          rx={rx} ry={rx} fill={bg} fillOpacity={bgOpacity}
-          stroke={previewW !== null ? '#3b82f6' : strokeColor} strokeWidth={previewW !== null ? 3.5 : strokeW}
-          filter={previewW !== null ? 'drop-shadow(0 0 8px rgba(59,130,246,0.7))' : 'drop-shadow(0 1px 4px rgba(0,0,0,0.1))'}
-        />
+        <>
+          {/* Shadow/glow rect — outside clip, same shape. Only casts shadow; the clipped group below covers it cleanly. */}
+          <rect
+            x={0} y={0} width={displayW} height={node.height}
+            rx={rx} ry={rx} fill={bg} fillOpacity={bgOpacity}
+            stroke="none" strokeWidth={0}
+            filter={previewW !== null ? 'drop-shadow(0 0 8px rgba(59,130,246,0.7))' : 'drop-shadow(0 1px 4px rgba(0,0,0,0.1))'}
+            style={{ pointerEvents: 'none' }}
+          />
+          {/* Background fill — inside clip so corners are pixel-perfect, no bleed */}
+          <g clipPath={`url(#${clipId})`} style={{ pointerEvents: 'none' }}>
+            <rect x={0} y={0} width={displayW} height={node.height} fill={bg} fillOpacity={bgOpacity} />
+            {/* Border as doubled-stroke so the clip cuts the outer half, keeping it inset */}
+            {(strokeW > 0 || previewW !== null) && (
+              <rect x={0} y={0} width={displayW} height={node.height} rx={rx} ry={rx}
+                fill="none"
+                stroke={previewW !== null ? '#3b82f6' : strokeColor}
+                strokeWidth={(previewW !== null ? 3.5 : strokeW) * 2}
+              />
+            )}
+          </g>
+        </>
       )}
 
       {editing ? (
@@ -413,27 +421,23 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
       ) : (
         <g clipPath={isRoot ? undefined : `url(#${clipId})`}>
           {hasEmoji && resolvedEmoji && !isMindmapL2Plus && (() => {
-            const zoneW = displayW * 0.2
-            const emojiSize = Math.min(node.height * 0.52, 22)
-            const textAreaX = zoneW + (displayW - zoneW) / 2
-            const sw = strokeW / 2
+            const sq = node.height
+            const emojiSize = Math.round(sq * 0.52)
+            const textX = sq + 10
             const h = node.height
             return (
               <>
-                <path
-                  d={`M ${rx},${sw} L ${zoneW},${sw} L ${zoneW},${h - sw} L ${rx},${h - sw} Q ${sw},${h - sw} ${sw},${h - rx} L ${sw},${rx} Q ${sw},${sw} ${rx},${sw} Z`}
-                  fill="rgba(255,255,255,0.95)"
-                  style={{ pointerEvents: 'none' }}
-                />
+                {/* White square badge — plain rect, clipPath on parent <g> handles rounded corners */}
+                <rect x={0} y={0} width={sq + 1} height={h} fill="#ffffff" style={{ pointerEvents: 'none' }} />
                 <text
-                  x={zoneW / 2} y={h / 2 + emojiSize * 0.36}
+                  x={sq / 2} y={h / 2 + emojiSize * 0.36}
                   textAnchor="middle" fontSize={emojiSize}
                   style={{ pointerEvents: 'none', userSelect: 'none' }}
                 >{resolvedEmoji}</text>
                 <text
-                  x={align === 'left' ? zoneW + 8 : align === 'right' ? displayW - 8 : textAreaX}
+                  x={textX}
                   y={h / 2 + fontSize * 0.38}
-                  textAnchor={textAnchor}
+                  textAnchor="start"
                   fontSize={fontSize} fontWeight={fontWeight} fontStyle={fontStyle}
                   fontFamily="Inter, system-ui, sans-serif"
                   fill={textColor}
@@ -443,18 +447,20 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
             )
           })()}
           {hasIcon && resolvedIcon && !isMindmapL2Plus && (() => {
-            const zoneW = displayW * 0.2
-            const iconSize = Math.min(fontSize + 4, zoneW * 0.65)
-            const iconX = (zoneW - iconSize) / 2
-            const iconY = (node.height - iconSize) / 2
-            const textAreaX = zoneW + (displayW - zoneW) / 2
+            const sq = node.height  // white square = full node height
+            const iconSize = Math.round(sq * 0.48)
+            const iconX = (sq - iconSize) / 2
+            const iconY = (sq - iconSize) / 2
+            const textX = sq + 10
             return (
               <>
-                <NodeIcon icon={resolvedIcon} x={iconX} y={iconY} size={iconSize} color={iconColor} strokeWidth={node.depth === 1 ? 2.8 : 1.8} />
+                {/* White square badge — plain rect, clipPath on parent <g> handles rounded corners */}
+                <rect x={0} y={0} width={sq + 1} height={sq} fill="#ffffff" style={{ pointerEvents: 'none' }} />
+                <NodeIcon icon={resolvedIcon} x={iconX} y={iconY} size={iconSize} color={node.color} strokeWidth={node.depth === 1 ? 2.5 : 1.8} />
                 <text
-                  x={align === 'left' ? zoneW + 8 : align === 'right' ? displayW - 8 : textAreaX}
+                  x={textX}
                   y={node.height / 2 + fontSize * 0.38}
-                  textAnchor={textAnchor}
+                  textAnchor="start"
                   fontSize={fontSize} fontWeight={fontWeight} fontStyle={fontStyle}
                   fontFamily="Inter, system-ui, sans-serif"
                   fill={textColor}

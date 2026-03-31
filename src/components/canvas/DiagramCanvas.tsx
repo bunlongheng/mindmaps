@@ -35,16 +35,18 @@ export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
 
   const [showZoomHud, setShowZoomHud] = useState(false)
   const zoomHudTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const isZoomingRef = useRef(false)
 
   const flashZoomHud = useCallback(() => {
-    isZoomingRef.current = true
     setShowZoomHud(true)
     if (zoomHudTimer.current) clearTimeout(zoomHudTimer.current)
-    zoomHudTimer.current = setTimeout(() => {
-      isZoomingRef.current = false
-      setShowZoomHud(false)
-    }, 1200)
+    zoomHudTimer.current = setTimeout(() => setShowZoomHud(false), 1500)
+  }, [])
+
+  // Block browser zoom (Ctrl+scroll / pinch) globally so only canvas zooms
+  useEffect(() => {
+    const handler = (e: WheelEvent) => { if (e.ctrlKey) e.preventDefault() }
+    document.addEventListener('wheel', handler, { passive: false })
+    return () => document.removeEventListener('wheel', handler)
   }, [])
 
   const fitView = useCallback(() => {
@@ -115,7 +117,7 @@ export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
       const factor = 1 - e.deltaY * 0.004
       const oldZoom = zoomCurrentRef.current
       if (!isFinite(oldZoom) || oldZoom <= 0) { zoomCurrentRef.current = 1; return }
-      const newZoom = Math.max(0.02, Math.min(50, oldZoom * factor))
+      const newZoom = Math.max(0.02, Math.min(10, oldZoom * factor))
       if (!isFinite(newZoom)) return
       const newPan = {
         x: e.clientX - ((e.clientX - panRef.current.x) / oldZoom) * newZoom,
@@ -190,7 +192,7 @@ export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
         const factor = lastPinchDist.current > 0 ? dist / lastPinchDist.current : 1
         const oldZoom = zoomCurrentRef.current
         if (!isFinite(oldZoom) || oldZoom <= 0) { zoomCurrentRef.current = 1; return }
-        const newZoom = Math.max(0.02, Math.min(50, oldZoom * factor))
+        const newZoom = Math.max(0.02, Math.min(10, oldZoom * factor))
         if (!isFinite(newZoom)) return
         const lm = lastPinchMid.current
         const newPan = {
@@ -437,17 +439,19 @@ export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
         </div>
       )}
 
-      {/* Zoom HUD — fixed to viewport top center, always above everything */}
+      {/* Zoom badge — always visible in bottom-left, highlights when actively zooming */}
       <div style={{
-        position: 'fixed', top: 16, left: '50%', transform: 'translateX(-50%)',
-        background: 'rgba(15,20,40,0.78)', backdropFilter: 'blur(10px)',
-        color: '#fff', fontFamily: 'Inter, system-ui, sans-serif',
-        fontSize: 14, fontWeight: 700, letterSpacing: '0.04em',
-        padding: '6px 18px', borderRadius: 24,
+        position: 'fixed', bottom: 18, left: 18,
+        background: showZoomHud ? 'rgba(15,20,40,0.88)' : 'rgba(15,20,40,0.45)',
+        backdropFilter: 'blur(8px)',
+        color: showZoomHud ? '#fff' : 'rgba(255,255,255,0.55)',
+        fontFamily: 'Inter, system-ui, sans-serif',
+        fontSize: 12, fontWeight: 600, letterSpacing: '0.05em',
+        padding: '4px 10px', borderRadius: 8,
         pointerEvents: 'none', zIndex: 9999,
-        opacity: showZoomHud ? 1 : 0,
-        transition: showZoomHud ? 'opacity 0.05s ease' : 'opacity 0.8s ease',
+        transition: 'background 0.2s, color 0.2s',
         whiteSpace: 'nowrap',
+        userSelect: 'none',
       }}>
         {Math.round(zoom * 100)}%
       </div>
