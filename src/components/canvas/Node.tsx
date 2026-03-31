@@ -367,32 +367,24 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
       ) : isMindmapL2Plus ? (
         <rect x={0} y={0} width={displayW} height={node.height} fill="transparent" />
       ) : (
-        <>
-          {/* Shadow/glow rect — outside clip, same shape. Only casts shadow; the clipped group below covers it cleanly. */}
-          <rect
-            x={0} y={0} width={displayW} height={node.height}
-            rx={rx} ry={rx} fill={bg} fillOpacity={bgOpacity}
-            stroke="none" strokeWidth={0}
-            filter={previewW !== null ? 'drop-shadow(0 0 8px rgba(59,130,246,0.7))' : 'drop-shadow(0 1px 4px rgba(0,0,0,0.1))'}
-            style={{ pointerEvents: 'none' }}
-          />
-          {/* Background fill — inside clip so corners are pixel-perfect, no bleed */}
-          <g clipPath={`url(#${clipId})`} style={{ pointerEvents: 'none' }}>
-            <rect x={0} y={0} width={displayW} height={node.height} fill={bg} fillOpacity={bgOpacity} />
-            {/* White badge behind border — drawn before the border ring so border sits on top */}
-            {(hasEmoji || hasIcon) && !isMindmapL2Plus && (
-              <rect x={0} y={0} width={node.height + 1} height={node.height} fill="#ffffff" />
-            )}
-            {/* Border as doubled-stroke so the clip cuts the outer half, keeping it inset */}
-            {(strokeW > 0 || previewW !== null) && (
-              <rect x={0} y={0} width={displayW} height={node.height} rx={rx} ry={rx}
-                fill="none"
-                stroke={previewW !== null ? '#3b82f6' : strokeColor}
-                strokeWidth={(previewW !== null ? 3.5 : strokeW) * 2}
-              />
-            )}
-          </g>
-        </>
+        /* Filter on the clip group = shadow cast from clipped shape, no external rect needed,
+           so no corner colour-bleed regardless of what's inside (white badge, coloured bg, etc.) */
+        <g clipPath={`url(#${clipId})`} style={{ pointerEvents: 'none' }}
+          filter={previewW !== null ? 'drop-shadow(0 0 8px rgba(59,130,246,0.7))' : 'drop-shadow(0 1px 4px rgba(0,0,0,0.1))'}>
+          <rect x={0} y={0} width={displayW} height={node.height} fill={bg} fillOpacity={bgOpacity} />
+          {/* White badge behind border — border ring sits on top */}
+          {(hasEmoji || hasIcon) && !isMindmapL2Plus && (
+            <rect x={0} y={0} width={node.height + 1} height={node.height} fill="#ffffff" />
+          )}
+          {/* Border ring — doubled stroke so clip cuts outer half, stays inset */}
+          {(strokeW > 0 || previewW !== null) && (
+            <rect x={0} y={0} width={displayW} height={node.height} rx={rx} ry={rx}
+              fill="none"
+              stroke={previewW !== null ? '#3b82f6' : strokeColor}
+              strokeWidth={(previewW !== null ? 3.5 : strokeW) * 2}
+            />
+          )}
+        </g>
       )}
 
       {editing ? (
