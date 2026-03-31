@@ -109,11 +109,11 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
     strokeColor = '#1a1d2e'
     strokeW = 0
   } else {
-    // L1 all other diagrams: solid color fill, auto text, no border
+    // L1 all other diagrams: solid color fill, darker border so white badge is framed
     bg = node.color
     textColor = isLight(node.color) ? '#1a1d2e' : '#ffffff'
-    strokeColor = node.color
-    strokeW = 0
+    strokeColor = node.color.startsWith('#') ? darkenColor(node.color, 0.25) : node.color
+    strokeW = 2
   }
 
 
