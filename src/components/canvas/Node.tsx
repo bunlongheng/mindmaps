@@ -379,6 +379,10 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
           {/* Background fill — inside clip so corners are pixel-perfect, no bleed */}
           <g clipPath={`url(#${clipId})`} style={{ pointerEvents: 'none' }}>
             <rect x={0} y={0} width={displayW} height={node.height} fill={bg} fillOpacity={bgOpacity} />
+            {/* White badge behind border — drawn before the border ring so border sits on top */}
+            {(hasEmoji || hasIcon) && !isMindmapL2Plus && (
+              <rect x={0} y={0} width={node.height + 1} height={node.height} fill="#ffffff" />
+            )}
             {/* Border as doubled-stroke so the clip cuts the outer half, keeping it inset */}
             {(strokeW > 0 || previewW !== null) && (
               <rect x={0} y={0} width={displayW} height={node.height} rx={rx} ry={rx}
@@ -427,8 +431,6 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
             const h = node.height
             return (
               <>
-                {/* White square badge — plain rect, clipPath on parent <g> handles rounded corners */}
-                <rect x={0} y={0} width={sq + 1} height={h} fill="#ffffff" style={{ pointerEvents: 'none' }} />
                 <text
                   x={sq / 2} y={h / 2 + emojiSize * 0.36}
                   textAnchor="middle" fontSize={emojiSize}
@@ -454,8 +456,6 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
             const textX = sq + 10
             return (
               <>
-                {/* White square badge — plain rect, clipPath on parent <g> handles rounded corners */}
-                <rect x={0} y={0} width={sq + 1} height={sq} fill="#ffffff" style={{ pointerEvents: 'none' }} />
                 <NodeIcon icon={resolvedIcon} x={iconX} y={iconY} size={iconSize} color={node.color} strokeWidth={node.depth === 1 ? 2.5 : 1.8} />
                 <text
                   x={textX}
