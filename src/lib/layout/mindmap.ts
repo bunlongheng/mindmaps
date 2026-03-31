@@ -22,12 +22,6 @@ function autoW(node: MindmapNode, depth: number): number {
 const L1_H = 44
 const L2_CIRCLE_SIZE = 60
 
-/** Count total leaf+internal nodes in subtree (used to weight arc allocation) */
-function subtreeWeight(nodeId: string, nodes: MindmapNode[]): number {
-  const children = nodes.filter(n => n.parentId === nodeId)
-  if (children.length === 0) return 1
-  return children.reduce((s, c) => s + subtreeWeight(c.id, nodes), 0)
-}
 
 function placeSubtree(
   nodeId: string,
@@ -66,15 +60,10 @@ function placeSubtree(
   const minArc = children.length * MIN_ARC
   const totalArc = Math.max(arcSpread, minArc)
 
-  // Distribute arc proportionally by subtree weight
-  const weights = children.map(c => subtreeWeight(c.id, nodes))
-  const totalWeight = weights.reduce((s, w) => s + w, 0)
-
-  let cursor = angle - totalArc / 2
+  // Distribute arc EVENLY — equal slice per child regardless of subtree size
+  const childArc = totalArc / children.length
   children.forEach((child, i) => {
-    const childArc = (weights[i] / totalWeight) * totalArc
-    const childAngle = cursor + childArc / 2
-    cursor += childArc
+    const childAngle = (angle - totalArc / 2) + childArc * (i + 0.5)
     const childCX = cx + childR * Math.cos(childAngle)
     const childCY = cy + childR * Math.sin(childAngle)
     placeSubtree(child.id, depth + 1, childCX, childCY, childAngle, childArc, nodes, result)

@@ -67,8 +67,8 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
       : 0
   )
   const canDrag = (isRoot && diagramType !== 'mindmap') || diagramType === 'logic-chart'
-  // Root shape: user-set overrides auto; auto = pill if title ≥15 chars or dims non-square
-  const isRootPill = isRoot && (
+  // Root shape: in mindmap mode always circle; otherwise user-set or auto from title length
+  const isRootPill = isRoot && diagramType !== 'mindmap' && (
     node.shape === 'pill' ? true :
     node.shape === 'circle' ? false :
     (node.title.length >= 15 || node.width !== node.height)

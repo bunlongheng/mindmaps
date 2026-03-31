@@ -337,9 +337,9 @@ export function SidePanel({ nodeId, onClose, onImport, onDelete }: SidePanelProp
                 </>
               )}
 
-              {/* Branch — root only */}
+              {/* Branch — root only; Shape+Line hidden in mindmap mode (root always circle, lines always straight) */}
               {node.depth === 0 && <SBlock title="Branch">
-                <PRow label="Shape">
+                {diagramType !== 'mindmap' && <PRow label="Shape">
                   <div style={{ display: 'flex', gap: 6 }}>
                     {([
                       { value: 'circle' as const, label: 'Circle', icon: (active: boolean) => (
@@ -375,8 +375,8 @@ export function SidePanel({ nodeId, onClose, onImport, onDelete }: SidePanelProp
                       )
                     })}
                   </div>
-                </PRow>
-                <PRow label="Line">
+                </PRow>}
+                {diagramType !== 'mindmap' && <PRow label="Line">
                   <div style={{ display: 'flex', gap: 6 }}>
                     {([
                       {
@@ -453,7 +453,7 @@ export function SidePanel({ nodeId, onClose, onImport, onDelete }: SidePanelProp
                       )
                     })}
                   </div>
-                </PRow>
+                </PRow>}
 
               </SBlock>}
               {node.depth === 0 && <HR />}
