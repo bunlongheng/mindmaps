@@ -19,6 +19,7 @@ export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
   const gRef = useRef<SVGGElement>(null!)
   const [pan, setPan] = useState({ x: 0, y: 0 })
   const panRef = useRef({ x: 0, y: 0 })
+  const zoomCurrentRef = useRef(1)
   const [zoom, setZoom] = useState(1)
   const [rootDragOffset, setRootDragOffset] = useState<{ dx: number; dy: number } | null>(null)
   const rootDragClientRef = useRef<{ x: number; y: number } | null>(null)
@@ -49,6 +50,11 @@ export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
     return () => document.removeEventListener('wheel', handler)
   }, [])
 
+  // Apply pan+zoom directly to the SVG group — no React re-render required
+  const applyTransform = useCallback((p = panRef.current, z = zoomCurrentRef.current) => {
+    if (gRef.current) gRef.current.setAttribute('transform', `translate(${p.x},${p.y}) scale(${z})`)
+  }, [])
+
   const fitView = useCallback(() => {
     const svg = svgRef.current
     if (!svg || !activeMindmap?.nodes.length) return
@@ -63,13 +69,14 @@ export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
     const newZoom = Math.min((svgW - pad * 2) / (maxX - minX), (svgH - pad * 2) / (maxY - minY), 1)
     const cx = (minX + maxX) / 2
     const cy = (minY + maxY) / 2
-    setZoom(newZoom)
     zoomCurrentRef.current = newZoom
+    setZoom(newZoom)  // badge only
 
     const p = { x: svgW / 2 - cx * newZoom, y: svgH / 2 - cy * newZoom }
     panRef.current = p
-    setPan(p)
-  }, [activeMindmap])
+    setPan(p)         // keep pan state in sync for selBox coords
+    applyTransform(p, newZoom)
+  }, [activeMindmap, applyTransform])
 
 
   // Auto-fit on initial diagram load or diagram type switch
@@ -79,9 +86,6 @@ export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
     return () => cancelAnimationFrame(raf)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeMindmap?.id, diagramType])
-
-  // No zoom limits — let the device go as fast/far as it wants
-  const zoomCurrentRef = useRef(1)
 
   // Rubber-band selection state
   const [selBox, setSelBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
@@ -113,24 +117,30 @@ export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
   const handleWheelRef = useRef<((e: WheelEvent) => void) | null>(null)
   handleWheelRef.current = (e: WheelEvent) => {
     e.preventDefault()
+    // Normalize deltaMode: trackpads may fire line (1) or page (2) mode
+    const norm = e.deltaMode === 1 ? 15 : e.deltaMode === 2 ? 300 : 1
+    const dx = e.deltaX * norm
+    const dy = e.deltaY * norm
+
     if (e.ctrlKey) {
-      const factor = 1 - e.deltaY * 0.004
+      // Math.pow gives smooth, consistent zoom regardless of delta magnitude
+      const factor = Math.pow(0.998, dy)
       const oldZoom = zoomCurrentRef.current
       if (!isFinite(oldZoom) || oldZoom <= 0) { zoomCurrentRef.current = 1; return }
       const newZoom = Math.max(0.02, Math.min(10, oldZoom * factor))
-      if (!isFinite(newZoom)) return
+      if (!isFinite(newZoom) || newZoom === oldZoom) return
       const newPan = {
         x: e.clientX - ((e.clientX - panRef.current.x) / oldZoom) * newZoom,
         y: e.clientY - ((e.clientY - panRef.current.y) / oldZoom) * newZoom,
       }
       panRef.current = newPan
       zoomCurrentRef.current = newZoom
-      setZoom(newZoom)
-      setPan(newPan)
+      applyTransform(newPan, newZoom)
+      setZoom(newZoom)  // badge only
       flashZoomHud()
     } else {
-      panRef.current = { x: panRef.current.x - e.deltaX, y: panRef.current.y - e.deltaY }
-      setPan({ ...panRef.current })
+      panRef.current = { x: panRef.current.x - dx, y: panRef.current.y - dy }
+      applyTransform()
     }
   }
 
@@ -178,7 +188,7 @@ export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
       const dx = e.clientX - touchPanRef.current.x
       const dy = e.clientY - touchPanRef.current.y
       panRef.current = { x: panRef.current.x + dx, y: panRef.current.y + dy }
-      setPan({ ...panRef.current })
+      applyTransform()
       touchPanRef.current = { x: e.clientX, y: e.clientY }
       return
     }
@@ -201,8 +211,8 @@ export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
         }
         panRef.current = newPan
         zoomCurrentRef.current = newZoom
-        setPan(newPan)
-        setZoom(newZoom)
+        applyTransform(newPan, newZoom)
+        setZoom(newZoom)  // badge only
         flashZoomHud()
       }
       lastPinchDist.current = dist
@@ -354,7 +364,7 @@ export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
         onPointerCancel={handleBgPointerUp}
         style={{ userSelect: 'none', touchAction: 'none' }}
       >
-        <g ref={gRef} transform={`translate(${pan.x},${pan.y}) scale(${zoom})`}>
+        <g ref={gRef}>
           <EdgeLayer nodes={hideDetails ? activeMindmap.nodes.filter(n => n.depth <= 2) : activeMindmap.nodes} lineStyle={lineStyle} diagramType={diagramType} />
           {(hideDetails ? activeMindmap.nodes.filter(n => n.depth <= 2) : activeMindmap.nodes).map(node => (
             <Node
