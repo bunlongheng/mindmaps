@@ -29,43 +29,57 @@ function CurvedEdge({ parent, child, goRight = true }: { parent: MindmapNode; ch
   )
 }
 
-/** Bracket connector: vertical bar with horizontal branches to each child */
+/** Curly-brace connector — renders an actual { shape between parent and its children */
 function BracketConnector({ parent, children, goRight = true, showOrderNumbers = false }: { parent: MindmapNode; children: MindmapNode[]; goRight?: boolean; showOrderNumbers?: boolean }) {
   if (children.length === 0) return null
 
   const sorted = [...children].sort((a, b) => a.y - b.y)
 
+  // Single child: simple bezier, no brace needed
   if (children.length === 1) {
     return <CurvedEdge parent={parent} child={sorted[0]} goRight={goRight} />
   }
 
   const px = goRight ? parent.x + parent.width : parent.x
   const py = parent.y + parent.height / 2
-  const barX = goRight ? px + 28 : px - 28
+  const topY  = sorted[0].y + sorted[0].height / 2
+  const botY  = sorted[sorted.length - 1].y + sorted[sorted.length - 1].height / 2
+  const midY  = (topY + botY) / 2
+  const h     = botY - topY
+  const tip   = Math.max(10, Math.min(20, h * 0.1))   // protrusion of the { tip
+  const r     = Math.min(14, h * 0.22)                // corner radius of the curves
+
+  // braceX = the "spine" of the { (where stubs to children attach)
+  // tipX   = the pointy middle of the {
+  const childEdgeX = goRight ? sorted[0].x : sorted[0].x + sorted[0].width
+  const gap = Math.abs(childEdgeX - px)
+  const braceX = goRight ? childEdgeX - Math.max(12, gap * 0.3) : childEdgeX + Math.max(12, gap * 0.3)
+  const tipX   = goRight ? braceX - tip : braceX + tip
+
+  // Curly brace path: top arm → tip → bottom arm
+  const d = [
+    `M ${braceX} ${topY}`,
+    `C ${braceX} ${topY + r}, ${tipX} ${midY - r}, ${tipX} ${midY}`,
+    `C ${tipX} ${midY + r}, ${braceX} ${botY - r}, ${braceX} ${botY}`,
+  ].join(' ')
+
+  const braceColor = sorted[Math.floor(sorted.length / 2)].color
 
   return (
     <g>
-      {/* Connector from parent to bar */}
-      <path d={`M ${px} ${py} C ${px + (goRight ? 14 : -14)} ${py} ${barX} ${py} ${barX} ${py}`}
-        stroke={sorted[0].color} strokeWidth={1.8} fill="none" strokeLinecap="round" />
-      {/* Colored vertical bar — each segment uses upper child's color */}
-      {sorted.slice(0, -1).map((child, i) => {
-        const y1 = child.y + child.height / 2
-        const y2 = sorted[i + 1].y + sorted[i + 1].height / 2
-        return (
-          <line key={`seg-${child.id}`}
-            x1={barX} y1={y1} x2={barX} y2={y2}
-            stroke={child.color} strokeWidth={1.8} strokeLinecap="square" />
-        )
-      })}
+      {/* Horizontal connector: parent edge → brace tip */}
+      <line x1={px} y1={py} x2={tipX} y2={midY}
+        stroke={braceColor} strokeWidth={2} strokeLinecap="round" />
+      {/* The curly brace */}
+      <path d={d} stroke={braceColor} strokeWidth={2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+      {/* Stubs: brace spine → each child */}
       {sorted.map(child => {
-        const cy = child.y + child.height / 2
+        const cy  = child.y + child.height / 2
         const cx2 = goRight ? child.x : child.x + child.width
-        const midX = (barX + cx2) / 2
+        const midX = (braceX + cx2) / 2
         return (
           <g key={child.id}>
-            <line
-              x1={barX} y1={cy} x2={cx2} y2={cy}
+            <line x1={braceX} y1={cy} x2={cx2} y2={cy}
               stroke={child.color} strokeWidth={2} strokeLinecap="round" />
             {showOrderNumbers && parent.depth === 0 && (
               <>
