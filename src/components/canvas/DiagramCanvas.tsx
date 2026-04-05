@@ -92,6 +92,17 @@ export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
   const selStart = useRef<{ cx: number; cy: number } | null>(null)
   const isDragging = useRef(false)
 
+  // Space+drag (Figma-style hand tool) panning
+  const spaceHeld = useRef(false)
+  const mousePanRef = useRef<{ x: number; y: number } | null>(null)
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => { if (e.code === 'Space' && !(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)) { spaceHeld.current = true } }
+    const onKeyUp = (e: KeyboardEvent) => { if (e.code === 'Space') spaceHeld.current = false }
+    window.addEventListener('keydown', onKeyDown)
+    window.addEventListener('keyup', onKeyUp)
+    return () => { window.removeEventListener('keydown', onKeyDown); window.removeEventListener('keyup', onKeyUp) }
+  }, [])
+
   // Pinch-to-zoom state
   const activePointers = useRef<Map<number, { x: number; y: number }>>(new Map())
   const lastPinchDist = useRef<number | null>(null)
@@ -158,12 +169,13 @@ export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
     const onBg = e.target === e.currentTarget || (e.target as Element).tagName === 'svg'
     e.preventDefault()
     activePointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
-    ;(e.target as Element).setPointerCapture(e.pointerId)
+    ;(e.currentTarget as Element).setPointerCapture(e.pointerId)
     // Second finger — switch to pinch regardless of target
     if (activePointers.current.size >= 2) {
       selStart.current = null
       isDragging.current = false
       setSelBox(null)
+      mousePanRef.current = null
       lastPinchDist.current = null
       lastPinchMid.current = null
       return
@@ -172,6 +184,11 @@ export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
     // Touch always allows pan — don't restrict to background-only
     if (e.pointerType !== 'mouse') {
       touchPanRef.current = { x: e.clientX, y: e.clientY }
+      return
+    }
+    // Space+drag or middle-button = Figma-style hand-tool pan
+    if (spaceHeld.current || e.button === 1) {
+      mousePanRef.current = { x: e.clientX, y: e.clientY }
       return
     }
     // Mouse: only start rubber-band selection on background clicks
@@ -183,6 +200,15 @@ export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
 
   const handleBgPointerMove = useCallback((e: React.PointerEvent) => {
     activePointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+    // Mouse hand-tool pan (space+drag or middle-button)
+    if (mousePanRef.current) {
+      const dx = e.clientX - mousePanRef.current.x
+      const dy = e.clientY - mousePanRef.current.y
+      panRef.current = { x: panRef.current.x + dx, y: panRef.current.y + dy }
+      applyTransform()
+      mousePanRef.current = { x: e.clientX, y: e.clientY }
+      return
+    }
     // Single-finger touch pan
     if (activePointers.current.size === 1 && e.pointerType !== 'mouse' && touchPanRef.current) {
       const dx = e.clientX - touchPanRef.current.x
@@ -251,6 +277,11 @@ export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
       }
     }
     if (activePointers.current.size === 0) touchPanRef.current = null
+    // If we were mouse-panning, just clean up — don't clear selection
+    if (mousePanRef.current) {
+      mousePanRef.current = null
+      return
+    }
     // Only act if the drag started on the background (selStart was set)
     if (selStart.current && !isDragging.current) {
       setSelectedNodeIds([])

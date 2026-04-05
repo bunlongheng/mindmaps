@@ -367,8 +367,11 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
       ) : isMindmapL2Plus ? (
         <rect x={0} y={0} width={displayW} height={node.height} fill="transparent" />
       ) : (
-        /* Filter on the clip group = shadow cast from clipped shape, no external rect needed,
-           so no corner colour-bleed regardless of what's inside (white badge, coloured bg, etc.) */
+        <>
+        {/* Invisible hit-area so pointer events reach the <g> handlers */}
+        <rect x={0} y={0} width={displayW} height={node.height} fill="transparent" />
+        {/* Filter on the clip group = shadow cast from clipped shape, no external rect needed,
+           so no corner colour-bleed regardless of what's inside (white badge, coloured bg, etc.) */}
         <g clipPath={`url(#${clipId})`} style={{ pointerEvents: 'none' }}
           filter={previewW !== null ? 'drop-shadow(0 0 8px rgba(59,130,246,0.7))' : 'drop-shadow(0 1px 4px rgba(0,0,0,0.1))'}>
           <rect x={0} y={0} width={displayW} height={node.height} fill={bg} fillOpacity={bgOpacity} />
@@ -385,13 +388,18 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
             />
           )}
         </g>
+        </>
       )}
 
-      {editing ? (
+      {editing ? (() => {
+        const hasBadge = (hasEmoji || hasIcon) && !isRoot && !isMindmapL2Plus
+        const editX = isRoot ? cx - r * 0.75 : hasBadge ? node.height : (align === 'left' ? 8 : 2)
+        const editW = isRoot ? r * 1.5 : hasBadge ? displayW - node.height - 4 : displayW - editX - 2
+        return (
         <foreignObject
-          x={isRoot ? cx - r * 0.75 : 2}
+          x={editX}
           y={isRoot ? cy - fontSize * 0.7 : 2}
-          width={isRoot ? r * 1.5 : displayW - 4}
+          width={editW}
           height={isRoot ? fontSize * 1.6 : node.height - 4}
         >
           <input
@@ -410,10 +418,12 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
               background: 'transparent', border: 'none', outline: 'none',
               color: textColor, fontSize, fontWeight, fontStyle,
               fontFamily: 'Inter, system-ui, sans-serif',
-              textAlign: 'center', padding: '0 4px', caretColor: textColor,
+              textAlign: isRoot ? 'center' : align, padding: '0 4px', caretColor: textColor,
             }}
           />
         </foreignObject>
+        )
+      })()
       ) : (
         <g clipPath={isRoot ? undefined : `url(#${clipId})`}>
           {hasEmoji && resolvedEmoji && !isMindmapL2Plus && (() => {
