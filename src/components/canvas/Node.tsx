@@ -282,6 +282,9 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   }
 
   const clipId = `clip-${node.id}`
+  const hasBadge = (hasEmoji || hasIcon) && !isRoot && !isMindmapL2Plus
+  const editX = isRoot ? cx - r * 0.75 : hasBadge ? node.height : (align === 'left' ? 8 : 2)
+  const editW = isRoot ? r * 1.5 : hasBadge ? displayW - node.height - 4 : displayW - editX - 2
 
   return (
     <g style={{
@@ -391,11 +394,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
         </>
       )}
 
-      {editing ? (() => {
-        const hasBadge = (hasEmoji || hasIcon) && !isRoot && !isMindmapL2Plus
-        const editX = isRoot ? cx - r * 0.75 : hasBadge ? node.height : (align === 'left' ? 8 : 2)
-        const editW = isRoot ? r * 1.5 : hasBadge ? displayW - node.height - 4 : displayW - editX - 2
-        return (
+      {editing ? (
         <foreignObject
           x={editX}
           y={isRoot ? cy - fontSize * 0.7 : 2}
@@ -422,8 +421,6 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
             }}
           />
         </foreignObject>
-        )
-      })()
       ) : (
         <g clipPath={isRoot ? undefined : `url(#${clipId})`}>
           {hasEmoji && resolvedEmoji && !isMindmapL2Plus && (() => {
