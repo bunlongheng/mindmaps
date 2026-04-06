@@ -134,8 +134,8 @@ export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
     const dy = e.deltaY * norm
 
     if (e.ctrlKey) {
-      // Math.pow gives smooth, consistent zoom regardless of delta magnitude
-      const factor = Math.pow(0.998, dy)
+      // Figma-style fast zoom — 0.99 base for snappy response
+      const factor = Math.pow(0.99, dy)
       const oldZoom = zoomCurrentRef.current
       if (!isFinite(oldZoom) || oldZoom <= 0) { zoomCurrentRef.current = 1; return }
       const newZoom = Math.max(0.02, Math.min(10, oldZoom * factor))

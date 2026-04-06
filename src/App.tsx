@@ -42,9 +42,11 @@ function getShareParam(search = window.location.search) {
 }
 
 // Skip auth gate when running locally (dev server or local IP)
+import { isLocal as checkIsLocal } from './lib/is-local'
 const isLocal = import.meta.env.DEV ||
   ['localhost', '127.0.0.1'].includes(window.location.hostname) ||
-  /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(window.location.hostname)
+  /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(window.location.hostname) ||
+  checkIsLocal()
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null)
@@ -282,7 +284,7 @@ export default function App() {
       <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
     </div>
   )
-  if (hasSupabase && !user && view !== 'viewer') return <><CuteToast /><LoginPage /></>
+  if (hasSupabase && !user && !isLocal && view !== 'viewer') return <><CuteToast /><LoginPage /></>
 
   // If editor has no diagram (e.g. bad URL), fall back to home
   if (view === 'editor' && !activeMindmap && !authLoading) {
