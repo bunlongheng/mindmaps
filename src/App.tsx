@@ -5,7 +5,6 @@ import { DiagramCanvas } from './components/canvas/DiagramCanvas'
 import { SidePanel } from './components/panels/SidePanel'
 import { ImportModal } from './components/modals/ImportModal'
 import { HomePage } from './components/home/HomePage'
-import { LoginPage } from './components/auth/LoginPage'
 import { useDiagram, lsDeleteDiagram } from './hooks/useDiagram'
 import { soundIncoming, soundDelete } from './lib/sounds'
 import { useMindmapStore } from './store/mindmapStore'
@@ -284,7 +283,7 @@ export default function App() {
       <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
     </div>
   )
-  if (hasSupabase && !user && !isLocal && view !== 'viewer') return <><CuteToast /><LoginPage /></>
+  // Auth is optional — app loads for everyone, login only for cloud sync
 
   // If editor has no diagram (e.g. bad URL), fall back to home
   if (view === 'editor' && !activeMindmap && !authLoading) {
