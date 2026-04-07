@@ -17,7 +17,7 @@ export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
   const canvasBg = getTheme(themeId).canvasBg
   const svgRef = useRef<SVGSVGElement>(null!)
   const gRef = useRef<SVGGElement>(null!)
-  const [pan, setPan] = useState({ x: 0, y: 0 })
+  const [, setPan] = useState({ x: 0, y: 0 })
   const panRef = useRef({ x: 0, y: 0 })
   const zoomCurrentRef = useRef(1)
   const [zoom, setZoom] = useState(1)
