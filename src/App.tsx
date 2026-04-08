@@ -285,10 +285,10 @@ export default function App() {
   )
   // Auth is optional — app loads for everyone, login only for cloud sync
 
-  // If editor has no diagram (e.g. bad URL), fall back to home
+  // If editor has no diagram (e.g. bad URL or RLS-blocked), fall back to home
   if (view === 'editor' && !activeMindmap && !authLoading) {
-    const mapId = getMapParam()
-    if (!mapId) { handleBack(); return null }
+    handleBack()
+    return null
   }
 
   async function handleSignOut() {
