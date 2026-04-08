@@ -2,19 +2,17 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { NODE_ICONS } from '../../lib/icons'
 import { useMindmapStore } from '../../store/mindmapStore'
 import { getTheme, THEMES } from '../../lib/themes'
-import { X, AlignLeft, AlignCenter, AlignRight, Copy, Check, Download, Upload, FileDown, Trash2, Sparkles } from 'lucide-react'
+import { X, AlignLeft, AlignCenter, AlignRight, Copy, Check, FileDown, Trash2, Sparkles } from 'lucide-react'
 import { getLucideIcon } from '../canvas/NodeIcon'
 import { showToast, dismissToast } from '../CuteToast'
 import { soundChaChing } from '../../lib/sounds'
 import type { LineStyle, DiagramType } from '../../types'
 import { QRCodeSVG } from 'qrcode.react'
-import { downloadJSON } from '../../lib/export/json'
 import { exportDiagramAsPdf } from '../../lib/export/exportPdf'
 
 interface SidePanelProps {
   nodeId: string | null
   onClose: () => void
-  onImport: () => void
   onDelete?: () => void
 }
 
@@ -112,7 +110,7 @@ function DiagramTypeIcon({ value, color }: { value: string; color: string }) {
 type Tab = 'style' | 'map' | 'share'
 
 
-export function SidePanel({ nodeId, onClose, onImport, onDelete }: SidePanelProps) {
+export function SidePanel({ nodeId, onClose, onDelete }: SidePanelProps) {
   const {
     activeMindmap, updateNode, batchUpdateNodes, selectedNodeIds,
     lineStyle, setLineStyle, diagramType, setDiagramType, setShareEnabled, rerunLayout,
@@ -624,54 +622,28 @@ export function SidePanel({ nodeId, onClose, onImport, onDelete }: SidePanelProp
               </button>
             </div>
 
-            {/* QR + copy — only when enabled */}
-            {activeMindmap?.sharingEnabled && (
-              <>
-                <div style={{ display: 'flex', justifyContent: 'center', margin: '10px 0 8px' }}>
-                  <QRCodeSVG value={shareUrl} size={160} bgColor="#ffffff" fgColor="#1a1d2e" level="M" />
-                </div>
-                <button onClick={copyShare} style={{
-                  width: '100%', padding: '9px', borderRadius: 8,
-                  border: '1px solid #e0e2e7',
-                  background: copied ? '#f0fdf4' : '#fff',
-                  cursor: 'pointer', fontSize: 12, fontWeight: 500,
-                  color: copied ? '#16a34a' : '#374151', fontFamily: 'inherit',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                  transition: 'all 0.15s',
-                }}>
-                  {copied ? <Check size={13} /> : <Copy size={13} />}
-                  {copied ? 'Copied!' : 'Copy Link'}
-                </button>
-                <p style={{ fontSize: 10, color: '#9ca3af', margin: 0, lineHeight: 1.5 }}>
-                  Anyone with the link can view (read only).
-                </p>
-              </>
-            )}
+            {/* QR + copy — always visible */}
+            <div style={{ display: 'flex', justifyContent: 'center', margin: '10px 0 8px' }}>
+              <QRCodeSVG value={shareUrl} size={160} bgColor="#ffffff" fgColor="#1a1d2e" level="M" />
+            </div>
+            <button onClick={copyShare} style={{
+              width: '100%', padding: '9px', borderRadius: 8,
+              border: '1px solid #e0e2e7',
+              background: copied ? '#f0fdf4' : '#fff',
+              cursor: 'pointer', fontSize: 12, fontWeight: 500,
+              color: copied ? '#16a34a' : '#374151', fontFamily: 'inherit',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              transition: 'all 0.15s',
+            }}>
+              {copied ? <Check size={13} /> : <Copy size={13} />}
+              {copied ? 'Copied!' : 'Copy Link'}
+            </button>
+            <p style={{ fontSize: 10, color: '#9ca3af', margin: 0, lineHeight: 1.5 }}>
+              Anyone with the link can view (read only).
+            </p>
           </SBlock>
           <HR />
           <SBlock title="File">
-            <button onClick={() => activeMindmap && downloadJSON(activeMindmap)} style={{
-              width: '100%', padding: '9px 12px', borderRadius: 8, marginBottom: 6,
-              border: '1px solid #e0e2e7', background: '#fff',
-              cursor: 'pointer', fontSize: 12, fontWeight: 500,
-              color: '#374151', fontFamily: 'inherit',
-              display: 'flex', alignItems: 'center', gap: 8,
-            }}
-              onMouseEnter={e => (e.currentTarget.style.background = '#f3f4f6')}
-              onMouseLeave={e => (e.currentTarget.style.background = '#fff')}>
-              <Download size={13} /> Export JSON
-            </button>
-            <button onClick={onImport} style={{
-              width: '100%', padding: '9px 12px', borderRadius: 8, marginBottom: 6,
-              border: '1px solid #e0e2e7', background: '#fff',
-              cursor: 'pointer', fontSize: 12, fontWeight: 500,
-              color: '#374151', fontFamily: 'inherit',
-              display: 'flex', alignItems: 'center', gap: 8,
-            }}
-              onMouseEnter={e => (e.currentTarget.style.background = '#f3f4f6')}
-              onMouseLeave={e => (e.currentTarget.style.background = '#fff')}>
-              <Upload size={13} /> Import JSON
-            </button>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => activeMindmap && exportDiagramAsPdf(activeMindmap.name)} style={{
                 flex: 1, padding: '9px 12px', borderRadius: 8,

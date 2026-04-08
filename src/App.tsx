@@ -400,7 +400,6 @@ export default function App() {
         <SidePanel
           nodeId={selectedPanelNodeId}
           onClose={() => { setSelectedPanelNodeId(null); setSelectedNodeIds([]); setShowPanel(false) }}
-          onImport={() => setShowImport(true)}
           onDelete={activeMindmap ? () => {
             const name = activeMindmap.name
             deleteDiagram(activeMindmap.id, name).then(() => {
