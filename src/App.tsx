@@ -163,6 +163,7 @@ export default function App() {
     document.addEventListener('mousedown', onDown, true)
     return () => document.removeEventListener('mousedown', onDown, true)
   }, [showTagFooter])
+  const [diagramLoading, setDiagramLoading] = useState(false)
   const [view, setView] = useState<View>(() => {
     if (decodeShareURL()) return 'viewer'
     if (getShareParam()) return 'viewer'
@@ -188,7 +189,7 @@ export default function App() {
     const shared = decodeShareURL()
     if (shared) { setActiveMindmap(shared); return }
     const shareId = getShareParam()
-    if (shareId) { loadDiagram(shareId); return }
+    if (shareId) { setDiagramLoading(true); loadDiagram(shareId).finally(() => setDiagramLoading(false)); return }
     const mapId = getMapParam()
     if (mapId) {
       // Normalize ?id= → ?map= in the URL, preserving ?imported
@@ -196,7 +197,7 @@ export default function App() {
         const isImported = new URLSearchParams(window.location.search).has('imported')
         window.history.replaceState({}, '', `?map=${mapId}${isImported ? '&imported=1' : ''}`)
       }
-      loadDiagram(mapId)
+      setDiagramLoading(true); loadDiagram(mapId).finally(() => setDiagramLoading(false))
     } else {
       loadDiagramList()
     }
@@ -276,17 +277,16 @@ export default function App() {
     if (nodeId) setSelectedPanelNodeId(nodeId)
   }, [])
 
-  // Auth gate — shared viewer is always public
-  if (authLoading) return (
+  // Show spinner while auth or diagram is loading
+  if (authLoading || diagramLoading) return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8f9fb' }}>
       <div style={{ width: 32, height: 32, border: '3px solid #e2e8f0', borderTopColor: '#6366f1', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
       <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
     </div>
   )
-  // Auth is optional — app loads for everyone, login only for cloud sync
 
-  // If editor has no diagram (e.g. bad URL or RLS-blocked), fall back to home
-  if (view === 'editor' && !activeMindmap && !authLoading) {
+  // If editor has no diagram after loading (bad URL, RLS-blocked, deleted), fall back to home
+  if (view === 'editor' && !activeMindmap) {
     handleBack()
     return null
   }
