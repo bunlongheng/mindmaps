@@ -1,9 +1,9 @@
 import type { MindmapNode } from '../../types'
 
-const ROOT_RADIUS = 240   // root center → L1 center
-const L1_EXTRA   = 120   // L1 center → L2 center
-const L2_EXTRA   = 90    // L2 center → L3 center
-const MIN_ARC    = 0.52  // minimum arc (radians) reserved per child node
+const ROOT_RADIUS = 260   // root center → L1 center
+const L1_EXTRA   = 140   // L1 center → L2 center
+const L2_EXTRA   = 110   // L2 center → L3 center
+const MIN_ARC    = 0.65  // minimum arc (radians) reserved per child node
 
 const FONT_SIZES: Record<number, number> = { 1: 18, 2: 13, 3: 11 }
 const DEFAULT_FONT_SIZE = 11
@@ -163,8 +163,8 @@ export function computeMindmapLayout(nodes: MindmapNode[]): MindmapNode[] {
 }
 
 /** Push overlapping nodes apart iteratively */
-function resolveOverlaps(nodes: MindmapNode[], maxPasses = 8) {
-  const pad = 8 // minimum gap between nodes
+function resolveOverlaps(nodes: MindmapNode[], maxPasses = 14) {
+  const pad = 24 // minimum gap between nodes (accounts for selection ring ~10px each side)
   for (let pass = 0; pass < maxPasses; pass++) {
     let moved = false
     for (let i = 0; i < nodes.length; i++) {
@@ -179,13 +179,14 @@ function resolveOverlaps(nodes: MindmapNode[], maxPasses = 8) {
         const overlapX = Math.min(ax + aw, bx + bw) - Math.max(ax, bx)
         const overlapY = Math.min(ay + ah, by + bh) - Math.max(ay, by)
         if (overlapX > 0 && overlapY > 0) {
-          // Push apart along the axis of least overlap
+          // Push apart along center-to-center direction
           const acx = a.x + a.width / 2, acy = a.y + a.height / 2
           const bcx = b.x + b.width / 2, bcy = b.y + b.height / 2
           let dx = bcx - acx, dy = bcy - acy
           const dist = Math.sqrt(dx * dx + dy * dy) || 1
           dx /= dist; dy /= dist
-          const push = Math.min(overlapX, overlapY) / 2 + 2
+          // Push by full overlap amount (not half) so nodes fully separate
+          const push = Math.max(overlapX, overlapY) / 2 + pad / 2
           // Only move the deeper node (or both if same depth)
           if (a.depth >= b.depth) { a.x -= dx * push; a.y -= dy * push }
           if (b.depth >= a.depth) { b.x += dx * push; b.y += dy * push }
