@@ -29,6 +29,7 @@ export default defineConfig({
           { src: '/icons/maskable-icon-512x512.png',  sizes: '512x512', type: 'image/png', purpose: 'maskable' },
         ],
       },
+      devOptions: { enabled: true, type: 'module' },
       workbox: {
         // Don't precache HTML — always fetch fresh from network to avoid stale-cache blank screen
         globPatterns: ['**/*.{js,css,png,svg,ico}'],

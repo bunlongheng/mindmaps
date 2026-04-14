@@ -8,7 +8,16 @@ const BRANCH_COLORS = [
   '#3b82f6', '#06b6d4', '#84cc16', '#f43f5e',
 ]
 
-const SYSTEM_PROMPT = `You are a mindmap generator. Create a structured, detailed mindmap based on the user's request.
+const ICON_LIST = `user, bot, server, database, zap, plug, git-branch, globe, brain, settings,
+  folder, cloud, mail, lock, key, search, star, rocket, lightbulb, flame,
+  check-circle, map-pin, trophy, message, phone, wrench, chart, eye, music,
+  heart, flag, shield, flask, trending, paint, sparkles, smile, home, building,
+  briefcase, graduate, gift, clock, calendar, file, cog, cpu, link, code,
+  terminal, package, layers, bell, alert, info, help, refresh, share, download,
+  upload, image, video, mic, headphones, camera, monitor, wifi, card, cart,
+  dollar, pie, activity, target, crosshair, compass, map, bookmark, tag, hash, at, send`
+
+const SYSTEM_PROMPT_CATEGORIZED = `You are a mindmap generator. Create a structured, detailed mindmap based on the user's request.
 
 OUTPUT FORMAT — return ONLY valid JSON, no markdown fences, no explanation:
 {
@@ -23,17 +32,45 @@ RULES:
 - Maximum 12 top-level categories
 - Maximum 10 subcategories per category (minimum 3)
 - Every top-level category MUST have exactly one "icon" field chosen from this list:
-  user, bot, server, database, zap, plug, git-branch, globe, brain, settings,
-  folder, cloud, mail, lock, key, search, star, rocket, lightbulb, flame,
-  check-circle, map-pin, trophy, message, phone, wrench, chart, eye, music,
-  heart, flag, shield, flask, trending, paint, sparkles, smile, home, building,
-  briefcase, graduate, gift, clock, calendar, file, cog, cpu, link, code,
-  terminal, package, layers, bell, alert, info, help, refresh, share, download,
-  upload, image, video, mic, headphones, camera, monitor, wifi, card, cart,
-  dollar, pie, activity, target, crosshair, compass, map, bookmark, tag, hash, at, send
+  ${ICON_LIST}
 - Icons must semantically match the category content
 - Subcategories should be specific and descriptive (4-10 words each)
 - Return ONLY the JSON object, nothing else`
+
+const SYSTEM_PROMPT_FLAT = `You are a mindmap generator. Create a flat, single-level mindmap based on the user's request.
+
+The user wants a simple list — NOT grouped by category. Each item is a direct child of the root.
+
+OUTPUT FORMAT — return ONLY valid JSON, no markdown fences, no explanation:
+{
+  "Root Title": [
+    { "icon": "star", "Item one title here": [] },
+    { "icon": "rocket", "Item two title here": [] },
+    { "icon": "brain", "Item three title here": [] }
+  ]
+}
+
+RULES:
+- Root Title: concise, 2-5 words
+- Return exactly the number of items the user asked for (e.g. "top 10" = 10 items)
+- Each item is a direct child of root — NO subcategories, NO nesting
+- Every item MUST have exactly one "icon" field chosen from this list:
+  ${ICON_LIST}
+- Icons must semantically match the item content
+- Item titles should be specific and descriptive (4-10 words each)
+- Return ONLY the JSON object, nothing else`
+
+// Detect if the user wants a flat list vs categorized breakdown
+function wantsFlatList(prompt: string): boolean {
+  const p = prompt.toLowerCase()
+  // Explicit category request — always use categorized
+  if (/\b(categor|group\s*by|break\s*down|breakdown|organize\s*by|sort\s*by|classify)\b/.test(p)) return false
+  // Flat list signals: "top N", "N best", "list of N", "give me N", "name N", etc.
+  if (/\b(top\s+\d|best\s+\d|\d+\s+best|\d+\s+top|list\s+(of\s+)?\d|\d+\s+things|\d+\s+ways|\d+\s+tips|\d+\s+ideas|\d+\s+reasons|give\s+me\s+\d|name\s+\d|rank\s+\d)\b/.test(p)) return true
+  // "just list", "simple list", "flat list", "straight list"
+  if (/\b(just\s+list|simple\s+list|flat\s+list|straight\s+list|just\s+give\s+me|no\s+categor)\b/.test(p)) return true
+  return false
+}
 
 const META_KEYS = new Set([
   'icon', 'emoji', 'bold', 'italic', 'fontSize',
@@ -193,7 +230,7 @@ export default async function handler(req: Request): Promise<Response> {
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 4096,
-        system: SYSTEM_PROMPT,
+        system: wantsFlatList(prompt) ? SYSTEM_PROMPT_FLAT : SYSTEM_PROMPT_CATEGORIZED,
         messages: [{ role: 'user', content: prompt.trim() }],
       }),
     })

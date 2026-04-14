@@ -56,6 +56,7 @@ interface HomePageProps {
 
 export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
   const { diagrams } = useMindmapStore()
+  const isLocal = import.meta.env.DEV || ['localhost', '127.0.0.1'].includes(window.location.hostname)
   const { loadDiagramList, createDiagram, createDiagramFromNodes, deleteDiagram, updateTags } = useDiagram(user?.id ?? null)
   const isMobile = window.innerWidth <= 768
 
@@ -69,7 +70,17 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
   const [aiPrompt, setAiPrompt] = useState('')
   const [aiLoading, setAiLoading] = useState(false)
   const [aiError, setAiError] = useState('')
-  const [activeTag, setActiveTag] = useState<string | null>(null) // null=All, '__no_tag__'=untagged, else tag name
+  const [activeTag, _setActiveTag] = useState<string | null>(() => {
+    const p = new URLSearchParams(window.location.search)
+    return p.get('tag') ?? null
+  })
+  const setActiveTag = (tag: string | null) => {
+    _setActiveTag(tag)
+    const p = new URLSearchParams(window.location.search)
+    if (tag) p.set('tag', tag); else p.delete('tag')
+    const next = p.toString() ? `?${p}` : window.location.pathname
+    window.history.replaceState({}, '', next)
+  }
   const [tagModalId, setTagModalId] = useState<string | null>(null)
   const [bgLevel, _setBgLevel] = useState<0|1|2>(() => {
     const saved = localStorage.getItem('mindmaps:bgLevel')
@@ -277,7 +288,7 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
           {newMapBusy ? <Loader2 size={14} style={{ animation: 'spin 0.7s linear infinite' }} /> : <Plus size={14} strokeWidth={2.5} />} New
         </button>
 
-        {user && (
+        {(user || isLocal || displayName) && (
           <div ref={menuRef} style={{ position: 'relative' }}>
             <button
               onClick={() => setShowUserMenu(p => !p)}
@@ -314,7 +325,7 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
                     {displayName}
                   </div>
                   <div style={{ fontSize: 11, color: TEXT_MUTED, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 2 }}>
-                    {user.email}
+                    {user?.email ?? 'Local'}
                   </div>
                 </div>
                 <button

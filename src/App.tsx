@@ -163,7 +163,7 @@ export default function App() {
     document.addEventListener('mousedown', onDown, true)
     return () => document.removeEventListener('mousedown', onDown, true)
   }, [showTagFooter])
-  const [diagramLoading, setDiagramLoading] = useState(false)
+  const [diagramLoading, setDiagramLoading] = useState(() => !!(getMapParam() || getShareParam()))
   const [view, setView] = useState<View>(() => {
     if (decodeShareURL()) return 'viewer'
     if (getShareParam()) return 'viewer'
@@ -257,7 +257,12 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [selectedNodeIds, activeMindmap, addNode, view])
 
+  // Track the last active tag so we can restore it on back navigation
+  const lastTagRef = useRef<string | null>(new URLSearchParams(window.location.search).get('tag'))
+
   const handleOpenDiagram = useCallback(async (id: string) => {
+    // Save the current tag before navigating away
+    lastTagRef.current = new URLSearchParams(window.location.search).get('tag')
     setShowPanel(false); setSelectedPanelNodeId(null)
     await loadDiagram(id)
     setView('editor')
@@ -270,7 +275,8 @@ export default function App() {
     setShowPanel(false); setSelectedPanelNodeId(null); setSelectedNodeIds([])
     loadDiagramList()
     setView('home')
-    window.history.pushState({}, '', window.location.pathname)
+    const tag = lastTagRef.current
+    window.history.pushState({}, '', tag ? `?tag=${tag}` : window.location.pathname)
   }, [setSelectedNodeIds, loadDiagramList])
 
   const handleNodeSelect = useCallback((nodeId: string | null) => {

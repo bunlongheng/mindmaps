@@ -2,6 +2,7 @@ import { useRef, useState, useCallback } from 'react'
 import type { MindmapNode } from '../../types'
 import { useMindmapStore } from '../../store/mindmapStore'
 import { NodeIcon, getLucideIcon } from './NodeIcon'
+import { wrapText } from '../../lib/layout/mindmap'
 
 interface NodeProps {
   node: MindmapNode
@@ -56,11 +57,6 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   const inputRef = useRef<HTMLInputElement>(null)
   const resizePreview = useMindmapStore(s => s.resizePreview)
   const diagramType = useMindmapStore(s => s.diagramType)
-  const parentNode = useMindmapStore(s =>
-    diagramType === 'mindmap' && node.depth >= 2
-      ? s.activeMindmap?.nodes.find(n => n.id === node.parentId)
-      : undefined
-  )
   const childCount = useMindmapStore(s =>
     diagramType === 'mindmap' && node.depth >= 1
       ? (s.activeMindmap?.nodes.filter(n => n.parentId === node.id).length ?? 0)
@@ -75,18 +71,11 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   )
   const isMindmapCircle = diagramType === 'mindmap' && node.depth === 1
   const isMindmapL2Plus = diagramType === 'mindmap' && node.depth >= 2
+  const effectiveRx = isMindmapL2Plus ? node.height / 2 : rx
   const previewW = (!isRoot && resizePreview?.depth === node.depth) ? resizePreview.width : null
 
-  // For mindmap L2+ nodes: rotate along the edge direction
-  const mindmapAngle = (() => {
-    if (diagramType !== 'mindmap' || node.depth < 2 || !parentNode) return null
-    const dx = (node.x + node.width / 2) - (parentNode.x + parentNode.width / 2)
-    const dy = (node.y + node.height / 2) - (parentNode.y + parentNode.height / 2)
-    let angle = Math.atan2(dy, dx) * 180 / Math.PI
-    // Flip upside-down text so it always reads left→right
-    if (angle > 90 || angle <= -90) angle += 180
-    return angle
-  })()
+  // Mindmap circles: keep text horizontal for readability
+  const mindmapAngle: number | null = null
 
   // Styling per depth
   let bg: string, textColor: string, strokeColor: string, strokeW: number
@@ -103,10 +92,10 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
     strokeColor = node.color
     strokeW = 2
   } else if (isMindmapCircle) {
-    // L1 mindmap: solid black pill like root, white text
-    bg = '#1a1d2e'
-    textColor = '#ffffff'
-    strokeColor = '#1a1d2e'
+    // L1 mindmap: solid color fill, matching the reference palette
+    bg = node.color
+    textColor = isLight(node.color) ? '#1a1d2e' : '#ffffff'
+    strokeColor = node.color
     strokeW = 0
   } else {
     // L1 all other diagrams: solid color fill, darker border so white badge is framed
@@ -296,7 +285,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
     {!isRoot && (
       <defs>
         <clipPath id={clipId}>
-          <rect x={0} y={0} width={displayW} height={node.height} rx={rx} ry={rx} />
+          <rect x={0} y={0} width={displayW} height={node.height} rx={effectiveRx} ry={effectiveRx} />
         </clipPath>
       </defs>
     )}
@@ -368,7 +357,18 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
           </>)})()}
         </>
       ) : isMindmapL2Plus ? (
+        <>
         <rect x={0} y={0} width={displayW} height={node.height} fill="transparent" />
+        <g style={{ pointerEvents: 'none' }}
+          filter="drop-shadow(0 1px 4px rgba(0,0,0,0.1))">
+          <rect x={0} y={0} width={displayW} height={node.height}
+            rx={effectiveRx} ry={effectiveRx}
+            fill={bg} fillOpacity={bgOpacity} />
+          <rect x={0} y={0} width={displayW} height={node.height}
+            rx={effectiveRx} ry={effectiveRx}
+            fill="none" stroke={strokeColor} strokeWidth={strokeW * 2} />
+        </g>
+        </>
       ) : (
         <>
         {/* Invisible hit-area so pointer events reach the <g> handlers */}
@@ -468,17 +468,62 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
               </>
             )
           })()}
-          {((!hasIcon && !hasEmoji) || isRoot || isMindmapL2Plus) && (
-            <text
-              x={isRoot ? cx : isMindmapL2Plus ? ((hasEmoji || hasIcon) ? 26 : 12) : align === 'left' ? 12 : align === 'right' ? displayW - 12 : displayW / 2}
-              y={isRoot ? cy + fontSize * 0.38 : node.height / 2 + fontSize * 0.38}
-              textAnchor={isRoot ? 'middle' : textAnchor}
-              fontSize={fontSize} fontWeight={fontWeight} fontStyle={fontStyle}
-              fontFamily="Inter, system-ui, sans-serif"
-              fill={textColor}
-              style={{ pointerEvents: 'none' }}
-            >{label}</text>
-          )}
+          {((!hasIcon && !hasEmoji) || isRoot || isMindmapL2Plus) && (() => {
+            if (isMindmapL2Plus) {
+              const maxChars = Math.max(8, Math.ceil(Math.sqrt(label.length * 1.8)))
+              const lines = wrapText(label, maxChars)
+              const lineH = fontSize * 1.3
+              const startY = node.height / 2 - ((lines.length - 1) * lineH) / 2
+              return (
+                <text
+                  x={displayW / 2}
+                  textAnchor="middle"
+                  fontSize={fontSize} fontWeight={fontWeight} fontStyle={fontStyle}
+                  fontFamily="Inter, system-ui, sans-serif"
+                  fill={textColor}
+                  style={{ pointerEvents: 'none' }}
+                >
+                  {lines.map((line, i) => (
+                    <tspan key={i} x={displayW / 2} dy={i === 0 ? startY + fontSize * 0.38 : lineH}>
+                      {line}
+                    </tspan>
+                  ))}
+                </text>
+              )
+            }
+            if (isRoot && diagramType === 'mindmap') {
+              const maxChars = Math.max(8, Math.ceil(Math.sqrt(label.length * 1.8)))
+              const lines = wrapText(label, maxChars)
+              const lineH = fontSize * 1.3
+              const startY = cy - ((lines.length - 1) * lineH) / 2
+              return (
+                <text
+                  x={cx} textAnchor="middle"
+                  fontSize={fontSize} fontWeight={fontWeight} fontStyle={fontStyle}
+                  fontFamily="Inter, system-ui, sans-serif"
+                  fill={textColor}
+                  style={{ pointerEvents: 'none' }}
+                >
+                  {lines.map((line, i) => (
+                    <tspan key={i} x={cx} dy={i === 0 ? startY + fontSize * 0.38 : lineH}>
+                      {line}
+                    </tspan>
+                  ))}
+                </text>
+              )
+            }
+            return (
+              <text
+                x={isRoot ? cx : align === 'left' ? 12 : align === 'right' ? displayW - 12 : displayW / 2}
+                y={isRoot ? cy + fontSize * 0.38 : node.height / 2 + fontSize * 0.38}
+                textAnchor={isRoot ? 'middle' : textAnchor}
+                fontSize={fontSize} fontWeight={fontWeight} fontStyle={fontStyle}
+                fontFamily="Inter, system-ui, sans-serif"
+                fill={textColor}
+                style={{ pointerEvents: 'none' }}
+              >{label}</text>
+            )
+          })()}
         </g>
       )}
 

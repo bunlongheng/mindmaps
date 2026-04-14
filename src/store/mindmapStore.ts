@@ -72,12 +72,25 @@ function rebalanceColors(nodes: MindmapNode[], palette: string[]): MindmapNode[]
   const vibrant = palette.slice(0, 12).filter(c => !isTooLight(c))
   const effectivePalette = vibrant.length >= 2 ? vibrant : palette.slice(0, 12)
   const l1 = nodes.filter(n => n.depth === 1).sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
-  const N = l1.length
-  if (N === 0) return nodes
-  const colorMap = new Map(l1.map((n, i) => [
-    n.id,
-    effectivePalette[Math.round(i * effectivePalette.length / N) % effectivePalette.length],
-  ]))
+  if (l1.length === 0) return nodes
+
+  // Preserve existing L1 colors — only assign palette colors to nodes that have none
+  const usedColors = new Set(l1.filter(n => n.color && effectivePalette.includes(n.color)).map(n => n.color))
+  const colorMap = new Map<string, string>()
+  let nextIdx = 0
+  for (const n of l1) {
+    if (n.color && effectivePalette.includes(n.color)) {
+      colorMap.set(n.id, n.color)
+    } else {
+      // Find next unused palette color
+      while (nextIdx < effectivePalette.length && usedColors.has(effectivePalette[nextIdx])) nextIdx++
+      const color = effectivePalette[nextIdx % effectivePalette.length]
+      colorMap.set(n.id, color)
+      usedColors.add(color)
+      nextIdx++
+    }
+  }
+
   function inheritedColor(node: MindmapNode): string {
     if (node.depth === 1) return colorMap.get(node.id) ?? node.color
     const parent = nodes.find(p => p.id === node.parentId)
