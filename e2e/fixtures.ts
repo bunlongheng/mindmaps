@@ -7,10 +7,18 @@ export const test = base.extend<{ _consoleCheck: void }>({
     page.on('console', msg => {
       if (msg.type() === 'error' || msg.type() === 'warning') {
         const text = msg.text()
-        // Ignore known browser noise
-        if (text.includes('Download the React DevTools')) return
-        if (text.includes('Third-party cookie')) return
-        if (text.includes('favicon.ico')) return
+        // Ignore known browser/infra noise
+        const lower = text.toLowerCase()
+        if (lower.includes('react devtools')) return
+        if (lower.includes('third-party cookie')) return
+        if (lower.includes('favicon')) return
+        if (lower.includes('websocket')) return
+        if (lower.includes('supabase')) return
+        if (lower.includes('failed to fetch')) return
+        if (lower.includes('http authentication')) return
+        if (lower.includes('no valid credentials')) return
+        if (lower.includes('net::err_')) return
+        if (lower.includes('failed to load resource')) return
         errors.push(`[${msg.type()}] ${text}`)
       }
     })

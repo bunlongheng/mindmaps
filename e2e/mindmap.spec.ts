@@ -1,41 +1,5 @@
 import { test, expect } from './fixtures'
-
-// Helper: wait for app to load
-async function waitForApp(page: import('@playwright/test').Page) {
-  await page.waitForSelector('.diagram-canvas-root, [title="New blank map"], [title="New Map"]', { timeout: 10_000 })
-}
-
-// Helper: create a new map from the home page
-async function createNewMap(page: import('@playwright/test').Page) {
-  await page.goto('/')
-  await waitForApp(page)
-  await page.click('[title="New blank map"]')
-  await page.waitForSelector('.diagram-canvas-root', { timeout: 10_000 })
-  // Wait for layout to settle
-  await page.waitForTimeout(500)
-}
-
-// Helper: get bounding box of an L1 node by its visible text
-async function getNodeBox(page: import('@playwright/test').Page, textContent: string) {
-  return page.evaluate((text) => {
-    const svg = document.querySelector('.diagram-canvas-root svg')
-    if (!svg) return null
-    // Find the text element containing the given text
-    const texts = svg.querySelectorAll('text')
-    for (const t of texts) {
-      if (t.textContent?.includes(text)) {
-        // Walk up to the nearest <g> with a transform
-        let g = t.closest('g')
-        // Get the g's bounding rect in screen coordinates
-        if (g) {
-          const rect = g.getBoundingClientRect()
-          return { x: rect.x, y: rect.y, width: rect.width, height: rect.height }
-        }
-      }
-    }
-    return null
-  }, textContent)
-}
+import { waitForApp, createMap as createNewMap, getNodeBox } from './helpers'
 
 test.describe('Home Page', () => {
   test('loads without crashing', async ({ page }) => {

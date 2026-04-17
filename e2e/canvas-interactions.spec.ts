@@ -1,12 +1,5 @@
 import { test, expect } from './fixtures'
-
-async function createMap(page: import('@playwright/test').Page) {
-  await page.goto('/')
-  await page.waitForSelector('[title="New blank map"]', { timeout: 10_000 })
-  await page.click('[title="New blank map"]')
-  await page.waitForSelector('.diagram-canvas-root', { timeout: 10_000 })
-  await page.waitForTimeout(500)
-}
+import { createMap } from './helpers'
 
 function parseTransform(transform: string | null) {
   if (!transform) return { tx: 0, ty: 0, scale: 1 }

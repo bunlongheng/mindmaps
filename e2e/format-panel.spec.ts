@@ -1,11 +1,8 @@
 import { test, expect } from './fixtures'
+import { createMap } from './helpers'
 
 async function createMapAndOpenFormat(page: import('@playwright/test').Page) {
-  await page.goto('/')
-  await page.waitForSelector('[title="New blank map"]', { timeout: 10_000 })
-  await page.click('[title="New blank map"]')
-  await page.waitForSelector('.diagram-canvas-root', { timeout: 10_000 })
-  await page.waitForTimeout(500)
+  await createMap(page)
   // Open Format panel
   await page.click('[title="Format"]')
   await page.waitForTimeout(300)
@@ -168,22 +165,13 @@ test.describe('Format Panel — Node Editing', () => {
 
 test.describe('Export & Actions', () => {
   test('PDF export button exists', async ({ page }) => {
-    await page.goto('/')
-    await page.waitForSelector('[title="New blank map"]', { timeout: 10_000 })
-    await page.click('[title="New blank map"]')
-    await page.waitForSelector('.diagram-canvas-root', { timeout: 10_000 })
-    await page.waitForTimeout(500)
-    // PDF button should be in the bottom bar
+    await createMap(page)
     const pdfBtn = page.locator('text="PDF"')
     await expect(pdfBtn.first()).toBeVisible()
   })
 
   test('Delete button exists', async ({ page }) => {
-    await page.goto('/')
-    await page.waitForSelector('[title="New blank map"]', { timeout: 10_000 })
-    await page.click('[title="New blank map"]')
-    await page.waitForSelector('.diagram-canvas-root', { timeout: 10_000 })
-    await page.waitForTimeout(500)
+    await createMap(page)
     const deleteBtn = page.locator('text="Delete"')
     await expect(deleteBtn.first()).toBeVisible()
   })
