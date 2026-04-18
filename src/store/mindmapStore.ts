@@ -164,7 +164,6 @@ interface MindmapStore {
   autoAssignIcons: () => void
   pasteImportFn: ((name: string, nodes: MindmapNode[]) => void) | null
   setPasteImportFn: (fn: ((name: string, nodes: MindmapNode[]) => void) | null) => void
-  setNodePositions: (positions: { id: string; x: number; y: number }[]) => void
 }
 
 function pushHistory(state: MindmapStore): Pick<MindmapStore, 'past' | 'future'> {
@@ -539,16 +538,6 @@ export const useMindmapStore = create<MindmapStore>()(
     },
 
     setHideDetails: (v) => set({ hideDetails: v }),
-
-    setNodePositions: (positions) => {
-      const state = get()
-      if (!state.activeMindmap) return
-      const posMap = new Map(positions.map(p => [p.id, p]))
-      const nodes = state.activeMindmap.nodes.map(n =>
-        posMap.has(n.id) ? { ...n, x: posMap.get(n.id)!.x, y: posMap.get(n.id)!.y, manuallyPositioned: true } : n
-      )
-      set({ activeMindmap: { ...state.activeMindmap, nodes }, isDirty: true })
-    },
 
     setIsImporting: (v) => set({ isImporting: v }),
     setResizePreview: (v) => set({ resizePreview: v }),

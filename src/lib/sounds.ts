@@ -85,18 +85,6 @@ export function soundDelete() {
   } catch {}
 }
 
-/** Sparkle arp — favorite / star */
-export function soundFavorite() {
-  try {
-    const c = ac(); const now = c.currentTime
-    ;[523, 659, 784, 1047].forEach((freq, i) => {
-      const g = gain(c, 0.1)
-      g.gain.exponentialRampToValueAtTime(0.0001, now + i * 0.07 + 0.12)
-      osc(c, 'sine', freq, g, now + i * 0.07, now + i * 0.07 + 0.12)
-    })
-  } catch {}
-}
-
 /** Notification ding — incoming real-time event */
 export function soundIncoming() {
   try {
@@ -120,16 +108,6 @@ export function soundPaste() {
     o.frequency.setValueAtTime(800, now)
     o.frequency.exponentialRampToValueAtTime(300, now + 0.12)
     o.connect(g); o.start(now); o.stop(now + 0.15)
-  } catch {}
-}
-
-/** Snap — copy to clipboard */
-export function soundCopy() {
-  try {
-    const c = ac(); const now = c.currentTime
-    const g = gain(c, 0.1)
-    g.gain.exponentialRampToValueAtTime(0.0001, now + 0.07)
-    osc(c, 'square', 1200, g, now, now + 0.07)
   } catch {}
 }
 
