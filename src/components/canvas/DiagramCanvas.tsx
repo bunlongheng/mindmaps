@@ -167,10 +167,10 @@ export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
 
   const handleBgPointerDown = useCallback((e: React.PointerEvent) => {
     const onBg = e.target === e.currentTarget || (e.target as Element).tagName === 'svg'
-    e.preventDefault()
     activePointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
     // Second finger — switch to pinch regardless of target
     if (activePointers.current.size >= 2) {
+      e.preventDefault()
       ;(e.currentTarget as Element).setPointerCapture(e.pointerId)
       selStart.current = null
       isDragging.current = false
@@ -184,12 +184,15 @@ export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
     // Touch: only capture + pan on background taps (not node taps)
     if (e.pointerType !== 'mouse') {
       if (onBg) {
+        e.preventDefault()
         ;(e.currentTarget as Element).setPointerCapture(e.pointerId)
         touchPanRef.current = { x: e.clientX, y: e.clientY }
       }
+      // Node taps: don't preventDefault, don't capture — let node handle it
       return
     }
-    // Mouse: always capture for pan/select
+    // Mouse on background: capture for pan/select
+    e.preventDefault()
     ;(e.currentTarget as Element).setPointerCapture(e.pointerId)
     // Space+drag or middle-button = Figma-style hand-tool pan
     if (spaceHeld.current || e.button === 1) {
