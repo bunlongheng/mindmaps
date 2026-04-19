@@ -256,7 +256,7 @@ export function EdgeLayer({ nodes, lineStyle, diagramType }: EdgeLayerProps) {
           )
         })}
 
-        {/* L2: short horizontal stub from diagonal to node left edge */}
+        {/* L2: short horizontal stub from diagonal to node left edge (parallelogram-aware) */}
         {nodes.filter(n => n.depth === 2).map(l2 => {
           const l1 = nodeMap.get(l2.parentId!)
           if (!l1) return null
@@ -264,7 +264,6 @@ export function EdgeLayer({ nodes, lineStyle, diagramType }: EdgeLayerProps) {
           const l1CY = l1.y + l1.height / 2
           const attachX = l1CX - FISHBONE_SLANT
           const above = l1CY < spineY
-          // Use the near EDGE of L1 — exactly where the diagonal line terminates
           const l1EdgeY = above ? l1.y + l1.height : l1.y
           const boneEdgeH = Math.abs(l1EdgeY - spineY)
           const l2CY = l2.y + l2.height / 2
@@ -272,10 +271,11 @@ export function EdgeLayer({ nodes, lineStyle, diagramType }: EdgeLayerProps) {
             ? (spineY - l2CY) / boneEdgeH
             : (l2CY - spineY) / boneEdgeH
           const diagX = attachX + FISHBONE_SLANT * t
+          const nodeEdgeX = l2.x
           return (
             <line key={l2.id}
               x1={diagX} y1={l2CY}
-              x2={l2.x} y2={l2CY}
+              x2={nodeEdgeX} y2={l2CY}
               stroke={l2.color} strokeWidth={1.5} strokeLinecap="round" />
           )
         })}

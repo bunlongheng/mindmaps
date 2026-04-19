@@ -399,7 +399,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
               : `0,0 ${badgeW},0 ${badgeW + sk},${h} ${sk},${h}`
             return <polygon points={badgePts} fill="#ffffff" />
           })()}
-          <polygon points={pts} fill="none" stroke={strokeColor} strokeWidth={strokeW * 2} />
+          <polygon points={pts} fill="none" stroke={strokeColor} strokeWidth={strokeW} />
         </g>
         </>)
       })() : (
@@ -459,12 +459,15 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
           {hasEmoji && resolvedEmoji && !isMindmapL2Plus && (() => {
             const sq = node.height
             const emojiSize = Math.round(sq * 0.52)
-            const textX = sq + 10
+            // For fishbone: shift icon center to account for parallelogram skew
+            const skOff = isFishboneNode ? node.height * 0.35 / 2 : 0
+            const emojiCX = sq / 2 + skOff
+            const textX = sq + 14 + skOff
             const h = node.height
             return (
               <>
                 <text
-                  x={sq / 2} y={h / 2 + emojiSize * 0.36}
+                  x={emojiCX} y={h / 2 + emojiSize * 0.36}
                   textAnchor="middle" fontSize={emojiSize}
                   style={{ pointerEvents: 'none', userSelect: 'none' }}
                 >{resolvedEmoji}</text>
@@ -483,9 +486,11 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
           {hasIcon && resolvedIcon && !isMindmapL2Plus && (() => {
             const sq = node.height  // white square = full node height
             const iconSize = Math.round(sq * 0.48)
-            const iconX = (sq - iconSize) / 2
+            // For fishbone: center icon within the skewed badge area
+            const skOff = isFishboneNode ? node.height * 0.35 / 2 : 0
+            const iconX = (sq - iconSize) / 2 + skOff
             const iconY = (sq - iconSize) / 2
-            const textX = sq + 10
+            const textX = sq + 14 + skOff
             return (
               <>
                 <NodeIcon icon={resolvedIcon} x={iconX} y={iconY} size={iconSize} color={node.color} strokeWidth={node.depth === 1 ? 2.5 : 1.8} />
