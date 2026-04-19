@@ -270,7 +270,7 @@ export function SidePanel({ nodeId, onClose, onDelete }: SidePanelProps) {
 
       {/* ── Style tab ── */}
       {tab === 'style' && (
-        <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
+        <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', minHeight: 0}}>
           {!node ? (
             <div style={{ padding: 24, textAlign: 'center', color: '#9ca3af', fontSize: 12, marginTop: 40 }}>
               Select a node to style it
@@ -484,7 +484,7 @@ export function SidePanel({ nodeId, onClose, onDelete }: SidePanelProps) {
 
       {/* ── Map tab ── */}
       {tab === 'map' && (
-        <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
+        <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', minHeight: 0}}>
           <SBlock title="Type">
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
               {DIAGRAM_TYPES.map(({ value, label }) => {
@@ -627,7 +627,7 @@ export function SidePanel({ nodeId, onClose, onDelete }: SidePanelProps) {
 
       {/* ── Share tab ── */}
       {tab === 'share' && (
-        <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
+        <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', minHeight: 0}}>
           <SBlock title="Public Link">
             {/* Toggle row */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -856,21 +856,6 @@ function VisualPickerBlock({ icon, emoji, onSave }: {
         {tabBtn('emoji', '😊 Emoji')}
         {tabBtn('text', 'Aa Text')}
       </div>
-
-      {/* Current value preview */}
-      {hasAny && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-          <div style={{ fontSize: 22, lineHeight: 1, minWidth: 28, textAlign: 'center' }}>
-            {icon
-              ? (() => { const found = NODE_ICONS.find(n => n.name === icon); return found ? <found.Icon style={{ width: 22, height: 22, color: '#3b82f6' }} /> : null })()
-              : emoji}
-          </div>
-          <button onClick={() => onSave({ icon: undefined, emoji: undefined })} style={{
-            fontSize: 10, color: '#9ca3af', background: 'none', border: '1px dashed #e0e2e7',
-            borderRadius: 5, padding: '3px 8px', cursor: 'pointer', fontFamily: 'inherit',
-          }}>Clear</button>
-        </div>
-      )}
 
       {/* Icon tab */}
       {tab === 'icon' && (

@@ -303,6 +303,11 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
       onDoubleClick={handleDoubleClick}
       style={{ cursor: editing ? 'default' : canDrag ? 'grab' : 'pointer', userSelect: 'none' }}
     >
+      {/* Fireflies around L1 nodes */}
+      {node.depth === 1 && (
+        <Fireflies cx={displayW / 2} cy={node.height / 2} r={Math.max(displayW, node.height) * 0.6} color={node.color} />
+      )}
+
       {isRoot ? (
         <>
           {/* Siri-style animated wave glow — use half-height as radius for pills */}
@@ -690,6 +695,70 @@ function randDrift(r: number) {
   return { dx: (Math.random() - 0.5) * r * 1.2, dy: (Math.random() - 0.5) * r * 1.2 }
 }
 
+/** Generate shades of a color — lighter and slightly shifted hue */
+function colorShades(hex: string, count: number): string[] {
+  const [r, g, b] = hexToRgb(hex)
+  return Array.from({ length: count }, (_, i) => {
+    const t = i / count
+    // Mix toward white for lighter shades, toward saturated for darker
+    const mix = 0.3 + t * 0.5
+    const nr = Math.round(r + (255 - r) * mix * (0.5 + Math.random() * 0.5))
+    const ng = Math.round(g + (255 - g) * mix * (0.5 + Math.random() * 0.5))
+    const nb = Math.round(b + (255 - b) * mix * (0.5 + Math.random() * 0.5))
+    return `rgb(${nr},${ng},${nb})`
+  })
+}
+
+function Fireflies({ cx, cy, r, color }: { cx: number; cy: number; r: number; color: string }) {
+  const [flies] = useState(() => {
+    const shades = colorShades(color, 10)
+    return Array.from({ length: 10 }, (_, i) => {
+      const angle = Math.random() * Math.PI * 2
+      const dist = r * (0.8 + Math.random() * 1.2)
+      return {
+        x: cx + Math.cos(angle) * dist,
+        y: cy + Math.sin(angle) * dist,
+        size: 1.2 + Math.random() * 1.8,
+        color: shades[i],
+        key: i,
+        d1: { dx: (Math.random() - 0.5) * r * 1.5, dy: (Math.random() - 0.5) * r * 1.5 },
+        d2: { dx: (Math.random() - 0.5) * r * 1.5, dy: (Math.random() - 0.5) * r * 1.5 },
+        dur: 5 + Math.random() * 8,
+        blinkDur: 1.2 + Math.random() * 2,
+        blinkBegin: Math.random() * 3,
+      }
+    })
+  })
+  return (
+    <g style={{ pointerEvents: 'none' }}>
+      {flies.map(f => (
+        <g key={f.key}>
+          {/* Glow */}
+          <circle cx={f.x} cy={f.y} r={f.size * 3.5} fill={f.color}>
+            <animate attributeName="opacity" values="0.04;0.25;0.04"
+              dur={`${f.blinkDur}s`} repeatCount="indefinite" begin={`${f.blinkBegin}s`} />
+            <animateTransform attributeName="transform" type="translate"
+              values={`0 0; ${f.d1.dx} ${f.d1.dy}; ${f.d2.dx} ${f.d2.dy}; 0 0`}
+              dur={`${f.dur}s`} repeatCount="indefinite"
+              calcMode="spline" keyTimes="0;0.33;0.67;1"
+              keySplines="0.45 0 0.55 1;0.45 0 0.55 1;0.45 0 0.55 1" />
+          </circle>
+          {/* Core */}
+          <circle cx={f.x} cy={f.y} r={f.size} fill={f.color}>
+            <animate attributeName="opacity" values="0.3;0.9;0.3"
+              dur={`${f.blinkDur}s`} repeatCount="indefinite" begin={`${f.blinkBegin}s`} />
+            <animateTransform attributeName="transform" type="translate"
+              values={`0 0; ${f.d1.dx} ${f.d1.dy}; ${f.d2.dx} ${f.d2.dy}; 0 0`}
+              dur={`${f.dur}s`} repeatCount="indefinite"
+              calcMode="spline" keyTimes="0;0.33;0.67;1"
+              keySplines="0.45 0 0.55 1;0.45 0 0.55 1;0.45 0 0.55 1" />
+          </circle>
+        </g>
+      ))}
+    </g>
+  )
+}
+
 function RoamingStars({ cx, cy, r, colors }: { cx: number; cy: number; r: number; colors: string[] }) {
   const palette = colors.length > 0 ? colors : FALLBACK_COLORS
   const [stars] = useState(() =>
@@ -761,8 +830,7 @@ function SiriWave({ cx, cy, r, colors }: { cx: number; cy: number; r: number; co
         ))}
       </g>
 
-      {/* Roaming star dots using L1 colors */}
-      <RoamingStars cx={cx} cy={cy} r={r} colors={colors} />
+      {/* Fireflies moved to L1 nodes — no longer on root */}
     </g>
   )
 }
