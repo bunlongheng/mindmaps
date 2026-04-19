@@ -155,15 +155,14 @@ export function useDiagram(userId: string | null = null) {
     }
 
     const diagram = rowToDiagram(data)
-    // If local cache has a newer type/lineStyle (e.g. RLS blocked the Supabase save),
-    // preserve the local values so user changes aren't lost
+    // If local cache is newer (e.g. saved locally but Supabase write was blocked),
+    // keep the entire local version — don't overwrite with stale remote data
     if (cached) {
-      const localNewer = new Date(cached.updatedAt ?? 0) >= new Date(diagram.updatedAt ?? 0)
-      if (localNewer && cached.type !== diagram.type) {
-        diagram.type = cached.type
-      }
-      if (localNewer && cached.lineStyle !== diagram.lineStyle) {
-        diagram.lineStyle = cached.lineStyle
+      const localTime = new Date(cached.updatedAt ?? 0).getTime()
+      const remoteTime = new Date(diagram.updatedAt ?? 0).getTime()
+      if (localTime > remoteTime) {
+        // Local is newer — don't overwrite, just keep what we already loaded from cache
+        return
       }
     }
     setActiveMindmap(diagram)
