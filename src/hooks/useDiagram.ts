@@ -13,8 +13,7 @@ const lsKey = (id: string) => `mindmaps:diagram:${id}`
 
 function lsGetList(): DiagramMeta[] {
   try {
-    const list = JSON.parse(localStorage.getItem(LS_LIST) ?? '[]')
-    return list.map((m: DiagramMeta) => m.type === 'mindmap' ? { ...m, type: 'logic-chart' } : m)
+    return JSON.parse(localStorage.getItem(LS_LIST) ?? '[]')
   } catch { return [] }
 }
 function lsSaveList(list: DiagramMeta[]) {

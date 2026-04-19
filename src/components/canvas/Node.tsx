@@ -92,11 +92,11 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
     strokeColor = node.color
     strokeW = 2
   } else if (isMindmapCircle) {
-    // L1 mindmap: solid color fill, matching the reference palette
+    // L1 mindmap: solid color fill with darker border, same as logic chart
     bg = node.color
     textColor = isLight(node.color) ? '#1a1d2e' : '#ffffff'
-    strokeColor = node.color
-    strokeW = 0
+    strokeColor = node.color.startsWith('#') ? darkenColor(node.color, 0.25) : node.color
+    strokeW = 2
   } else {
     // L1 all other diagrams: solid color fill, darker border so white badge is framed
     bg = node.color
