@@ -477,22 +477,24 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
               const hasVisual = hasIcon || hasEmoji
               const iconSize = fontSize * 1.4
               const iconGap = 4
-              // Total content height: icon + gap + text block
               const textBlockH = lines.length * lineH
               const totalH = hasVisual ? iconSize + iconGap + textBlockH : textBlockH
-              const contentStartY = node.height / 2 - totalH / 2
-              const textStartY = hasVisual ? contentStartY + iconSize + iconGap : contentStartY
+              const groupCY = node.height / 2
+              // Icon sits above text, both centered as a group
+              const iconY = groupCY - totalH / 2
+              const firstLineY = hasVisual
+                ? iconY + iconSize + iconGap + fontSize * 0.38
+                : groupCY - textBlockH / 2 + fontSize * 0.38
               return (
                 <g style={{ pointerEvents: 'none' }}>
-                  {/* Centered icon/emoji above text */}
                   {hasEmoji && resolvedEmoji && (
-                    <text x={displayW / 2} y={contentStartY + iconSize * 0.75}
+                    <text x={displayW / 2} y={iconY + iconSize * 0.8}
                       textAnchor="middle" fontSize={iconSize}
                       style={{ pointerEvents: 'none' }}>{resolvedEmoji}</text>
                   )}
                   {hasIcon && resolvedIcon && !hasEmoji && (
                     <NodeIcon icon={resolvedIcon}
-                      x={displayW / 2 - iconSize / 2} y={contentStartY}
+                      x={displayW / 2 - iconSize / 2} y={iconY}
                       size={iconSize} color={textColor} strokeWidth={1.8} />
                   )}
                   <text
@@ -504,7 +506,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
                     style={{ pointerEvents: 'none' }}
                   >
                     {lines.map((line, i) => (
-                      <tspan key={i} x={displayW / 2} dy={i === 0 ? textStartY + fontSize * 0.38 : lineH}>
+                      <tspan key={i} x={displayW / 2} y={i === 0 ? firstLineY : undefined} dy={i === 0 ? undefined : lineH}>
                         {line}
                       </tspan>
                     ))}
