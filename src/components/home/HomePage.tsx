@@ -861,11 +861,11 @@ function DiagramMinimap({ id, type }: { id: string; type: string }) {
   // ── Mindmap (radial) ─────────────────────────────────────────────
   if (type === 'mindmap') {
     const cx = W / 2, cy = H / 2
-    const armLen = 38, barW = 30, barH = 7
     const visible = thumbL1s
     const vn = visible.length
     const angleStep = (2 * Math.PI) / Math.max(vn, 1)
     const startAngle = -Math.PI / 2
+    const armLen = 42, dotR = 6
 
     return (
       <svg viewBox={VB} style={{ width: '100%', height: '100%' }} overflow="hidden">
@@ -877,11 +877,7 @@ function DiagramMinimap({ id, type }: { id: string; type: string }) {
           return (
             <g key={l1.id}>
               <line x1={cx} y1={cy} x2={x2} y2={y2} stroke={l1.color} strokeWidth={1.8} strokeLinecap="round" />
-              <rect
-                x={x2 - barW / 2} y={y2 - barH / 2}
-                width={barW} height={barH} rx={barH / 2}
-                fill={l1.color}
-              />
+              <circle cx={x2} cy={y2} r={dotR} fill={l1.color} />
             </g>
           )
         })}
