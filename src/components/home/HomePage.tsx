@@ -691,6 +691,32 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
                 </div>
               )}
 
+              {/* Custom tag input */}
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: TEXT_MUTED, marginBottom: 8 }}>New tag</div>
+                <form onSubmit={e => {
+                  e.preventDefault()
+                  const input = (e.currentTarget.elements.namedItem('newTag') as HTMLInputElement)
+                  const val = input.value.trim()
+                  if (val) { addTag(val); setTagModalId(null) }
+                }} style={{ display: 'flex', gap: 6 }}>
+                  <input name="newTag" placeholder="Type a new tag…" autoFocus
+                    style={{
+                      flex: 1, fontSize: 13, padding: '7px 12px', borderRadius: 10,
+                      border: `1.5px solid ${BORDER}`, outline: 'none', fontFamily: 'inherit',
+                      color: TEXT_PRIMARY, background: '#f8fafc',
+                    }}
+                    onFocus={e => e.currentTarget.style.borderColor = '#6366f1'}
+                    onBlur={e => e.currentTarget.style.borderColor = BORDER}
+                  />
+                  <button type="submit" style={{
+                    padding: '7px 14px', borderRadius: 10, border: 'none',
+                    background: '#6366f1', color: '#fff', fontSize: 12, fontWeight: 600,
+                    cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap',
+                  }}>Add</button>
+                </form>
+              </div>
+
             </div>
           </div>
         )
