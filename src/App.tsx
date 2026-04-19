@@ -253,6 +253,18 @@ export default function App() {
     function onKeyDown(e: KeyboardEvent) {
       const tag = (e.target as HTMLElement).tagName.toLowerCase()
       if (tag === 'input' || tag === 'textarea') return
+      // Cmd+S / Ctrl+S — manual save
+      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+        e.preventDefault()
+        const { activeMindmap: m } = useMindmapStore.getState()
+        if (m && view === 'editor') {
+          if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+          saveDiagram(m).then(() => {
+            showToast(`"${m.name}" saved`, { color: '#1a1d2e' })
+          })
+        }
+        return
+      }
       if (e.key === 'Tab' && view === 'editor') {
         e.preventDefault()
         const parentId = selectedNodeIds[0] ?? activeMindmap?.nodes.find(n => n.parentId === null)?.id ?? null
@@ -265,7 +277,7 @@ export default function App() {
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [selectedNodeIds, activeMindmap, addNode, view])
+  }, [selectedNodeIds, activeMindmap, addNode, view, saveDiagram])
 
   // Track the last active tag so we can restore it on back navigation
   const lastTagRef = useRef<string | null>(new URLSearchParams(window.location.search).get('tag'))
