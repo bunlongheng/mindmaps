@@ -281,15 +281,16 @@ export default function App() {
     if (name) setTimeout(() => showToast(name, { color: '#1a1d2e', confetti: false }), 150)
   }, [loadDiagram])
 
-  const handleBack = useCallback(() => {
+  const handleBack = useCallback(async () => {
     // Save immediately before leaving — don't rely on the 1.5s auto-save timer
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
     const { activeMindmap: current, isDirty: dirty } = useMindmapStore.getState()
-    if (dirty && current) saveDiagram(current)
+    if (dirty && current) await saveDiagram(current)
     setShowPanel(false); setSelectedPanelNodeId(null); setSelectedNodeIds([])
-    loadDiagramList()
+    await loadDiagramList()
     setView('home')
-    const tag = lastTagRef.current
+    // Restore the tag filter the user was viewing before opening this diagram
+    const tag = current?.tags?.[0] ?? lastTagRef.current
     window.history.pushState({}, '', tag ? `?tag=${tag}` : window.location.pathname)
   }, [setSelectedNodeIds, loadDiagramList, saveDiagram])
 
