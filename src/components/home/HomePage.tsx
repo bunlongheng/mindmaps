@@ -784,9 +784,13 @@ function DiagramMinimap({ id, type }: { id: string; type: string }) {
   const W = 200, H = 110
   const VB = `${-P} ${-P} ${W + P * 2} ${H + P * 2}`  // expanded viewBox
 
+  // Fixed 6 vibrant colors for thumbnail L1 nodes — quick visual identification
+  const THUMB_COLORS = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#8b5cf6']
+  const thumbL1s = l1s.slice(0, 6).map((l1, i) => ({ ...l1, color: THUMB_COLORS[i % THUMB_COLORS.length] }))
+
   // ── Logic Chart ──────────────────────────────────────────────────
   if (type === 'logic-chart' || !type) {
-    const n = l1s.length
+    const n = thumbL1s.length
     const rowH = (H - 14) / n
     const l1H = Math.max(7, Math.min(18, Math.round(rowH * 0.65)))
     const totalH = n * l1H + (n - 1) * (rowH - l1H)
@@ -802,7 +806,7 @@ function DiagramMinimap({ id, type }: { id: string; type: string }) {
           {rootShape(22, rootCY)}
           {lineStyle === 'straight' ? (
             /* Straight: diagonal lines from root to each L1 */
-            l1s.map((l1, i) => {
+            thumbL1s.map((l1, i) => {
               const cy = startY + i * rowH + l1H / 2
               return (
                 <g key={l1.id}>
@@ -815,7 +819,7 @@ function DiagramMinimap({ id, type }: { id: string; type: string }) {
             /* Brace/curved: curly bracket from root to each L1 */
             <>
               <line x1={rootRight} y1={rootCY} x2={rootRight + 6} y2={rootCY} stroke={rootFill} strokeWidth={2.5} strokeLinecap="round" />
-              {l1s.map((l1, i) => {
+              {thumbL1s.map((l1, i) => {
                 const cy = startY + i * rowH + l1H / 2
                 const midX = rootRight + 8
                 const curveR = Math.min(8, Math.abs(cy - rootCY) / 2)
@@ -837,8 +841,8 @@ function DiagramMinimap({ id, type }: { id: string; type: string }) {
             /* Orthogonal (default): vertical bar + horizontal stubs */
             <>
               <line x1={rootRight} y1={rootCY} x2={barX} y2={rootCY} stroke={rootFill} strokeWidth={2.5} strokeLinecap="round" />
-              {n > 1 && <line x1={barX} y1={startY + l1H / 2} x2={barX} y2={startY + totalH - l1H / 2} stroke={l1s[Math.floor(n / 2)].color} strokeWidth={2.5} />}
-              {l1s.map((l1, i) => {
+              {n > 1 && <line x1={barX} y1={startY + l1H / 2} x2={barX} y2={startY + totalH - l1H / 2} stroke={thumbL1s[Math.floor(n / 2)].color} strokeWidth={2.5} />}
+              {thumbL1s.map((l1, i) => {
                 const cy = startY + i * rowH + l1H / 2
                 return (
                   <g key={l1.id}>
@@ -858,7 +862,7 @@ function DiagramMinimap({ id, type }: { id: string; type: string }) {
   if (type === 'mindmap') {
     const cx = W / 2, cy = H / 2
     const armLen = 38, barW = 30, barH = 7
-    const visible = l1s.slice(0, 6)
+    const visible = thumbL1s
     const vn = visible.length
     const angleStep = (2 * Math.PI) / Math.max(vn, 1)
     const startAngle = -Math.PI / 2
@@ -899,7 +903,7 @@ function DiagramMinimap({ id, type }: { id: string; type: string }) {
         {rootShape(17, spineY)}
         {/* Spine from root rightward */}
         <line x1={rootEndX} y1={spineY} x2={W - 14} y2={spineY} stroke={spineFill} strokeWidth={2.5} strokeLinecap="round" />
-        {l1s.map((l1, i) => {
+        {thumbL1s.map((l1, i) => {
           const above = i % 2 === 0
           const x = rootEndX + 26 + Math.floor(i / 2) * 38
           if (x > W - 24) return null
@@ -917,7 +921,7 @@ function DiagramMinimap({ id, type }: { id: string; type: string }) {
 
   // ── Timeline ─────────────────────────────────────────────────────
   if (type === 'timeline') {
-    const spineY = H / 2, n = l1s.length
+    const spineY = H / 2, n = thumbL1s.length
     const rootEndX = 8 + THUMB_ROOT_R * 2 + 4
     const step = (W - rootEndX - 14) / Math.max(n, 1)
 
@@ -926,7 +930,7 @@ function DiagramMinimap({ id, type }: { id: string; type: string }) {
         <rect x={-P} y={-P} width={W + P * 2} height={H + P * 2} fill={canvasBg} />
         {rootShape(8 + THUMB_ROOT_R, spineY)}
         <line x1={rootEndX} y1={spineY} x2={W - 14} y2={spineY} stroke={spineFill} strokeWidth={2} strokeLinecap="round" />
-        {l1s.map((l1, i) => {
+        {thumbL1s.map((l1, i) => {
           const x = rootEndX + i * step + step / 2
           const above = i % 2 === 0
           const boxY = above ? spineY - 34 : spineY + 12
@@ -944,12 +948,12 @@ function DiagramMinimap({ id, type }: { id: string; type: string }) {
 
   // ── Tree vertical ────────────────────────────────────────────────
   if (type === 'tree-vertical') {
-    const n = l1s.length, step = (W - 20) / Math.max(n, 1)
+    const n = thumbL1s.length, step = (W - 20) / Math.max(n, 1)
     return (
       <svg viewBox={VB} style={{ width: '100%', height: '100%' }} overflow="hidden">
         <rect x={-P} y={-P} width={W + P * 2} height={H + P * 2} fill={canvasBg} />
         {rootShape(W / 2, 16)}
-        {l1s.map((l1, i) => {
+        {thumbL1s.map((l1, i) => {
           const x = 10 + i * step + step / 2
           return (
             <g key={l1.id}>
@@ -963,12 +967,12 @@ function DiagramMinimap({ id, type }: { id: string; type: string }) {
   }
 
   // ── Tree horizontal (default fallback) ───────────────────────────
-  const n2 = l1s.length, step2 = (H - 16) / Math.max(n2, 1)
+  const n2 = thumbL1s.length, step2 = (H - 16) / Math.max(n2, 1)
   return (
     <svg viewBox={VB} style={{ width: '100%', height: '100%' }} overflow="hidden">
       <rect x={-P} y={-P} width={W + P * 2} height={H + P * 2} fill={canvasBg} />
       {rootShape(24, H / 2)}
-      {l1s.map((l1, i) => {
+      {thumbL1s.map((l1, i) => {
         const y = 8 + i * step2 + step2 / 2
         return (
           <g key={l1.id}>
