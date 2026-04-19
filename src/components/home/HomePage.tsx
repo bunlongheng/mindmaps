@@ -288,7 +288,7 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
           {newMapBusy ? <Loader2 size={14} style={{ animation: 'spin 0.7s linear infinite' }} /> : <Plus size={14} strokeWidth={2.5} />} New
         </button>
 
-        {(user || isLocal || displayName) && (
+        {(user || avatarUrl || displayName) && (
           <div ref={menuRef} style={{ position: 'relative' }}>
             <button
               onClick={() => setShowUserMenu(p => !p)}
@@ -301,15 +301,16 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
               }}
               title={displayName}
             >
-              <span style={{ fontSize: 13, fontWeight: 700, color: '#6366f1', userSelect: 'none', lineHeight: 1 }}>
-                {displayName[0]?.toUpperCase() ?? '?'}
-              </span>
-              {avatarUrl && (
+              {avatarUrl ? (
                 <img src={avatarUrl} alt=""
                   referrerPolicy="no-referrer"
                   style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
                   onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
                 />
+              ) : (
+                <span style={{ fontSize: 13, fontWeight: 700, color: '#6366f1', userSelect: 'none', lineHeight: 1 }}>
+                  {displayName[0]?.toUpperCase() || ''}
+                </span>
               )}
             </button>
 
