@@ -771,7 +771,7 @@ function ColorField({ color, onChange, allowNone, swatches }: {
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 5 }}>
-      {(swatches ?? []).slice(0, 12).map(c => (
+      {(swatches ?? []).slice(0, 11).map(c => (
         <button key={c} onClick={() => onChange(c)} style={{
           width: '100%', aspectRatio: '1', borderRadius: 5, border: 'none',
           background: c, cursor: 'pointer', padding: 0,
