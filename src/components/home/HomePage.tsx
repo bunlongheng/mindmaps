@@ -316,8 +316,8 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
               onClick={() => setShowUserMenu(p => !p)}
               style={{
                 width: 34, height: 34, borderRadius: '50%', overflow: 'hidden',
-                border: showUserMenu ? '2px solid #6366f1' : `1px solid ${BORDER}`,
-                cursor: 'pointer', padding: 0, background: '#e0e7ff',
+                border: showUserMenu ? '2px solid #1c1e21' : `1px solid #e4e6e8`,
+                cursor: 'pointer', padding: 0, background: '#e4e6e8',
                 transition: 'border-color 0.15s', flexShrink: 0,
                 position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}
@@ -330,7 +330,7 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
                   onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
                 />
               ) : (
-                <span style={{ fontSize: 13, fontWeight: 700, color: '#6366f1', userSelect: 'none', lineHeight: 1 }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: '#1c1e21', userSelect: 'none', lineHeight: 1 }}>
                   {displayName[0]?.toUpperCase() || ''}
                 </span>
               )}
@@ -338,7 +338,7 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
 
             {showUserMenu && (
               <div style={{
-                position: 'absolute', top: 42, right: 0, width: 200,
+                position: 'absolute', top: 42, right: 0, width: 210,
                 background: '#fff', borderRadius: 12,
                 boxShadow: '0 8px 32px rgba(0,0,0,0.12), 0 0 0 1px #e2e8f0',
                 overflow: 'hidden', zIndex: 50,
