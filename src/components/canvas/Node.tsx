@@ -277,7 +277,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   const editW = isRoot ? r * 1.5 : hasBadge ? displayW - node.height - 4 : displayW - editX - 2
 
   return (
-    <g style={{
+    <g data-node-id={node.id} style={{
       transform: mindmapAngle !== null
         ? `translate(${node.x + node.width / 2}px, ${node.y + node.height / 2}px) rotate(${mindmapAngle}deg) translate(${-node.width / 2}px, ${-node.height / 2}px)`
         : `translate(${node.x}px, ${node.y}px)`,

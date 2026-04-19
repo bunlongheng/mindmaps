@@ -142,20 +142,34 @@ export function SidePanel({ nodeId, onClose, onDelete }: SidePanelProps) {
   const runAIIcons = useCallback(async () => {
     if (!activeMindmap || iconLoading) return
     const nodes = activeMindmap.nodes.filter(n => n.depth > 0)
-    if (nodes.length === 0) return
+    // Only assign icons to nodes that don't already have one
+    const nodesWithoutIcons = nodes.filter(n => !n.icon && !n.emoji)
+    if (nodesWithoutIcons.length === 0) {
+      showToast('All nodes already have icons', { color: '#64748b', duration: 2000 })
+      return
+    }
     setIconLoading(true)
 
     const FALLBACK_POOL = ['star','sparkles','zap','rocket','brain','lightbulb','heart','globe','folder','code','flame','trophy','target','compass','map','layers','cpu','shield','cloud','smile']
     function forcedIcon(title: string): string {
-      // pick from fallback pool based on title hash so it's consistent
       const h = (title ?? '').split('').reduce((a, c) => a + c.charCodeAt(0), 0)
       return FALLBACK_POOL[h % FALLBACK_POOL.length]
     }
 
+    // Blink nodes that are waiting for icons
+    const blinkIds = new Set(nodesWithoutIcons.map(n => n.id))
+    const blinkStyle = document.createElement('style')
+    blinkStyle.textContent = `@keyframes icon-blink { 0%,100% { opacity: 1 } 50% { opacity: 0.3 } }`
+    document.head.appendChild(blinkStyle)
+    blinkIds.forEach(id => {
+      const el = document.querySelector(`[data-node-id="${id}"]`) as HTMLElement | null
+      if (el) el.style.animation = 'icon-blink 0.8s ease-in-out infinite'
+    })
+
     showToast('✦ Assigning icons…', { color: '#1a1d2e', duration: 120000 })
     let tokenCount = 0
     try {
-      const nodeList = nodes.map(n => ({ id: n.id, title: n.title, depth: n.depth }))
+      const nodeList = nodesWithoutIcons.map(n => ({ id: n.id, title: n.title, depth: n.depth }))
       const prompt = `You are an icon assignment expert. For each mindmap node, pick the single best icon name.\n\nYou may use ANY icon from Lucide (lucide.dev) or Heroicons (heroicons.com) — use kebab-case names like: academic-cap, adjustments-horizontal, arrow-trending-up, banknotes, beaker, bolt, book-open, briefcase, building-office, calendar-days, chart-bar, chat-bubble-left, check-circle, chip, clock, cloud, code-bracket, cog, command-line, cpu-chip, credit-card, cube, currency-dollar, device-phone-mobile, document, eye, fire, flag, folder, gift, globe-alt, heart, home, key, light-bulb, link, lock-closed, magnifying-glass, map, map-pin, microphone, moon, musical-note, paint-brush, paper-airplane, photo, puzzle-piece, rocket-launch, server, shield-check, shopping-cart, signal, sparkles, star, sun, tag, trophy, user, video-camera, wifi, wrench, or any other valid lucide/heroicons icon name.\n\nRules:\n- You MUST assign an icon to EVERY node in the list. No exceptions.\n- Pick the most contextually relevant icon.\n- Respond ONLY with a valid JSON array, no explanation: [{\"id\":\"...\",\"icon\":\"...\"}, ...]\n\nNodes:\n${JSON.stringify(nodeList)}`
       const res = await fetch('https://mindmaps-bheng.vercel.app/api/ai/generate-mindmap', {
         method: 'POST',
@@ -180,17 +194,23 @@ export function SidePanel({ nodeId, onClose, onDelete }: SidePanelProps) {
         await new Promise(r => setTimeout(r, 60))
       }
       // Any node AI missed → force an icon with stagger too
-      const missed = nodes.filter(n => !assigned.has(n.id))
+      const missed = nodesWithoutIcons.filter(n => !assigned.has(n.id))
       for (const n of missed) {
         updateNode(n.id, { icon: forcedIcon(n.title) })
         await new Promise(r => setTimeout(r, 60))
       }
       useMindmapStore.getState().setIsDirty(true)
     } catch {
-      // Fallback: force icons on ALL nodes immediately
-      nodes.forEach(n => updateNode(n.id, { icon: forcedIcon(n.title) }))
+      // Fallback: force icons on nodes without icons
+      nodesWithoutIcons.forEach(n => updateNode(n.id, { icon: forcedIcon(n.title) }))
       useMindmapStore.getState().setIsDirty(true)
     } finally {
+      // Stop blinking
+      blinkIds.forEach(id => {
+        const el = document.querySelector(`[data-node-id="${id}"]`) as HTMLElement | null
+        if (el) el.style.animation = ''
+      })
+      blinkStyle.remove()
       dismissToast()
       soundChaChing()
       const tokLabel = tokenCount >= 1000 ? `${(tokenCount / 1000).toFixed(1)}k` : `${tokenCount}`
