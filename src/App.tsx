@@ -222,6 +222,16 @@ export default function App() {
     return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current) }
   }, [isDirty, activeMindmap])
 
+  // Save on tab close / refresh so no work is lost
+  useEffect(() => {
+    function onBeforeUnload() {
+      const { activeMindmap: m, isDirty: d } = useMindmapStore.getState()
+      if (d && m) saveDiagram(m)
+    }
+    window.addEventListener('beforeunload', onBeforeUnload)
+    return () => window.removeEventListener('beforeunload', onBeforeUnload)
+  }, [saveDiagram])
+
   // Sync view with URL on browser back/forward
   useEffect(() => {
     function onPopState() {
@@ -272,12 +282,16 @@ export default function App() {
   }, [loadDiagram])
 
   const handleBack = useCallback(() => {
+    // Save immediately before leaving — don't rely on the 1.5s auto-save timer
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+    const { activeMindmap: current, isDirty: dirty } = useMindmapStore.getState()
+    if (dirty && current) saveDiagram(current)
     setShowPanel(false); setSelectedPanelNodeId(null); setSelectedNodeIds([])
     loadDiagramList()
     setView('home')
     const tag = lastTagRef.current
     window.history.pushState({}, '', tag ? `?tag=${tag}` : window.location.pathname)
-  }, [setSelectedNodeIds, loadDiagramList])
+  }, [setSelectedNodeIds, loadDiagramList, saveDiagram])
 
   const handleNodeSelect = useCallback((nodeId: string | null) => {
     if (nodeId) setSelectedPanelNodeId(nodeId)
