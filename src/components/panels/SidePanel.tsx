@@ -888,7 +888,7 @@ function VisualPickerBlock({ icon, emoji, onSave }: {
             onFocus={e => (e.target.style.borderColor = '#3b82f6')}
             onBlur={e => (e.target.style.borderColor = '#e0e2e7')}
           />
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4, maxHeight: 180, overflowY: 'auto' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4, maxHeight: 180, overflowY: 'auto', padding: 2 }}>
             {filtered.map(({ name, label, Icon: Ic }) => {
               const active = icon === name
               return (
