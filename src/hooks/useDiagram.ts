@@ -25,11 +25,13 @@ function lsGetDiagram(id: string): Diagram | null {
   } catch { return null }
 }
 function lsSaveDiagram(d: Diagram) {
-  localStorage.setItem(lsKey(d.id), JSON.stringify(d))
+  const now = new Date().toISOString()
+  const saved = { ...d, updatedAt: now }
+  localStorage.setItem(lsKey(d.id), JSON.stringify(saved))
   const list = lsGetList()
   const idx = list.findIndex(m => m.id === d.id)
   const existingMeta = list.find(m => m.id === d.id)
-  const meta: DiagramMeta = { id: d.id, name: d.name, type: d.type, updatedAt: new Date().toISOString(), tags: d.tags ?? existingMeta?.tags ?? [] }
+  const meta: DiagramMeta = { id: d.id, name: d.name, type: d.type, updatedAt: now, tags: d.tags ?? existingMeta?.tags ?? [] }
   if (idx >= 0) list[idx] = meta; else list.unshift(meta)
   lsSaveList(list)
 }
@@ -97,10 +99,20 @@ export function useDiagram(userId: string | null = null) {
     // Cache diagrams locally so minimap thumbnails are available instantly
     if (data && data.length > 0) {
       const remoteIds = new Set(data.map((d: { id: string }) => d.id))
-      // Remove any local entries that no longer exist in Supabase (deleted on another machine)
-      lsSaveList(lsGetList().filter(m => remoteIds.has(m.id)))
+      const localList = lsGetList()
+      // Keep local entries that exist remotely, plus any local-only ones not yet in Supabase
+      const localOnlyIds = new Set(localList.filter(m => !remoteIds.has(m.id)).map(m => m.id))
+      lsSaveList([...localList.filter(m => localOnlyIds.has(m.id) || remoteIds.has(m.id))])
       for (const row of data) {
-        if (row.nodes) lsSaveDiagram(rowToDiagram(row as Record<string, unknown>))
+        if (!row.nodes) continue
+        const localCached = lsGetDiagram(row.id)
+        // Don't overwrite local cache if it's newer (e.g. just saved locally before Supabase propagated)
+        if (localCached) {
+          const localTime = new Date(localCached.updatedAt ?? 0).getTime()
+          const remoteTime = new Date((row as Record<string, unknown>).updated_at as string ?? 0).getTime()
+          if (localTime > remoteTime) continue
+        }
+        lsSaveDiagram(rowToDiagram(row as Record<string, unknown>))
       }
     }
 
