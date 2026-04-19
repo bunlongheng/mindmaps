@@ -1,14 +1,22 @@
 import type { MindmapNode } from '../../types'
 
-const H_GAP = 70   // vertical gap between parent row and child row
-const V_GAP = 20   // horizontal gap between sibling subtrees
+const H_GAP = 60   // vertical gap between parent row and child row
+const V_GAP = 16   // horizontal gap between sibling subtrees
 
-// Compact fixed sizes for tree mode — independent of mindmap widths
-const TREE_W: Record<number, number> = { 0: 180, 1: 160, 2: 145, 3: 130 }
-const TREE_H: Record<number, number> = { 0: 180, 1: 42,  2: 38,  3: 34  }
+const TREE_H: Record<number, number> = { 0: 180, 1: 42,  2: 36,  3: 32  }
 
-function tw(node: MindmapNode) { return TREE_W[Math.min(node.depth, 3)] ?? 115 }
-function th(node: MindmapNode) { return TREE_H[Math.min(node.depth, 3)] ?? 30 }
+/** Auto-size width from title */
+function tw(node: MindmapNode): number {
+  if (node.depth === 0) return 180
+  const fontSize = node.depth === 1 ? 22 : node.depth === 2 ? 16 : 13
+  const charW = fontSize * 0.64
+  const pad = 24
+  const iconW = (node.icon || node.emoji) ? 44 : 0
+  const textW = Math.ceil(node.title.length * charW) + pad + iconW
+  const min = node.depth === 1 ? 140 : node.depth === 2 ? 120 : 100
+  return Math.max(min, Math.min(400, textW))
+}
+function th(node: MindmapNode) { return TREE_H[Math.min(node.depth, 3)] ?? 28 }
 
 interface TreeNode {
   node: MindmapNode

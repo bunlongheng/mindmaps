@@ -271,7 +271,9 @@ export function EdgeLayer({ nodes, lineStyle, diagramType }: EdgeLayerProps) {
             ? (spineY - l2CY) / boneEdgeH
             : (l2CY - spineY) / boneEdgeH
           const diagX = attachX + FISHBONE_SLANT * t
-          const nodeEdgeX = l2.x
+          // Extend stub into the parallelogram to meet the visible skewed edge
+          const sk = l2.height * 0.35
+          const nodeEdgeX = l2.x + sk / 2
           return (
             <line key={l2.id}
               x1={diagX} y1={l2CY}
