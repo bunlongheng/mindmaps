@@ -63,9 +63,9 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
       ? (s.activeMindmap?.nodes.filter(n => n.parentId === node.id).length ?? 0)
       : 0
   )
-  // Total descendants under this node (for firefly count on L1)
+  // Total descendants under this node (for firefly count)
   const descendantCount = useMindmapStore(s => {
-    if (node.depth !== 1 || !s.activeMindmap) return 0
+    if (node.depth < 1 || !s.activeMindmap) return 0
     const nodes = s.activeMindmap.nodes
     let count = 0
     const stack = [node.id]
@@ -317,8 +317,8 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
       onDoubleClick={handleDoubleClick}
       style={{ cursor: editing ? 'default' : canDrag ? 'grab' : 'pointer', userSelect: 'none' }}
     >
-      {/* Fireflies around L1 nodes — count = all descendants */}
-      {node.depth === 1 && descendantCount > 0 && (
+      {/* Fireflies around nodes with children — count = all descendants */}
+      {node.depth >= 1 && descendantCount > 0 && (
         <Fireflies cx={displayW / 2} cy={node.height / 2} r={Math.max(displayW, node.height) * 0.45} color={node.color} count={descendantCount} />
       )}
 
