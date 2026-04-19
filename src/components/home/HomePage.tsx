@@ -1015,12 +1015,16 @@ function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isPublic, tags, tagCo
   tagColorMap: Map<string, string>; onTagEdit: () => void; flash?: boolean; isMobile?: boolean
 }) {
   const [hovered, setHovered] = useState(false)
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const currentTags = tags ?? []
 
   return (
     <div
       onMouseEnter={() => { setHovered(true); soundHover() }}
       onMouseLeave={() => setHovered(false)}
+      onTouchStart={() => { longPressTimer.current = setTimeout(() => setHovered(true), 500) }}
+      onTouchEnd={() => { if (longPressTimer.current) clearTimeout(longPressTimer.current) }}
+      onTouchMove={() => { if (longPressTimer.current) clearTimeout(longPressTimer.current) }}
       style={{
         background: 'var(--card-bg)',
         border: `1px solid ${flash ? '#6366f1' : hovered ? 'var(--card-border-hover)' : 'var(--card-border)'}`,
@@ -1060,13 +1064,11 @@ function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isPublic, tags, tagCo
         <DiagramMinimap id={diagram.id} type={diagram.type} />
         {hovered && (
           <>
-            {!isMobile && (
-              <button onClick={e => { e.stopPropagation(); onTagEdit() }} title="Edit tags"
-                style={{ position: 'absolute', top: 8, left: 8, width: 28, height: 28, borderRadius: 8, border: '1px solid #e2e8f0', background: 'rgba(255,255,255,0.92)', cursor: 'pointer', color: '#94a3b8', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(8px)' }}>
-                <Tag size={13} />
-              </button>
-            )}
-            <button onClick={e => { e.stopPropagation(); onDelete() }}
+            <button onClick={e => { e.stopPropagation(); onTagEdit() }} title="Edit tags"
+              style={{ position: 'absolute', top: 8, left: 8, width: 28, height: 28, borderRadius: 8, border: '1px solid #e2e8f0', background: 'rgba(255,255,255,0.92)', cursor: 'pointer', color: '#94a3b8', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(8px)' }}>
+              <Tag size={13} />
+            </button>
+            <button onClick={e => { e.stopPropagation(); setHovered(false); onDelete() }}
               style={{ position: 'absolute', top: 8, right: 8, width: 28, height: 28, borderRadius: 8, border: '1px solid #fecaca', background: 'rgba(255,255,255,0.92)', cursor: 'pointer', color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(8px)' }}>
               <Trash2 size={13} />
             </button>
