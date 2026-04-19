@@ -4,10 +4,21 @@ export const FISHBONE_SLANT = 90
 
 const SPINE_Y = 400
 const ROOT_X = 120
-const ROOT_W = 200, ROOT_H = 54
-const L1_W = 160, L1_H = 44
-const L2_W = 130, L2_H = 36
-const L3_W = 110, L3_H = 30
+const ROOT_H = 54
+const L1_H = 44
+const L2_H = 36
+const L3_H = 30
+
+/** Auto-size node width from title length */
+function autoW(title: string, depth: number, hasIcon: boolean): number {
+  const fontSize = depth === 0 ? 28 : depth === 1 ? 22 : depth === 2 ? 16 : 13
+  const charW = fontSize * 0.64
+  const pad = 24
+  const iconZone = hasIcon ? 44 : 0
+  const textW = Math.ceil(title.length * charW) + pad + iconZone
+  const min = depth === 0 ? 200 : depth === 1 ? 160 : depth === 2 ? 130 : 110
+  return Math.max(min, Math.min(500, textW))
+}
 const SPINE_SEG = 340         // horizontal gap between L1 attachment points
 const BONE_HEIGHT_BASE = 260  // minimum vertical distance from spine to L1 tip
 const L2_MIN_SPACING = 56     // minimum vertical gap between L2 nodes on the diagonal
@@ -20,9 +31,10 @@ export function computeFishboneLayout(nodes: MindmapNode[]): MindmapNode[] {
     .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
 
   const result: MindmapNode[] = []
-  result.push({ ...root, x: ROOT_X, y: SPINE_Y - ROOT_H / 2, width: ROOT_W, height: ROOT_H, manuallyPositioned: false })
+  const rootW = autoW(root.title, 0, !!(root.icon || root.emoji))
+  result.push({ ...root, x: ROOT_X, y: SPINE_Y - ROOT_H / 2, width: rootW, height: ROOT_H, manuallyPositioned: false })
 
-  const spineOriginX = ROOT_X + ROOT_W
+  const spineOriginX = ROOT_X + rootW
 
   l1s.forEach((l1, i) => {
     const above = i % 2 === 0
@@ -37,7 +49,7 @@ export function computeFishboneLayout(nodes: MindmapNode[]): MindmapNode[] {
 
     const l1CX = attachX + FISHBONE_SLANT
     const l1CY = above ? SPINE_Y - boneHeight : SPINE_Y + boneHeight
-    const l1w = l1.width > 0 ? l1.width : L1_W
+    const l1w = autoW(l1.title, 1, !!(l1.icon || l1.emoji))
 
     result.push({
       ...l1,
@@ -55,8 +67,8 @@ export function computeFishboneLayout(nodes: MindmapNode[]): MindmapNode[] {
       const diagX = attachX + FISHBONE_SLANT * t
       const diagY = SPINE_Y + (above ? -1 : 1) * boneEdgeH * t
 
-      const l2w = l2.width > 0 ? l2.width : L2_W
-      const l2h = l2.height > 0 ? l2.height : L2_H
+      const l2w = autoW(l2.title, 2, !!(l2.icon || l2.emoji))
+      const l2h = L2_H
       const l2X = diagX + 28
       const l2Y = diagY - l2h / 2
 
@@ -67,8 +79,8 @@ export function computeFishboneLayout(nodes: MindmapNode[]): MindmapNode[] {
         .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
       const l3dir = above ? -1 : 1  // stack further from spine
       l3s.forEach((l3, k) => {
-        const l3w = l3.width > 0 ? l3.width : L3_W
-        const l3h = l3.height > 0 ? l3.height : L3_H
+        const l3w = autoW(l3.title, 3, !!(l3.icon || l3.emoji))
+        const l3h = L3_H
         result.push({
           ...l3,
           x: l2X + l2w + 16,
