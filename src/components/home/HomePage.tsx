@@ -925,14 +925,21 @@ function DiagramMinimap({ id, type }: { id: string; type: string }) {
   // ── Timeline ─────────────────────────────────────────────────────
   if (type === 'timeline') {
     const spineY = H / 2, n = l1s.length
-    const step = (W - 28) / Math.max(n, 1)
+    const rootR = 10, pillW2 = 30, pillH2 = 12
+    const rootEndX = isRootPill ? 8 + pillW2 + 4 : 8 + rootR * 2 + 4
+    const step = (W - rootEndX - 14) / Math.max(n, 1)
 
     return (
       <svg viewBox={VB} style={{ width: '100%', height: '100%' }} overflow="hidden">
         <rect x={-P} y={-P} width={W + P * 2} height={H + P * 2} fill={canvasBg} />
-        <line x1={14} y1={spineY} x2={W - 14} y2={spineY} stroke={spineFill} strokeWidth={2} strokeLinecap="round" />
+        {/* Root */}
+        {isRootPill
+          ? <rect x={8} y={spineY - pillH2 / 2} width={pillW2} height={pillH2} rx={pillH2 / 2} fill={rootFill} />
+          : <circle cx={8 + rootR} cy={spineY} r={rootR} fill={rootFill} />
+        }
+        <line x1={rootEndX} y1={spineY} x2={W - 14} y2={spineY} stroke={spineFill} strokeWidth={2} strokeLinecap="round" />
         {l1s.map((l1, i) => {
-          const x = 18 + i * step + step / 2
+          const x = rootEndX + i * step + step / 2
           const above = i % 2 === 0
           const boxY = above ? spineY - 34 : spineY + 12
           return (
