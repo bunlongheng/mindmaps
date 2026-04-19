@@ -72,7 +72,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   )
   const isMindmapCircle = diagramType === 'mindmap' && node.depth === 1
   const isMindmapL2Plus = diagramType === 'mindmap' && node.depth >= 2
-  const effectiveRx = isMindmapL2Plus ? node.height / 2 : rx
+  const effectiveRx = isMindmapL2Plus ? Math.max(node.width, node.height) / 2 : rx
   const previewW = (!isRoot && resizePreview?.depth === node.depth) ? resizePreview.width : null
 
   // Mindmap circles: keep text horizontal for readability
@@ -223,7 +223,9 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   const autoPillW = isRootPill
     ? Math.max(180, Math.min(500, Math.ceil(node.title.length * 28 * 0.62 + 80)))
     : null
-  const displayW = previewW ?? (autoPillW ?? node.width)
+  // Mindmap L2+ circles: force width = height so it's always a circle
+  const circleW = isMindmapL2Plus ? Math.max(node.width, node.height) : null
+  const displayW = previewW ?? (autoPillW ?? circleW ?? node.width)
   void ((hasIcon || hasEmoji) ? displayW * 0.2 : 0) // iconZoneW — reserved for future use
   const label = (showChildCount && node.depth >= 1 && childCount > 0)
     ? `${node.title} (${childCount})`

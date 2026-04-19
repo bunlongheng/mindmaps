@@ -32,12 +32,19 @@ function computeNodeWidth(title: string, depth: number, hasIcon: boolean): numbe
 }
 
 /** Make all nodes at the same depth share the width of the widest node at that depth */
-function normalizeWidthsPerDepth(nodes: MindmapNode[]): MindmapNode[] {
+function normalizeWidthsPerDepth(nodes: MindmapNode[], type?: DiagramType): MindmapNode[] {
+  // For mindmap type, only normalize L1 widths — L2+ are circles sized individually
   const maxByDepth = new Map<number, number>()
   for (const n of nodes) {
-    if (n.depth > 0) maxByDepth.set(n.depth, Math.max(maxByDepth.get(n.depth) ?? 0, n.width))
+    if (n.depth > 0 && !(type === 'mindmap' && n.depth >= 2)) {
+      maxByDepth.set(n.depth, Math.max(maxByDepth.get(n.depth) ?? 0, n.width))
+    }
   }
-  return nodes.map(n => n.depth > 0 ? { ...n, width: maxByDepth.get(n.depth) ?? n.width } : n)
+  return nodes.map(n => {
+    if (n.depth <= 0) return n
+    if (type === 'mindmap' && n.depth >= 2) return n // circles keep individual sizes
+    return { ...n, width: maxByDepth.get(n.depth) ?? n.width }
+  })
 }
 
 /** Re-index sortOrder per parent group so numbers are always 0,1,2,... with no gaps */
@@ -209,7 +216,7 @@ export const useMindmapStore = create<MindmapStore>()(
         return n
       })
       const withWidths = runLayout(freshNodes, d.type)
-      const nodes = runLayout(normalizeWidthsPerDepth(withWidths), d.type)
+      const nodes = runLayout(normalizeWidthsPerDepth(withWidths, d.type), d.type)
       const themeId = d.themeId ?? localStorage.getItem('mindmaps:themeId') ?? 'default'
       localStorage.setItem('mindmaps:themeId', themeId)
       set({
@@ -235,7 +242,7 @@ export const useMindmapStore = create<MindmapStore>()(
       )
       // Run layout once to get auto-computed widths, normalize per depth, then re-layout for correct positions
       const withWidths = runLayout(resetNodes, t)
-      const newNodes = runLayout(normalizeWidthsPerDepth(withWidths), t)
+      const newNodes = runLayout(normalizeWidthsPerDepth(withWidths, t), t)
       set({
         diagramType: t,
         activeMindmap: { ...state.activeMindmap, type: t, nodes: newNodes },
@@ -326,7 +333,7 @@ export const useMindmapStore = create<MindmapStore>()(
       }
       // Strip manuallyPositioned so the layout is always clean when adding nodes
       const reset = [...state.activeMindmap.nodes, newNode].map(n => ({ ...n, manuallyPositioned: false }))
-      const laid = runLayout(normalizeWidthsPerDepth(reset), state.diagramType)
+      const laid = runLayout(normalizeWidthsPerDepth(reset, state.diagramType), state.diagramType)
       const newNodes = rebalanceColors(laid, palette)
       set({
         activeMindmap: { ...state.activeMindmap, nodes: newNodes },
@@ -523,7 +530,7 @@ export const useMindmapStore = create<MindmapStore>()(
     rerunLayout: () => {
       const state = get()
       if (!state.activeMindmap) return
-      const nodes = normalizeWidthsPerDepth(state.activeMindmap.nodes.map(n => ({ ...n, manuallyPositioned: false })))
+      const nodes = normalizeWidthsPerDepth(state.activeMindmap.nodes.map(n => ({ ...n, manuallyPositioned: false })), state.diagramType)
       const newNodes = runLayout(nodes, state.diagramType)
       set({ activeMindmap: { ...state.activeMindmap, nodes: newNodes }, isDirty: true })
     },
@@ -763,7 +770,8 @@ export const useMindmapStore = create<MindmapStore>()(
       })
 
       set({ isImporting: true })
-      const laid = runLayout(normalizeWidthsPerDepth(rawNodes), state.activeMindmap?.type ?? state.diagramType ?? 'logic-chart')
+      const layoutType = state.activeMindmap?.type ?? state.diagramType ?? 'logic-chart'
+      const laid = runLayout(normalizeWidthsPerDepth(rawNodes, layoutType), layoutType)
       const nodes = hasExplicitColors ? laid : rebalanceColors(laid, palette)
       const name = parsed[0].title
 
