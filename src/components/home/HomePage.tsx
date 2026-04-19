@@ -901,13 +901,14 @@ function DiagramMinimap({ id, type }: { id: string; type: string }) {
         <line x1={rootEndX} y1={spineY} x2={W - 14} y2={spineY} stroke={spineFill} strokeWidth={2.5} strokeLinecap="round" />
         {thumbL1s.map((l1, i) => {
           const above = i % 2 === 0
-          const x = rootEndX + 26 + Math.floor(i / 2) * 38
-          if (x > W - 24) return null
-          const tipX = x + 22, tipY = above ? spineY - 28 : spineY + 28
+          const nPairs = Math.ceil(thumbL1s.length / 2)
+          const pairGap = (W - rootEndX - 40) / Math.max(nPairs, 1)
+          const x = rootEndX + 16 + Math.floor(i / 2) * pairGap
+          const tipX = x + 18, tipY = above ? spineY - 26 : spineY + 26
           return (
             <g key={l1.id}>
               <line x1={x} y1={spineY} x2={tipX} y2={tipY} stroke={l1.color} strokeWidth={1.8} strokeLinecap="round" />
-              <rect x={tipX - 14} y={tipY - 7} width={28} height={14} rx={3} fill={l1.color} />
+              <rect x={tipX - 12} y={tipY - 6} width={24} height={12} rx={2} fill={l1.color} />
             </g>
           )
         })}
