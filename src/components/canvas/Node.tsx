@@ -310,8 +310,8 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
 
       {isRoot ? (
         <>
-          {/* Siri-style animated wave glow — use half-height as radius for pills */}
-          {(() => { const ar = isRootPill ? node.height / 2 : r; return (
+          {/* Siri glow + spinning rings — circle root only */}
+          {!isRootPill && (() => { const ar = r; return (
           <>
           <SiriWave cx={cx} cy={cy} r={ar} colors={l1Colors} />
 
@@ -335,6 +335,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
             <animateTransform attributeName="transform" type="rotate"
               from={`0 ${cx} ${cy}`} to={`-360 ${cx} ${cy}`} dur="18s" repeatCount="indefinite" />
           </ellipse>
+          </>)})()}
 
           {/* Root shape: pill rect for long titles, circle for short */}
           {isRootPill ? (
@@ -348,7 +349,9 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
               filter="drop-shadow(0 4px 16px rgba(0,0,0,0.35))" />
           )}
 
-          {/* Front ring glint — horizontal */}
+          {/* Front ring glints — circle root only */}
+          {!isRootPill && (() => { const ar = r; return (
+          <>
           <ellipse cx={cx} cy={cy} rx={ar * 2.0} ry={ar * 0.32}
             stroke="#d1d5db" strokeWidth={2} fill="none" opacity={0.55}
             strokeDasharray={`${ar * 3.14} ${ar * 9.42}`}
@@ -357,7 +360,6 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
             <animateTransform attributeName="transform" type="rotate"
               from={`0 ${cx} ${cy}`} to={`360 ${cx} ${cy}`} dur="12s" repeatCount="indefinite" />
           </ellipse>
-          {/* Front ring glint — vertical spine */}
           <ellipse cx={cx} cy={cy} rx={ar * 0.32} ry={ar * 2.0}
             stroke="#d1d5db" strokeWidth={2} fill="none" opacity={0.55}
             strokeDasharray={`${ar * 3.14} ${ar * 9.42}`}
