@@ -303,9 +303,9 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
       onDoubleClick={handleDoubleClick}
       style={{ cursor: editing ? 'default' : canDrag ? 'grab' : 'pointer', userSelect: 'none' }}
     >
-      {/* Fireflies around L1 nodes */}
-      {node.depth === 1 && (
-        <Fireflies cx={displayW / 2} cy={node.height / 2} r={Math.max(displayW, node.height) * 0.45} color={node.color} />
+      {/* Fireflies around L1 nodes — count = number of children */}
+      {node.depth === 1 && childCount > 0 && (
+        <Fireflies cx={displayW / 2} cy={node.height / 2} r={Math.max(displayW, node.height) * 0.45} color={node.color} count={childCount} />
       )}
 
       {isRoot ? (
@@ -695,24 +695,25 @@ function randDrift(r: number) {
   return { dx: (Math.random() - 0.5) * r * 1.2, dy: (Math.random() - 0.5) * r * 1.2 }
 }
 
-/** Generate shades of a color — lighter and slightly shifted hue */
+/** Generate shades of a color — lighter variations, same hue */
 function colorShades(hex: string, count: number): string[] {
+  if (!hex.startsWith('#')) return Array.from({ length: count }, () => hex)
   const [r, g, b] = hexToRgb(hex)
   return Array.from({ length: count }, (_, i) => {
-    const t = i / count
-    // Mix toward white for lighter shades, toward saturated for darker
-    const mix = 0.3 + t * 0.5
-    const nr = Math.round(r + (255 - r) * mix * (0.5 + Math.random() * 0.5))
-    const ng = Math.round(g + (255 - g) * mix * (0.5 + Math.random() * 0.5))
-    const nb = Math.round(b + (255 - b) * mix * (0.5 + Math.random() * 0.5))
+    // Same random factor for all channels to preserve hue
+    const mix = 0.3 + (i / count) * 0.4 + Math.random() * 0.2
+    const nr = Math.round(r + (255 - r) * mix)
+    const ng = Math.round(g + (255 - g) * mix)
+    const nb = Math.round(b + (255 - b) * mix)
     return `rgb(${nr},${ng},${nb})`
   })
 }
 
-function Fireflies({ cx, cy, r, color }: { cx: number; cy: number; r: number; color: string }) {
+function Fireflies({ cx, cy, r, color, count = 10 }: { cx: number; cy: number; r: number; color: string; count?: number }) {
+  const n = Math.min(count, 20) // cap at 20 to avoid perf issues
   const [flies] = useState(() => {
-    const shades = colorShades(color, 10)
-    return Array.from({ length: 10 }, (_, i) => {
+    const shades = colorShades(color, n)
+    return Array.from({ length: n }, (_, i) => {
       const angle = Math.random() * Math.PI * 2
       const dist = r * (0.7 + Math.random() * 0.3)
       const maxDrift = r * 0.35
