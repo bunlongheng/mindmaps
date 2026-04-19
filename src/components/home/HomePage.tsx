@@ -944,17 +944,18 @@ function DiagramMinimap({ id, type }: { id: string; type: string }) {
 
   // ── Tree vertical ────────────────────────────────────────────────
   if (type === 'tree-vertical') {
-    const n = thumbL1s.length, step = (W - 20) / Math.max(n, 1)
+    const n = thumbL1s.length, step = (W - 10) / Math.max(n, 1)
     return (
       <svg viewBox={VB} style={{ width: '100%', height: '100%' }} overflow="hidden">
         <rect x={-P} y={-P} width={W + P * 2} height={H + P * 2} fill={canvasBg} />
-        {rootShape(W / 2, 16)}
+        {rootShape(W / 2, 14)}
         {thumbL1s.map((l1, i) => {
-          const x = 10 + i * step + step / 2
+          const x = 5 + i * step + step / 2
+          const nodeW = Math.min(28, step - 4)
           return (
             <g key={l1.id}>
-              <line x1={W / 2} y1={28} x2={x} y2={72} stroke={l1.color} strokeWidth={1.5} />
-              <rect x={x - 16} y={72} width={32} height={16} rx={4} fill={l1.color} />
+              <line x1={W / 2} y1={26} x2={x} y2={68} stroke={l1.color} strokeWidth={1.5} />
+              <rect x={x - nodeW / 2} y={68} width={nodeW} height={14} rx={3} fill={l1.color} />
             </g>
           )
         })}
@@ -963,17 +964,18 @@ function DiagramMinimap({ id, type }: { id: string; type: string }) {
   }
 
   // ── Tree horizontal (default fallback) ───────────────────────────
-  const n2 = thumbL1s.length, step2 = (H - 16) / Math.max(n2, 1)
+  const n2 = thumbL1s.length, step2 = (H - 8) / Math.max(n2, 1)
   return (
     <svg viewBox={VB} style={{ width: '100%', height: '100%' }} overflow="hidden">
       <rect x={-P} y={-P} width={W + P * 2} height={H + P * 2} fill={canvasBg} />
-      {rootShape(24, H / 2)}
+      {rootShape(22, H / 2)}
       {thumbL1s.map((l1, i) => {
-        const y = 8 + i * step2 + step2 / 2
+        const y = 4 + i * step2 + step2 / 2
+        const nodeH = Math.min(14, step2 - 4)
         return (
           <g key={l1.id}>
-            <line x1={36} y1={H / 2} x2={64} y2={y} stroke={l1.color} strokeWidth={1.5} />
-            <rect x={64} y={y - 8} width={56} height={16} rx={4} fill={l1.color} />
+            <line x1={34} y1={H / 2} x2={60} y2={y} stroke={l1.color} strokeWidth={1.5} />
+            <rect x={60} y={y - nodeH / 2} width={80} height={nodeH} rx={3} fill={l1.color} />
           </g>
         )
       })}
