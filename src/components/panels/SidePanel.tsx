@@ -114,7 +114,7 @@ export function SidePanel({ nodeId, onClose, onDelete }: SidePanelProps) {
   const {
     activeMindmap, updateNode, batchUpdateNodes, selectedNodeIds,
     lineStyle, setLineStyle, diagramType, setDiagramType, setShareEnabled, rerunLayout,
-    themeId, setTheme, showOrderNumbers, setShowOrderNumbers, autoAssignIcons,
+    themeId, setTheme, showOrderNumbers, setShowOrderNumbers, showChildCount, setShowChildCount, autoAssignIcons,
     resizeNodeDepth,
   } = useMindmapStore()
   const themeColors = getTheme(themeId).colors
@@ -531,6 +531,23 @@ export function SidePanel({ nodeId, onClose, onDelete }: SidePanelProps) {
               >
                 <span style={{
                   position: 'absolute', top: 3, left: showOrderNumbers ? 20 : 3,
+                  width: 16, height: 16, borderRadius: '50%', background: '#fff',
+                  transition: 'left 0.2s', display: 'block',
+                }} />
+              </button>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <span style={{ fontSize: 12, color: '#374151' }}>Show count</span>
+              <button
+                onClick={() => setShowChildCount(!showChildCount)}
+                style={{
+                  width: 40, height: 22, borderRadius: 11, border: 'none', cursor: 'pointer', padding: 0,
+                  background: showChildCount ? '#1a1d2e' : '#d1d5db',
+                  position: 'relative', transition: 'background 0.2s', flexShrink: 0,
+                }}
+              >
+                <span style={{
+                  position: 'absolute', top: 3, left: showChildCount ? 20 : 3,
                   width: 16, height: 16, borderRadius: '50%', background: '#fff',
                   transition: 'left 0.2s', display: 'block',
                 }} />

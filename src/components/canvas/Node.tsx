@@ -57,8 +57,9 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   const inputRef = useRef<HTMLInputElement>(null)
   const resizePreview = useMindmapStore(s => s.resizePreview)
   const diagramType = useMindmapStore(s => s.diagramType)
+  const showChildCount = useMindmapStore(s => s.showChildCount)
   const childCount = useMindmapStore(s =>
-    diagramType === 'mindmap' && node.depth >= 1
+    showChildCount && node.depth >= 1
       ? (s.activeMindmap?.nodes.filter(n => n.parentId === node.id).length ?? 0)
       : 0
   )
@@ -224,7 +225,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
     : null
   const displayW = previewW ?? (autoPillW ?? node.width)
   void ((hasIcon || hasEmoji) ? displayW * 0.2 : 0) // iconZoneW — reserved for future use
-  const label = (diagramType === 'mindmap' && node.depth >= 1 && childCount > 0)
+  const label = (showChildCount && node.depth >= 1 && childCount > 0)
     ? `${node.title} (${childCount})`
     : node.title
   // All coordinates are relative to (node.x, node.y)
