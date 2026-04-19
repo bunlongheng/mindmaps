@@ -473,22 +473,42 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
               const maxChars = Math.max(8, Math.ceil(Math.sqrt(label.length * 1.8)))
               const lines = wrapText(label, maxChars)
               const lineH = fontSize * 1.3
-              const startY = node.height / 2 - ((lines.length - 1) * lineH) / 2
+              const hasVisual = hasIcon || hasEmoji
+              const iconSize = fontSize * 1.4
+              const iconGap = 4
+              // Total content height: icon + gap + text block
+              const textBlockH = lines.length * lineH
+              const totalH = hasVisual ? iconSize + iconGap + textBlockH : textBlockH
+              const contentStartY = node.height / 2 - totalH / 2
+              const textStartY = hasVisual ? contentStartY + iconSize + iconGap : contentStartY
               return (
-                <text
-                  x={displayW / 2}
-                  textAnchor="middle"
-                  fontSize={fontSize} fontWeight={fontWeight} fontStyle={fontStyle}
-                  fontFamily="Inter, system-ui, sans-serif"
-                  fill={textColor}
-                  style={{ pointerEvents: 'none' }}
-                >
-                  {lines.map((line, i) => (
-                    <tspan key={i} x={displayW / 2} dy={i === 0 ? startY + fontSize * 0.38 : lineH}>
-                      {line}
-                    </tspan>
-                  ))}
-                </text>
+                <g style={{ pointerEvents: 'none' }}>
+                  {/* Centered icon/emoji above text */}
+                  {hasEmoji && resolvedEmoji && (
+                    <text x={displayW / 2} y={contentStartY + iconSize * 0.75}
+                      textAnchor="middle" fontSize={iconSize}
+                      style={{ pointerEvents: 'none' }}>{resolvedEmoji}</text>
+                  )}
+                  {hasIcon && resolvedIcon && !hasEmoji && (
+                    <NodeIcon icon={resolvedIcon}
+                      x={displayW / 2 - iconSize / 2} y={contentStartY}
+                      size={iconSize} color={textColor} strokeWidth={1.8} />
+                  )}
+                  <text
+                    x={displayW / 2}
+                    textAnchor="middle"
+                    fontSize={fontSize} fontWeight={fontWeight} fontStyle={fontStyle}
+                    fontFamily="Inter, system-ui, sans-serif"
+                    fill={textColor}
+                    style={{ pointerEvents: 'none' }}
+                  >
+                    {lines.map((line, i) => (
+                      <tspan key={i} x={displayW / 2} dy={i === 0 ? textStartY + fontSize * 0.38 : lineH}>
+                        {line}
+                      </tspan>
+                    ))}
+                  </text>
+                </g>
               )
             }
             if (isRoot && diagramType === 'mindmap') {
@@ -541,26 +561,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
         </g>
       )}
 
-      {/* Mindmap L2+: emoji/icon circle at the near edge (toward parent), rendered outside clip */}
-      {isMindmapL2Plus && (hasEmoji || hasIcon) && (() => {
-        const emojiR = 10
-        const cx2 = emojiR + 2   // sits at the beginning (left edge) of the node
-        const cy2 = node.height / 2
-        const iconS = emojiR * 1.4
-        return (
-          <g style={{ pointerEvents: 'none', animation: 'iconPop 0.4s cubic-bezier(0.34,1.56,0.64,1)', transformBox: 'fill-box', transformOrigin: `${cx2}px ${cy2}px` }}>
-            <circle cx={cx2} cy={cy2} r={emojiR} fill={node.color} stroke="white" strokeWidth={1.5} />
-            {hasEmoji && resolvedEmoji
-              ? <text x={cx2} y={cy2} textAnchor="middle" dominantBaseline="central"
-                  fontSize={emojiR * 1.3} style={{ pointerEvents: 'none' }}>{resolvedEmoji}</text>
-              : hasIcon && resolvedIcon
-                ? <NodeIcon icon={resolvedIcon} x={cx2 - iconS / 2} y={cy2 - iconS / 2}
-                    size={iconS} color="#fff" strokeWidth={1.8} />
-                : null
-            }
-          </g>
-        )
-      })()}
+      {/* Mindmap L2+ icons are rendered centered inside the circle (in the text block above) */}
 
 
       {/* Selection ring — always on top */}
