@@ -117,7 +117,6 @@ export function useDiagram(userId: string | null = null) {
     if (cached) {
       setActiveMindmap(cached)
       localStorage.setItem('activeMindmapId', id)
-      // Still refresh from Supabase in the background if possible
     }
 
     if (!hasSupabase || !supabase) return
@@ -127,9 +126,7 @@ export function useDiagram(userId: string | null = null) {
     const { data, error } = await (userId ? query.eq('user_id', userId) : query).single()
 
     if (error || !data) {
-      // Already loaded from cache above; if nothing found anywhere, nothing to do
       if (!cached && userId) {
-        // Re-upload cache to Supabase if it got wiped
         const recached = lsGetDiagram(id)
         if (recached) {
           setActiveMindmap(recached)
@@ -146,6 +143,17 @@ export function useDiagram(userId: string | null = null) {
     }
 
     const diagram = rowToDiagram(data)
+    // If local cache has a newer type/lineStyle (e.g. RLS blocked the Supabase save),
+    // preserve the local values so user changes aren't lost
+    if (cached) {
+      const localNewer = new Date(cached.updatedAt ?? 0) >= new Date(diagram.updatedAt ?? 0)
+      if (localNewer && cached.type !== diagram.type) {
+        diagram.type = cached.type
+      }
+      if (localNewer && cached.lineStyle !== diagram.lineStyle) {
+        diagram.lineStyle = cached.lineStyle
+      }
+    }
     setActiveMindmap(diagram)
     localStorage.setItem('activeMindmapId', id)
     lsSaveDiagram(diagram)
