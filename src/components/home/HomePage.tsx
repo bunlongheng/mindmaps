@@ -729,9 +729,10 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
 
 
 function DiagramMinimap({ id, type }: { id: string; type: string }) {
-  const storeThemeId = useMindmapStore(s => s.themeId) // re-read when theme changes
+  const storeThemeId = useMindmapStore(s => s.themeId)
   const [nodes, setNodes] = useState<MindmapNode[]>([])
   const [diagramThemeId, setDiagramThemeId] = useState<string>('default')
+  const [lineStyle, setLineStyle] = useState<string>('orthogonal')
 
   useEffect(() => {
     try {
@@ -739,9 +740,10 @@ function DiagramMinimap({ id, type }: { id: string; type: string }) {
       if (data?.nodes?.length) {
         setNodes(data.nodes)
         setDiagramThemeId(data.themeId ?? 'default')
+        setLineStyle(data.lineStyle ?? 'orthogonal')
       }
     } catch {}
-  }, [id, storeThemeId]) // re-read when active theme changes
+  }, [id, storeThemeId])
 
   const theme = getTheme(diagramThemeId)
   const canvasBg = theme.canvasBg
@@ -797,17 +799,55 @@ function DiagramMinimap({ id, type }: { id: string; type: string }) {
             ? <rect x={8} y={rootCY - pillH / 2} width={pillW} height={pillH} rx={pillH / 2} fill={rootFill} />
             : <circle cx={22} cy={rootCY} r={rootR} fill={rootFill} />
           }
-          <line x1={rootRight} y1={rootCY} x2={barX} y2={rootCY} stroke={rootFill} strokeWidth={2.5} strokeLinecap="round" />
-          {n > 1 && <line x1={barX} y1={startY + l1H / 2} x2={barX} y2={startY + totalH - l1H / 2} stroke={l1s[Math.floor(n / 2)].color} strokeWidth={2.5} />}
-          {l1s.map((l1, i) => {
-            const cy = startY + i * rowH + l1H / 2
-            return (
-              <g key={l1.id}>
-                <line x1={barX} y1={cy} x2={l1X} y2={cy} stroke={l1.color} strokeWidth={1.8} strokeLinecap="round" />
-                <rect x={l1X} y={cy - l1H / 2} width={l1W} height={l1H} rx={l1H / 2} fill={l1.color} />
-              </g>
-            )
-          })}
+          {lineStyle === 'straight' ? (
+            /* Straight: diagonal lines from root to each L1 */
+            l1s.map((l1, i) => {
+              const cy = startY + i * rowH + l1H / 2
+              return (
+                <g key={l1.id}>
+                  <line x1={rootRight} y1={rootCY} x2={l1X} y2={cy} stroke={l1.color} strokeWidth={1.8} strokeLinecap="round" />
+                  <rect x={l1X} y={cy - l1H / 2} width={l1W} height={l1H} rx={l1H / 2} fill={l1.color} />
+                </g>
+              )
+            })
+          ) : lineStyle === 'curved' ? (
+            /* Brace/curved: curly bracket from root to each L1 */
+            <>
+              <line x1={rootRight} y1={rootCY} x2={rootRight + 6} y2={rootCY} stroke={rootFill} strokeWidth={2.5} strokeLinecap="round" />
+              {l1s.map((l1, i) => {
+                const cy = startY + i * rowH + l1H / 2
+                const midX = rootRight + 8
+                const curveR = Math.min(8, Math.abs(cy - rootCY) / 2)
+                const dir = cy > rootCY ? 1 : cy < rootCY ? -1 : 0
+                return (
+                  <g key={l1.id}>
+                    <path
+                      d={dir === 0
+                        ? `M${midX},${rootCY} L${l1X},${cy}`
+                        : `M${midX},${rootCY} L${midX},${cy - dir * curveR} Q${midX},${cy} ${midX + curveR},${cy} L${l1X},${cy}`
+                      }
+                      fill="none" stroke={l1.color} strokeWidth={1.8} strokeLinecap="round" />
+                    <rect x={l1X} y={cy - l1H / 2} width={l1W} height={l1H} rx={l1H / 2} fill={l1.color} />
+                  </g>
+                )
+              })}
+            </>
+          ) : (
+            /* Orthogonal (default): vertical bar + horizontal stubs */
+            <>
+              <line x1={rootRight} y1={rootCY} x2={barX} y2={rootCY} stroke={rootFill} strokeWidth={2.5} strokeLinecap="round" />
+              {n > 1 && <line x1={barX} y1={startY + l1H / 2} x2={barX} y2={startY + totalH - l1H / 2} stroke={l1s[Math.floor(n / 2)].color} strokeWidth={2.5} />}
+              {l1s.map((l1, i) => {
+                const cy = startY + i * rowH + l1H / 2
+                return (
+                  <g key={l1.id}>
+                    <line x1={barX} y1={cy} x2={l1X} y2={cy} stroke={l1.color} strokeWidth={1.8} strokeLinecap="round" />
+                    <rect x={l1X} y={cy - l1H / 2} width={l1W} height={l1H} rx={l1H / 2} fill={l1.color} />
+                  </g>
+                )
+              })}
+            </>
+          )}
         </g>
       </svg>
     )
