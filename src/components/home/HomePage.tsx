@@ -769,6 +769,9 @@ function DiagramMinimap({ id, type }: { id: string; type: string }) {
     )
   }
 
+  // Root shape: pill for long titles, circle otherwise
+  const isRootPill = root?.shape === 'pill' || (!root?.shape && (root?.title?.length ?? 0) >= 15)
+
   // Diagram content area — padding is baked into the viewBox so canvasBg fills edge-to-edge
   const P = 14  // internal padding
   const W = 200, H = 110
@@ -781,15 +784,20 @@ function DiagramMinimap({ id, type }: { id: string; type: string }) {
     const l1H = Math.max(7, Math.min(18, Math.round(rowH * 0.65)))
     const totalH = n * l1H + (n - 1) * (rowH - l1H)
     const startY = (H - totalH) / 2
-    const rootCX = 22, rootCY = H / 2, rootR = 10
-    const barX = 52, l1X = 60, l1W = 100
+    const rootCY = H / 2, rootR = 10
+    const pillW = 34, pillH = 14
+    const rootRight = isRootPill ? 8 + pillW : 22 + rootR
+    const barX = rootRight + 10, l1X = barX + 8, l1W = 100
 
     return (
       <svg viewBox={VB} style={{ width: '100%', height: '100%' }} overflow="hidden">
         <rect x={-P} y={-P} width={W + P * 2} height={H + P * 2} fill={canvasBg} />
         <g transform={`translate(${W / 2} ${H / 2}) scale(0.8) translate(${-W / 2} ${-H / 2})`}>
-          <circle cx={rootCX} cy={rootCY} r={rootR} fill={rootFill} />
-          <line x1={rootCX + rootR} y1={rootCY} x2={barX} y2={rootCY} stroke={rootFill} strokeWidth={2.5} strokeLinecap="round" />
+          {isRootPill
+            ? <rect x={8} y={rootCY - pillH / 2} width={pillW} height={pillH} rx={pillH / 2} fill={rootFill} />
+            : <circle cx={22} cy={rootCY} r={rootR} fill={rootFill} />
+          }
+          <line x1={rootRight} y1={rootCY} x2={barX} y2={rootCY} stroke={rootFill} strokeWidth={2.5} strokeLinecap="round" />
           {n > 1 && <line x1={barX} y1={startY + l1H / 2} x2={barX} y2={startY + totalH - l1H / 2} stroke={l1s[Math.floor(n / 2)].color} strokeWidth={2.5} />}
           {l1s.map((l1, i) => {
             const cy = startY + i * rowH + l1H / 2
@@ -807,7 +815,6 @@ function DiagramMinimap({ id, type }: { id: string; type: string }) {
 
   // ── Mindmap (radial) ─────────────────────────────────────────────
   if (type === 'mindmap') {
-    const isRootPill = root?.shape === 'pill' || (!root?.shape && (root?.title?.length ?? 0) >= 15)
     const cx = W / 2, cy = H / 2
     const rootR = isRootPill ? 0 : 10
     const pillW = 34, pillH = 12
@@ -853,7 +860,10 @@ function DiagramMinimap({ id, type }: { id: string; type: string }) {
       <svg viewBox={VB} style={{ width: '100%', height: '100%' }} overflow="hidden">
         <rect x={-P} y={-P} width={W + P * 2} height={H + P * 2} fill={canvasBg} />
         {/* Root on the LEFT */}
-        <rect x={4} y={spineY - 13} width={26} height={26} rx={5} fill={rootFill} />
+        {isRootPill
+          ? <rect x={4} y={spineY - 8} width={26} height={16} rx={8} fill={rootFill} />
+          : <circle cx={17} cy={spineY} r={10} fill={rootFill} />
+        }
         {/* Spine from root rightward */}
         <line x1={rootEndX} y1={spineY} x2={W - 14} y2={spineY} stroke={spineFill} strokeWidth={2.5} strokeLinecap="round" />
         {l1s.map((l1, i) => {
@@ -903,7 +913,10 @@ function DiagramMinimap({ id, type }: { id: string; type: string }) {
     return (
       <svg viewBox={VB} style={{ width: '100%', height: '100%' }} overflow="hidden">
         <rect x={-P} y={-P} width={W + P * 2} height={H + P * 2} fill={canvasBg} />
-        <rect x={W / 2 - 24} y={8} width={48} height={20} rx={5} fill={rootFill} />
+        {isRootPill
+          ? <rect x={W / 2 - 20} y={8} width={40} height={16} rx={8} fill={rootFill} />
+          : <circle cx={W / 2} cy={16} r={10} fill={rootFill} />
+        }
         {l1s.map((l1, i) => {
           const x = 10 + i * step + step / 2
           return (
@@ -922,7 +935,10 @@ function DiagramMinimap({ id, type }: { id: string; type: string }) {
   return (
     <svg viewBox={VB} style={{ width: '100%', height: '100%' }} overflow="hidden">
       <rect x={-P} y={-P} width={W + P * 2} height={H + P * 2} fill={canvasBg} />
-      <rect x={12} y={H / 2 - 16} width={24} height={32} rx={5} fill={rootFill} />
+      {isRootPill
+        ? <rect x={8} y={H / 2 - 8} width={30} height={16} rx={8} fill={rootFill} />
+        : <circle cx={24} cy={H / 2} r={10} fill={rootFill} />
+      }
       {l1s.map((l1, i) => {
         const y = 8 + i * step2 + step2 / 2
         return (
