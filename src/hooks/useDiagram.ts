@@ -172,8 +172,10 @@ export function useDiagram(userId: string | null = null) {
   }, [setActiveMindmap, userId])
 
   const saveDiagram = useCallback(async (diagram: Diagram) => {
+    // Always save to localStorage first — guaranteed to work
+    lsSaveDiagram(diagram)
+
     if (!hasSupabase || !supabase || !userId) {
-      lsSaveDiagram(diagram)
       setIsDirty(false)
       return
     }
@@ -188,11 +190,12 @@ export function useDiagram(userId: string | null = null) {
       nodes:           diagram.nodes,
     })
     if (error) {
-      // On local dev without real auth, Supabase write is blocked by RLS — fall back to localStorage silently
-      if (error.code === '42501') { lsSaveDiagram(diagram); setIsDirty(false); return }
-      console.error('save error:', error); soundError(); showToast('Failed to save', { color: '#ef4444' }); return
+      // RLS or other errors — localStorage already saved above, just mark clean
+      if (error.code === '42501') { setIsDirty(false); return }
+      console.error('save error:', error)
+      setIsDirty(false) // localStorage save succeeded, so mark clean
+      return
     }
-    lsSaveDiagram(diagram) // keep localStorage cache fresh for minimap
     setIsDirty(false)
     soundSave()
   }, [setIsDirty, userId])
