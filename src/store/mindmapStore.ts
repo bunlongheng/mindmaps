@@ -790,3 +790,26 @@ export const useMindmapStore = create<MindmapStore>()(
     },
   }))
 )
+
+// Auto-persist to localStorage whenever the diagram changes
+// This is the safety net — no matter what, localStorage always has the latest
+const LS_KEY = (id: string) => `mindmaps:diagram:${id}`
+const LS_LIST = 'mindmaps:list'
+useMindmapStore.subscribe(
+  (state) => ({ dirty: state.isDirty, map: state.activeMindmap }),
+  ({ dirty, map }) => {
+    if (!dirty || !map) return
+    try {
+      const now = new Date().toISOString()
+      localStorage.setItem(LS_KEY(map.id), JSON.stringify({ ...map, updatedAt: now }))
+      // Update the list entry too
+      const list: { id: string; name: string; type: string; updatedAt: string; tags?: string[] }[] =
+        JSON.parse(localStorage.getItem(LS_LIST) ?? '[]')
+      const idx = list.findIndex(m => m.id === map.id)
+      const meta = { id: map.id, name: map.name, type: map.type, updatedAt: now, tags: map.tags ?? [] }
+      if (idx >= 0) list[idx] = meta; else list.unshift(meta)
+      localStorage.setItem(LS_LIST, JSON.stringify(list))
+    } catch {}
+  },
+  { equalityFn: (a, b) => a.dirty === b.dirty && a.map === b.map }
+)
