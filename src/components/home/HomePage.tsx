@@ -771,8 +771,8 @@ function DiagramMinimap({ id, type }: { id: string; type: string }) {
     )
   }
 
-  // Root shape: pill for long titles, circle otherwise
-  const isRootPill = root?.shape === 'pill' || (!root?.shape && (root?.title?.length ?? 0) >= 15)
+  // Thumbnail root: always a fixed-size circle for consistency
+  const THUMB_ROOT_R = 10
 
   // Diagram content area — padding is baked into the viewBox so canvasBg fills edge-to-edge
   const P = 14  // internal padding
@@ -786,19 +786,15 @@ function DiagramMinimap({ id, type }: { id: string; type: string }) {
     const l1H = Math.max(7, Math.min(18, Math.round(rowH * 0.65)))
     const totalH = n * l1H + (n - 1) * (rowH - l1H)
     const startY = (H - totalH) / 2
-    const rootCY = H / 2, rootR = 10
-    const pillW = 34, pillH = 14
-    const rootRight = isRootPill ? 8 + pillW : 22 + rootR
+    const rootCY = H / 2
+    const rootRight = 22 + THUMB_ROOT_R
     const barX = rootRight + 10, l1X = barX + 8, l1W = 100
 
     return (
       <svg viewBox={VB} style={{ width: '100%', height: '100%' }} overflow="hidden">
         <rect x={-P} y={-P} width={W + P * 2} height={H + P * 2} fill={canvasBg} />
         <g transform={`translate(${W / 2} ${H / 2}) scale(0.8) translate(${-W / 2} ${-H / 2})`}>
-          {isRootPill
-            ? <rect x={8} y={rootCY - pillH / 2} width={pillW} height={pillH} rx={pillH / 2} fill={rootFill} />
-            : <circle cx={22} cy={rootCY} r={rootR} fill={rootFill} />
-          }
+          <circle cx={22} cy={rootCY} r={THUMB_ROOT_R} fill={rootFill} />
           {lineStyle === 'straight' ? (
             /* Straight: diagonal lines from root to each L1 */
             l1s.map((l1, i) => {
@@ -856,8 +852,6 @@ function DiagramMinimap({ id, type }: { id: string; type: string }) {
   // ── Mindmap (radial) ─────────────────────────────────────────────
   if (type === 'mindmap') {
     const cx = W / 2, cy = H / 2
-    const rootR = isRootPill ? 0 : 10
-    const pillW = 34, pillH = 12
     const armLen = 38, barW = 30, barH = 7
     const visible = l1s.slice(0, 6)
     const vn = visible.length
@@ -883,10 +877,7 @@ function DiagramMinimap({ id, type }: { id: string; type: string }) {
           )
         })}
         {/* Root shape on top */}
-        {isRootPill
-          ? <rect x={cx - pillW / 2} y={cy - pillH / 2} width={pillW} height={pillH} rx={pillH / 2} fill={rootFill} />
-          : <circle cx={cx} cy={cy} r={rootR} fill={rootFill} />
-        }
+        <circle cx={cx} cy={cy} r={THUMB_ROOT_R} fill={rootFill} />
       </svg>
     )
   }
@@ -900,10 +891,7 @@ function DiagramMinimap({ id, type }: { id: string; type: string }) {
       <svg viewBox={VB} style={{ width: '100%', height: '100%' }} overflow="hidden">
         <rect x={-P} y={-P} width={W + P * 2} height={H + P * 2} fill={canvasBg} />
         {/* Root on the LEFT */}
-        {isRootPill
-          ? <rect x={4} y={spineY - 8} width={26} height={16} rx={8} fill={rootFill} />
-          : <circle cx={17} cy={spineY} r={10} fill={rootFill} />
-        }
+        <circle cx={17} cy={spineY} r={THUMB_ROOT_R} fill={rootFill} />
         {/* Spine from root rightward */}
         <line x1={rootEndX} y1={spineY} x2={W - 14} y2={spineY} stroke={spineFill} strokeWidth={2.5} strokeLinecap="round" />
         {l1s.map((l1, i) => {
@@ -925,18 +913,13 @@ function DiagramMinimap({ id, type }: { id: string; type: string }) {
   // ── Timeline ─────────────────────────────────────────────────────
   if (type === 'timeline') {
     const spineY = H / 2, n = l1s.length
-    const rootR = 10, pillW2 = 30, pillH2 = 12
-    const rootEndX = isRootPill ? 8 + pillW2 + 4 : 8 + rootR * 2 + 4
+    const rootEndX = 8 + THUMB_ROOT_R * 2 + 4
     const step = (W - rootEndX - 14) / Math.max(n, 1)
 
     return (
       <svg viewBox={VB} style={{ width: '100%', height: '100%' }} overflow="hidden">
         <rect x={-P} y={-P} width={W + P * 2} height={H + P * 2} fill={canvasBg} />
-        {/* Root */}
-        {isRootPill
-          ? <rect x={8} y={spineY - pillH2 / 2} width={pillW2} height={pillH2} rx={pillH2 / 2} fill={rootFill} />
-          : <circle cx={8 + rootR} cy={spineY} r={rootR} fill={rootFill} />
-        }
+        <circle cx={8 + THUMB_ROOT_R} cy={spineY} r={THUMB_ROOT_R} fill={rootFill} />
         <line x1={rootEndX} y1={spineY} x2={W - 14} y2={spineY} stroke={spineFill} strokeWidth={2} strokeLinecap="round" />
         {l1s.map((l1, i) => {
           const x = rootEndX + i * step + step / 2
@@ -960,10 +943,7 @@ function DiagramMinimap({ id, type }: { id: string; type: string }) {
     return (
       <svg viewBox={VB} style={{ width: '100%', height: '100%' }} overflow="hidden">
         <rect x={-P} y={-P} width={W + P * 2} height={H + P * 2} fill={canvasBg} />
-        {isRootPill
-          ? <rect x={W / 2 - 20} y={8} width={40} height={16} rx={8} fill={rootFill} />
-          : <circle cx={W / 2} cy={16} r={10} fill={rootFill} />
-        }
+        <circle cx={W / 2} cy={16} r={THUMB_ROOT_R} fill={rootFill} />
         {l1s.map((l1, i) => {
           const x = 10 + i * step + step / 2
           return (
@@ -982,10 +962,7 @@ function DiagramMinimap({ id, type }: { id: string; type: string }) {
   return (
     <svg viewBox={VB} style={{ width: '100%', height: '100%' }} overflow="hidden">
       <rect x={-P} y={-P} width={W + P * 2} height={H + P * 2} fill={canvasBg} />
-      {isRootPill
-        ? <rect x={8} y={H / 2 - 8} width={30} height={16} rx={8} fill={rootFill} />
-        : <circle cx={24} cy={H / 2} r={10} fill={rootFill} />
-      }
+      <circle cx={24} cy={H / 2} r={THUMB_ROOT_R} fill={rootFill} />
       {l1s.map((l1, i) => {
         const y = 8 + i * step2 + step2 / 2
         return (
