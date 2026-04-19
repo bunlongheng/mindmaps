@@ -213,11 +213,33 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
   }
 
   // Cache user profile in localStorage so it's available instantly on next load
-  const avatarUrl = (() => {
-    const live = user?.user_metadata?.avatar_url as string | undefined
-    if (live) { localStorage.setItem('mindmaps:avatar', live); return live }
-    return localStorage.getItem('mindmaps:avatar') ?? undefined
-  })()
+  const [avatarUrl, setAvatarUrl] = useState<string | undefined>(() =>
+    localStorage.getItem('mindmaps:avatarB64') ?? localStorage.getItem('mindmaps:avatar') ?? undefined
+  )
+  // Cache avatar as base64 on first load so it never needs network again
+  useEffect(() => {
+    const liveUrl = user?.user_metadata?.avatar_url as string | undefined
+    if (!liveUrl) return
+    const cached = localStorage.getItem('mindmaps:avatarB64')
+    if (cached) { setAvatarUrl(cached); return }
+    // Fetch and convert to base64
+    fetch(liveUrl, { referrerPolicy: 'no-referrer' })
+      .then(r => r.blob())
+      .then(blob => {
+        const reader = new FileReader()
+        reader.onloadend = () => {
+          const b64 = reader.result as string
+          localStorage.setItem('mindmaps:avatarB64', b64)
+          localStorage.setItem('mindmaps:avatar', liveUrl)
+          setAvatarUrl(b64)
+        }
+        reader.readAsDataURL(blob)
+      })
+      .catch(() => {
+        localStorage.setItem('mindmaps:avatar', liveUrl)
+        setAvatarUrl(liveUrl)
+      })
+  }, [user])
   const displayName = (() => {
     const live = (user?.user_metadata?.full_name ?? user?.email ?? '') as string
     if (live) { localStorage.setItem('mindmaps:displayName', live); return live }
