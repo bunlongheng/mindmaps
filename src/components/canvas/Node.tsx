@@ -305,7 +305,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
     >
       {/* Fireflies around L1 nodes */}
       {node.depth === 1 && (
-        <Fireflies cx={displayW / 2} cy={node.height / 2} r={Math.max(displayW, node.height) * 0.6} color={node.color} />
+        <Fireflies cx={displayW / 2} cy={node.height / 2} r={Math.max(displayW, node.height) * 0.45} color={node.color} />
       )}
 
       {isRoot ? (
@@ -714,15 +714,15 @@ function Fireflies({ cx, cy, r, color }: { cx: number; cy: number; r: number; co
     const shades = colorShades(color, 10)
     return Array.from({ length: 10 }, (_, i) => {
       const angle = Math.random() * Math.PI * 2
-      const dist = r * (0.8 + Math.random() * 1.2)
+      const dist = r * (0.6 + Math.random() * 0.5)
       return {
         x: cx + Math.cos(angle) * dist,
         y: cy + Math.sin(angle) * dist,
         size: 1.2 + Math.random() * 1.8,
         color: shades[i],
         key: i,
-        d1: { dx: (Math.random() - 0.5) * r * 1.5, dy: (Math.random() - 0.5) * r * 1.5 },
-        d2: { dx: (Math.random() - 0.5) * r * 1.5, dy: (Math.random() - 0.5) * r * 1.5 },
+        d1: { dx: (Math.random() - 0.5) * r * 0.7, dy: (Math.random() - 0.5) * r * 0.7 },
+        d2: { dx: (Math.random() - 0.5) * r * 0.7, dy: (Math.random() - 0.5) * r * 0.7 },
         dur: 5 + Math.random() * 8,
         blinkDur: 1.2 + Math.random() * 2,
         blinkBegin: Math.random() * 3,
