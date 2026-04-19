@@ -72,7 +72,11 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   )
   const isMindmapCircle = diagramType === 'mindmap' && node.depth === 1
   const isMindmapL2Plus = diagramType === 'mindmap' && node.depth >= 2
-  const effectiveRx = isMindmapL2Plus ? Math.max(node.width, node.height) / 2 : rx
+  const isFishbone = diagramType === 'fishbone'
+  const isFishboneNode = isFishbone && node.depth >= 1
+  // Fishbone: detect if node is above or below the spine (Y=400) for parallelogram direction
+  const fishboneAbove = isFishboneNode ? (node.y + node.height / 2) < 400 : false
+  const effectiveRx = isMindmapL2Plus ? Math.max(node.width, node.height) / 2 : isFishboneNode ? 0 : rx
   const previewW = (!isRoot && resizePreview?.depth === node.depth) ? resizePreview.width : null
 
   // Mindmap circles: keep text horizontal for readability
@@ -372,7 +376,33 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
             fill="none" stroke={strokeColor} strokeWidth={strokeW * 2} />
         </g>
         </>
-      ) : (
+      ) : isFishboneNode ? (() => {
+        // Parallelogram: skew matches the bone direction
+        const sk = node.height * 0.35  // skew amount
+        const w = displayW, h = node.height
+        // Above spine: leans right (top shifts right)
+        // Below spine: leans left (top shifts left)
+        const pts = fishboneAbove
+          ? `${sk},0 ${w},0 ${w - sk},${h} 0,${h}`
+          : `0,0 ${w - sk},0 ${w},${h} ${sk},${h}`
+        return (
+        <>
+        <polygon points={pts} fill="transparent" />
+        <g style={{ pointerEvents: 'none' }}
+          filter="drop-shadow(0 1px 4px rgba(0,0,0,0.1))">
+          <polygon points={pts} fill={bg} fillOpacity={bgOpacity} />
+          {(hasEmoji || hasIcon) && (() => {
+            // White badge area as a clipped rect inside the parallelogram
+            const badgeW = node.height + 1
+            const badgePts = fishboneAbove
+              ? `${sk},0 ${sk + badgeW},0 ${badgeW},${h} 0,${h}`
+              : `0,0 ${badgeW},0 ${badgeW + sk},${h} ${sk},${h}`
+            return <polygon points={badgePts} fill="#ffffff" />
+          })()}
+          <polygon points={pts} fill="none" stroke={strokeColor} strokeWidth={strokeW * 2} />
+        </g>
+        </>)
+      })() : (
         <>
         {/* Invisible hit-area so pointer events reach the <g> handlers */}
         <rect x={0} y={0} width={displayW} height={node.height} fill="transparent" />
@@ -594,7 +624,27 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
               style={{ pointerEvents: 'none' }} />
           </>
         )
-      ) : (
+      ) : isFishboneNode ? (() => {
+        const sk = node.height * 0.35
+        const w = displayW, h = node.height
+        const pad1 = 5, pad2 = 2
+        const outerPts = fishboneAbove
+          ? `${sk - pad1},${-pad1} ${w + pad1},${-pad1} ${w - sk + pad1},${h + pad1} ${-pad1},${h + pad1}`
+          : `${-pad1},${-pad1} ${w - sk + pad1},${-pad1} ${w + pad1},${h + pad1} ${sk - pad1},${h + pad1}`
+        const innerPts = fishboneAbove
+          ? `${sk - pad2},${-pad2} ${w + pad2},${-pad2} ${w - sk + pad2},${h + pad2} ${-pad2},${h + pad2}`
+          : `${-pad2},${-pad2} ${w - sk + pad2},${-pad2} ${w + pad2},${h + pad2} ${sk - pad2},${h + pad2}`
+        return (
+        <>
+          <polygon points={outerPts}
+            fill="none" stroke="rgba(59,130,246,0.18)" strokeWidth={6}
+            style={{ pointerEvents: 'none' }} />
+          <polygon points={innerPts}
+            fill="none" stroke="#3b82f6" strokeWidth={3.5}
+            filter="drop-shadow(0 0 8px rgba(59,130,246,0.7))"
+            style={{ pointerEvents: 'none' }} />
+        </>)
+      })() : (
         <>
           <rect
             x={-5} y={-5}
