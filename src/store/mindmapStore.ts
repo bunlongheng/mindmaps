@@ -193,7 +193,7 @@ export const useMindmapStore = create<MindmapStore>()(
     lineStyle: 'orthogonal',
     themeId: localStorage.getItem('mindmaps:themeId') ?? 'default',
     showOrderNumbers: true,
-    showChildCount: true,
+    showChildCount: false,
     hideDetails: false,
     isImporting: false,
     resizePreview: null,

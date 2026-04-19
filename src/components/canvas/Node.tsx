@@ -63,6 +63,20 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
       ? (s.activeMindmap?.nodes.filter(n => n.parentId === node.id).length ?? 0)
       : 0
   )
+  // Total descendants under this node (for firefly count on L1)
+  const descendantCount = useMindmapStore(s => {
+    if (node.depth !== 1 || !s.activeMindmap) return 0
+    const nodes = s.activeMindmap.nodes
+    let count = 0
+    const stack = [node.id]
+    while (stack.length) {
+      const pid = stack.pop()!
+      for (const n of nodes) {
+        if (n.parentId === pid) { count++; stack.push(n.id) }
+      }
+    }
+    return count
+  })
   const canDrag = (isRoot && diagramType !== 'mindmap') || diagramType === 'logic-chart'
   // Root shape: in mindmap mode always circle; otherwise user-set or auto from title length
   const isRootPill = isRoot && diagramType !== 'mindmap' && (
@@ -303,9 +317,9 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
       onDoubleClick={handleDoubleClick}
       style={{ cursor: editing ? 'default' : canDrag ? 'grab' : 'pointer', userSelect: 'none' }}
     >
-      {/* Fireflies around L1 nodes — count = number of children */}
-      {node.depth === 1 && childCount > 0 && (
-        <Fireflies cx={displayW / 2} cy={node.height / 2} r={Math.max(displayW, node.height) * 0.45} color={node.color} count={childCount} />
+      {/* Fireflies around L1 nodes — count = all descendants */}
+      {node.depth === 1 && descendantCount > 0 && (
+        <Fireflies cx={displayW / 2} cy={node.height / 2} r={Math.max(displayW, node.height) * 0.45} color={node.color} count={descendantCount} />
       )}
 
       {isRoot ? (
