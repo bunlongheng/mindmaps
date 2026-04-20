@@ -10,7 +10,6 @@ function uuid(): string {
 import { create } from 'zustand'
 import { subscribeWithSelector } from 'zustand/middleware'
 import type { Diagram, DiagramMeta, DiagramType, LineStyle, MindmapNode } from '../types'
-import { computeTreeLayout } from '../lib/layout/tree'
 import { computeMindmapsLayout } from '../lib/layout/mindmaps-layout'
 import { computeMindmapLayout } from '../lib/layout/mindmap'
 import { computeFishboneLayout } from '../lib/layout/fishbone'
@@ -115,8 +114,6 @@ function runLayout(nodes: MindmapNode[], type: DiagramType): MindmapNode[] {
     case 'logic-chart': return computeMindmapsLayout(nodes)
     case 'mindmap':     return computeMindmapLayout(nodes)
     case 'fishbone':    return computeFishboneLayout(nodes)
-    case 'tree-vertical':   return computeTreeLayout(nodes, 'vertical')
-    case 'tree-horizontal': return computeTreeLayout(nodes, 'horizontal')
     case 'timeline':    return computeTimelineLayout(nodes)
   }
 }
@@ -250,7 +247,6 @@ export const useMindmapStore = create<MindmapStore>()(
       })
       const labels: Record<string, string> = {
         'logic-chart': 'Logic Chart', 'mindmap': 'Mind Map',
-        'tree-vertical': 'Tree ↓', 'tree-horizontal': 'Tree →',
         'fishbone': 'Fishbone', 'timeline': 'Timeline',
       }
       showToast(`✦ Switched to ${labels[t] ?? t}`, { color: '#1a1d2e' })

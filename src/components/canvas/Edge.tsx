@@ -12,13 +12,7 @@ interface EdgeProps {
 
 export function Edge({ parent, child, lineStyle, diagramType }: EdgeProps) {
   let src, tgt
-  if (diagramType === 'tree-vertical') {
-    src = nodeCenterBottom(parent)
-    tgt = nodeCenterTop(child)
-  } else if (diagramType === 'tree-horizontal') {
-    src = nodeCenterRight(parent)
-    tgt = nodeCenterLeft(child)
-  } else if (diagramType === 'fishbone') {
+  if (diagramType === 'fishbone') {
     src = nodeCenter(parent)
     tgt = nodeCenter(child)
   } else {

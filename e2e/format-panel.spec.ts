@@ -26,7 +26,7 @@ test.describe('Format Panel', () => {
   })
 
   test('switch to all diagram types', async ({ page }) => {
-    const types = ['Mind Map', 'Tree ↓', 'Tree →', 'Fishbone', 'Timeline', 'Logic Chart']
+    const types = ['Mind Map', 'Fishbone', 'Timeline', 'Logic Chart']
     for (const label of types) {
       const btn = page.locator(`text="${label}"`).first()
       if (await btn.isVisible()) {

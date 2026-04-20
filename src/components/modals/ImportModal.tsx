@@ -90,7 +90,7 @@ JSON object with optional icon/emoji/color per node. Children inherit parent col
   ]
 }
 Indented outlines also work. Icons: kebab-case names from lucide.dev/icons.
-Diagram types: logic-chart | mindmap | tree-vertical | tree-horizontal | fishbone | timeline
+Diagram types: logic-chart | mindmap | fishbone | timeline
 
 ## 3. POST via API
 Bearer token is auto-loaded into every shell on this Mac via ~/.zshenv:
@@ -195,8 +195,6 @@ Example prompt: "top 10 productivity habits for software engineers"`} />
               <a href="https://lucide.dev/icons" target="_blank" rel="noreferrer" style={{ color: '#6366f1', fontWeight: 600 }}>lucide.dev/icons</a>.
               Diagram types: <code style={{ fontSize: 10, background: '#f1f5f9', padding: '1px 5px', borderRadius: 3 }}>logic-chart</code>,{' '}
               <code style={{ fontSize: 10, background: '#f1f5f9', padding: '1px 5px', borderRadius: 3 }}>mindmap</code>,{' '}
-              <code style={{ fontSize: 10, background: '#f1f5f9', padding: '1px 5px', borderRadius: 3 }}>tree-vertical</code>,{' '}
-              <code style={{ fontSize: 10, background: '#f1f5f9', padding: '1px 5px', borderRadius: 3 }}>tree-horizontal</code>,{' '}
               <code style={{ fontSize: 10, background: '#f1f5f9', padding: '1px 5px', borderRadius: 3 }}>fishbone</code>,{' '}
               <code style={{ fontSize: 10, background: '#f1f5f9', padding: '1px 5px', borderRadius: 3 }}>timeline</code>.
             </p>

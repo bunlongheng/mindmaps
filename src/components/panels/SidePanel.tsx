@@ -53,32 +53,6 @@ function DiagramTypeIcon({ value, color }: { value: string; color: string }) {
       <rect x="1"  y="11" width="7" height="4" rx="1.5" fill={color} opacity="0.3"/>
     </svg>
   )
-  if (value === 'tree-vertical') return (
-    <svg width="36" height="26" viewBox="0 0 36 26" fill="none">
-      <rect x="13" y="1" width="10" height="6" rx="1.5" fill={color} opacity="0.9"/>
-      <line x1="18" y1="7" x2="18" y2="12" stroke={color} strokeWidth="1.8" strokeLinecap="round"/>
-      <line x1="8" y1="12" x2="28" y2="12" stroke={color} strokeWidth="1.8" strokeLinecap="round"/>
-      <line x1="8"  y1="12" x2="8"  y2="16" stroke={color} strokeWidth="1.8" strokeLinecap="round"/>
-      <line x1="18" y1="12" x2="18" y2="16" stroke={color} strokeWidth="1.8" strokeLinecap="round"/>
-      <line x1="28" y1="12" x2="28" y2="16" stroke={color} strokeWidth="1.8" strokeLinecap="round"/>
-      <rect x="3"  y="16" width="10" height="6" rx="1.5" fill={color} opacity="0.3"/>
-      <rect x="13" y="16" width="10" height="6" rx="1.5" fill={color} opacity="0.3"/>
-      <rect x="23" y="16" width="10" height="6" rx="1.5" fill={color} opacity="0.3"/>
-    </svg>
-  )
-  if (value === 'tree-horizontal') return (
-    <svg width="36" height="26" viewBox="0 0 36 26" fill="none">
-      <rect x="1" y="10" width="9" height="6" rx="1.5" fill={color} opacity="0.9"/>
-      <line x1="10" y1="13" x2="15" y2="13" stroke={color} strokeWidth="1.8" strokeLinecap="round"/>
-      <line x1="15" y1="6" x2="15" y2="20" stroke={color} strokeWidth="1.8" strokeLinecap="round"/>
-      <line x1="15" y1="6"  x2="20" y2="6"  stroke={color} strokeWidth="1.8" strokeLinecap="round"/>
-      <line x1="15" y1="13" x2="20" y2="13" stroke={color} strokeWidth="1.8" strokeLinecap="round"/>
-      <line x1="15" y1="20" x2="20" y2="20" stroke={color} strokeWidth="1.8" strokeLinecap="round"/>
-      <rect x="20" y="3"  width="10" height="6" rx="1.5" fill={color} opacity="0.3"/>
-      <rect x="20" y="10" width="10" height="6" rx="1.5" fill={color} opacity="0.3"/>
-      <rect x="20" y="17" width="10" height="6" rx="1.5" fill={color} opacity="0.3"/>
-    </svg>
-  )
   if (value === 'fishbone') return (
     <svg width="36" height="26" viewBox="0 0 36 26" fill="none">
       <line x1="3" y1="13" x2="30" y2="13" stroke={color} strokeWidth="2" strokeLinecap="round"/>

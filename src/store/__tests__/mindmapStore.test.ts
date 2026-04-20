@@ -351,7 +351,7 @@ describe('mindmapStore', () => {
     it('re-lays out all nodes', () => {
       loadDiagram()
       const before = useMindmapStore.getState().activeMindmap!.nodes.map(n => ({ x: n.x, y: n.y }))
-      useMindmapStore.getState().setDiagramType('tree-vertical')
+      useMindmapStore.getState().setDiagramType('fishbone')
       const after = useMindmapStore.getState().activeMindmap!.nodes.map(n => ({ x: n.x, y: n.y }))
       expect(after).not.toEqual(before)
     })

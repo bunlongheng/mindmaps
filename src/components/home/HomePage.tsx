@@ -966,43 +966,28 @@ function DiagramMinimap({ id, type }: { id: string; type: string }) {
     )
   }
 
-  // ── Tree vertical ────────────────────────────────────────────────
-  if (type === 'tree-vertical') {
-    const n = thumbL1s.length, step = (W - 10) / Math.max(n, 1)
-    return (
-      <svg viewBox={VB} style={{ width: '100%', height: '100%' }} overflow="hidden">
-        <rect x={-P} y={-P} width={W + P * 2} height={H + P * 2} fill={canvasBg} />
-        {rootShape(W / 2, 14)}
-        {thumbL1s.map((l1, i) => {
-          const x = 5 + i * step + step / 2
-          const nodeW = Math.min(28, step - 4)
-          return (
-            <g key={l1.id}>
-              <line x1={W / 2} y1={26} x2={x} y2={68} stroke={l1.color} strokeWidth={1.5} />
-              <rect x={x - nodeW / 2} y={68} width={nodeW} height={14} rx={3} fill={l1.color} />
-            </g>
-          )
-        })}
-      </svg>
-    )
-  }
-
-  // ── Tree horizontal (default fallback) ───────────────────────────
-  const n2 = thumbL1s.length, step2 = (H - 8) / Math.max(n2, 1)
+  // ── Default fallback (render as logic chart) ──────────────────────
+  const n2 = thumbL1s.length, rowH2 = (H - 14) / Math.max(n2, 1)
+  const l1H2 = Math.max(7, Math.min(18, Math.round(rowH2 * 0.65)))
+  const totalH2 = n2 * l1H2 + (n2 - 1) * (rowH2 - l1H2)
+  const startY2 = (H - totalH2) / 2
   return (
     <svg viewBox={VB} style={{ width: '100%', height: '100%' }} overflow="hidden">
       <rect x={-P} y={-P} width={W + P * 2} height={H + P * 2} fill={canvasBg} />
+      <g transform={`translate(${W / 2} ${H / 2}) scale(0.8) translate(${-W / 2} ${-H / 2})`}>
       {rootShape(22, H / 2)}
+      <line x1={32} y1={H / 2} x2={42} y2={H / 2} stroke={rootFill} strokeWidth={2.5} strokeLinecap="round" />
+      {n2 > 1 && <line x1={42} y1={startY2 + l1H2 / 2} x2={42} y2={startY2 + totalH2 - l1H2 / 2} stroke={thumbL1s[Math.floor(n2 / 2)]?.color ?? '#94a3b8'} strokeWidth={2.5} />}
       {thumbL1s.map((l1, i) => {
-        const y = 4 + i * step2 + step2 / 2
-        const nodeH = Math.min(14, step2 - 4)
+        const cy2 = startY2 + i * rowH2 + l1H2 / 2
         return (
           <g key={l1.id}>
-            <line x1={34} y1={H / 2} x2={60} y2={y} stroke={l1.color} strokeWidth={1.5} />
-            <rect x={60} y={y - nodeH / 2} width={80} height={nodeH} rx={3} fill={l1.color} />
+            <line x1={42} y1={cy2} x2={50} y2={cy2} stroke={l1.color} strokeWidth={1.8} strokeLinecap="round" />
+            <rect x={50} y={cy2 - l1H2 / 2} width={100} height={l1H2} rx={l1H2 / 2} fill={l1.color} />
           </g>
         )
       })}
+      </g>
     </svg>
   )
 }
