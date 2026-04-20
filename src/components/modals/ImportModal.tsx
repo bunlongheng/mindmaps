@@ -1,8 +1,6 @@
 import { useState } from 'react'
 import { X, Copy, Check } from 'lucide-react'
 
-const API_KEY = import.meta.env.VITE_MINDMAP_API_KEY ?? '<API_KEY>'
-
 interface ImportModalProps { onClose: () => void; userId?: string | null }
 
 function Badge({ label, color }: { label: string; color?: string }) {
@@ -73,61 +71,38 @@ function Row({ title, badge, badgeColor, children }: {
   )
 }
 
-const ALL_INSTRUCTIONS = `# Mindmaps Import Guide
+const ALL_INSTRUCTIONS = `# Mindmaps — Import Guide for AI Agents
 
-## Format 1 — Indented outline (paste on canvas with ⌘V)
-Root Topic
-    Branch A
-        Item 1
-        Item 2
-    Branch B
-        Item 3
+Three ways to create a mindmap:
 
-## Format 2 — JSON object with icons, emojis & colors (paste on canvas with ⌘V)
-Any node at any depth can have an optional "icon", "emoji", or "color" (hex) field.
-Colors are optional — children inherit parent color automatically.
+## 1. Generate with AI (built-in UI)
+Click the ✦ button on the index page and describe the mindmap in plain English.
+
+## 2. Paste (⌘V) anywhere on canvas
+JSON object with optional icon/emoji/color per node. Children inherit parent color.
 {
   "Root Title": [
     { "icon": "brain", "color": "#6366f1", "Category": [
         { "icon": "zap", "Sub Item": ["detail 1", "detail 2"] },
-        { "emoji": "🚀", "color": "#ec4899", "Another Sub": ["detail 3"] },
+        { "emoji": "🚀", "Another Sub": ["detail 3"] },
         "plain text leaf"
-    ]},
-    { "emoji": "🎯", "color": "#f97316", "Another Category": ["item 1", "item 2"] }
-  ]
-}
-
-## Supported icons (use in "icon" field)
-user, bot, server, database, zap, plug, git-branch, globe, brain, settings,
-folder, cloud, mail, lock, key, search, star, rocket, lightbulb, flame,
-check-circle, map-pin, trophy, message, phone, wrench, chart, eye, music,
-heart, flag, shield, flask, trending, paint, sparkles, smile, home, building,
-briefcase, graduate, gift, clock, calendar, file, cog, cpu, link, code,
-terminal, package, layers, bell, alert, info, help, refresh, share, download
-
-## Supported diagram types (use as "type" field)
-logic-chart | mindmap | tree-vertical | tree-horizontal | fishbone | timeline
-
-## Prompt template to generate a compatible outline
-Generate a mindmap outline for [TOPIC].
-Return JSON in this format:
-{
-  "Root Title": [
-    { "icon": "<icon>", "color": "<hex (optional)>", "Category Name": [
-        { "icon": "<icon>", "Sub Category": ["leaf item", "leaf item"] },
-        "plain leaf item"
     ]}
   ]
 }
-Use icons from this list: brain, zap, star, rocket, lightbulb, flame, code,
-database, globe, shield, chart, folder, settings, trophy, heart, flag, sparkles.
-color is optional (any hex value, e.g. "#6366f1"). If omitted, a default palette is used.
-Children inherit the parent's color. Subcategories can also have icons or emojis.
-Minimum 3 items per node.
+Indented outlines also work. Icons: kebab-case names from lucide.dev/icons.
+Diagram types: logic-chart | mindmap | tree-vertical | tree-horizontal | fishbone | timeline
 
-## API — Outline import
-POST https://mindmaps-bheng.vercel.app/api/ai/mindmaps
-Body: { "title": "My Map", "outline": "Root\\n  Branch 1\\n    Item A", "type": "logic-chart", "userId": "<your-user-id>" }
+## 3. POST via API
+Bearer token is auto-loaded into every shell on this Mac via ~/.zshenv:
+  echo $MINDMAP_AI_API_KEY
+
+curl -X POST https://mindmaps-bheng.vercel.app/api/ai/mindmaps \\
+  -H "Authorization: Bearer $MINDMAP_AI_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{ "title": "My Map", "outline": "Root\\n  Branch 1\\n    Item A", "type": "logic-chart", "userId": "<user-id>" }'
+
+Required: title. Optional: outline, type, userId, isFavorite, colors, lineStyle, themeId.
+Calling with no body returns a JSON sample. Search stickies for "Mindmaps Import API" for the full reference.
 `
 
 export function ImportModal({ onClose, userId }: ImportModalProps) {
@@ -196,65 +171,40 @@ export function ImportModal({ onClose, userId }: ImportModalProps) {
         {/* Body */}
         <div style={{ overflowY: 'auto', padding: '24px 32px' }}>
 
-          <Row title="Paste — Indented outline" badge="⌘V on canvas" badgeColor="#22c55e">
-            <CodeBlock copyable code={`Root Topic
-    Branch A
-        Item 1
-        Item 2
-    Branch B
-        Item 3`} />
+          <Row title="1. Generate with AI" badge="Built-in" badgeColor="#a855f7">
+            <CodeBlock code={`Click the ✦ button on the index page and describe your mindmap
+in plain English. Claude generates the JSON structure with icons
+and saves it to your library automatically.
+
+Example prompt: "top 10 productivity habits for software engineers"`} />
           </Row>
 
-          <Row title="Paste — JSON object" badge="⌘V on canvas" badgeColor="#22c55e">
+          <Row title="2. Paste (⌘V) anywhere" badge="Auto-detect" badgeColor="#22c55e">
             <CodeBlock copyable code={`{
   "Root Title": [
     { "icon": "brain", "color": "#6366f1", "Category": [
         { "icon": "zap", "Sub Item": ["detail 1", "detail 2"] },
-        { "emoji": "🚀", "color": "#ec4899", "Another Sub": ["detail 3"] },
+        { "emoji": "🚀", "Another Sub": ["detail 3"] },
         "plain text leaf"
     ]},
-    { "emoji": "🎯", "color": "#f97316", "Another Branch": ["item 1", "item 2"] }
+    { "emoji": "🎯", "Another Branch": ["item 1", "item 2"] }
   ]
 }`} />
             <p style={{ fontSize: 11, color: '#94a3b8', margin: '6px 0 0' }}>
-              <code style={{ background: '#f1f5f9', padding: '1px 5px', borderRadius: 3, fontSize: 10 }}>color</code> is optional — any hex value. Children inherit the parent's color automatically.
+              Indented outlines also work. Icons use kebab-case names from{' '}
+              <a href="https://lucide.dev/icons" target="_blank" rel="noreferrer" style={{ color: '#6366f1', fontWeight: 600 }}>lucide.dev/icons</a>.
+              Diagram types: <code style={{ fontSize: 10, background: '#f1f5f9', padding: '1px 5px', borderRadius: 3 }}>logic-chart</code>,{' '}
+              <code style={{ fontSize: 10, background: '#f1f5f9', padding: '1px 5px', borderRadius: 3 }}>mindmap</code>,{' '}
+              <code style={{ fontSize: 10, background: '#f1f5f9', padding: '1px 5px', borderRadius: 3 }}>tree-vertical</code>,{' '}
+              <code style={{ fontSize: 10, background: '#f1f5f9', padding: '1px 5px', borderRadius: 3 }}>tree-horizontal</code>,{' '}
+              <code style={{ fontSize: 10, background: '#f1f5f9', padding: '1px 5px', borderRadius: 3 }}>fishbone</code>,{' '}
+              <code style={{ fontSize: 10, background: '#f1f5f9', padding: '1px 5px', borderRadius: 3 }}>timeline</code>.
             </p>
           </Row>
 
-          <Row title="Supported icons" badge="icon field" badgeColor="#0ea5e9">
-            <p style={{ fontSize: 12, color: '#64748b', margin: 0 }}>
-              Browse at{' '}
-              <a href="https://lucide.dev/icons" target="_blank" rel="noreferrer"
-                style={{ color: '#6366f1', fontWeight: 600 }}>lucide.dev/icons</a>
-              {' '}— use the kebab-case name (e.g. <code style={{ fontSize: 11, background: '#f1f5f9', padding: '1px 5px', borderRadius: 3 }}>arrow-right</code>)
-            </p>
-          </Row>
-
-          <Row title="Paste — AI prompt template" badge="copy & use" badgeColor="#6366f1">
-            <CodeBlock copyable code={`Generate a mindmap for [TOPIC] as JSON:
-{
-  "Root Title": [
-    { "icon": "<icon>", "color": "<hex>", "Branch": [
-        { "icon": "<icon>", "Sub": ["leaf", "leaf"] },
-        { "emoji": "🔥", "Sub2": ["leaf"] },
-        "plain leaf"
-    ]}
-  ]
-}
-Icons (pick from): brain zap star rocket lightbulb flame code
-database globe shield chart folder settings trophy heart sparkles
-color is optional (any hex, e.g. "#6366f1"). Children inherit parent color.
-Sub-categories can also have icons or emojis. Min 3 items per node.`} />
-          </Row>
-
-          <Row title="Supported diagram types" badge="type field">
-            <CodeBlock copyable code={`logic-chart  |  mindmap  |  tree-vertical
-tree-horizontal  |  fishbone  |  timeline`} />
-          </Row>
-
-          <Row title="API — Outline import" badge="POST /api/ai/mindmaps" badgeColor="#f97316">
+          <Row title="3. POST via API" badge="External agents" badgeColor="#6366f1">
             <CodeBlock copyable code={`curl -X POST https://mindmaps-bheng.vercel.app/api/ai/mindmaps \\
-  -H "Authorization: Bearer ${API_KEY}" \\
+  -H "Authorization: Bearer $MINDMAP_AI_API_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{
     "title": "My Map",
@@ -262,6 +212,26 @@ tree-horizontal  |  fishbone  |  timeline`} />
     "type": "logic-chart",
     "userId": "${uid}"
   }'`} />
+          </Row>
+
+          <Row title="AI agents — how to discover this API" badge="For Claude/LLM" badgeColor="#0ea5e9">
+            <CodeBlock copyable code={`If you are an AI assistant, here is how to learn this endpoint:
+
+1. The Bearer token is auto-loaded in every shell at this Mac
+   (via ~/.zshenv — works in non-interactive shells too):
+     echo $MINDMAP_AI_API_KEY
+
+2. Search the user's stickies for the full reference:
+     stickies search "Mindmaps Import API"
+
+3. Or call the endpoint with no body — it returns a JSON
+   sample you can copy verbatim:
+     curl -X POST https://mindmaps-bheng.vercel.app/api/ai/mindmaps \\
+       -H "Authorization: Bearer $MINDMAP_AI_API_KEY"
+
+4. Project memory at:
+   ~/.claude/projects/-Users-bheng-Sites-mindmaps/memory/
+     reference_mindmaps_import_api.md`} />
           </Row>
 
 </div>
