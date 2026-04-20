@@ -19,8 +19,6 @@ interface SidePanelProps {
 const DIAGRAM_TYPES: { value: DiagramType; label: string }[] = [
   { value: 'logic-chart',     label: 'Logic Chart' },
   { value: 'mindmap',         label: 'Mind Map' },
-  { value: 'tree-vertical',   label: 'Tree ↓' },
-  { value: 'tree-horizontal', label: 'Tree →' },
   { value: 'fishbone',        label: 'Fishbone' },
   { value: 'timeline',        label: 'Timeline' },
 ]
