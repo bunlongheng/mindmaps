@@ -5,8 +5,8 @@ import { DiagramCanvas } from './components/canvas/DiagramCanvas'
 import { SidePanel } from './components/panels/SidePanel'
 import { ImportModal } from './components/modals/ImportModal'
 import { HomePage } from './components/home/HomePage'
-import { useDiagram, lsDeleteDiagram } from './hooks/useDiagram'
-import { soundIncoming, soundDelete } from './lib/sounds'
+import { useDiagram } from './hooks/useDiagram'
+import { soundDelete } from './lib/sounds'
 import { useMindmapStore } from './store/mindmapStore'
 import { decodeShareURL } from './lib/export/share'
 import { supabase, hasSupabase } from './lib/supabase'
@@ -115,34 +115,7 @@ export default function App() {
   const effectiveUserId = user?.id ?? (isLocal ? (import.meta.env.VITE_LOCAL_USER_ID ?? null) : null)
   const { loadDiagramList, loadDiagram, saveDiagram, createDiagramFromNodes, deleteDiagram, updateTags } = useDiagram(effectiveUserId)
 
-  // Real-time DB sync — INSERT/DELETE on mindmaps table
-  useEffect(() => {
-    if (!hasSupabase || !supabase || !effectiveUserId) return
-    const ch = supabase
-      .channel('mindmaps-db-changes')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'mindmaps', filter: `user_id=eq.${effectiveUserId}` }, (payload) => {
-        const row = payload.new as Record<string, unknown>
-        const { diagrams } = useMindmapStore.getState()
-        if (diagrams.find(d => d.id === row.id)) return
-        soundIncoming()
-        showToast(`✦ "${row.name}" added`, { color: '#1a1d2e' })
-        loadDiagramList()
-      })
-      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'mindmaps', filter: `user_id=eq.${effectiveUserId}` }, (payload) => {
-        const id = (payload.old as Record<string, unknown>).id as string
-        const { diagrams, activeMindmap, setIsDirty } = useMindmapStore.getState()
-        const deleted = diagrams.find(d => d.id === id)
-        lsDeleteDiagram(id)
-        if (activeMindmap?.id === id) {
-          useMindmapStore.getState().setActiveMindmap(null as unknown as import('./types').Diagram)
-          setIsDirty(false)
-        }
-        loadDiagramList()
-        if (deleted) { soundDelete(); showToast(`"${deleted.name}" deleted`, { color: '#1a1d2e' }) }
-      })
-      .subscribe()
-    return () => { supabase!.removeChannel(ch) }
-  }, [effectiveUserId, loadDiagramList])
+  // Realtime removed — data now on Linode PostgreSQL
   const { activeMindmap, isDirty, setActiveMindmap, addNode, selectedNodeIds, setSelectedNodeIds, setPasteImportFn, diagrams } = useMindmapStore()
   const [flashDiagramId, setFlashDiagramId] = useState<string | null>(null)
   const [showTagFooter, setShowTagFooter] = useState(false)

@@ -1,10 +1,12 @@
 import { useCallback } from 'react'
 import { showToast } from '../components/CuteToast'
-import { supabase, hasSupabase } from '../lib/supabase'
 import { useMindmapStore } from '../store/mindmapStore'
 import { ROOT_COLORS } from '../lib/color'
 import { soundCreate, soundDelete, soundSave, soundError, soundPaste } from '../lib/sounds'
 import type { Diagram, DiagramMeta, MindmapNode } from '../types'
+
+// ── API base URL ───────────────────────────────────────────────────────────
+const API_BASE = 'https://bheng.dev/api/mindmaps'
 
 // ── localStorage helpers ────────────────────────────────────────────────────
 
@@ -69,9 +71,9 @@ function rowToDiagram(row: Record<string, unknown>): Diagram {
     id:             row.id as string,
     name:           row.name as string,
     type:           row.type as Diagram['type'],
-    lineStyle:      row.line_style as Diagram['lineStyle'],
-    createdAt:      row.created_at as string,
-    updatedAt:      row.updated_at as string,
+    lineStyle:      (row.line_style as Diagram['lineStyle']) ?? 'orthogonal',
+    createdAt:      (row.created_at as string) ?? new Date().toISOString(),
+    updatedAt:      (row.updated_at as string) ?? new Date().toISOString(),
     sharingEnabled: (row.sharing_enabled ?? false) as boolean,
     themeId:        (row.theme_id as string | undefined) ?? 'default',
     tags:           (row.tags as string[] | undefined) ?? [],
@@ -85,42 +87,43 @@ export function useDiagram(userId: string | null = null) {
   const { setActiveMindmap, setDiagrams, setIsDirty } = useMindmapStore()
 
   const loadDiagramList = useCallback(async () => {
-    if (!hasSupabase || !supabase || !userId) {
-      setDiagrams(lsGetList())
-      return
-    }
-    const { data, error } = await supabase
-      .from('mindmaps')
-      .select('id, name, type, updated_at, nodes, sharing_enabled, is_favorite, tags')
-      .eq('user_id', userId)
-      .order('updated_at', { ascending: false })
-    if (error) { console.error(error); setDiagrams(lsGetList()); return }
+    // Always show local cache first
+    setDiagrams(lsGetList())
 
-    // Cache diagrams locally so minimap thumbnails are available instantly
-    if (data && data.length > 0) {
-      const remoteIds = new Set(data.map((d: { id: string }) => d.id))
-      const localList = lsGetList()
-      // Keep local entries that exist remotely, plus any local-only ones not yet in Supabase
-      const localOnlyIds = new Set(localList.filter(m => !remoteIds.has(m.id)).map(m => m.id))
-      lsSaveList([...localList.filter(m => localOnlyIds.has(m.id) || remoteIds.has(m.id))])
-      for (const row of data) {
-        if (!row.nodes) continue
-        const localCached = lsGetDiagram(row.id)
-        // Don't overwrite local cache if it's newer (e.g. just saved locally before Supabase propagated)
-        if (localCached) {
-          const localTime = new Date(localCached.updatedAt ?? 0).getTime()
-          const remoteTime = new Date((row as Record<string, unknown>).updated_at as string ?? 0).getTime()
-          if (localTime > remoteTime) continue
+    if (!userId) return
+
+    try {
+      const res = await fetch(`${API_BASE}?user_id=${userId}`)
+      if (!res.ok) return
+      const data = await res.json() as Record<string, unknown>[]
+
+      // Cache remotely fetched diagrams locally
+      if (data.length > 0) {
+        const remoteIds = new Set(data.map((d: Record<string, unknown>) => d.id as string))
+        const localList = lsGetList()
+        const localOnlyIds = new Set(localList.filter(m => !remoteIds.has(m.id)).map(m => m.id))
+        lsSaveList([...localList.filter(m => localOnlyIds.has(m.id) || remoteIds.has(m.id))])
+        for (const row of data) {
+          if (!row.nodes) continue
+          const localCached = lsGetDiagram(row.id as string)
+          if (localCached) {
+            const localTime = new Date(localCached.updatedAt ?? 0).getTime()
+            const remoteTime = new Date(row.updated_at as string ?? 0).getTime()
+            if (localTime > remoteTime) continue
+          }
+          lsSaveDiagram(rowToDiagram(row))
         }
-        lsSaveDiagram(rowToDiagram(row as Record<string, unknown>))
       }
-    }
 
-    setDiagrams((data ?? []).map(d => ({
-      id: d.id, name: d.name, type: d.type, updatedAt: d.updated_at,
-      isPublic: d.sharing_enabled ?? false,
-      tags: (d as Record<string, unknown>).tags as string[] ?? [],
-    })))
+      setDiagrams((data ?? []).map(d => ({
+        id: d.id as string, name: d.name as string, type: d.type as string,
+        updatedAt: d.updated_at as string,
+        isPublic: (d.sharing_enabled ?? false) as boolean,
+        tags: (d.tags as string[]) ?? [],
+      })))
+    } catch {
+      // Network error — localStorage is already showing
+    }
   }, [setDiagrams, userId])
 
   const loadDiagram = useCallback(async (id: string) => {
@@ -131,69 +134,57 @@ export function useDiagram(userId: string | null = null) {
       localStorage.setItem('activeMindmapId', id)
     }
 
-    if (!hasSupabase || !supabase) return
+    if (!userId) return
 
-    // 2. Query Supabase — with user_id filter if authenticated, without if local/anonymous
-    const query = supabase.from('mindmaps').select('*').eq('id', id)
-    const { data, error } = await (userId ? query.eq('user_id', userId) : query).single()
+    try {
+      // 2. Query Linode API
+      const res = await fetch(`${API_BASE}?id=${id}&user_id=${userId}`)
+      if (!res.ok) return
+      const data = await res.json()
+      if (data.error) return
 
-    if (error || !data) {
-      if (!cached && userId) {
-        const recached = lsGetDiagram(id)
-        if (recached) {
-          setActiveMindmap(recached)
-          localStorage.setItem('activeMindmapId', id)
-          await supabase.from('mindmaps').upsert({
-            id: recached.id, user_id: userId, name: recached.name,
-            type: recached.type, line_style: recached.lineStyle,
-            sharing_enabled: recached.sharingEnabled ?? false,
-            theme_id: recached.themeId ?? 'default', nodes: recached.nodes,
-          })
-        }
+      const diagram = rowToDiagram(data)
+      // If local cache is newer, keep it
+      if (cached) {
+        const localTime = new Date(cached.updatedAt ?? 0).getTime()
+        const remoteTime = new Date(diagram.updatedAt ?? 0).getTime()
+        if (localTime > remoteTime) return
       }
-      return
+      setActiveMindmap(diagram)
+      localStorage.setItem('activeMindmapId', id)
+      lsSaveDiagram(diagram)
+    } catch {
+      // Network error — cached version already loaded
     }
-
-    const diagram = rowToDiagram(data)
-    // If local cache is newer (e.g. saved locally but Supabase write was blocked),
-    // keep the entire local version — don't overwrite with stale remote data
-    if (cached) {
-      const localTime = new Date(cached.updatedAt ?? 0).getTime()
-      const remoteTime = new Date(diagram.updatedAt ?? 0).getTime()
-      if (localTime > remoteTime) {
-        // Local is newer — don't overwrite, just keep what we already loaded from cache
-        return
-      }
-    }
-    setActiveMindmap(diagram)
-    localStorage.setItem('activeMindmapId', id)
-    lsSaveDiagram(diagram)
   }, [setActiveMindmap, userId])
 
   const saveDiagram = useCallback(async (diagram: Diagram) => {
-    // Always save to localStorage first — guaranteed to work
+    // Always save to localStorage first
     lsSaveDiagram(diagram)
 
-    if (!hasSupabase || !supabase || !userId) {
+    if (!userId) {
       setIsDirty(false)
       return
     }
-    const { error } = await supabase.from('mindmaps').upsert({
-      id:              diagram.id,
-      user_id:         userId,
-      name:            diagram.name,
-      type:            diagram.type,
-      line_style:      diagram.lineStyle,
-      sharing_enabled: diagram.sharingEnabled ?? false,
-      theme_id:        diagram.themeId ?? 'default',
-      nodes:           diagram.nodes,
-    })
-    if (error) {
-      // RLS or other errors — localStorage already saved above, just mark clean
-      if (error.code === '42501') { setIsDirty(false); return }
-      console.error('save error:', error)
-      setIsDirty(false) // localStorage save succeeded, so mark clean
-      return
+
+    try {
+      await fetch(API_BASE, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id:              diagram.id,
+          user_id:         userId,
+          name:            diagram.name,
+          type:            diagram.type,
+          line_style:      diagram.lineStyle,
+          sharing_enabled: diagram.sharingEnabled ?? false,
+          theme_id:        diagram.themeId ?? 'default',
+          nodes:           diagram.nodes,
+          tags:            diagram.tags,
+        }),
+      })
+    } catch {
+      // Network error — localStorage saved above
     }
     setIsDirty(false)
     soundSave()
@@ -218,26 +209,26 @@ export function useDiagram(userId: string | null = null) {
     const laid = computeMindmapsLayout(allNodes)
     const diagram: Diagram = { id, name, type: 'logic-chart', lineStyle: 'orthogonal', createdAt: now, updatedAt: now, nodes: laid }
 
-    if (!hasSupabase || !supabase || !userId) {
-      lsSaveDiagram(diagram)
-      setActiveMindmap(diagram)
-      localStorage.setItem('activeMindmapId', id)
-      setDiagrams(lsGetList())
-      soundCreate()
-      showToast(`✦ "${name}" created`, { color: '#1a1d2e', confetti: true })
-      return id
-    }
-    const { error } = await supabase.from('mindmaps').insert({
-      id, user_id: userId, name, type: 'logic-chart', line_style: 'orthogonal',
-      sharing_enabled: false, nodes: laid,
-    })
-    if (error) { console.error(error); soundError(); showToast('Failed to create map', { color: '#ef4444' }); return id }
-    await loadDiagram(id)
-    await loadDiagramList()
+    lsSaveDiagram(diagram)
+    setActiveMindmap(diagram)
+    localStorage.setItem('activeMindmapId', id)
+    setDiagrams(lsGetList())
     soundCreate()
     showToast(`✦ "${name}" created`, { color: '#1a1d2e', confetti: true })
+
+    // Sync to server in background
+    if (userId) {
+      fetch(API_BASE, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id, user_id: userId, name, type: 'logic-chart', line_style: 'orthogonal',
+          sharing_enabled: false, nodes: laid,
+        }),
+      }).catch(() => {})
+    }
     return id
-  }, [loadDiagram, loadDiagramList, setActiveMindmap, setDiagrams, userId])
+  }, [setActiveMindmap, setDiagrams, userId])
 
   const createDiagramFromNodes = useCallback(async (name: string, nodes: MindmapNode[]): Promise<string | null> => {
     const existingNames = new Set(useMindmapStore.getState().diagrams.map(d => d.name))
@@ -249,59 +240,56 @@ export function useDiagram(userId: string | null = null) {
     const now = new Date().toISOString()
     const diagram: Diagram = { id, name: finalName, type: 'logic-chart', lineStyle: 'orthogonal', createdAt: now, updatedAt: now, nodes }
 
-    if (!hasSupabase || !supabase || !userId) {
-      lsSaveDiagram(diagram)
-      setActiveMindmap(diagram)
-      localStorage.setItem('activeMindmapId', id)
-      setDiagrams(lsGetList())
-      soundPaste()
-      showToast(`✦ "${finalName}" created`, { color: '#22c55e', confetti: true })
-      return id
-    }
-    const { error } = await supabase.from('mindmaps').insert({
-      id, user_id: userId, name: finalName, type: 'logic-chart', line_style: 'orthogonal',
-      sharing_enabled: false, nodes,
-    })
-    if (error) { console.error(error); soundError(); showToast(`Failed: ${error.message}`, { color: '#ef4444' }); return null }
-    await loadDiagram(id)
-    await loadDiagramList()
+    lsSaveDiagram(diagram)
+    setActiveMindmap(diagram)
+    localStorage.setItem('activeMindmapId', id)
+    setDiagrams(lsGetList())
     soundPaste()
     showToast(`✦ "${finalName}" created`, { color: '#22c55e', confetti: true })
+
+    if (userId) {
+      fetch(API_BASE, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id, user_id: userId, name: finalName, type: 'logic-chart', line_style: 'orthogonal',
+          sharing_enabled: false, nodes,
+        }),
+      }).catch(() => {})
+    }
     return id
-  }, [loadDiagram, loadDiagramList, setActiveMindmap, setDiagrams, userId])
+  }, [setActiveMindmap, setDiagrams, userId])
 
   const deleteDiagram = useCallback(async (id: string, name?: string) => {
-    // Clear active diagram immediately so any pending auto-save timer can't re-insert it
     const store = useMindmapStore.getState()
     if (store.activeMindmap?.id === id) {
       store.setActiveMindmap(null as unknown as Diagram)
       store.setIsDirty(false)
     }
     lsDeleteDiagram(id)
-    if (!hasSupabase || !supabase || !userId) {
-      setDiagrams(lsGetList())
-      soundDelete()
-      showToast(`"${name ?? 'Map'}" deleted`, { color: '#1a1d2e' })
-      return
-    }
-    await supabase.from('mindmaps').delete().eq('id', id).eq('user_id', userId)
-    await loadDiagramList()
+    setDiagrams(lsGetList())
     soundDelete()
     showToast(`"${name ?? 'Map'}" deleted`, { color: '#1a1d2e' })
-  }, [loadDiagramList, setDiagrams, userId])
+
+    if (userId) {
+      fetch(`${API_BASE}?id=${id}&user_id=${userId}`, { method: 'DELETE' }).catch(() => {})
+    }
+  }, [setDiagrams, userId])
 
   const updateTags = useCallback(async (id: string, tags: string[]) => {
-    // Optimistic update in store
     const { diagrams, activeMindmap, setActiveMindmap } = useMindmapStore.getState()
     setDiagrams(diagrams.map(d => d.id === id ? { ...d, tags } : d))
     if (activeMindmap?.id === id) setActiveMindmap({ ...activeMindmap, tags })
-    // Persist to localStorage
     lsSaveList(lsGetList().map(m => m.id === id ? { ...m, tags } : m))
     const cached = lsGetDiagram(id)
     if (cached) lsSaveDiagram({ ...cached, tags })
-    // Persist to Supabase
-    if (hasSupabase && supabase && userId) {
-      await supabase.from('mindmaps').update({ tags }).eq('id', id).eq('user_id', userId)
+
+    if (userId) {
+      fetch(API_BASE, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, user_id: userId, tags }),
+      }).catch(() => {})
     }
   }, [setDiagrams, userId])
 

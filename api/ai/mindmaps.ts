@@ -1,6 +1,5 @@
 export const config = { runtime: 'edge' }
 
-import { createClient } from '@supabase/supabase-js'
 
 const BRANCH_COLORS = [
   '#6366f1', '#8b5cf6', '#ec4899', '#ef4444',
@@ -159,12 +158,8 @@ export default async function handler(req: Request): Promise<Response> {
   }
   if (!title) return json({ error: 'title is required' }, 400)
 
-  const supabaseUrl = process.env.VITE_SUPABASE_URL
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!supabaseUrl || !serviceKey) return json({ error: 'Missing Supabase env vars' }, 500)
-
-  const supabase = createClient(supabaseUrl, serviceKey)
   const id = crypto.randomUUID()
+  const apiBase = process.env.MINDMAP_DB_API ?? 'https://bheng.dev/api/mindmaps'
 
   let nodes: MindmapNode[] = []
   if (outline) {
@@ -175,20 +170,12 @@ export default async function handler(req: Request): Promise<Response> {
     if (!nodes.length) nodes = parseOutline(outline)
   }
 
-  const { error } = await supabase.from('mindmaps').insert({ id, user_id: userId, name: title, type, line_style: lineStyle, sharing_enabled: true, theme_id: themeId, nodes, is_favorite: isFavorite, tags: ['API'] })
-  if (error) return json({ error: error.message }, 500)
-
-  // Broadcast to all connected clients so they get a live toast + card flash
-  await fetch(`${supabaseUrl}/realtime/v1/api/broadcast`, {
+  const dbRes = await fetch(apiBase, {
     method: 'POST',
-    headers: { 'Authorization': `Bearer ${serviceKey}`, 'Content-Type': 'application/json', 'apikey': serviceKey },
-    body: JSON.stringify({
-      messages: [{ topic: 'realtime:app-notifications', event: 'broadcast', payload: {
-        type: 'broadcast', event: 'diagram-created',
-        payload: { id, title, nodeCount: nodes.length },
-      }}],
-    }),
-  }).catch(() => {/* non-fatal */})
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id, user_id: userId, name: title, type, line_style: lineStyle, sharing_enabled: true, theme_id: themeId, nodes, tags: ['API'] }),
+  }).catch(() => null)
+  if (!dbRes || !dbRes.ok) return json({ error: 'Failed to save diagram' }, 500)
 
   const appUrl = process.env.MINDMAP_APP_URL ?? 'https://mindmaps-bheng.vercel.app'
   return json({ id, url: `${appUrl}/?id=${id}`, nodeCount: nodes.length }, 201)
