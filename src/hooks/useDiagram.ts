@@ -2,11 +2,11 @@ import { useCallback } from 'react'
 import { showToast } from '../components/CuteToast'
 import { useMindmapStore } from '../store/mindmapStore'
 import { ROOT_COLORS } from '../lib/color'
-import { soundCreate, soundDelete, soundSave, soundError, soundPaste } from '../lib/sounds'
+import { soundCreate, soundDelete, soundSave, soundPaste } from '../lib/sounds'
 import type { Diagram, DiagramMeta, MindmapNode } from '../types'
 
 // ── API base URL ───────────────────────────────────────────────────────────
-const API_BASE = 'https://bheng.dev/api/mindmaps'
+const API_BASE = 'https://bunlongheng.com/api/mindmaps'
 
 // ── localStorage helpers ────────────────────────────────────────────────────
 
@@ -116,7 +116,7 @@ export function useDiagram(userId: string | null = null) {
       }
 
       setDiagrams((data ?? []).map(d => ({
-        id: d.id as string, name: d.name as string, type: d.type as string,
+        id: d.id as string, name: d.name as string, type: d.type as DiagramMeta['type'],
         updatedAt: d.updated_at as string,
         isPublic: (d.sharing_enabled ?? false) as boolean,
         tags: (d.tags as string[]) ?? [],

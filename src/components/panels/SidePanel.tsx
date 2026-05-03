@@ -818,7 +818,6 @@ function VisualPickerBlock({ icon, emoji, onSave }: {
     }}>{label}</button>
   )
 
-  const hasAny = !!(icon || emoji)
 
   return (
     <SBlock title="Visual">

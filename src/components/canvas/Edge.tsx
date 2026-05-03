@@ -1,6 +1,6 @@
 import type { MindmapNode } from '../../types'
 import type { LineStyle } from '../../types'
-import { nodeCenterRight, nodeCenterLeft, nodeCenterBottom, nodeCenterTop, nodeCenter, buildStraightPath, buildCurvedPath, buildOrthogonalPath } from '../../lib/geometry'
+import { nodeCenterRight, nodeCenterLeft, nodeCenter, buildStraightPath, buildCurvedPath, buildOrthogonalPath } from '../../lib/geometry'
 import { applyDepthTransparency } from '../../lib/color'
 
 interface EdgeProps {

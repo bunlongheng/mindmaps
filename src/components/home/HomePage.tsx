@@ -56,7 +56,6 @@ interface HomePageProps {
 
 export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
   const { diagrams } = useMindmapStore()
-  const isLocal = import.meta.env.DEV || ['localhost', '127.0.0.1'].includes(window.location.hostname)
   const { loadDiagramList, createDiagram, createDiagramFromNodes, deleteDiagram, updateTags } = useDiagram(user?.id ?? null)
   const isMobile = window.innerWidth <= 768
 
@@ -505,7 +504,7 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
                   key={d.id} diagram={d} timeAgo={timeAgo(d.updatedAt)}
                   onOpen={() => onOpen(d.id)} onDelete={() => deleteDiagram(d.id, d.name)}
                   isPublic={d.isPublic} tags={d.tags} tagColorMap={tagColorMap}
-                  isMobile={isMobile} onTagEdit={isMobile ? () => {} : () => { setTagModalId(d.id) }}
+                  onTagEdit={() => { setTagModalId(d.id) }}
                   flash={flashId === d.id}
                 />
               ))}
@@ -1015,10 +1014,10 @@ function DiagramMinimap({ id, type }: { id: string; type: string }) {
 
 // ── DiagramCard ────────────────────────────────────────────────────────────
 
-function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isPublic, tags, tagColorMap, onTagEdit, flash, isMobile }: {
+function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isPublic, tags, tagColorMap, onTagEdit, flash }: {
   diagram: DiagramMeta; timeAgo: string; onOpen: () => void; onDelete: () => void
   isPublic?: boolean; tags?: string[]
-  tagColorMap: Map<string, string>; onTagEdit: () => void; flash?: boolean; isMobile?: boolean
+  tagColorMap: Map<string, string>; onTagEdit: () => void; flash?: boolean
 }) {
   const [hovered, setHovered] = useState(false)
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)

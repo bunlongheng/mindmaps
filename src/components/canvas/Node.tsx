@@ -702,15 +702,6 @@ const BLOB_OFFSETS = [
 ]
 const FALLBACK_COLORS = ['#0080FF','#BF5AF2','#FF375F','#34C8E8','#FF9F0A','#30D158']
 
-function randPos(cx: number, cy: number, r: number) {
-  const angle = Math.random() * Math.PI * 2
-  const dist = r * (1.4 + Math.random() * 1.4)
-  return { x: cx + Math.cos(angle) * dist, y: cy + Math.sin(angle) * dist, size: 1.0 + Math.random() * 1.5 }
-}
-function randDrift(r: number) {
-  return { dx: (Math.random() - 0.5) * r * 1.2, dy: (Math.random() - 0.5) * r * 1.2 }
-}
-
 /** Generate shades of a color — lighter variations, same hue */
 function colorShades(hex: string, count: number): string[] {
   if (!hex.startsWith('#')) return Array.from({ length: count }, () => hex)
@@ -774,48 +765,6 @@ function Fireflies({ cx, cy, r, color, count = 10 }: { cx: number; cy: number; r
         </g>
       ))}
     </g>
-  )
-}
-
-function RoamingStars({ cx, cy, r, colors }: { cx: number; cy: number; r: number; colors: string[] }) {
-  const palette = colors.length > 0 ? colors : FALLBACK_COLORS
-  const [stars] = useState(() =>
-    Array.from({ length: 12 }, (_, i) => ({
-      ...randPos(cx, cy, r),
-      color: palette[i % palette.length],
-      key: i,
-      d1: randDrift(r),
-      d2: randDrift(r),
-      dur: 7 + Math.random() * 6,
-      blinkDur: 1.6 + Math.random() * 1.4,
-      blinkBegin: Math.random() * 2,
-    }))
-  )
-  return (
-    <>
-      {stars.map(st => (
-        <g key={st.key} style={{ pointerEvents: 'none' }}>
-          <circle cx={st.x} cy={st.y} r={st.size * 3} fill={st.color}>
-            <animate attributeName="opacity" values="0.08;0.3;0.08"
-              dur={`${st.blinkDur}s`} repeatCount="indefinite" begin={`${st.blinkBegin}s`} />
-            <animateTransform attributeName="transform" type="translate"
-              values={`0 0; ${st.d1.dx} ${st.d1.dy}; ${st.d2.dx} ${st.d2.dy}; 0 0`}
-              dur={`${st.dur}s`} repeatCount="indefinite"
-              calcMode="spline" keyTimes="0;0.33;0.67;1"
-              keySplines="0.45 0 0.55 1;0.45 0 0.55 1;0.45 0 0.55 1" />
-          </circle>
-          <circle cx={st.x} cy={st.y} r={st.size} fill={st.color}>
-            <animate attributeName="opacity" values="0.5;1;0.5"
-              dur={`${st.blinkDur}s`} repeatCount="indefinite" begin={`${st.blinkBegin}s`} />
-            <animateTransform attributeName="transform" type="translate"
-              values={`0 0; ${st.d1.dx} ${st.d1.dy}; ${st.d2.dx} ${st.d2.dy}; 0 0`}
-              dur={`${st.dur}s`} repeatCount="indefinite"
-              calcMode="spline" keyTimes="0;0.33;0.67;1"
-              keySplines="0.45 0 0.55 1;0.45 0 0.55 1;0.45 0 0.55 1" />
-          </circle>
-        </g>
-      ))}
-    </>
   )
 }
 
