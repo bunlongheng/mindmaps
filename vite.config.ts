@@ -37,7 +37,7 @@ export default defineConfig({
         skipWaiting: true,
         clientsClaim: true,
         // Bump this string to force all clients to install the new SW immediately
-        additionalManifestEntries: [{ url: '/', revision: '20260329-2' }],
+        additionalManifestEntries: [{ url: '/', revision: '20260501-google-oauth' }],
         runtimeCaching: [
           // Navigation requests: always try network first, fall back to cache
           {
