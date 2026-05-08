@@ -5,8 +5,10 @@ import { ROOT_COLORS } from '../lib/color'
 import { soundCreate, soundDelete, soundSave, soundPaste } from '../lib/sounds'
 import type { Diagram, DiagramMeta, MindmapNode } from '../types'
 
-// ── API base URL ───────────────────────────────────────────────────────────
+// ── API config ─────────────────────────────────────────────────────────────
 const API_BASE = 'https://bunlongheng.com/api/mindmaps'
+const API_KEY = 'REDACTED_ROTATED_KEY'
+const AUTH_HEADERS = { 'Authorization': `Bearer ${API_KEY}`, 'Content-Type': 'application/json' }
 
 // ── localStorage helpers ────────────────────────────────────────────────────
 
@@ -93,7 +95,7 @@ export function useDiagram(userId: string | null = null) {
     if (!userId) return
 
     try {
-      const res = await fetch(`${API_BASE}?user_id=${userId}`)
+      const res = await fetch(`${API_BASE}?user_id=${userId}`, { headers: AUTH_HEADERS })
       if (!res.ok) return
       const data = await res.json() as Record<string, unknown>[]
 
@@ -138,7 +140,7 @@ export function useDiagram(userId: string | null = null) {
 
     try {
       // 2. Query Linode API
-      const res = await fetch(`${API_BASE}?id=${id}&user_id=${userId}`)
+      const res = await fetch(`${API_BASE}?id=${id}&user_id=${userId}`, { headers: AUTH_HEADERS })
       if (!res.ok) return
       const data = await res.json()
       if (data.error) return
@@ -170,7 +172,7 @@ export function useDiagram(userId: string | null = null) {
     try {
       await fetch(API_BASE, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: AUTH_HEADERS,
         body: JSON.stringify({
           id:              diagram.id,
           user_id:         userId,
@@ -220,7 +222,7 @@ export function useDiagram(userId: string | null = null) {
     if (userId) {
       fetch(API_BASE, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: AUTH_HEADERS,
         body: JSON.stringify({
           id, user_id: userId, name, type: 'logic-chart', line_style: 'orthogonal',
           sharing_enabled: false, nodes: laid,
@@ -250,7 +252,7 @@ export function useDiagram(userId: string | null = null) {
     if (userId) {
       fetch(API_BASE, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: AUTH_HEADERS,
         body: JSON.stringify({
           id, user_id: userId, name: finalName, type: 'logic-chart', line_style: 'orthogonal',
           sharing_enabled: false, nodes,
@@ -272,7 +274,7 @@ export function useDiagram(userId: string | null = null) {
     showToast(`"${name ?? 'Map'}" deleted`, { color: '#1a1d2e' })
 
     if (userId) {
-      fetch(`${API_BASE}?id=${id}&user_id=${userId}`, { method: 'DELETE' }).catch(() => {})
+      fetch(`${API_BASE}?id=${id}&user_id=${userId}`, { method: 'DELETE', headers: AUTH_HEADERS }).catch(() => {})
     }
   }, [setDiagrams, userId])
 
@@ -287,7 +289,7 @@ export function useDiagram(userId: string | null = null) {
     if (userId) {
       fetch(API_BASE, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: AUTH_HEADERS,
         body: JSON.stringify({ id, user_id: userId, tags }),
       }).catch(() => {})
     }
