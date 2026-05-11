@@ -136,11 +136,10 @@ export function useDiagram(userId: string | null = null) {
       localStorage.setItem('activeMindmapId', id)
     }
 
-    if (!userId) return
-
     try {
-      // 2. Query Linode API
-      const res = await fetch(`${API_BASE}?id=${id}&user_id=${userId}`, { headers: AUTH_HEADERS })
+      // 2. Query Linode API — always try, even without userId (for shared/direct links)
+      const params = userId ? `id=${id}&user_id=${userId}` : `id=${id}`
+      const res = await fetch(`${API_BASE}?${params}`, { headers: AUTH_HEADERS })
       if (!res.ok) return
       const data = await res.json()
       if (data.error) return
