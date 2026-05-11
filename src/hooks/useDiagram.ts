@@ -6,9 +6,8 @@ import { soundCreate, soundDelete, soundSave, soundPaste } from '../lib/sounds'
 import type { Diagram, DiagramMeta, MindmapNode } from '../types'
 
 // ── API config ─────────────────────────────────────────────────────────────
-const API_BASE = 'https://bunlongheng.com/api/mindmaps'
-const API_KEY = 'REDACTED_ROTATED_KEY'
-const AUTH_HEADERS = { 'Authorization': `Bearer ${API_KEY}`, 'Content-Type': 'application/json' }
+const API_BASE = '/api/mindmaps'
+const AUTH_HEADERS = { 'Content-Type': 'application/json' }
 
 // ── localStorage helpers ────────────────────────────────────────────────────
 
