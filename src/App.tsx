@@ -291,10 +291,11 @@ export default function App() {
   )
 
   // If editor has no diagram after loading (bad URL, RLS-blocked, deleted), fall back to home
-  if (view === 'editor' && !activeMindmap) {
-    handleBack()
-    return null
-  }
+  useEffect(() => {
+    if (view === 'editor' && !activeMindmap && !diagramLoading && !authLoading) {
+      handleBack()
+    }
+  }, [view, activeMindmap, diagramLoading, authLoading])
 
   async function handleSignOut() {
     if (supabase) await supabase.auth.signOut()
