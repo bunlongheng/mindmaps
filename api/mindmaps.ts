@@ -16,7 +16,7 @@ function json(data: unknown, status = 200) {
 export default async function handler(req: Request): Promise<Response> {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS })
 
-  const apiBase = process.env.MINDMAP_DB_API ?? 'http://45.79.212.154:3000/api/mindmaps'
+  const apiBase = process.env.MINDMAP_DB_API ?? 'https://www.bunlongheng.com/api/mindmaps'
   const apiKey = process.env.MINDMAP_AI_API_KEY ?? ''
 
   // Forward the request to the Linode API
