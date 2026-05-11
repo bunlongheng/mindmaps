@@ -289,6 +289,10 @@ export default function App() {
     }
   }, [view, activeMindmap, diagramLoading, authLoading])
 
+  async function handleSignOut() {
+    if (supabase) await supabase.auth.signOut()
+  }
+
   // Show spinner while auth or diagram is loading
   if (authLoading || diagramLoading) return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8f9fb' }}>
@@ -297,11 +301,15 @@ export default function App() {
     </div>
   )
 
-  async function handleSignOut() {
-    if (supabase) await supabase.auth.signOut()
-  }
-
   if (view === 'home') return (
+    <>
+      <CuteToast />
+      <HomePage onOpen={handleOpenDiagram} user={user} onSignOut={handleSignOut} flashId={flashDiagramId} />
+    </>
+  )
+
+  // Guard: if editor view but no diagram, show home instead of crashing
+  if (view === 'editor' && !activeMindmap) return (
     <>
       <CuteToast />
       <HomePage onOpen={handleOpenDiagram} user={user} onSignOut={handleSignOut} flashId={flashDiagramId} />
