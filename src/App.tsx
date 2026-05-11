@@ -282,6 +282,13 @@ export default function App() {
     if (nodeId) setSelectedPanelNodeId(nodeId)
   }, [])
 
+  // If editor has no diagram after loading, fall back to home
+  useEffect(() => {
+    if (view === 'editor' && !activeMindmap && !diagramLoading && !authLoading) {
+      handleBack()
+    }
+  }, [view, activeMindmap, diagramLoading, authLoading])
+
   // Show spinner while auth or diagram is loading
   if (authLoading || diagramLoading) return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8f9fb' }}>
@@ -289,13 +296,6 @@ export default function App() {
       <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
     </div>
   )
-
-  // If editor has no diagram after loading (bad URL, RLS-blocked, deleted), fall back to home
-  useEffect(() => {
-    if (view === 'editor' && !activeMindmap && !diagramLoading && !authLoading) {
-      handleBack()
-    }
-  }, [view, activeMindmap, diagramLoading, authLoading])
 
   async function handleSignOut() {
     if (supabase) await supabase.auth.signOut()
