@@ -1,10 +1,17 @@
-import { createClient, SupabaseClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
-const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL as string | undefined)?.trim()
-const supabaseAnonKey = (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined)?.trim()
+const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL as string | undefined)?.replace(/\\n/g, '').trim()
+const supabaseAnonKey = (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined)?.replace(/\\n/g, '').trim()
 
-export const hasSupabase = Boolean(supabaseUrl && supabaseAnonKey)
+export let hasSupabase = Boolean(supabaseUrl && supabaseAnonKey)
+export let supabase: SupabaseClient | null = null
 
-export const supabase: SupabaseClient | null = hasSupabase
-  ? createClient(supabaseUrl!, supabaseAnonKey!)
-  : null
+try {
+  if (hasSupabase) {
+    supabase = createClient(supabaseUrl!, supabaseAnonKey!)
+  }
+} catch (e) {
+  console.error('Supabase init failed:', e)
+  hasSupabase = false
+  supabase = null
+}
