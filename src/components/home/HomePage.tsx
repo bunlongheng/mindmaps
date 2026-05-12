@@ -49,14 +49,14 @@ function TagIcon({ tag, size = 11 }: { tag: string; size?: number }) {
 
 interface HomePageProps {
   onOpen: (id: string) => void
-  user?: import('@supabase/supabase-js').User | null
+  user?: { email: string; name: string; userId: string } | null
   onSignOut?: () => void
   flashId?: string | null
 }
 
 export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
   const { diagrams } = useMindmapStore()
-  const { loadDiagramList, createDiagram, createDiagramFromNodes, deleteDiagram, updateTags } = useDiagram(user?.id ?? null)
+  const { loadDiagramList, createDiagram, createDiagramFromNodes, deleteDiagram, updateTags } = useDiagram(user?.userId ?? null)
   const isMobile = window.innerWidth <= 768
 
   // Compute a unique color per tag (sorted alphabetically → palette index)
@@ -178,7 +178,7 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
         },
         body: JSON.stringify({
           prompt: aiPrompt.trim(),
-          userId: user?.id ?? null,
+          userId: user?.userId ?? null,
         }),
       })
       const data = await res.json() as { id?: string; error?: string; usage?: { total_tokens?: number }; tokens?: number }
@@ -211,7 +211,7 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
   )
   // Cache avatar as base64 on first load so it never needs network again
   useEffect(() => {
-    const liveUrl = user?.user_metadata?.avatar_url as string | undefined
+    const liveUrl = undefined
     if (!liveUrl) return
     const cached = localStorage.getItem('mindmaps:avatarB64')
     if (cached) { setAvatarUrl(cached); return }
@@ -234,7 +234,7 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
       })
   }, [user])
   const displayName = (() => {
-    const live = (user?.user_metadata?.full_name ?? user?.email ?? '') as string
+    const live = user?.name ?? user?.email ?? ''
     if (live) { localStorage.setItem('mindmaps:displayName', live); return live }
     return localStorage.getItem('mindmaps:displayName') ?? ''
   })()
@@ -249,7 +249,7 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
 
   return (
     <div style={{ minHeight: '100vh', background: BG, fontFamily: 'Inter, system-ui, sans-serif' }}>
-      {showImport && <ImportModal onClose={() => setShowImport(false)} userId={user?.id} />}
+      {showImport && <ImportModal onClose={() => setShowImport(false)} userId={user?.userId} />}
 
       {/* AI thinking canvas overlay */}
       {aiLoading && <AIThinkingOverlay />}

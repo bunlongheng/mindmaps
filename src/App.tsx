@@ -39,9 +39,41 @@ function getShareParam(search = window.location.search) {
 
 
 export default function App() {
-  // No auth — hardcoded user ID for API calls
-  const user = null
-  const authLoading = false
+  // Simple auth — check localStorage for session
+  const [user, setUser] = useState<{ email: string; name: string; userId: string } | null>(() => {
+    try { return JSON.parse(localStorage.getItem('mindmaps:user') ?? 'null') } catch { return null }
+  })
+  const [authLoading, setAuthLoading] = useState(false)
+  const [loginError, setLoginError] = useState('')
+
+  async function handleLogin(email: string, password: string) {
+    setAuthLoading(true)
+    setLoginError('')
+    try {
+      const res = await fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      })
+      const data = await res.json()
+      if (data.ok) {
+        localStorage.setItem('mindmaps:user', JSON.stringify(data.user))
+        localStorage.setItem('mindmaps:token', data.token)
+        setUser(data.user)
+        showToast("Welcome back, boss.", { color: '#1a1d2e', confetti: true })
+      } else {
+        setLoginError(data.error || 'Invalid credentials')
+      }
+    } catch { setLoginError('Network error') }
+    finally { setAuthLoading(false) }
+  }
+
+  function handleSignOut() {
+    localStorage.removeItem('mindmaps:user')
+    localStorage.removeItem('mindmaps:token')
+    setUser(null)
+    showToast('See ya!', { color: '#64748b' })
+  }
 
   // Prevent iOS Safari viewport zoom (ignores user-scalable=no) so fixed UI stays put
   useEffect(() => {
@@ -59,7 +91,7 @@ export default function App() {
 
   // Local dev: fall back to the hardcoded dev user ID so Supabase queries work without auth.
   // Triple-locked: only when (1) isLocal, (2) no real session, (3) env var is set.
-  const effectiveUserId = '731ace87-64e5-44db-bf2a-82265f06f4d9'
+  const effectiveUserId = user?.userId ?? null
   const { loadDiagramList, loadDiagram, saveDiagram, createDiagramFromNodes, deleteDiagram, updateTags } = useDiagram(effectiveUserId)
 
   // Realtime removed — data now on Linode PostgreSQL
@@ -240,10 +272,35 @@ export default function App() {
     </div>
   )
 
+  // Login screen when not authenticated
+  if (!user) return (
+    <>
+      <CuteToast />
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8f9fb', fontFamily: 'Inter, system-ui, sans-serif' }}>
+        <form onSubmit={e => { e.preventDefault(); const fd = new FormData(e.currentTarget); handleLogin(fd.get('email') as string, fd.get('password') as string) }}
+          style={{ width: 340, background: '#fff', borderRadius: 16, padding: 32, boxShadow: '0 8px 32px rgba(0,0,0,0.08)' }}>
+          <div style={{ textAlign: 'center', marginBottom: 24 }}>
+            <div style={{ fontSize: 28, fontWeight: 700, color: '#1e293b' }}>Mindmaps</div>
+            <div style={{ fontSize: 13, color: '#94a3b8', marginTop: 4 }}>Sign in to continue</div>
+          </div>
+          <input name="email" type="email" placeholder="Email" autoComplete="email" required
+            style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: 10, border: '1.5px solid #e2e8f0', fontSize: 14, marginBottom: 12, outline: 'none', fontFamily: 'inherit' }} />
+          <input name="password" type="password" placeholder="Password" autoComplete="current-password" required
+            style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: 10, border: '1.5px solid #e2e8f0', fontSize: 14, marginBottom: 16, outline: 'none', fontFamily: 'inherit' }} />
+          {loginError && <div style={{ color: '#ef4444', fontSize: 12, marginBottom: 12 }}>{loginError}</div>}
+          <button type="submit" disabled={authLoading}
+            style={{ width: '100%', padding: '11px 0', borderRadius: 10, border: 'none', background: '#6366f1', color: '#fff', fontSize: 14, fontWeight: 600, cursor: authLoading ? 'wait' : 'pointer', fontFamily: 'inherit' }}>
+            {authLoading ? 'Signing in...' : 'Sign in'}
+          </button>
+        </form>
+      </div>
+    </>
+  )
+
   if (view === 'home') return (
     <>
       <CuteToast />
-      <HomePage onOpen={handleOpenDiagram} user={user} onSignOut={() => {}} flashId={flashDiagramId} />
+      <HomePage onOpen={handleOpenDiagram} user={user} onSignOut={handleSignOut} flashId={flashDiagramId} />
     </>
   )
 
@@ -251,7 +308,7 @@ export default function App() {
   if (view === 'editor' && !activeMindmap) return (
     <>
       <CuteToast />
-      <HomePage onOpen={handleOpenDiagram} user={user} onSignOut={() => {}} flashId={flashDiagramId} />
+      <HomePage onOpen={handleOpenDiagram} user={user} onSignOut={handleSignOut} flashId={flashDiagramId} />
     </>
   )
 
