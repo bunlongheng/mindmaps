@@ -5,14 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 
     <title>Mindmaps</title>
-    <script>
-      // Force-kill stale service workers
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistrations().then(regs => {
-          regs.forEach(r => r.unregister());
-        });
-      }
-    </script>
     <meta name="description" content="Visual mind map and diagram tool. Mind map, tree, fishbone layouts with Supabase persistence." />
     <meta name="author" content="bunlongheng" />
     <meta name="keywords" content="mindmaps, diagram, mind map, fishbone, tree, visual thinking" />

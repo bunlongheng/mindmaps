@@ -20,10 +20,6 @@ if (import.meta.env.DEV) {
   }
 }
 
-// Auto-reload when a new service worker activates so stale cached assets never cause blank screens
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.addEventListener('controllerchange', () => window.location.reload())
-}
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state = { error: null }

@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
-import type { User } from '@supabase/supabase-js'
 import { CuteToast, showToast } from './components/CuteToast'
 import { DiagramCanvas } from './components/canvas/DiagramCanvas'
 import { SidePanel } from './components/panels/SidePanel'
@@ -8,7 +7,6 @@ import { HomePage } from './components/home/HomePage'
 import { useDiagram } from './hooks/useDiagram'
 import { useMindmapStore } from './store/mindmapStore'
 import { decodeShareURL } from './lib/export/share'
-import { supabase, hasSupabase } from './lib/supabase'
 import { ArrowLeft, SlidersHorizontal, Tag, X, FileDown, Trash2 } from 'lucide-react'
 import { exportDiagramAsPdf } from './lib/export/exportPdf'
 import { Confetti } from './components/Confetti'
@@ -39,44 +37,11 @@ function getShareParam(search = window.location.search) {
   return new URLSearchParams(search).get('share') ?? null
 }
 
-// Skip auth gate when running locally (dev server or local IP)
-import { isLocal as checkIsLocal } from './lib/is-local'
-const isLocal = import.meta.env.DEV ||
-  ['localhost', '127.0.0.1'].includes(window.location.hostname) ||
-  /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(window.location.hostname) ||
-  checkIsLocal()
 
 export default function App() {
-  const [user, setUser] = useState<User | null>(null)
-  const [authLoading, setAuthLoading] = useState(hasSupabase)
-
-  useEffect(() => {
-    if (!hasSupabase || !supabase) { setAuthLoading(false); return }
-    // INITIAL_SESSION fires immediately with the stored session on every page load —
-    // this is the earliest possible moment to know if the user is logged in,
-    // so we never show a login flash for returning users.
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') {
-        setUser(session?.user ?? null)
-        setAuthLoading(false)
-      } else if (event === 'SIGNED_IN') {
-        setUser(session?.user ?? null)
-        setAuthLoading(false)
-        const greetings = ["Let's build something cool.", "Welcome back, boss.", "Let's do it. One diagram at a time.", "Good to see you.", "Ready when you are.", "Let's make it count.", "Diagrams standing by.", "Ready, set, go.", "All systems initiated.", "Let's make something great."]
-        const greeting = greetings[Math.floor(Math.random() * greetings.length)]
-        setTimeout(() => showToast(greeting, { color: '#1a1d2e', confetti: true }), 150)
-      } else if (event === 'SIGNED_OUT') {
-        const farewells = ["Later!", "See ya!", "Peace out!", "Catch you later!", "Adios!", "So long!", "Bye for now!", "Take care!", "Until next time!"]
-        const farewell = farewells[Math.floor(Math.random() * farewells.length)]
-        setUser(null)
-        setTimeout(() => {
-          showToast(farewell, { color: '#64748b' })
-          setTimeout(() => window.location.reload(), 1800)
-        }, 150)
-      }
-    })
-    return () => subscription.unsubscribe()
-  }, [])
+  // No auth — hardcoded user ID for API calls
+  const user = null
+  const authLoading = false
 
   // Prevent iOS Safari viewport zoom (ignores user-scalable=no) so fixed UI stays put
   useEffect(() => {
@@ -91,32 +56,15 @@ export default function App() {
     }
   }, [])
 
-  // Subscribe to real-time push notifications (toast broadcasts from /api/notify)
-  useEffect(() => {
-    if (!hasSupabase || !supabase) return
-    const ch = supabase
-      .channel('app-notifications')
-      .on('broadcast', { event: 'toast' }, ({ payload }) => {
-        showToast(payload.message, { color: payload.color ?? '#6366f1', confetti: payload.confetti ?? false })
-      })
-      .on('broadcast', { event: 'diagram-created' }, ({ payload }) => {
-        showToast(`✦ "${payload.title}" added`, { color: '#1a1d2e' })
-        setFlashDiagramId(payload.id)
-        loadDiagramList()
-        setTimeout(() => setFlashDiagramId(null), 3500)
-      })
-      .subscribe()
-    return () => { supabase!.removeChannel(ch) }
-  }, [])
 
   // Local dev: fall back to the hardcoded dev user ID so Supabase queries work without auth.
   // Triple-locked: only when (1) isLocal, (2) no real session, (3) env var is set.
-  const effectiveUserId = user?.id ?? (isLocal ? (import.meta.env.VITE_LOCAL_USER_ID ?? null) : null)
+  const effectiveUserId = '731ace87-64e5-44db-bf2a-82265f06f4d9'
   const { loadDiagramList, loadDiagram, saveDiagram, createDiagramFromNodes, deleteDiagram, updateTags } = useDiagram(effectiveUserId)
 
   // Realtime removed — data now on Linode PostgreSQL
   const { activeMindmap, isDirty, setActiveMindmap, addNode, selectedNodeIds, setSelectedNodeIds, setPasteImportFn, diagrams } = useMindmapStore()
-  const [flashDiagramId, setFlashDiagramId] = useState<string | null>(null)
+  const [flashDiagramId] = useState<string | null>(null)
   const [showTagFooter, setShowTagFooter] = useState(false)
   const [tagInput, setTagInput] = useState('')
   const tagFooterRef = useRef<HTMLDivElement>(null)
@@ -173,7 +121,7 @@ export default function App() {
     } else {
       loadDiagramList()
     }
-  }, [authLoading, user?.id])
+  }, [authLoading])
 
   useEffect(() => {
     setPasteImportFn(async (name, nodes) => {
@@ -282,16 +230,7 @@ export default function App() {
     if (nodeId) setSelectedPanelNodeId(nodeId)
   }, [])
 
-  // If editor has no diagram after loading, fall back to home
-  useEffect(() => {
-    if (view === 'editor' && !activeMindmap && !diagramLoading && !authLoading) {
-      handleBack()
-    }
-  }, [view, activeMindmap, diagramLoading, authLoading])
 
-  async function handleSignOut() {
-    if (supabase) await supabase.auth.signOut()
-  }
 
   // Show spinner while auth or diagram is loading
   if (authLoading || diagramLoading) return (
@@ -304,7 +243,7 @@ export default function App() {
   if (view === 'home') return (
     <>
       <CuteToast />
-      <HomePage onOpen={handleOpenDiagram} user={user} onSignOut={handleSignOut} flashId={flashDiagramId} />
+      <HomePage onOpen={handleOpenDiagram} user={user} onSignOut={() => {}} flashId={flashDiagramId} />
     </>
   )
 
@@ -312,7 +251,7 @@ export default function App() {
   if (view === 'editor' && !activeMindmap) return (
     <>
       <CuteToast />
-      <HomePage onOpen={handleOpenDiagram} user={user} onSignOut={handleSignOut} flashId={flashDiagramId} />
+      <HomePage onOpen={handleOpenDiagram} user={user} onSignOut={() => {}} flashId={flashDiagramId} />
     </>
   )
 
