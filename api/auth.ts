@@ -10,14 +10,21 @@ export default async function handler(req: Request): Promise<Response> {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS })
   if (req.method !== 'POST') return new Response('Method not allowed', { status: 405, headers: CORS })
 
-  const { email, password } = await req.json() as { email?: string; password?: string }
+  const body = await req.text()
+  let email = '', password = ''
+  try {
+    const parsed = JSON.parse(body)
+    email = parsed.email || ''
+    password = parsed.password || ''
+  } catch {
+    return new Response(JSON.stringify({ ok: false, error: 'Invalid JSON' }), { status: 400, headers: { ...CORS, 'Content-Type': 'application/json' } })
+  }
 
-  const validEmail = process.env.AUTH_EMAIL ?? 'bheng.code@gmail.com'
-  const validPassword = process.env.AUTH_PASSWORD ?? 'mindmaps2026'
+  const validEmail = 'bheng.code@gmail.com'
+  const validPassword = 'mindmaps2026'
 
   if (email === validEmail && password === validPassword) {
-    // Simple token: base64(email:timestamp)
-    const token = btoa(`${email}:${Date.now()}:mindmaps`)
+    const token = btoa(email + ':' + Date.now() + ':mindmaps')
     return new Response(JSON.stringify({
       ok: true,
       token,
