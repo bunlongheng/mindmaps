@@ -1,4 +1,5 @@
-export const config = { runtime: 'edge' }
+import { Pool } from 'pg'
+const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } })
 
 const BRANCH_COLORS = [
   '#6366f1', '#8b5cf6', '#ec4899', '#ef4444',
@@ -256,26 +257,16 @@ export default async function handler(req: Request): Promise<Response> {
   const { title, nodes } = result
 
   const id = crypto.randomUUID()
-  const dbApi = process.env.MINDMAP_DB_API
-  const dbKey = process.env.MINDMAP_AI_API_KEY ?? ''
 
-  if (!dbApi) return json({ error: 'MINDMAP_DB_API not configured' }, 500)
-
-  // Save to Linode PostgreSQL
-  const dbRes = await fetch(dbApi, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${dbKey}` },
-    body: JSON.stringify({
-      id, user_id: userId, name: title,
-      type, line_style: 'orthogonal',
-      sharing_enabled: false, theme_id: themeId, nodes,
-      tags: ['AI'],
-    }),
-  }).catch(() => null)
-
-  if (!dbRes || !dbRes.ok) {
-    const err = dbRes ? await dbRes.text() : 'Network error'
-    return json({ error: 'Failed to save diagram', detail: err }, 500)
+  try {
+    await pool.query(
+      `INSERT INTO mindmaps (id, user_id, name, type, line_style, sharing_enabled, theme_id, nodes, tags)
+       VALUES ($1,$2,$3,$4,'orthogonal',false,$5,$6,$7)
+       ON CONFLICT (id) DO UPDATE SET name=$3, nodes=$6, updated_at=now()`,
+      [id, userId ?? null, title, type, themeId, JSON.stringify(nodes), ['AI']]
+    )
+  } catch (e) {
+    return json({ error: 'Failed to save diagram', detail: String(e) }, 500)
   }
 
   const appUrl = process.env.MINDMAP_APP_URL ?? 'https://mindmaps-bheng.vercel.app'

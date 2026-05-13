@@ -1,4 +1,5 @@
-export const config = { runtime: 'edge' }
+import { Pool } from 'pg'
+const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } })
 
 
 const BRANCH_COLORS = [
@@ -159,7 +160,6 @@ export default async function handler(req: Request): Promise<Response> {
   if (!title) return json({ error: 'title is required' }, 400)
 
   const id = crypto.randomUUID()
-  const apiBase = process.env.MINDMAP_DB_API
 
   let nodes: MindmapNode[] = []
   if (outline) {
@@ -170,12 +170,16 @@ export default async function handler(req: Request): Promise<Response> {
     if (!nodes.length) nodes = parseOutline(outline)
   }
 
-  const dbRes = await fetch(apiBase, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ id, user_id: userId, name: title, type, line_style: lineStyle, sharing_enabled: true, theme_id: themeId, nodes, tags: ['API'] }),
-  }).catch(() => null)
-  if (!dbRes || !dbRes.ok) return json({ error: 'Failed to save diagram' }, 500)
+  try {
+    await pool.query(
+      `INSERT INTO mindmaps (id, user_id, name, type, line_style, sharing_enabled, theme_id, nodes, tags)
+       VALUES ($1,$2,$3,$4,$5,true,$6,$7,$8)
+       ON CONFLICT (id) DO UPDATE SET name=$3, nodes=$7, updated_at=now()`,
+      [id, userId ?? null, title, type, lineStyle, themeId, JSON.stringify(nodes), ['API']]
+    )
+  } catch (e) {
+    return json({ error: 'Failed to save diagram', detail: String(e) }, 500)
+  }
 
   const appUrl = process.env.MINDMAP_APP_URL ?? 'https://mindmaps-bheng.vercel.app'
   return json({ id, url: `${appUrl}/?id=${id}`, nodeCount: nodes.length }, 201)
