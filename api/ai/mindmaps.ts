@@ -132,34 +132,23 @@ function parseJsonOutline(json: unknown): { title: string; nodes: MindmapNode[] 
   return { title: rootKey.trim(), nodes }
 }
 
-const CORS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Authorization, Content-Type',
-}
+export default async function handler(req: any, res: any) {
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
+  res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type')
+  if (req.method === 'OPTIONS') return res.status(204).end()
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
-function json(data: unknown, status = 200) {
-  return new Response(JSON.stringify(data), { status, headers: { ...CORS, 'Content-Type': 'application/json' } })
-}
-
-export default async function handler(req: Request): Promise<Response> {
-  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS })
-  if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
-
-  const token = (req.headers.get('authorization') ?? '').replace(/^Bearer\s+/i, '').trim()
+  const token = (req.headers.authorization ?? '').replace(/^Bearer\s+/i, '').trim()
   const expectedToken = (process.env.MINDMAP_AI_API_KEY ?? '').trim()
-  if (!expectedToken || token !== expectedToken) return json({ error: 'Unauthorized' }, 401)
+  if (!expectedToken || token !== expectedToken) return res.status(401).json({ error: 'Unauthorized' })
 
-  let body: { title?: string; outline?: string; type?: string; themeId?: string; lineStyle?: string; userId?: string; isFavorite?: boolean; colors?: string[] }
-  try { body = await req.json() } catch { return json({ error: 'Invalid JSON body' }, 400) }
+  const { title, outline, type = 'logic-chart', themeId = 'default', lineStyle = 'orthogonal', userId = null, colors } = req.body || {}
 
-  const { title, outline, type = 'logic-chart', themeId = 'default', lineStyle = 'orthogonal', userId = null, isFavorite = false, colors } = body
-
-  // Allow caller to override the branch color palette
   if (Array.isArray(colors) && colors.length > 0) {
-    colors.forEach((c, i) => { if (typeof c === 'string') BRANCH_COLORS[i % BRANCH_COLORS.length] = c })
+    colors.forEach((c: string, i: number) => { if (typeof c === 'string') BRANCH_COLORS[i % BRANCH_COLORS.length] = c })
   }
-  if (!title) return json({ error: 'title is required' }, 400)
+  if (!title) return res.status(400).json({ error: 'title is required' })
 
   const id = crypto.randomUUID()
 
@@ -179,10 +168,10 @@ export default async function handler(req: Request): Promise<Response> {
        ON CONFLICT (id) DO UPDATE SET name=$3, nodes=$7, updated_at=now()`,
       [id, userId ?? null, title, type, lineStyle, themeId, JSON.stringify(nodes), ['API']]
     )
-  } catch (e) {
-    return json({ error: 'Failed to save diagram', detail: String(e) }, 500)
+  } catch (e: any) {
+    return res.status(500).json({ error: 'Failed to save diagram', detail: e.message })
   }
 
   const appUrl = process.env.MINDMAP_APP_URL ?? 'https://mindmaps-bheng.vercel.app'
-  return json({ id, url: `${appUrl}/?id=${id}`, nodeCount: nodes.length }, 201)
+  return res.status(201).json({ id, url: `${appUrl}/?id=${id}`, nodeCount: nodes.length })
 }
