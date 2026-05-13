@@ -256,7 +256,7 @@ export default async function handler(req: Request): Promise<Response> {
   const { title, nodes } = result
 
   const id = crypto.randomUUID()
-  const apiBase = process.env.MINDMAP_DB_API ?? 'https://www.bunlongheng.com/api/mindmaps'
+  const apiBase = process.env.MINDMAP_DB_API
 
   // Save to Linode PostgreSQL via API
   const dbRes = await fetch(apiBase, {

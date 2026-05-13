@@ -159,7 +159,7 @@ export default async function handler(req: Request): Promise<Response> {
   if (!title) return json({ error: 'title is required' }, 400)
 
   const id = crypto.randomUUID()
-  const apiBase = process.env.MINDMAP_DB_API ?? 'https://www.bunlongheng.com/api/mindmaps'
+  const apiBase = process.env.MINDMAP_DB_API
 
   let nodes: MindmapNode[] = []
   if (outline) {
