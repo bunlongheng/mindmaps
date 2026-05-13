@@ -256,12 +256,15 @@ export default async function handler(req: Request): Promise<Response> {
   const { title, nodes } = result
 
   const id = crypto.randomUUID()
-  const apiBase = process.env.MINDMAP_DB_API
+  const dbApi = process.env.MINDMAP_DB_API
+  const dbKey = process.env.MINDMAP_AI_API_KEY ?? ''
 
-  // Save to Linode PostgreSQL via API
-  const dbRes = await fetch(apiBase, {
+  if (!dbApi) return json({ error: 'MINDMAP_DB_API not configured' }, 500)
+
+  // Save to Linode PostgreSQL
+  const dbRes = await fetch(dbApi, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${dbKey}` },
     body: JSON.stringify({
       id, user_id: userId, name: title,
       type, line_style: 'orthogonal',
