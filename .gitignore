@@ -5,3 +5,6 @@ dist
 *.local
 .vercel
 .env*.local
+test-results/
+dev-dist/
+.claude/
