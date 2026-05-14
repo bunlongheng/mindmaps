@@ -16,7 +16,8 @@ const lsKey = (id: string) => `mindmaps:diagram:${id}`
 
 function lsGetList(): DiagramMeta[] {
   try {
-    return JSON.parse(localStorage.getItem(LS_LIST) ?? '[]')
+    const list: DiagramMeta[] = JSON.parse(localStorage.getItem(LS_LIST) ?? '[]')
+    return list.sort((a, b) => new Date(b.updatedAt ?? 0).getTime() - new Date(a.updatedAt ?? 0).getTime())
   } catch { return [] }
 }
 function lsSaveList(list: DiagramMeta[]) {
@@ -88,42 +89,22 @@ export function useDiagram(userId: string | null = null) {
   const { setActiveMindmap, setDiagrams, setIsDirty } = useMindmapStore()
 
   const loadDiagramList = useCallback(async () => {
-    // Always show local cache first
-    setDiagrams(lsGetList())
-
-    if (!userId) return
+    if (!userId) { setDiagrams([]); return }
 
     try {
       const res = await fetch(`${API_BASE}?user_id=${userId}`, { headers: AUTH_HEADERS })
-      if (!res.ok) return
+      if (!res.ok) { setDiagrams([]); return }
       const data = await res.json() as Record<string, unknown>[]
 
-      // Cache remotely fetched diagrams locally
-      if (data.length > 0) {
-        const remoteIds = new Set(data.map((d: Record<string, unknown>) => d.id as string))
-        const localList = lsGetList()
-        const localOnlyIds = new Set(localList.filter(m => !remoteIds.has(m.id)).map(m => m.id))
-        lsSaveList([...localList.filter(m => localOnlyIds.has(m.id) || remoteIds.has(m.id))])
-        for (const row of data) {
-          if (!row.nodes) continue
-          const localCached = lsGetDiagram(row.id as string)
-          if (localCached) {
-            const localTime = new Date(localCached.updatedAt ?? 0).getTime()
-            const remoteTime = new Date(row.updated_at as string ?? 0).getTime()
-            if (localTime > remoteTime) continue
-          }
-          lsSaveDiagram(rowToDiagram(row))
-        }
-      }
-
-      setDiagrams((data ?? []).map(d => ({
+      const list = (data ?? []).map(d => ({
         id: d.id as string, name: d.name as string, type: d.type as DiagramMeta['type'],
         updatedAt: d.updated_at as string,
         isPublic: (d.sharing_enabled ?? false) as boolean,
         tags: (d.tags as string[]) ?? [],
-      })))
+      }))
+      setDiagrams(list)
     } catch {
-      // Network error — localStorage is already showing
+      setDiagrams([])
     }
   }, [setDiagrams, userId])
 
@@ -267,7 +248,8 @@ export function useDiagram(userId: string | null = null) {
       store.setIsDirty(false)
     }
     lsDeleteDiagram(id)
-    setDiagrams(lsGetList())
+    const { diagrams } = useMindmapStore.getState()
+    setDiagrams(diagrams.filter(d => d.id !== id))
     soundDelete()
     showToast(`"${name ?? 'Map'}" deleted`, { color: '#1a1d2e' })
 

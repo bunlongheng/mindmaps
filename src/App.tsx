@@ -40,7 +40,13 @@ function getShareParam(search = window.location.search) {
 
 export default function App() {
   // Simple auth — check localStorage for session
+  const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  const DEV_USER = { email: 'bheng.code@gmail.com', name: 'Bunlong Heng', userId: '731ace87-64e5-44db-bf2a-82265f06f4d9' }
   const [user, setUser] = useState<{ email: string; name: string; userId: string } | null>(() => {
+    if (isLocal) {
+      localStorage.setItem('mindmaps:user', JSON.stringify(DEV_USER))
+      return DEV_USER
+    }
     try { return JSON.parse(localStorage.getItem('mindmaps:user') ?? 'null') } catch { return null }
   })
   const [authLoading, setAuthLoading] = useState(false)
@@ -57,6 +63,8 @@ export default function App() {
       })
       const data = await res.json()
       if (data.ok) {
+        // Clear stale diagram cache so API is always the source of truth
+        Object.keys(localStorage).filter(k => k.startsWith('mindmaps:diagram:') || k === 'mindmaps:list').forEach(k => localStorage.removeItem(k))
         localStorage.setItem('mindmaps:user', JSON.stringify(data.user))
         localStorage.setItem('mindmaps:token', data.token)
         setUser(data.user)
@@ -272,8 +280,11 @@ export default function App() {
     </div>
   )
 
-  // Login screen when not authenticated
-  if (!user) return (
+  // Allow shared links to bypass login
+  const isShareLink = !!getShareParam() || !!decodeShareURL()
+
+  // Login screen when not authenticated (unless it's a share link)
+  if (!user && !isShareLink && !activeMindmap) return (
     <>
       <CuteToast />
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8f9fb', fontFamily: 'Inter, system-ui, sans-serif' }}>

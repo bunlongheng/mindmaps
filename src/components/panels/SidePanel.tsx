@@ -194,7 +194,7 @@ export function SidePanel({ nodeId, onClose, onDelete }: SidePanelProps) {
 
 
   const shareUrl = activeMindmap
-    ? `${window.location.origin}${window.location.pathname}?share=${activeMindmap.id}`
+    ? `${window.location.origin}/api/og?id=${activeMindmap.id}`
     : ''
 
 

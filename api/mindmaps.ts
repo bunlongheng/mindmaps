@@ -1,4 +1,3 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { Pool } from 'pg'
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } })
@@ -9,37 +8,24 @@ const CORS = {
   'Access-Control-Allow-Headers': 'Authorization, Content-Type',
 }
 
-async function ensureTable() {
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS mindmaps (
-      id              text        PRIMARY KEY,
-      user_id         text,
-      name            text        NOT NULL DEFAULT 'Untitled',
-      type            text        NOT NULL DEFAULT 'logic-chart',
-      line_style      text        NOT NULL DEFAULT 'orthogonal',
-      sharing_enabled boolean     NOT NULL DEFAULT false,
-      theme_id        text        NOT NULL DEFAULT 'default',
-      nodes           jsonb       NOT NULL DEFAULT '[]',
-      tags            text[]      NOT NULL DEFAULT '{}',
-      created_at      timestamptz NOT NULL DEFAULT now(),
-      updated_at      timestamptz NOT NULL DEFAULT now()
-    )
-  `)
-}
-
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default async function handler(req: any, res: any) {
   Object.entries(CORS).forEach(([k, v]) => res.setHeader(k, v))
   if (req.method === 'OPTIONS') return res.status(204).end()
 
-  await ensureTable()
-
+  try {
   const { id, user_id } = req.query as Record<string, string>
 
   if (req.method === 'GET') {
     if (id) {
       const r = await pool.query('SELECT * FROM mindmaps WHERE id=$1', [id])
       if (!r.rows.length) return res.status(404).json({ error: 'Not found' })
-      return res.json(r.rows[0])
+      const row = r.rows[0]
+      // If requester is not the owner, only return if sharing is enabled
+      if (user_id && user_id !== row.user_id) {
+        if (!row.sharing_enabled) return res.status(403).json({ error: 'Not shared' })
+      }
+      if (!user_id && !row.sharing_enabled) return res.status(403).json({ error: 'Not shared' })
+      return res.json(row)
     }
     if (!user_id) return res.status(400).json({ error: 'user_id required' })
     const r = await pool.query(
@@ -89,4 +75,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   return res.status(405).json({ error: 'Method not allowed' })
+  } catch (e: any) {
+    return res.status(500).json({ error: e.message, code: e.code })
+  }
 }

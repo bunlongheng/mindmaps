@@ -37,7 +37,7 @@ export default defineConfig({
         skipWaiting: true,
         clientsClaim: true,
         // Bump this string to force all clients to install the new SW immediately
-        additionalManifestEntries: [{ url: '/', revision: '20260511-fix-hooks' }],
+        additionalManifestEntries: [{ url: '/', revision: '20260514-share-fix' }],
         runtimeCaching: [
           // Navigation requests: always try network first, fall back to cache
           {
@@ -54,4 +54,13 @@ export default defineConfig({
       },
     }),
   ],
+  server: {
+    proxy: {
+      '/api': {
+        target: 'https://mindmaps-bheng.vercel.app',
+        changeOrigin: true,
+        secure: true,
+      },
+    },
+  },
 })

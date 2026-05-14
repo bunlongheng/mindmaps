@@ -51,7 +51,7 @@ function isLight(hex: string): boolean {
 export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onDragMove, onRootDragOffset, svgRef, readOnly, l1Colors = [] }: NodeProps) {
   const isRoot = node.depth === 0
   const isL2Plus = node.depth >= 2
-  const rx = isRoot ? 10 : 8
+  const rx = isRoot ? 4 : 3
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
@@ -90,7 +90,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   const isFishboneNode = isFishbone && node.depth >= 1
   // Fishbone: detect if node is above or below the spine (Y=400) for parallelogram direction
   const fishboneAbove = isFishboneNode ? (node.y + node.height / 2) < 400 : false
-  const effectiveRx = isMindmapL2Plus ? Math.max(node.width, node.height) / 2 : isFishboneNode ? 0 : rx
+  const effectiveRx = isFishboneNode ? 0 : rx
   const previewW = (!isRoot && resizePreview?.depth === node.depth) ? resizePreview.width : null
 
   // Mindmap circles: keep text horizontal for readability

@@ -475,7 +475,7 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
               {filtered.map(d => (
                 <DiagramCard
                   key={d.id} diagram={d} timeAgo={timeAgo(d.updatedAt)}
-                  onOpen={() => onOpen(d.id)} onDelete={() => deleteDiagram(d.id, d.name)}
+                  onOpen={() => onOpen(d.id)} onDelete={() => { deleteDiagram(d.id, d.name); setActiveTag(null) }}
                   isPublic={d.isPublic} tags={d.tags} tagColorMap={tagColorMap}
                   onTagEdit={() => { setTagModalId(d.id) }}
                   flash={flashId === d.id}
@@ -749,7 +749,10 @@ function DiagramMinimap({ id, type }: { id: string; type: string }) {
   const [nodes, setNodes] = useState<MindmapNode[]>([])
   const [diagramThemeId, setDiagramThemeId] = useState<string>('default')
   const [lineStyle, setLineStyle] = useState<string>('orthogonal')
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const [inView, setInView] = useState(false)
 
+  // Hydrate from localStorage immediately (synchronous, free)
   useEffect(() => {
     try {
       const data = JSON.parse(localStorage.getItem(`mindmaps:diagram:${id}`) ?? 'null')
@@ -760,6 +763,41 @@ function DiagramMinimap({ id, type }: { id: string; type: string }) {
       }
     } catch {}
   }, [id, storeThemeId])
+
+  // Observe viewport — only fetch when card is visible
+  useEffect(() => {
+    const el = wrapRef.current
+    if (!el) return
+    const io = new IntersectionObserver(entries => {
+      if (entries.some(e => e.isIntersecting)) {
+        setInView(true)
+        io.disconnect()
+      }
+    }, { rootMargin: '200px' })
+    io.observe(el)
+    return () => io.disconnect()
+  }, [])
+
+  // Fetch from API only when in view AND no cached nodes loaded yet
+  useEffect(() => {
+    if (!inView || nodes.length) return
+    const stored = localStorage.getItem('mindmaps:user')
+    const uid = stored ? JSON.parse(stored)?.userId : null
+    let aborted = false
+    fetch(`/api/mindmaps?id=${id}${uid ? `&user_id=${uid}` : ''}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (aborted || !data?.nodes?.length) return
+        setNodes(data.nodes)
+        setDiagramThemeId(data.theme_id ?? 'default')
+        setLineStyle(data.line_style ?? 'orthogonal')
+        localStorage.setItem(`mindmaps:diagram:${id}`, JSON.stringify({
+          id, nodes: data.nodes, themeId: data.theme_id ?? 'default', lineStyle: data.line_style ?? 'orthogonal',
+        }))
+      })
+      .catch(() => {})
+    return () => { aborted = true }
+  }, [inView, id, nodes.length])
 
   const theme = getTheme(diagramThemeId)
   const canvasBg = theme.canvasBg
@@ -781,8 +819,10 @@ function DiagramMinimap({ id, type }: { id: string; type: string }) {
 
   if (l1s.length === 0) {
     return (
-      <div style={{ width: '100%', height: '100%', background: canvasBg, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '0 0 14px 14px' }}>
-        <div style={{ fontSize: 11, color: isDarkCanvas ? 'rgba(255,255,255,0.3)' : '#cbd5e1', fontWeight: 500 }}>Open to preview</div>
+      <div ref={wrapRef} style={{ width: '100%', height: '100%', background: canvasBg, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '0 0 14px 14px' }}>
+        <div style={{ fontSize: 11, color: isDarkCanvas ? 'rgba(255,255,255,0.3)' : '#cbd5e1', fontWeight: 500 }}>
+          {inView ? 'Loading…' : 'Open to preview'}
+        </div>
       </div>
     )
   }
