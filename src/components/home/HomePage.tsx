@@ -168,7 +168,8 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
     if (!aiPrompt.trim() || aiLoading) return
     setAiLoading(true)
     setAiError('')
-    setShowCreate(false)
+    // Keep the modal open during generation: on success we navigate away below,
+    // on error the modal must stay up to show aiError (closing it here hid errors).
     try {
       const res = await fetch(`${MINDMAP_API_BASE}/api/ai/generate-mindmap`, {
         method: 'POST',

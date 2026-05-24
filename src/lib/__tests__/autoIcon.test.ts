@@ -36,8 +36,19 @@ describe('resolveIcon', () => {
     expect(resolveIcon('users')).toBe('user')
   })
 
-  it('strips numeric suffix and checks alias', () => {
+  it('resolves direct alias before numeric-suffix stripping', () => {
+    // "gamepad-2" is itself a key in ALIASES (line 129 returns first)
     expect(resolveIcon('gamepad-2')).toBe('smile')
+  })
+
+  it('strips numeric suffix and resolves the base alias', () => {
+    // "timer-2" is NOT a key, but base "timer" IS in ALIASES → resolves (covers line 132 return)
+    expect(resolveIcon('timer-2')).toBe('clock')
+  })
+
+  it('passes through numeric-suffix names whose base is not an alias', () => {
+    // base "rocket" is not in ALIASES → falls through to pass-through (line 132 false branch)
+    expect(resolveIcon('rocket-2')).toBe('rocket-2')
   })
 
   it('passes through unknown names', () => {

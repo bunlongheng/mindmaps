@@ -263,7 +263,7 @@ export function useDiagram(userId: string | null = null) {
   const deleteDiagram = useCallback(async (id: string, name?: string) => {
     const store = useMindmapStore.getState()
     if (store.activeMindmap?.id === id) {
-      store.setActiveMindmap(null as unknown as Diagram)
+      store.setActiveMindmap(null)
       store.setIsDirty(false)
     }
     lsDeleteDiagram(id)

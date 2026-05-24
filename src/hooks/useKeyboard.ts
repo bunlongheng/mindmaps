@@ -20,7 +20,7 @@ export function useKeyboard() {
     }
 
     function onKeyDown(e: KeyboardEvent) {
-      const tag = (e.target as HTMLElement).tagName.toLowerCase()
+      const tag = (e.target as HTMLElement | null)?.tagName?.toLowerCase() ?? ''
       if (tag === 'input' || tag === 'textarea') return
 
       const { deleteSelectedNodes, dissolveNode, dissolveSelectedNodes, setSelectedNodeIds, undo, redo, activeMindmap, selectedNodeIds } = useMindmapStore.getState()
@@ -49,7 +49,7 @@ export function useKeyboard() {
       if ((e.metaKey || e.ctrlKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) { e.preventDefault(); redo() }
     }
     function onCopy(e: ClipboardEvent) {
-      const tag = (e.target as HTMLElement).tagName.toLowerCase()
+      const tag = (e.target as HTMLElement | null)?.tagName?.toLowerCase() ?? ''
       if (tag === 'input' || tag === 'textarea') return
       const { activeMindmap, selectedNodeIds } = useMindmapStore.getState()
       if (!activeMindmap) return
@@ -74,7 +74,7 @@ export function useKeyboard() {
     }
 
     function onPaste(e: ClipboardEvent) {
-      const tag = (e.target as HTMLElement).tagName.toLowerCase()
+      const tag = (e.target as HTMLElement | null)?.tagName?.toLowerCase() ?? ''
       if (tag === 'input' || tag === 'textarea') return
       const text = e.clipboardData?.getData('text/plain') ?? ''
       if (text.trim()) { e.preventDefault(); tryLoad(text) }

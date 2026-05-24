@@ -141,7 +141,7 @@ interface MindmapStore {
   past: HistoryState[]
   future: HistoryState[]
   // Actions
-  setActiveMindmap: (d: Diagram) => void
+  setActiveMindmap: (d: Diagram | null) => void
   setDiagrams: (ds: DiagramMeta[]) => void
   setSelectedNodeIds: (ids: string[]) => void
   setDiagramType: (t: DiagramType) => void
@@ -203,6 +203,9 @@ export const useMindmapStore = create<MindmapStore>()(
     setPasteImportFn: (fn) => set({ pasteImportFn: fn }),
 
     setActiveMindmap: (d) => {
+      // Clearing the active map (e.g. after deleting the one being viewed): reset
+      // cleanly instead of throwing on d.nodes of a null diagram.
+      if (!d) { set({ activeMindmap: null, isDirty: false, past: [], future: [] }); return }
       // Re-run layout on load: reset widths → compute auto-widths → normalize per depth → final layout
       const freshNodes = d.nodes.map(n => {
         if (n.depth !== 0) return { ...n, width: 0, height: 0, manuallyPositioned: false }

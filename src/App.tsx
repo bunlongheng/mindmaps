@@ -221,7 +221,7 @@ export default function App() {
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
-      const tag = (e.target as HTMLElement).tagName.toLowerCase()
+      const tag = (e.target as HTMLElement | null)?.tagName?.toLowerCase() ?? ''
       if (tag === 'input' || tag === 'textarea') return
       // Cmd+S / Ctrl+S — manual save
       if ((e.metaKey || e.ctrlKey) && e.key === 's') {

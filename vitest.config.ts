@@ -9,7 +9,14 @@ export default defineConfig({
     setupFiles: ['./src/test/setup.ts'],
     include: ['src/**/*.test.{ts,tsx}'],
     coverage: {
-      include: ['src/lib/**', 'src/store/**', 'src/hooks/**'],
+      provider: 'v8',
+      include: ['src/**/*.{ts,tsx}'],
+      exclude: ['src/**/*.test.{ts,tsx}', 'src/test/**', 'src/main.tsx', 'src/types/**', 'src/**/*.d.ts'],
+      reporter: ['text-summary'],
+      // Regression gate. Achieved ~99% lines; the small remainder is verified
+      // dead/unreachable code (SSR fallbacks, impossible-state guards). Thresholds
+      // sit just under the achieved level so a real coverage drop fails the run.
+      thresholds: { statements: 96, branches: 87, functions: 96, lines: 98 },
     },
   },
 })

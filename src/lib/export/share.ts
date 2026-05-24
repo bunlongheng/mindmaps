@@ -3,7 +3,9 @@ import type { Diagram } from '../../types'
 export function encodeShareURL(diagram: Diagram): string {
   const json = JSON.stringify(diagram)
   const b64 = btoa(unescape(encodeURIComponent(json)))
-  return `${window.location.origin}?d=${b64}`
+  // URL-encode: raw base64 contains + and /, and URLSearchParams turns + into a
+  // space on read-back, corrupting the payload. encodeURIComponent keeps it intact.
+  return `${window.location.origin}?d=${encodeURIComponent(b64)}`
 }
 
 export function decodeShareURL(): Diagram | null {
