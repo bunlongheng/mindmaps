@@ -46,6 +46,14 @@ export function lsDeleteDiagram(id: string) {
 
 // ── DB row → Diagram ─────────────────────────────────────────────────────────
 
+// Some legacy/AI-generated rows were saved with type 'logic' (not a valid
+// DiagramType). Map anything unrecognized to 'logic-chart' so layout + rendering
+// never break. Resaving the map heals the stored value.
+const VALID_TYPES: Diagram['type'][] = ['logic-chart', 'mindmap', 'fishbone', 'timeline']
+function normalizeType(t: unknown): Diagram['type'] {
+  return VALID_TYPES.includes(t as Diagram['type']) ? (t as Diagram['type']) : 'logic-chart'
+}
+
 function rowToDiagram(row: Record<string, unknown>): Diagram {
   const rawNodes = (row.nodes ?? []) as Record<string, unknown>[]
   const nodes: MindmapNode[] = rawNodes.map(n => ({
@@ -72,7 +80,7 @@ function rowToDiagram(row: Record<string, unknown>): Diagram {
   return {
     id:             row.id as string,
     name:           row.name as string,
-    type:           row.type as Diagram['type'],
+    type:           normalizeType(row.type),
     lineStyle:      (row.line_style as Diagram['lineStyle']) ?? 'orthogonal',
     createdAt:      (row.created_at as string) ?? new Date().toISOString(),
     updatedAt:      (row.updated_at as string) ?? new Date().toISOString(),
@@ -97,7 +105,7 @@ export function useDiagram(userId: string | null = null) {
       const data = await res.json() as Record<string, unknown>[]
 
       const list = (data ?? []).map(d => ({
-        id: d.id as string, name: d.name as string, type: d.type as DiagramMeta['type'],
+        id: d.id as string, name: d.name as string, type: normalizeType(d.type),
         updatedAt: d.updated_at as string,
         isPublic: (d.sharing_enabled ?? false) as boolean,
         tags: (d.tags as string[]) ?? [],
@@ -108,7 +116,7 @@ export function useDiagram(userId: string | null = null) {
     }
   }, [setDiagrams, userId])
 
-  const loadDiagram = useCallback(async (id: string) => {
+  const loadDiagram = useCallback(async (id: string): Promise<Diagram | null> => {
     // 1. Try localStorage cache first (instant)
     const cached = lsGetDiagram(id)
     if (cached) {
@@ -116,27 +124,38 @@ export function useDiagram(userId: string | null = null) {
       localStorage.setItem('activeMindmapId', id)
     }
 
-    try {
-      // 2. Query Linode API — always try, even without userId (for shared/direct links)
-      const params = userId ? `id=${id}&user_id=${userId}` : `id=${id}`
-      const res = await fetch(`${API_BASE}?${params}`, { headers: AUTH_HEADERS })
-      if (!res.ok) return
-      const data = await res.json()
-      if (data.error) return
+    // 2. Query Linode API — retry once on transient failure (flaky mobile networks,
+    //    serverless cold starts). Always try, even without userId (shared/direct links).
+    const params = userId ? `id=${id}&user_id=${userId}` : `id=${id}`
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const res = await fetch(`${API_BASE}?${params}`, { headers: AUTH_HEADERS })
+        if (!res.ok) {
+          // Retry 5xx once; treat 4xx (not found / not shared) as final.
+          if (res.status >= 500 && attempt === 0) { await new Promise(r => setTimeout(r, 500)); continue }
+          return cached ?? null
+        }
+        const data = await res.json()
+        if (data.error) return cached ?? null
 
-      const diagram = rowToDiagram(data)
-      // If local cache is newer, keep it
-      if (cached) {
-        const localTime = new Date(cached.updatedAt ?? 0).getTime()
-        const remoteTime = new Date(diagram.updatedAt ?? 0).getTime()
-        if (localTime > remoteTime) return
+        const diagram = rowToDiagram(data)
+        // If local cache is newer, keep it
+        if (cached) {
+          const localTime = new Date(cached.updatedAt ?? 0).getTime()
+          const remoteTime = new Date(diagram.updatedAt ?? 0).getTime()
+          if (localTime > remoteTime) return cached
+        }
+        setActiveMindmap(diagram)
+        localStorage.setItem('activeMindmapId', id)
+        lsSaveDiagram(diagram)
+        return diagram
+      } catch {
+        // Network blip — retry once, then fall back to cache (may be null)
+        if (attempt === 0) { await new Promise(r => setTimeout(r, 500)); continue }
+        return cached ?? null
       }
-      setActiveMindmap(diagram)
-      localStorage.setItem('activeMindmapId', id)
-      lsSaveDiagram(diagram)
-    } catch {
-      // Network error — cached version already loaded
     }
+    return cached ?? null
   }, [setActiveMindmap, userId])
 
   const saveDiagram = useCallback(async (diagram: Diagram) => {

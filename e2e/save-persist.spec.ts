@@ -1,11 +1,32 @@
 import { test, expect } from './fixtures'
 import { createMap } from './helpers'
 
+// Reopen the just-created map deterministically via its own ?map=<id> URL instead
+// of clicking an ambiguous "Untitled" card (there can be many). Going through goto
+// also exercises the deep-link / refresh load path.
+async function reopen(page: import('@playwright/test').Page, mapUrl: string) {
+  await page.goto(mapUrl)
+  await page.waitForSelector('.diagram-canvas-root', { timeout: 10_000 })
+  await page.waitForTimeout(800)
+}
+
+// Remove the map this test created so the suite can run repeatedly without piling
+// up throwaway maps in the backing store.
+async function cleanup(page: import('@playwright/test').Page, mapUrl: string) {
+  const id = new URL(mapUrl).searchParams.get('map')
+  if (!id) return
+  await page.evaluate(async (mapId) => {
+    const uid = JSON.parse(localStorage.getItem('mindmaps:user') ?? 'null')?.userId
+    await fetch(`/api/mindmaps?id=${mapId}${uid ? `&user_id=${uid}` : ''}`, { method: 'DELETE' }).catch(() => {})
+  }, id)
+}
+
 test.describe('Save & Persist', () => {
   test('added node persists after back and reopen', async ({ page }) => {
     await createMap(page)
+    const mapUrl = page.url()
+    expect(mapUrl).toContain('?map=')
 
-    // Count nodes before
     const beforeCount = await page.locator('.diagram-canvas-root svg text').count()
 
     // Add a child node via Tab
@@ -14,54 +35,36 @@ test.describe('Save & Persist', () => {
     const afterAdd = await page.locator('.diagram-canvas-root svg text').count()
     expect(afterAdd).toBeGreaterThan(beforeCount)
 
-    // Wait for auto-persist (Zustand subscriber writes immediately, but give it a moment)
-    await page.waitForTimeout(500)
+    await page.waitForTimeout(600) // let auto-save flush
 
-    // Click back button
-    const backBtn = page.locator('[title="All maps"]')
-    if (await backBtn.isVisible({ timeout: 2_000 }).catch(() => false)) {
-      await backBtn.click()
-      await page.waitForSelector('[title="New blank map"], [title="New Map"]', { timeout: 5_000 })
-    } else {
-      // Fallback: navigate directly
-      await page.goto('/')
-      await page.waitForSelector('[title="New blank map"], [title="New Map"]', { timeout: 10_000 })
-    }
-    await page.waitForTimeout(500)
+    await reopen(page, mapUrl)
+    const reopenCount = await page.locator('.diagram-canvas-root svg text').count()
+    expect(reopenCount).toBe(afterAdd)
 
-    // Reopen the diagram — click the first card (most recent = "Untitled")
-    const card = page.locator('text="Untitled"').first()
-    if (await card.isVisible({ timeout: 3_000 }).catch(() => false)) {
-      await card.click()
-      await page.waitForSelector('.diagram-canvas-root', { timeout: 10_000 })
-      await page.waitForTimeout(1000)
-
-      // Verify the added node is still there
-      const reopenCount = await page.locator('.diagram-canvas-root svg text').count()
-      expect(reopenCount).toBe(afterAdd)
-    }
+    await cleanup(page, mapUrl)
   })
 
   test('Cmd+S saves and shows toast', async ({ page }) => {
     await createMap(page)
+    const mapUrl = page.url()
 
-    // Add a node
     await page.keyboard.press('Tab')
     await page.waitForTimeout(800)
 
-    // Press Cmd+S
     await page.keyboard.press('Meta+s')
     await page.waitForTimeout(1000)
 
-    // Should show a "saved" toast
     const bodyText = await page.evaluate(() => document.body.innerText.toLowerCase())
     expect(bodyText).toContain('saved')
+
+    await cleanup(page, mapUrl)
   })
 
   test('node edit persists after back and reopen', async ({ page }) => {
     await createMap(page)
+    const mapUrl = page.url()
 
-    // Find and double-click "Main Topic 1" to edit
+    // Double-click "Main Topic 1" to edit
     const box = await page.evaluate(() => {
       const svg = document.querySelector('.diagram-canvas-root svg')
       if (!svg) return null
@@ -83,27 +86,13 @@ test.describe('Save & Persist', () => {
     await input.press('Enter')
     await page.waitForTimeout(1000)
 
-    // Go back
-    const backBtn = page.locator('[title="All maps"]')
-    if (await backBtn.isVisible({ timeout: 2_000 }).catch(() => false)) {
-      await backBtn.click()
-      await page.waitForSelector('[title="New blank map"], [title="New Map"]', { timeout: 5_000 })
-    }
-    await page.waitForTimeout(500)
+    await reopen(page, mapUrl)
+    const hasTitle = await page.evaluate(() => {
+      const texts = document.querySelectorAll('.diagram-canvas-root svg text')
+      return Array.from(texts).some(t => t.textContent?.includes('Persisted Title'))
+    })
+    expect(hasTitle).toBe(true)
 
-    // Reopen
-    const card = page.locator('text="Untitled"').first()
-    if (await card.isVisible({ timeout: 3_000 }).catch(() => false)) {
-      await card.click()
-      await page.waitForSelector('.diagram-canvas-root', { timeout: 10_000 })
-      await page.waitForTimeout(1000)
-
-      // Verify edited title persisted
-      const hasTitle = await page.evaluate(() => {
-        const texts = document.querySelectorAll('.diagram-canvas-root svg text')
-        return Array.from(texts).some(t => t.textContent?.includes('Persisted Title'))
-      })
-      expect(hasTitle).toBe(true)
-    }
+    await cleanup(page, mapUrl)
   })
 })

@@ -69,6 +69,17 @@ describe('mindmapStore', () => {
       const nonRoot = nodes.filter(n => n.depth > 0)
       expect(nonRoot.length).toBeGreaterThan(0)
     })
+
+    // Regression: legacy/AI rows were saved with type 'logic' (not a valid
+    // DiagramType). runLayout had no default case → returned undefined →
+    // "nodes is not iterable" threw → the map silently failed to open.
+    it('opens a map with a legacy/unknown type without crashing', () => {
+      const legacy = { ...makeDiagram(), type: 'logic' as unknown as Diagram['type'] }
+      expect(() => useMindmapStore.getState().setActiveMindmap(legacy)).not.toThrow()
+      const nodes = useMindmapStore.getState().activeMindmap!.nodes
+      expect(nodes.length).toBe(legacy.nodes.length)
+      expect(nodes.filter(n => n.depth > 0).length).toBeGreaterThan(0)
+    })
   })
 
   describe('addNode', () => {

@@ -157,7 +157,15 @@ export default function App() {
         const isImported = new URLSearchParams(window.location.search).has('imported')
         window.history.replaceState({}, '', `?map=${mapId}${isImported ? '&imported=1' : ''}`)
       }
-      setDiagramLoading(true); loadDiagram(mapId).finally(() => setDiagramLoading(false))
+      setDiagramLoading(true)
+      loadDiagram(mapId).then(loaded => {
+        if (!loaded) {
+          // Deep link / refresh to a map that failed to load: fall back to home.
+          setView('home'); loadDiagramList()
+          window.history.replaceState({}, '', window.location.pathname)
+          setTimeout(() => showToast("Couldn't open that map - check your connection and try again", { color: '#ef4444' }), 200)
+        }
+      }).finally(() => setDiagramLoading(false))
     } else {
       loadDiagramList()
     }
@@ -198,8 +206,10 @@ export default function App() {
       if (decodeShareURL()) return
       const mapId = getMapParam()
       if (mapId) {
-        loadDiagram(mapId)
-        setView('editor')
+        loadDiagram(mapId).then(loaded => {
+          if (loaded) setView('editor')
+          else { loadDiagramList(); setView('home') }
+        })
       } else {
         loadDiagramList()
         setView('home')
@@ -246,11 +256,19 @@ export default function App() {
     // Save the current tag before navigating away
     lastTagRef.current = new URLSearchParams(window.location.search).get('tag')
     setShowPanel(false); setSelectedPanelNodeId(null)
-    await loadDiagram(id)
+    setDiagramLoading(true)
+    const loaded = await loadDiagram(id)
+    setDiagramLoading(false)
+    // Load failed (no cache + network/server error): stay on home with clear
+    // feedback instead of silently bouncing to a blank editor. Defer the toast so
+    // CuteToast (unmounted during the loading spinner) has remounted to receive it.
+    if (!loaded) {
+      setTimeout(() => showToast("Couldn't open that map - check your connection and try again", { color: '#ef4444' }), 200)
+      return
+    }
     setView('editor')
     window.history.pushState({}, '', `?map=${id}`)
-    const name = useMindmapStore.getState().activeMindmap?.name
-    if (name) setTimeout(() => showToast(name, { color: '#1a1d2e', confetti: false }), 150)
+    if (loaded.name) setTimeout(() => showToast(loaded.name, { color: '#1a1d2e', confetti: false }), 150)
   }, [loadDiagram])
 
   const handleBack = useCallback(async () => {

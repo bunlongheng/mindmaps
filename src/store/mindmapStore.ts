@@ -111,10 +111,12 @@ function rebalanceColors(nodes: MindmapNode[], palette: string[]): MindmapNode[]
 
 function runLayout(nodes: MindmapNode[], type: DiagramType): MindmapNode[] {
   switch (type) {
-    case 'logic-chart': return computeMindmapsLayout(nodes)
     case 'mindmap':     return computeMindmapLayout(nodes)
     case 'fishbone':    return computeFishboneLayout(nodes)
     case 'timeline':    return computeTimelineLayout(nodes)
+    // 'logic-chart' and any unknown/legacy type (e.g. older 'logic' rows) fall back
+    // to the logic-chart layout — never return undefined, which crashed map opening.
+    default:            return computeMindmapsLayout(nodes)
   }
 }
 

@@ -1,7 +1,26 @@
 import { test as base, expect } from '@playwright/test'
 
-// Extend Playwright's test to capture console errors/warnings on every test
-export const test = base.extend<{ _consoleCheck: void }>({
+// Extend Playwright's test with two always-on fixtures:
+//   _consoleCheck — fails a test if it logged console errors/warnings
+//   _mapCleanup   — deletes any maps the test created so runs don't pile up
+//                   throwaway maps in the backing store (tests proxy to the real API)
+export const test = base.extend<{ _consoleCheck: void; _mapCleanup: void }>({
+  _mapCleanup: [async ({ page }, use) => {
+    const createdIds = new Set<string>()
+    page.on('request', req => {
+      if (req.method() !== 'POST' || !req.url().includes('/api/mindmaps')) return
+      try {
+        const id = JSON.parse(req.postData() ?? '{}')?.id
+        if (id) createdIds.add(id)
+      } catch { /* ignore non-JSON bodies */ }
+    })
+    await use()
+    // Best-effort teardown: delete each map this test created.
+    for (const id of createdIds) {
+      await page.request.delete(`/api/mindmaps?id=${id}`).catch(() => {})
+    }
+  }, { auto: true }],
+
   _consoleCheck: [async ({ page }, use) => {
     const errors: string[] = []
     page.on('console', msg => {

@@ -131,6 +131,58 @@ test.describe('Format Panel — Node Editing', () => {
     }
   })
 
+  test('changing a node color updates the node fill', async ({ page }) => {
+    await createMapAndOpenFormat(page)
+
+    // Select "Main Topic 1"
+    const box = await page.evaluate(() => {
+      const texts = document.querySelectorAll('.diagram-canvas-root svg text')
+      for (const t of texts) {
+        if (t.textContent?.includes('Main Topic 1')) {
+          const g = (t as SVGTextElement).closest('g[data-node-id]')
+          const r = g?.getBoundingClientRect()
+          if (r) return { x: r.x, y: r.y, width: r.width, height: r.height }
+        }
+      }
+      return null
+    })
+    expect(box).not.toBeNull()
+    await page.mouse.click(box!.x + box!.width / 2, box!.y + box!.height / 2)
+    await page.waitForTimeout(400)
+
+    // The node <g> has several layers (glow, selection outline); read the one shape
+    // that carries a concrete colour fill (not none/transparent), which is node.color.
+    const fillOf = () => page.evaluate(() => {
+      const texts = document.querySelectorAll('.diagram-canvas-root svg text')
+      for (const t of texts) {
+        if (t.textContent?.includes('Main Topic 1')) {
+          const g = (t as SVGTextElement).closest('g[data-node-id]')
+          const shapes = g ? [...g.querySelectorAll('rect, circle, path, ellipse')] : []
+          for (const s of shapes) {
+            const v = s.getAttribute('fill')
+            if (v && /^#|^rgb/.test(v) && v !== 'transparent') return v
+          }
+        }
+      }
+      return null
+    })
+
+    const before = await fillOf()
+    // Color swatches in the panel are square buttons with an inline aspect-ratio.
+    const swatches = page.locator('aside button[style*="aspect-ratio"], button[style*="aspect-ratio"]')
+    const count = await swatches.count()
+    expect(count).toBeGreaterThan(0)
+
+    // Click swatches until the node fill actually changes (skip the one matching current).
+    let changed = false
+    for (let i = 0; i < count && !changed; i++) {
+      await swatches.nth(i).click()
+      await page.waitForTimeout(300)
+      changed = (await fillOf()) !== before
+    }
+    expect(changed).toBe(true)
+  })
+
   test('text alignment buttons work', async ({ page }) => {
     await createMapAndOpenFormat(page)
     // Select a node first
