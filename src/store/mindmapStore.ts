@@ -209,11 +209,13 @@ export const useMindmapStore = create<MindmapStore>()(
       // Re-run layout on load: reset widths → compute auto-widths → normalize per depth → final layout
       const freshNodes = d.nodes.map(n => {
         if (n.depth !== 0) return { ...n, width: 0, height: 0, manuallyPositioned: false }
-        // Fix root: if title is long (≥15 chars) but stored as a circle, convert to pill
-        if (n.title.length >= 15 && n.width === n.height) {
-          const fontSize = 28
-          const textW = n.title.length * fontSize * 0.55
-          return { ...n, width: Math.max(240, Math.round(textW + 72)), height: 90 }
+        // Root: a long title (or an already-pill root) renders as a pill that the
+        // canvas auto-sizes from the title. Reserve the SAME width the canvas draws
+        // (Node.tsx autoPillW: cap 720, +80 pad) so children never overlap the pill.
+        const isPill = n.title.length >= 15 || n.width !== n.height
+        if (isPill) {
+          const w = Math.max(180, Math.min(720, Math.ceil(n.title.length * 28 * 0.62 + 80)))
+          return { ...n, width: w, height: 90 }
         }
         return n
       })

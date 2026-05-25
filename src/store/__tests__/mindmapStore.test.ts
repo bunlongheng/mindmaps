@@ -80,6 +80,25 @@ describe('mindmapStore', () => {
       expect(nodes.length).toBe(legacy.nodes.length)
       expect(nodes.filter(n => n.depth > 0).length).toBeGreaterThan(0)
     })
+
+    // Regression: a long root title overflowed the pill (render width was hard-
+    // capped at 500). The layout must now reserve a bounded pill width that matches
+    // the canvas (≤720) so the title fits and children don't overlap it.
+    it('reserves a bounded pill width for a long root title', () => {
+      const longRoot = { ...makeRoot(), title: 'It’s Happening... Anthropic MYTHOS 1 Is Here!' }
+      loadDiagram(makeDiagram([longRoot, makeChild('c1', 'Child 1', 'root', 1, 0)]))
+      const root = useMindmapStore.getState().activeMindmap!.nodes.find(n => n.parentId === null)!
+      expect(root.width).toBeLessThanOrEqual(720)  // capped — never unbounded
+      expect(root.width).toBeGreaterThan(400)      // grew well past the short-circle size
+      expect(root.width).not.toBe(root.height)     // a pill, not a circle
+    })
+
+    it('keeps a short root title as a circle (width === height)', () => {
+      const shortRoot = { ...makeRoot(), title: 'Hi' }
+      loadDiagram(makeDiagram([shortRoot, makeChild('c1', 'Child 1', 'root', 1, 0)]))
+      const root = useMindmapStore.getState().activeMindmap!.nodes.find(n => n.parentId === null)!
+      expect(root.width).toBe(root.height)
+    })
   })
 
   describe('addNode', () => {
