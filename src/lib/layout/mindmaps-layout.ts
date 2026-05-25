@@ -1,4 +1,5 @@
 import type { MindmapNode } from '../../types'
+import { rootPillWidth } from '../rootPill'
 
 const SIZES: Record<number, { w: number; h: number }> = {
   0: { w: 200, h: 200 },  // circle: w === h
@@ -28,7 +29,9 @@ function nodeSize(node: MindmapNode, depth: number) {
   if (depth === 0) {
     const isPill = node.shape === 'pill' || (!node.shape && node.title.length >= 15)
     if (isPill) {
-      const w = Math.max(180, Math.min(500, Math.ceil(node.title.length * 28 * 0.62 + 80)))
+      // Same width the canvas draws (src/lib/rootPill) so the trunk meets the
+      // pill's edge instead of starting inside it.
+      const w = rootPillWidth(node.title, node.fontSize ?? 28)
       return { w, h: 64 }
     }
     // Circle: use stored square size or default

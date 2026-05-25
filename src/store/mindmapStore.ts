@@ -15,6 +15,7 @@ import { computeMindmapLayout } from '../lib/layout/mindmap'
 import { computeFishboneLayout } from '../lib/layout/fishbone'
 import { computeTimelineLayout } from '../lib/layout/timeline'
 import { getTheme } from '../lib/themes'
+import { rootPillWidth } from '../lib/rootPill'
 import { guessIcon } from '../lib/autoIcon'
 import { ICON_MAP } from '../lib/icons'
 import { showToast } from '../components/CuteToast'
@@ -214,8 +215,7 @@ export const useMindmapStore = create<MindmapStore>()(
         // (Node.tsx autoPillW: cap 720, +80 pad) so children never overlap the pill.
         const isPill = n.title.length >= 15 || n.width !== n.height
         if (isPill) {
-          const w = Math.max(180, Math.min(720, Math.ceil(n.title.length * 28 * 0.62 + 80)))
-          return { ...n, width: w, height: 90 }
+          return { ...n, width: rootPillWidth(n.title, n.fontSize ?? 28), height: 90 }
         }
         return n
       })

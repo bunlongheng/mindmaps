@@ -3,6 +3,7 @@ import type { MindmapNode } from '../../types'
 import { useMindmapStore } from '../../store/mindmapStore'
 import { NodeIcon, getLucideIcon } from './NodeIcon'
 import { wrapText } from '../../lib/layout/mindmap'
+import { rootPillWidth, rootPillFontSize } from '../../lib/rootPill'
 
 interface NodeProps {
   node: MindmapNode
@@ -131,15 +132,10 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   // Depth-based font sizes
   const defaultFontSize = node.depth === 0 ? 28 : node.depth === 1 ? 22 : node.depth === 2 ? 16 : node.depth === 3 ? 13 : 11
   const baseFontSize = node.fontSize ?? defaultFontSize
-  // Root pill grows to fit the title up to a max width; past that, shrink the font
-  // so long root titles never overflow the pill (was hard-clipped at 500px).
-  const ROOT_PILL_MAX = 720
-  const ROOT_PILL_PAD = 80
-  const rootTitleLen = Math.max(1, node.title.length)
-  const rootNaturalW = isRootPill ? Math.ceil(rootTitleLen * baseFontSize * 0.62 + ROOT_PILL_PAD) : 0
-  const fontSize = isRootPill && rootNaturalW > ROOT_PILL_MAX
-    ? Math.max(15, Math.floor((ROOT_PILL_MAX - ROOT_PILL_PAD) / (rootTitleLen * 0.62)))
-    : baseFontSize
+  // Root pill grows to fit the title up to a max width; past that the font shrinks
+  // so long titles never overflow. Shared with the layout (src/lib/rootPill) so
+  // the trunk meets the pill's edge instead of starting inside it.
+  const fontSize = isRootPill ? rootPillFontSize(node.title, baseFontSize) : baseFontSize
   const fontWeight = node.bold ? '700' : (isRoot ? '500' : node.depth === 1 ? '500' : '400')
 
   // Depth-based bg opacity only (text stays fully opaque)
@@ -247,10 +243,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   const resolvedIcon = isRoot ? undefined : (!hasEmoji ? node.icon : undefined)
   const hasIcon = !!resolvedIcon && !!getLucideIcon(resolvedIcon)
   // Root pill: always auto-size from title so it never relies on stale stored width.
-  // Uses the (possibly shrunk) fontSize so the pill is exactly as wide as the text needs.
-  const autoPillW = isRootPill
-    ? Math.max(180, Math.min(ROOT_PILL_MAX, Math.ceil(rootTitleLen * fontSize * 0.62 + ROOT_PILL_PAD)))
-    : null
+  const autoPillW = isRootPill ? rootPillWidth(node.title, baseFontSize) : null
   // Mindmap L2+ circles: force width = height so it's always a circle
   const circleW = isMindmapL2Plus ? Math.max(node.width, node.height) : null
   const displayW = previewW ?? (autoPillW ?? circleW ?? node.width)

@@ -49,7 +49,7 @@ describe('computeMindmapsLayout', () => {
     const root = byId(out, 'root')
     expect(root.height).toBe(64) // pill
     expect(root.width).toBeGreaterThanOrEqual(180)
-    expect(root.width).toBeLessThanOrEqual(500)
+    expect(root.width).toBeLessThanOrEqual(720)
   })
 
   it('clamps pill width to the 180px minimum for short-but-pill-shaped roots', () => {
@@ -61,11 +61,11 @@ describe('computeMindmapsLayout', () => {
     expect(root.width).toBe(180) // min clamp
   })
 
-  it('clamps very long pill titles to the 500px maximum', () => {
+  it('clamps very long pill titles to the 720px maximum', () => {
     const out = computeMindmapsLayout([
       node({ id: 'root', depth: 0, title: 'x'.repeat(200), shape: 'pill' }),
     ])
-    expect(byId(out, 'root').width).toBe(500)
+    expect(byId(out, 'root').width).toBe(720)
   })
 
   it('places L1 children to the right of the root', () => {
