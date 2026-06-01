@@ -93,6 +93,41 @@ interface MindmapNode {
   icon?: string
 }
 
+// Pull a JSON object out of whatever the model returns: tolerates markdown
+// fences, leading/trailing prose, and trailing commas. Returns undefined if
+// nothing parseable is found.
+function extractJson(text: string): unknown {
+  if (!text) return undefined
+  let s = text.replace(/```(?:json)?/gi, '').trim()
+
+  // Try the whole thing first.
+  const tryParse = (str: string): unknown => {
+    try { return JSON.parse(str) } catch { /* fall through */ }
+    try { return JSON.parse(str.replace(/,\s*([}\]])/g, '$1')) } catch { return undefined }
+  }
+
+  const direct = tryParse(s)
+  if (direct !== undefined) return direct
+
+  // Otherwise grab the outermost {...} by brace matching.
+  const start = s.indexOf('{')
+  if (start === -1) return undefined
+  let depth = 0
+  for (let i = start; i < s.length; i++) {
+    const ch = s[i]
+    if (ch === '{') depth++
+    else if (ch === '}') {
+      depth--
+      if (depth === 0) {
+        const candidate = s.slice(start, i + 1)
+        const out = tryParse(candidate)
+        if (out !== undefined) return out
+      }
+    }
+  }
+  return undefined
+}
+
 function computeWidth(title: string, depth: number): number {
   if (depth === 0) return 180
   const charW = depth === 1 ? 10.24 : depth === 2 ? 8.19 : 7.04
@@ -209,11 +244,10 @@ export default async function handler(req: any, res: any) {
   }
 
   const aiData = await aiRes.json() as { content: Array<{ type: string; text: string }> }
-  let rawText = aiData.content?.find((b: any) => b.type === 'text')?.text ?? ''
-  rawText = rawText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').trim()
+  const rawText = aiData.content?.find((b: any) => b.type === 'text')?.text ?? ''
 
-  let parsed: unknown
-  try { parsed = JSON.parse(rawText) } catch {
+  const parsed = extractJson(rawText)
+  if (parsed === undefined) {
     return res.status(502).json({ error: 'AI returned invalid JSON', raw: rawText.slice(0, 200) })
   }
 
