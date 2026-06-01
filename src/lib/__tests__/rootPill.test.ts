@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { rootPillWidth, rootPillFontSize, ROOT_PILL_MAX } from '../rootPill'
+import { rootPillWidth, rootPillFontSize, ROOT_PILL_MAX, rootCircleDiameter, rootTitleNeedsPill, ROOT_CIRCLE_MAX } from '../rootPill'
 
 describe('rootPillFontSize', () => {
   it('keeps the base font when the title fits within the max width', () => {
@@ -35,5 +35,31 @@ describe('rootPillWidth', () => {
   it('is deterministic for the same input (layout, render, and store agree)', () => {
     const title = 'A medium length root title here'
     expect(rootPillWidth(title, 28)).toBe(rootPillWidth(title, 28))
+  })
+})
+
+describe('rootCircleDiameter', () => {
+  it('clamps very short titles to the 180px minimum', () => {
+    expect(rootCircleDiameter('Hi', 28)).toBe(180)
+  })
+
+  it('grows to fit a medium title without exceeding the max', () => {
+    const d = rootCircleDiameter('Deploy Captain', 28)
+    expect(d).toBeGreaterThan(180)
+    expect(d).toBeLessThanOrEqual(ROOT_CIRCLE_MAX)
+  })
+
+  it('never exceeds ROOT_CIRCLE_MAX', () => {
+    expect(rootCircleDiameter('x'.repeat(100), 28)).toBe(ROOT_CIRCLE_MAX)
+  })
+})
+
+describe('rootTitleNeedsPill', () => {
+  it('keeps a circle for titles that fit', () => {
+    expect(rootTitleNeedsPill('Deploy Captain', 28)).toBe(false)
+  })
+
+  it('switches to a pill once a fitting circle would exceed the max', () => {
+    expect(rootTitleNeedsPill('This title is far too long for a circle', 28)).toBe(true)
   })
 })

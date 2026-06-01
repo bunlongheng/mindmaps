@@ -26,13 +26,21 @@ describe('computeMindmapsLayout', () => {
     expect(computeMindmapsLayout(input)).toBe(input)
   })
 
-  it('places a lone short-title root as a default circle', () => {
+  it('places a lone short-title root as a min-size circle', () => {
     const out = computeMindmapsLayout([node({ id: 'root', depth: 0, title: 'Hi' })])
     expect(out).toHaveLength(1)
     const root = byId(out, 'root')
-    // short title (<15 chars), no shape -> circle, default 200x200
-    expect(root.width).toBe(200)
-    expect(root.height).toBe(200)
+    // short title, no shape -> circle sized to fit, clamped to the 180px minimum
+    expect(root.width).toBe(180)
+    expect(root.height).toBe(180)
+  })
+
+  it('grows a circle root to fit a medium title', () => {
+    const out = computeMindmapsLayout([node({ id: 'root', depth: 0, title: 'Deploy Captain' })])
+    const root = byId(out, 'root')
+    expect(root.width).toBe(root.height) // square
+    expect(root.width).toBeGreaterThan(180) // grew past the minimum
+    expect(root.width).toBeLessThanOrEqual(340)
   })
 
   it('uses a stored square size for circle roots when width > 0', () => {

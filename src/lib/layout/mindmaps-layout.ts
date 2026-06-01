@@ -1,9 +1,6 @@
 import type { MindmapNode } from '../../types'
-import { rootPillWidth } from '../rootPill'
+import { rootPillWidth, rootCircleDiameter, rootTitleNeedsPill } from '../rootPill'
 
-const SIZES: Record<number, { w: number; h: number }> = {
-  0: { w: 200, h: 200 },  // circle: w === h
-}
 const DEFAULT_H: Record<number, number> = { 1: 54, 2: 38, 3: 34 }
 const DEFAULT_HEIGHT = 30
 const H_GAPS: Record<number, number> = { 0: 120, 1: 60 }
@@ -27,15 +24,17 @@ function autoWidth(node: MindmapNode, depth: number): number {
 /** Effective size: root pill always auto-sizes from title; circle uses stored or default */
 function nodeSize(node: MindmapNode, depth: number) {
   if (depth === 0) {
-    const isPill = node.shape === 'pill' || (!node.shape && node.title.length >= 15)
+    const fs = node.fontSize ?? 28
+    const isPill = node.shape === 'pill' ||
+      (node.shape !== 'circle' && rootTitleNeedsPill(node.title, fs))
     if (isPill) {
       // Same width the canvas draws (src/lib/rootPill) so the trunk meets the
       // pill's edge instead of starting inside it.
-      const w = rootPillWidth(node.title, node.fontSize ?? 28)
+      const w = rootPillWidth(node.title, fs)
       return { w, h: 64 }
     }
-    // Circle: use stored square size or default
-    const sq = node.width > 0 ? node.width : SIZES[0].w
+    // Circle: grow to fit the title (never smaller), so it never overflows.
+    const sq = Math.max(rootCircleDiameter(node.title, fs), node.width > 0 ? node.width : 0)
     return { w: sq, h: sq }
   }
   const w = node.width > 0 ? node.width : autoWidth(node, depth)

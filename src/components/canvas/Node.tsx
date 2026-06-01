@@ -3,7 +3,7 @@ import type { MindmapNode } from '../../types'
 import { useMindmapStore } from '../../store/mindmapStore'
 import { NodeIcon, getLucideIcon } from './NodeIcon'
 import { wrapText } from '../../lib/layout/mindmap'
-import { rootPillWidth, rootPillFontSize } from '../../lib/rootPill'
+import { rootPillWidth, rootPillFontSize, rootTitleNeedsPill, rootCircleDiameter } from '../../lib/rootPill'
 
 interface NodeProps {
   node: MindmapNode
@@ -83,7 +83,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   const isRootPill = isRoot && diagramType !== 'mindmap' && (
     node.shape === 'pill' ? true :
     node.shape === 'circle' ? false :
-    (node.title.length >= 15 || node.width !== node.height)
+    rootTitleNeedsPill(node.title, node.fontSize ?? 28)
   )
   const isMindmapCircle = diagramType === 'mindmap' && node.depth === 1
   const isMindmapL2Plus = diagramType === 'mindmap' && node.depth >= 2
@@ -169,14 +169,13 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
     if (!val || val === node.title) return
     const updates: Partial<MindmapNode> = { title: val }
     if (isRoot) {
-      const textW = val.length * fontSize * 0.55
-      if (val.length >= 15) {
+      if (node.shape !== 'circle' && (node.shape === 'pill' || rootTitleNeedsPill(val, baseFontSize))) {
         // pill: auto width, fixed height
-        updates.width = Math.max(240, Math.round(textW + 72))
+        updates.width = rootPillWidth(val, baseFontSize)
         updates.height = 90
       } else {
-        // circle: equal width and height
-        const diameter = Math.max(180, Math.round(textW + 56))
+        // circle: equal width and height, grown to fit the title
+        const diameter = rootCircleDiameter(val, baseFontSize)
         updates.width = diameter
         updates.height = diameter
       }
@@ -386,6 +385,12 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
               from={`0 ${cx} ${cy}`} to={`-360 ${cx} ${cy}`} dur="12s" repeatCount="indefinite" />
           </ellipse>
           </>)})()}
+
+          {/* Roaming fireflies in the L1 colours — twinkle around the root */}
+          {l1Colors.length > 0 && (
+            <Fireflies cx={cx} cy={cy} r={Math.max(displayW, node.height) / 2}
+              colors={l1Colors} count={Math.min(20, Math.max(10, l1Colors.length))} color={l1Colors[0]} />
+          )}
         </>
       ) : isMindmapL2Plus ? (
         <>
@@ -719,10 +724,12 @@ function colorShades(hex: string, count: number): string[] {
   })
 }
 
-function Fireflies({ cx, cy, r, color, count = 10 }: { cx: number; cy: number; r: number; color: string; count?: number }) {
+function Fireflies({ cx, cy, r, color, colors, count = 10 }: { cx: number; cy: number; r: number; color: string; colors?: string[]; count?: number }) {
   const n = Math.min(count, 20) // cap at 20 to avoid perf issues
   const [flies] = useState(() => {
-    const shades = colorShades(color, n)
+    const shades = colors && colors.length
+      ? Array.from({ length: n }, (_, i) => colors[i % colors.length])
+      : colorShades(color, n)
     return Array.from({ length: n }, (_, i) => {
       const angle = Math.random() * Math.PI * 2
       const dist = r * (0.7 + Math.random() * 0.3)
