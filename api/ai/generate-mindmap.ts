@@ -18,48 +18,56 @@ const ICON_LIST = `user, bot, server, database, zap, plug, git-branch, globe, br
   upload, image, video, mic, headphones, camera, monitor, wifi, card, cart,
   dollar, pie, activity, target, crosshair, compass, map, bookmark, tag, hash, at, send`
 
-const SYSTEM_PROMPT_CATEGORIZED = `You are a mindmap generator. Create a structured, detailed mindmap based on the user's request.
+const MINDMAP_TOOL = {
+  name: 'create_mindmap',
+  description: 'Build a mindmap from the user request by emitting a root title and a list of branches.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      title: { type: 'string', description: 'Concise root title, 2-5 words' },
+      branches: {
+        type: 'array',
+        description: 'Top-level branches of the mindmap',
+        items: {
+          type: 'object',
+          properties: {
+            label: { type: 'string', description: 'Branch label, specific and descriptive (4-10 words)' },
+            icon: { type: 'string', description: `One icon name from: ${ICON_LIST}` },
+            children: {
+              type: 'array',
+              description: 'Sub-items as plain strings (empty for a flat list)',
+              items: { type: 'string' },
+            },
+          },
+          required: ['label', 'icon', 'children'],
+        },
+      },
+    },
+    required: ['title', 'branches'],
+  },
+} as const
 
-OUTPUT FORMAT — return ONLY valid JSON, no markdown fences, no explanation:
-{
-  "Root Title": [
-    { "icon": "brain", "Category Name": ["subcategory 1", "subcategory 2", "subcategory 3"] },
-    { "icon": "star", "Another Category": ["item 1", "item 2", "item 3"] }
-  ]
-}
-
-RULES:
-- Root Title: concise, 2-5 words
-- Maximum 12 top-level categories
-- Maximum 10 subcategories per category (minimum 3)
-- Every top-level category MUST have exactly one "icon" field chosen from this list:
-  ${ICON_LIST}
-- Icons must semantically match the category content
-- Subcategories should be specific and descriptive (4-10 words each)
-- Return ONLY the JSON object, nothing else`
-
-const SYSTEM_PROMPT_FLAT = `You are a mindmap generator. Create a flat, single-level mindmap based on the user's request.
-
-The user wants a simple list — NOT grouped by category. Each item is a direct child of the root.
-
-OUTPUT FORMAT — return ONLY valid JSON, no markdown fences, no explanation:
-{
-  "Root Title": [
-    { "icon": "star", "Item one title here": [] },
-    { "icon": "rocket", "Item two title here": [] },
-    { "icon": "brain", "Item three title here": [] }
-  ]
-}
+const SYSTEM_PROMPT_CATEGORIZED = `You are a mindmap generator. Build a structured, detailed mindmap by calling the create_mindmap tool.
 
 RULES:
-- Root Title: concise, 2-5 words
-- Return exactly the number of items the user asked for (e.g. "top 10" = 10 items)
-- Each item is a direct child of root — NO subcategories, NO nesting
-- Every item MUST have exactly one "icon" field chosen from this list:
-  ${ICON_LIST}
-- Icons must semantically match the item content
-- Item titles should be specific and descriptive (4-10 words each)
-- Return ONLY the JSON object, nothing else`
+- title: concise, 2-5 words
+- Maximum 12 branches (top-level categories)
+- Each branch has 3-10 children (subcategory strings)
+- Every branch MUST have an icon semantically matching its content
+- Children should be specific and descriptive (4-10 words each)
+- Always call the create_mindmap tool; never reply with plain text`
+
+const SYSTEM_PROMPT_FLAT = `You are a mindmap generator. Build a flat, single-level mindmap by calling the create_mindmap tool.
+
+The user wants a simple list — NOT grouped by category. Each branch is a direct item with NO children.
+
+RULES:
+- title: concise, 2-5 words
+- Return exactly the number of branches the user asked for (e.g. "top 10" = 10 branches)
+- Each branch's children array MUST be empty []
+- Every branch MUST have an icon semantically matching its content
+- Branch labels should be specific and descriptive (4-10 words each)
+- Always call the create_mindmap tool; never reply with plain text`
 
 // Detect if the user wants a flat list vs categorized breakdown
 function wantsFlatList(prompt: string): boolean {
@@ -231,6 +239,8 @@ export default async function handler(req: any, res: any) {
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 4096,
         system: wantsFlatList(prompt) ? SYSTEM_PROMPT_FLAT : SYSTEM_PROMPT_CATEGORIZED,
+        tools: [MINDMAP_TOOL],
+        tool_choice: { type: 'tool', name: MINDMAP_TOOL.name },
         messages: [{ role: 'user', content: prompt.trim() }],
       }),
     })
@@ -243,12 +253,29 @@ export default async function handler(req: any, res: any) {
     return res.status(502).json({ error: 'AI generation failed', detail: err.slice(0, 200) })
   }
 
-  const aiData = await aiRes.json() as { content: Array<{ type: string; text: string }> }
-  const rawText = aiData.content?.find((b: any) => b.type === 'text')?.text ?? ''
+  const aiData = await aiRes.json() as { content: Array<{ type: string; text?: string; name?: string; input?: any }> }
 
-  const parsed = extractJson(rawText)
+  // Preferred path: forced tool_use returns a guaranteed-valid object.
+  const toolUse = aiData.content?.find((b: any) => b.type === 'tool_use' && b.name === MINDMAP_TOOL.name)
+  let parsed: unknown
+  if (toolUse?.input && typeof toolUse.input === 'object') {
+    const { title, branches } = toolUse.input as { title?: string; branches?: Array<{ label?: string; icon?: string; children?: string[] }> }
+    if (title && Array.isArray(branches)) {
+      parsed = {
+        [title]: branches
+          .filter(b => b?.label)
+          .map(b => ({ icon: b.icon, [b.label as string]: Array.isArray(b.children) ? b.children : [] })),
+      }
+    }
+  }
+
+  // Fallback: tolerant text extraction (in case the model emits text anyway).
   if (parsed === undefined) {
-    return res.status(502).json({ error: 'AI returned invalid JSON', raw: rawText.slice(0, 200) })
+    const rawText = aiData.content?.find((b: any) => b.type === 'text')?.text ?? ''
+    parsed = extractJson(rawText)
+    if (parsed === undefined) {
+      return res.status(502).json({ error: 'AI returned invalid JSON', raw: rawText.slice(0, 200) })
+    }
   }
 
   const result = parseJsonOutline(parsed)
