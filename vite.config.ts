@@ -31,13 +31,13 @@ export default defineConfig({
       },
       devOptions: { enabled: true, type: 'module' },
       workbox: {
-        // Don't precache HTML — always fetch fresh from network to avoid stale-cache blank screen
+        // Don't precache HTML — always fetch fresh from network to avoid stale-cache blank screen.
+        // Precaching '/' pinned a stale index.html referencing purged chunk hashes after each deploy,
+        // causing intermittent white screens; navigation is served by the NetworkFirst rule below.
         globPatterns: ['**/*.{js,css,png,svg,ico}'],
         cleanupOutdatedCaches: true,
         skipWaiting: true,
         clientsClaim: true,
-        // Bump this string to force all clients to install the new SW immediately
-        additionalManifestEntries: [{ url: '/', revision: '20260514-share-fix' }],
         runtimeCaching: [
           // Navigation requests: always try network first, fall back to cache
           {

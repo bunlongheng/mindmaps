@@ -3,6 +3,15 @@ import ReactDOM from 'react-dom/client'
 import App from './App'
 import './index.css'
 
+// After a deploy, old chunk hashes are purged; a stale tab requesting them gets a
+// failed dynamic import. Reload once (guarded against loops) to fetch fresh assets.
+window.addEventListener('vite:preloadError', () => {
+  if (!sessionStorage.getItem('chunk-reloaded')) {
+    sessionStorage.setItem('chunk-reloaded', '1')
+    window.location.reload()
+  }
+})
+
 // Grayscale favicon on local dev so it's easy to tell apart from prod tabs
 if (import.meta.env.DEV) {
   const img = new Image()
