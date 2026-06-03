@@ -744,6 +744,36 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
 
 // ── DiagramMinimap ─────────────────────────────────────────────────────────
 
+/** Extract a YouTube video id from a watch/share/embed/shorts URL, else null */
+function youtubeId(url?: string): string | null {
+  if (!url) return null
+  const m = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/|v\/))([\w-]{11})/)
+  return m ? m[1] : null
+}
+
+function YoutubeThumbs({ ids, bg }: { ids: string[]; bg: string }) {
+  const shown = ids.slice(0, 4)
+  const cols = shown.length === 1 ? 1 : 2
+  return (
+    <div style={{ width: '100%', height: '100%', display: 'grid', gridTemplateColumns: `repeat(${cols},1fr)`,
+      gridAutoRows: '1fr', gap: 1, background: bg, borderRadius: '0 0 14px 14px', overflow: 'hidden' }}>
+      {shown.map((vid, i) => (
+        <div key={i} style={{ position: 'relative', overflow: 'hidden', minHeight: 0, background: '#000' }}>
+          <img src={`https://img.youtube.com/vi/${vid}/hqdefault.jpg`} alt="" loading="lazy"
+            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+            onError={e => { (e.currentTarget as HTMLImageElement).style.visibility = 'hidden' }} />
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ width: 26, height: 18, borderRadius: 5, background: 'rgba(220,40,40,0.92)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ width: 0, height: 0, borderTop: '4px solid transparent', borderBottom: '4px solid transparent',
+                borderLeft: '7px solid #fff', marginLeft: 2 }} />
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
 
 function DiagramMinimap({ id, type }: { id: string; type: string }) {
   const storeThemeId = useMindmapStore(s => s.themeId)
@@ -817,6 +847,16 @@ function DiagramMinimap({ id, type }: { id: string; type: string }) {
   const l1s = root
     ? nodes.filter(n => n.parentId === root.id).sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
     : []
+
+  // If the map has nodes linking to YouTube, show video thumbnails instead of the wireframe.
+  const ytIds = nodes.map(n => youtubeId(n.url)).filter((v): v is string => !!v)
+  if (ytIds.length > 0) {
+    return (
+      <div ref={wrapRef} style={{ width: '100%', height: '100%' }}>
+        <YoutubeThumbs ids={ytIds} bg={canvasBg} />
+      </div>
+    )
+  }
 
   if (l1s.length === 0) {
     return (
