@@ -9,6 +9,23 @@ const BRANCH_COLORS = [
   '#3b82f6', '#06b6d4', '#84cc16', '#f43f5e',
 ]
 
+function hslToHex(h: number, s: number, l: number): string {
+  s /= 100; l /= 100
+  const k = (n: number) => (n + h / 30) % 12
+  const a = s * Math.min(l, 1 - l)
+  const f = (n: number) => l - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1))
+  const toHex = (x: number) => Math.round(255 * x).toString(16).padStart(2, '0')
+  return `#${toHex(f(0))}${toHex(f(8))}${toHex(f(4))}`
+}
+
+// Evenly spread branch hues across a smooth rainbow so colors flow gradually
+// with no duplicates, regardless of how many branches there are.
+function branchColor(i: number, total: number): string {
+  if (total <= 1) return hslToHex(230, 68, 58)
+  const hue = (i / total) * 300 // red → violet, stops short of wrapping back to red
+  return hslToHex(hue, 68, 58)
+}
+
 const ICON_LIST = `user, bot, server, database, zap, plug, git-branch, globe, brain, settings,
   folder, cloud, mail, lock, key, search, star, rocket, lightbulb, flame,
   check-circle, map-pin, trophy, message, phone, wrench, chart, eye, music,
@@ -166,6 +183,7 @@ function parseJsonOutline(json: unknown): { title: string; nodes: MindmapNode[] 
     depth: number,
     sortOrder: number,
     maxChildren: number,
+    branchTotal: number,
   ) {
     const parentColor = colorById.get(parentId) ?? BRANCH_COLORS[0]
 
@@ -186,7 +204,7 @@ function parseJsonOutline(json: unknown): { title: string; nodes: MindmapNode[] 
     const icon = obj.icon as string | undefined
     const id = crypto.randomUUID()
     const color = depth === 1
-      ? BRANCH_COLORS[branchColorIdx++ % BRANCH_COLORS.length]
+      ? branchColor(branchColorIdx++, branchTotal)
       : parentColor
     colorById.set(id, color)
 
@@ -199,14 +217,15 @@ function parseJsonOutline(json: unknown): { title: string; nodes: MindmapNode[] 
     const kids = obj[titleKey]
     if (Array.isArray(kids)) {
       kids.slice(0, maxChildren).forEach((child, i) => {
-        flattenNode(child as Record<string, unknown> | string, id, depth + 1, i, 10)
+        flattenNode(child as Record<string, unknown> | string, id, depth + 1, i, 10, branchTotal)
       })
     }
   }
 
   if (Array.isArray(rootChildren)) {
-    rootChildren.slice(0, 12).forEach((child, i) => {
-      flattenNode(child as Record<string, unknown> | string, rootId, 1, i, 10)
+    const branches = rootChildren.slice(0, 12)
+    branches.forEach((child, i) => {
+      flattenNode(child as Record<string, unknown> | string, rootId, 1, i, 10, branches.length)
     })
   }
 
