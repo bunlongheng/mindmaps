@@ -76,6 +76,8 @@ function rowToDiagram(row: Record<string, unknown>): Diagram {
     borderWidth:        (n.borderWidth ?? undefined) as number | undefined,
     icon:               (n.icon ?? undefined) as string | undefined,
     emoji:              (n.emoji ?? undefined) as string | undefined,
+    shape:              (n.shape ?? undefined) as 'circle' | 'pill' | undefined,
+    url:                (n.url ?? undefined) as string | undefined,
   }))
   return {
     id:             row.id as string,

@@ -40,6 +40,12 @@ function darkenColor(hex: string, amount = 0.35): string {
   return `rgb(${nr},${ng},${nb})`
 }
 
+/** Open a node's hyperlink in a new tab, adding https:// if no protocol given */
+function openNodeUrl(url: string) {
+  const href = /^https?:\/\//i.test(url) ? url : `https://${url}`
+  window.open(href, '_blank', 'noopener,noreferrer')
+}
+
 /** Returns true if the color is light enough that black text is readable */
 function isLight(hex: string): boolean {
   if (!hex.startsWith('#')) return true
@@ -317,6 +323,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
       onPointerMove={onPointerMove}
       onPointerUp={handlePointerUp}
       onDoubleClick={handleDoubleClick}
+      onClick={readOnly && node.url ? () => openNodeUrl(node.url!) : undefined}
       style={{ cursor: editing ? 'default' : canDrag ? 'grab' : 'pointer', userSelect: 'none' }}
     >
       {/* Fireflies around nodes with children — count = all descendants */}
@@ -695,6 +702,16 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
             style={{ pointerEvents: 'none' }} />
         </>
       ))}
+
+      {/* Link badge — node has a hyperlink; click opens it in a new tab */}
+      {node.url && !isRoot && (
+        <g style={{ cursor: 'pointer' }}
+          onPointerDown={e => e.stopPropagation()}
+          onClick={e => { e.stopPropagation(); openNodeUrl(node.url!) }}>
+          <circle cx={displayW - 15} cy={15} r={9.5} fill="#ffffff" stroke={strokeColor} strokeWidth={1.25} />
+          <NodeIcon icon="link" x={displayW - 15 - 6} y={15 - 6} size={12} color={strokeColor} strokeWidth={2.2} />
+        </g>
+      )}
     </g>
     </g>
   )

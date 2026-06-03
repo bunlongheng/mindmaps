@@ -97,8 +97,10 @@ export function SidePanel({ nodeId, onClose, onDelete }: SidePanelProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const node = nodeId ? (activeMindmap?.nodes.find(n => n.id === nodeId) ?? null) : null
   const [title, setTitle] = useState(node?.title ?? '')
+  const [url, setUrl] = useState(node?.url ?? '')
 
   useEffect(() => { setTitle(node?.title ?? '') }, [nodeId, node?.title])
+  useEffect(() => { setUrl(node?.url ?? '') }, [nodeId, node?.url])
 
   // Auto-switch to style tab when a node is selected
   useEffect(() => { if (nodeId) setTab('style') }, [nodeId])
@@ -259,6 +261,23 @@ export function SidePanel({ nodeId, onClose, onDelete }: SidePanelProps) {
                     onChange={e => setTitle(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter') { save({ title }); (e.target as HTMLInputElement).blur() } }}
                     onBlur={() => { if (title !== node.title) save({ title }) }}
+                    style={{
+                      flex: 1, minWidth: 0, boxSizing: 'border-box', fontSize: 12,
+                      border: '1px solid #e0e2e7', borderRadius: 7, padding: '6px 9px',
+                      outline: 'none', fontFamily: 'inherit', color: '#111827', background: '#fff',
+                      width: '100%',
+                    }}
+                    onFocus={e => (e.target.style.borderColor = '#3b82f6')}
+                    onBlurCapture={e => (e.target.style.borderColor = '#e0e2e7')}
+                  />
+                </PRow>
+                <PRow label="Link">
+                  <input
+                    value={url}
+                    placeholder="https://…"
+                    onChange={e => setUrl(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') { save({ url: url.trim() || undefined }); (e.target as HTMLInputElement).blur() } }}
+                    onBlur={() => { if ((url.trim() || undefined) !== node.url) save({ url: url.trim() || undefined }) }}
                     style={{
                       flex: 1, minWidth: 0, boxSizing: 'border-box', fontSize: 12,
                       border: '1px solid #e0e2e7', borderRadius: 7, padding: '6px 9px',
