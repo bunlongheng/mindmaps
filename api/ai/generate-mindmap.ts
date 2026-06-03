@@ -287,7 +287,7 @@ export default async function handler(req: any, res: any) {
   try {
     await pool.query(
       `INSERT INTO mindmaps (id, user_id, name, type, line_style, sharing_enabled, theme_id, nodes, tags)
-       VALUES ($1,$2,$3,$4,'orthogonal',false,$5,$6,$7)
+       VALUES ($1,$2,$3,$4,'orthogonal',true,$5,$6,$7)
        ON CONFLICT (id) DO UPDATE SET name=$3, nodes=$6, updated_at=now()`,
       [id, userId ?? null, title, type, themeId, JSON.stringify(nodes), ['AI']]
     )
