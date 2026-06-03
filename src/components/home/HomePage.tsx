@@ -515,6 +515,10 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
           70%  { box-shadow: 0 0 0 2px #6366f1, 0 0 20px rgba(99,102,241,0.5); border-color: #6366f1; }
           100% { box-shadow: 0 1px 4px rgba(0,0,0,0.06); border-color: var(--card-border); }
         }
+        @keyframes cardBreathe {
+          0%, 100% { opacity: 0.35; transform: scale(0.98); }
+          50%      { opacity: 1;    transform: scale(1.04); }
+        }
         input::placeholder { color: #94a3b8 !important; }
         .home-grid {
           display: grid;
@@ -861,7 +865,7 @@ function DiagramMinimap({ id, type }: { id: string; type: string }) {
   if (l1s.length === 0) {
     return (
       <div ref={wrapRef} style={{ width: '100%', height: '100%', background: canvasBg, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '0 0 14px 14px' }}>
-        <div style={{ fontSize: 11, color: isDarkCanvas ? 'rgba(255,255,255,0.3)' : '#cbd5e1', fontWeight: 500 }}>
+        <div style={{ fontSize: 11, color: isDarkCanvas ? 'rgba(255,255,255,0.3)' : '#cbd5e1', fontWeight: 500, animation: inView ? 'cardBreathe 1.6s ease-in-out infinite' : undefined }}>
           {inView ? 'Loading…' : 'Open to preview'}
         </div>
       </div>
