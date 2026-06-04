@@ -612,8 +612,8 @@ describe('HomePage — DiagramMinimap inView fetch', () => {
     seedDiagrams([{ id: 'm1', name: 'Project Plan', type: 'logic-chart', updatedAt: SAMPLE[0].updatedAt, tags: [] }])
     const { container } = render(<HomePage onOpen={vi.fn()} user={USER} onSignOut={vi.fn()} />)
     await waitFor(() => expect(container.querySelectorAll('svg rect').length).toBeGreaterThan(0))
-    // localStorage cache was written by the minimap
-    expect(localStorage.getItem('mindmaps:diagram:m1')).toBeTruthy()
+    // thumbnail cache was written by the minimap (separate from the full-diagram cache)
+    expect(localStorage.getItem('mindmaps:thumb:m1')).toBeTruthy()
   })
 
   it('in-view fetch that returns no nodes leaves the placeholder', async () => {

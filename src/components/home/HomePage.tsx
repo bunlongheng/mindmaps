@@ -790,7 +790,9 @@ function DiagramMinimap({ id, type }: { id: string; type: string }) {
   // Hydrate from localStorage immediately (synchronous, free)
   useEffect(() => {
     try {
-      const data = JSON.parse(localStorage.getItem(`mindmaps:diagram:${id}`) ?? 'null')
+      const data = JSON.parse(
+        localStorage.getItem(`mindmaps:diagram:${id}`) ?? localStorage.getItem(`mindmaps:thumb:${id}`) ?? 'null',
+      )
       if (data?.nodes?.length) {
         setNodes(data.nodes)
         setDiagramThemeId(data.themeId ?? 'default')
@@ -826,7 +828,9 @@ function DiagramMinimap({ id, type }: { id: string; type: string }) {
         setNodes(data.nodes)
         setDiagramThemeId(data.theme_id ?? 'default')
         setLineStyle(data.line_style ?? 'orthogonal')
-        localStorage.setItem(`mindmaps:diagram:${id}`, JSON.stringify({
+        // Thumbnail-only cache (partial: no name/type/dates). Kept under its own key so
+        // loadDiagram never mistakes it for a fully loaded diagram and opens a blank editor.
+        localStorage.setItem(`mindmaps:thumb:${id}`, JSON.stringify({
           id, nodes: data.nodes, themeId: data.theme_id ?? 'default', lineStyle: data.line_style ?? 'orthogonal',
         }))
       })
