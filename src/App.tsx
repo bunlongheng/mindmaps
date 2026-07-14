@@ -8,7 +8,6 @@ import { useDiagram } from './hooks/useDiagram'
 import { useMindmapStore } from './store/mindmapStore'
 import { decodeShareURL } from './lib/export/share'
 import { ArrowLeft, SlidersHorizontal, Tag, X, FileDown, Trash2 } from 'lucide-react'
-import { exportDiagramAsPdf } from './lib/export/exportPdf'
 import { Confetti } from './components/Confetti'
 
 // 8 cohesive colors — all Tailwind-500 level, same saturation family
@@ -554,7 +553,7 @@ export default function App() {
 
             {/* PDF / Star / Delete */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-              <button onClick={() => exportDiagramAsPdf(activeMindmap!.name)} title="Download PDF" style={{
+              <button onClick={() => import('./lib/export/exportPdf').then(m => m.exportDiagramAsPdf(activeMindmap!.name))} title="Download PDF" style={{
                 height: 22, padding: '0 8px', border: '1px solid #e2e8f0', borderRadius: 6,
                 background: 'transparent', cursor: 'pointer', fontSize: 11, fontWeight: 500,
                 color: '#64748b', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 4,

@@ -540,12 +540,12 @@ describe('SidePanel — Share tab', () => {
     expect(navigator.clipboard.writeText).not.toHaveBeenCalled()
   })
 
-  it('Export PDF button calls exportDiagramAsPdf', () => {
+  it('Export PDF button calls exportDiagramAsPdf', async () => {
     loadDiagram()
     render(<SidePanel nodeId={null} onClose={vi.fn()} />)
     fireEvent.click(screen.getByText('Share'))
     fireEvent.click(screen.getByText('Export PDF'))
-    expect(exportDiagramAsPdf).toHaveBeenCalledWith('Root Topic')
+    await waitFor(() => expect(exportDiagramAsPdf).toHaveBeenCalledWith('Root Topic'))
   })
 
   it('delete flow: opens confirm modal, cancel closes it', () => {

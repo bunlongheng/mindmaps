@@ -286,7 +286,7 @@ describe('App — editor view, panel, footer', () => {
     render(<App />)
     await waitFor(() => expect(screen.getByTestId('canvas')).toBeInTheDocument())
     fireEvent.click(screen.getByText('PDF'))
-    expect(exportDiagramAsPdf).toHaveBeenCalledWith('My Map')
+    await waitFor(() => expect(exportDiagramAsPdf).toHaveBeenCalledWith('My Map'))
   })
 
   it('adds and removes tags in the footer', async () => {

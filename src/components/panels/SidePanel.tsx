@@ -8,7 +8,6 @@ import { showToast, dismissToast } from '../CuteToast'
 import { soundChaChing } from '../../lib/sounds'
 import type { LineStyle, DiagramType } from '../../types'
 import { QRCodeSVG } from 'qrcode.react'
-import { exportDiagramAsPdf } from '../../lib/export/exportPdf'
 
 interface SidePanelProps {
   nodeId: string | null
@@ -677,7 +676,7 @@ export function SidePanel({ nodeId, onClose, onDelete }: SidePanelProps) {
           <HR />
           <SBlock title="File">
             <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={() => activeMindmap && exportDiagramAsPdf(activeMindmap.name)} style={{
+              <button onClick={() => activeMindmap && import('../../lib/export/exportPdf').then(m => m.exportDiagramAsPdf(activeMindmap.name))} style={{
                 flex: 1, padding: '9px 12px', borderRadius: 8,
                 border: '1px solid #e0e2e7', background: '#fff',
                 cursor: 'pointer', fontSize: 12, fontWeight: 500,
