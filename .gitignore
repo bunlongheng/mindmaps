@@ -7,6 +7,7 @@ dist
 .env*.local
 test-results/
 dev-dist/
+supabase/.temp/
 .claude/
 coverage/
 playwright-report/
