@@ -672,6 +672,7 @@ describe('HomePage — DiagramMinimap inView fetch', () => {
 describe('HomePage — DiagramCard interactions (coverage)', () => {
   it('handles touch start/move/end and long-press hover via timer', () => {
     vi.useFakeTimers()
+    localStorage.setItem('mindmaps:viewMode', 'grid') // touch long-press lives on DiagramCard (grid)
     seedDiagrams(SAMPLE)
     render(<HomePage onOpen={vi.fn()} user={USER} onSignOut={vi.fn()} />)
     const card = screen.getByText('Project Plan').closest('div[style*="cursor: pointer"]')!

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { NODE_ICONS } from '../../lib/icons'
 import { useMindmapStore } from '../../store/mindmapStore'
-import { getTheme, THEMES } from '../../lib/themes'
+import { getTheme, THEMES, isDarkBg } from '../../lib/themes'
 import { X, AlignLeft, AlignCenter, AlignRight, Copy, Check, FileDown, Trash2, Sparkles } from 'lucide-react'
 import { getLucideIcon } from '../canvas/NodeIcon'
 import { showToast, dismissToast } from '../CuteToast'
@@ -145,9 +145,9 @@ export function SidePanel({ nodeId, onClose, onDelete }: SidePanelProps) {
     try {
       const nodeList = nodesWithoutIcons.map(n => ({ id: n.id, title: n.title, depth: n.depth }))
       const prompt = `You are an icon assignment expert. For each mindmap node, pick the single best icon name.\n\nYou may use ANY icon from Lucide (lucide.dev) or Heroicons (heroicons.com) — use kebab-case names like: academic-cap, adjustments-horizontal, arrow-trending-up, banknotes, beaker, bolt, book-open, briefcase, building-office, calendar-days, chart-bar, chat-bubble-left, check-circle, chip, clock, cloud, code-bracket, cog, command-line, cpu-chip, credit-card, cube, currency-dollar, device-phone-mobile, document, eye, fire, flag, folder, gift, globe-alt, heart, home, key, light-bulb, link, lock-closed, magnifying-glass, map, map-pin, microphone, moon, musical-note, paint-brush, paper-airplane, photo, puzzle-piece, rocket-launch, server, shield-check, shopping-cart, signal, sparkles, star, sun, tag, trophy, user, video-camera, wifi, wrench, or any other valid lucide/heroicons icon name.\n\nRules:\n- You MUST assign an icon to EVERY node in the list. No exceptions.\n- Pick the most contextually relevant icon.\n- Respond ONLY with a valid JSON array, no explanation: [{\"id\":\"...\",\"icon\":\"...\"}, ...]\n\nNodes:\n${JSON.stringify(nodeList)}`
-      const res = await fetch('https://mindmaps-bheng.vercel.app/api/ai/generate-mindmap', {
+      const res = await fetch('/api/ai/generate-mindmap', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer REDACTED_ROTATED_KEY' },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt, mode: 'icons' }),
       })
       const data = await res.json()
@@ -586,6 +586,10 @@ export function SidePanel({ nodeId, onClose, onDelete }: SidePanelProps) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
               {THEMES.map(theme => {
                 const active = themeId === theme.id
+                const dark = isDarkBg(theme.canvasBg)
+                const labelColor = active
+                  ? (dark ? '#93c5fd' : '#3b82f6')
+                  : (dark ? '#f1f5f9' : '#374151')
                 return (
                   <button key={theme.id} onClick={() => setTheme(theme.id)}
                     style={{
@@ -605,7 +609,7 @@ export function SidePanel({ nodeId, onClose, onDelete }: SidePanelProps) {
                         }} />
                       ))}
                     </div>
-                    <span style={{ fontSize: 12, fontWeight: active ? 700 : 400, color: active ? '#3b82f6' : '#374151' }}>
+                    <span style={{ fontSize: 12, fontWeight: active ? 700 : 400, color: labelColor }}>
                       {theme.label}
                     </span>
                   </button>

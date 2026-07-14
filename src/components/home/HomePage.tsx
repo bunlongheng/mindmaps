@@ -3,15 +3,12 @@ import { useMindmapStore } from '../../store/mindmapStore'
 import { useDiagram } from '../../hooks/useDiagram'
 import { showToast } from '../CuteToast'
 import type { DiagramMeta, MindmapNode } from '../../types'
-import { Plus, Search, Trash2, LayoutGrid, Globe, Sparkles, Loader2, Tag, X, Bot, Briefcase, User, BookOpen, Zap, GraduationCap, FlaskConical, Beaker, FileInput, type LucideIcon } from 'lucide-react'
+import { Plus, Search, Trash2, LayoutGrid, List, Globe, Sparkles, Loader2, Tag, X, Bot, Briefcase, User, BookOpen, Zap, GraduationCap, FlaskConical, Beaker, FileInput, type LucideIcon } from 'lucide-react'
 import { ImportModal } from '../modals/ImportModal'
 import { MindmapsLogo } from '../MindmapsLogo'
 import { getTheme } from '../../lib/themes'
 import { AIThinkingOverlay } from '../AIThinkingOverlay'
 import { soundHover, soundClick, soundPaste } from '../../lib/sounds'
-
-const MINDMAP_API_KEY = 'REDACTED_ROTATED_KEY'
-const MINDMAP_API_BASE = 'https://mindmaps-bheng.vercel.app'
 
 const PRESET_TAGS = ['AI', 'Work', 'Personal', 'Research']
 
@@ -87,6 +84,10 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
   })
   const [showUserMenu, setShowUserMenu] = useState(false)
   const [showImport, setShowImport] = useState(false)
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>(
+    () => (localStorage.getItem('mindmaps:viewMode') === 'grid' ? 'grid' : 'list'),
+  )
+  useEffect(() => { localStorage.setItem('mindmaps:viewMode', viewMode) }, [viewMode])
   const menuRef = useRef<HTMLDivElement>(null)
   useEffect(() => { loadDiagramList() }, [])
 
@@ -138,17 +139,30 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // All unique tags for filter bar (preset + any used in diagrams)
+  // All unique tags (preset + any used in diagrams) — used by the tag editor modal.
   const allTags = Array.from(new Set([...PRESET_TAGS, ...diagrams.flatMap(d => d.tags ?? [])]))
 
-  const filtered = diagrams.filter(d => {
-    const matchSearch = d.name.toLowerCase().includes(search.toLowerCase())
+  // Tags that still have at least one map. The filter bar only shows these, so a
+  // tag disappears once its last map is deleted/untagged.
+  const usedTags = useMemo(() => {
+    const s = new Set<string>()
+    diagrams.forEach(d => (d.tags ?? []).forEach(t => s.add(t)))
+    return s
+  }, [diagrams])
+  const barTags = allTags.filter(t => usedTags.has(t))
+
+  // Maps matching the search box only (ignoring the active tag). Pill counts bind
+  // to this set so each count reflects what the current search would surface.
+  const searchFiltered = useMemo(
+    () => diagrams.filter(d => d.name.toLowerCase().includes(search.toLowerCase())),
+    [diagrams, search],
+  )
+
+  const filtered = searchFiltered.filter(d => {
     const tags = d.tags ?? []
-    const matchTag =
-      activeTag === null ? true :
-      activeTag === '__no_tag__' ? tags.length === 0 :
-      tags.includes(activeTag)
-    return matchSearch && matchTag
+    return activeTag === null ? true
+      : activeTag === '__no_tag__' ? tags.length === 0
+      : tags.includes(activeTag)
   })
 
 
@@ -171,10 +185,9 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
     // Keep the modal open during generation: on success we navigate away below,
     // on error the modal must stay up to show aiError (closing it here hid errors).
     try {
-      const res = await fetch(`${MINDMAP_API_BASE}/api/ai/generate-mindmap`, {
+      const res = await fetch('/api/ai/generate-mindmap', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${MINDMAP_API_KEY}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -400,16 +413,16 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
             }}>
               {!isMobile && 'All'}
               {isMobile && <LayoutGrid size={11} />}
-              <span style={{ fontSize: 11, fontWeight: 700, opacity: 0.7 }}>{diagrams.length}</span>
+              <span style={{ fontSize: 11, fontWeight: 700, opacity: 0.7 }}>{searchFiltered.length}</span>
             </button>
           )
         })()}
 
         {/* Tag pills */}
-        {allTags.map(tag => {
+        {barTags.map(tag => {
           const bg = tagBg(tag, tagColorMap)
           const isActive = activeTag === tag
-          const count = diagrams.filter(d => (d.tags ?? []).includes(tag)).length
+          const count = searchFiltered.filter(d => (d.tags ?? []).includes(tag)).length
           return (
             <button key={tag} onClick={() => setActiveTag(isActive ? null : tag)}
               style={{
@@ -431,7 +444,7 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
         {/* No Tag */}
         {(() => {
           const isActive = activeTag === '__no_tag__'
-          const count = diagrams.filter(d => (d.tags ?? []).length === 0).length
+          const count = searchFiltered.filter(d => (d.tags ?? []).length === 0).length
           return (
             <button onClick={() => setActiveTag(isActive ? null : '__no_tag__')} style={{
               display: 'flex', alignItems: 'center', gap: 5,
@@ -468,21 +481,54 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
         {/* All Maps */}
         {filtered.length > 0 && (
           <section>
-            <h2 style={{ fontSize: 11, fontWeight: 600, color: TEXT_MUTED, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 6 }}>
-              <LayoutGrid size={11} color={TEXT_MUTED} /> All Maps
-              <span style={{ fontSize: 13, fontWeight: 800, color: '#6366f1' }}>{filtered.length}</span>
-            </h2>
-            <div className="home-grid">
-              {filtered.map(d => (
-                <DiagramCard
-                  key={d.id} diagram={d} timeAgo={timeAgo(d.updatedAt)}
-                  onOpen={() => onOpen(d.id)} onDelete={() => { deleteDiagram(d.id, d.name); setActiveTag(null) }}
-                  isPublic={d.isPublic} tags={d.tags} tagColorMap={tagColorMap}
-                  onTagEdit={() => { setTagModalId(d.id) }}
-                  flash={flashId === d.id}
-                />
-              ))}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+              <h2 style={{ fontSize: 11, fontWeight: 600, color: TEXT_MUTED, margin: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
+                {viewMode === 'list' ? <List size={11} color={TEXT_MUTED} /> : <LayoutGrid size={11} color={TEXT_MUTED} />} All Maps
+                <span style={{ fontSize: 13, fontWeight: 800, color: '#6366f1' }}>{filtered.length}</span>
+              </h2>
+              {/* View toggle */}
+              <div style={{ display: 'flex', gap: 2, padding: 2, background: '#fff', border: `1px solid ${BORDER}`, borderRadius: 9, flexShrink: 0 }}>
+                {([['list', List], ['grid', LayoutGrid]] as const).map(([mode, Icon]) => {
+                  const active = viewMode === mode
+                  return (
+                    <button key={mode} onClick={() => setViewMode(mode)} title={mode === 'list' ? 'List view' : 'Grid view'}
+                      style={{
+                        width: 30, height: 26, borderRadius: 7, border: 'none', cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        background: active ? '#1e293b' : 'transparent',
+                        color: active ? '#fff' : TEXT_MUTED, transition: 'all 0.15s',
+                      }}>
+                      <Icon size={14} />
+                    </button>
+                  )
+                })}
+              </div>
             </div>
+            {viewMode === 'grid' ? (
+              <div className="home-grid">
+                {filtered.map(d => (
+                  <DiagramCard
+                    key={d.id} diagram={d} timeAgo={timeAgo(d.updatedAt)}
+                    onOpen={() => onOpen(d.id)} onDelete={() => { deleteDiagram(d.id, d.name); setActiveTag(null) }}
+                    isPublic={d.isPublic} tags={d.tags} tagColorMap={tagColorMap}
+                    onTagEdit={() => { setTagModalId(d.id) }}
+                    flash={flashId === d.id}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="home-list">
+                {filtered.map(d => (
+                  <DiagramRow
+                    key={d.id} diagram={d} timeAgo={timeAgo(d.updatedAt)}
+                    onOpen={() => onOpen(d.id)} onDelete={() => { deleteDiagram(d.id, d.name); setActiveTag(null) }}
+                    isPublic={d.isPublic} tags={d.tags} tagColorMap={tagColorMap}
+                    onTagEdit={() => { setTagModalId(d.id) }}
+                    flash={flashId === d.id}
+                  />
+                ))}
+              </div>
+            )}
           </section>
         )}
       </main>
@@ -530,6 +576,7 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
         @media (min-width: 1024px) { .home-grid { grid-template-columns: repeat(5, 1fr); } }
         @media (min-width: 1280px) { .home-grid { grid-template-columns: repeat(6, 1fr); } }
         @media (min-width: 1600px) { .home-grid { grid-template-columns: repeat(7, 1fr); } }
+        .home-list { display: flex; flex-direction: column; gap: 8px; }
         .home-header { padding: 0 16px !important; }
         @media (min-width: 640px) { .home-header { padding: 0 24px !important; } }
         .home-search { width: 160px !important; }
@@ -1137,6 +1184,76 @@ function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isPublic, tags, tagCo
             </button>
             <button onClick={e => { e.stopPropagation(); setHovered(false); onDelete() }}
               style={{ position: 'absolute', top: 8, right: 8, width: 28, height: 28, borderRadius: 8, border: '1px solid #fecaca', background: 'rgba(255,255,255,0.92)', cursor: 'pointer', color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(8px)' }}>
+              <Trash2 size={13} />
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── DiagramRow (list view) ───────────────────────────────────────────────────
+
+function DiagramRow({ diagram, timeAgo, onOpen, onDelete, isPublic, tags, tagColorMap, onTagEdit, flash }: {
+  diagram: DiagramMeta; timeAgo: string; onOpen: () => void; onDelete: () => void
+  isPublic?: boolean; tags?: string[]
+  tagColorMap: Map<string, string>; onTagEdit: () => void; flash?: boolean
+}) {
+  const [hovered, setHovered] = useState(false)
+  const currentTags = tags ?? []
+
+  return (
+    <div
+      onMouseEnter={() => { setHovered(true); soundHover() }}
+      onMouseLeave={() => setHovered(false)}
+      onClick={() => { soundClick(); onOpen() }}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 12,
+        background: 'var(--card-bg)',
+        border: `1px solid ${flash ? '#6366f1' : hovered ? 'var(--card-border-hover)' : 'var(--card-border)'}`,
+        borderRadius: 12, padding: '8px 12px', cursor: 'pointer', position: 'relative',
+        transition: flash ? 'none' : 'border-color 0.2s, box-shadow 0.2s',
+        animation: flash ? 'cardFlash 3s ease-out forwards' : undefined,
+        boxShadow: hovered && !flash ? '0 2px 12px rgba(99,102,241,0.12)' : '0 1px 3px rgba(0,0,0,0.05)',
+      }}
+    >
+      {/* Thumbnail */}
+      <div style={{ width: 72, height: 44, borderRadius: 8, overflow: 'hidden', flexShrink: 0, border: '1px solid #eef0f5' }}>
+        <DiagramMinimap id={diagram.id} type={diagram.type} />
+      </div>
+
+      {/* Name + tags */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: 13, fontWeight: 600, color: '#334155', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{diagram.name}</span>
+          {isPublic && <Globe size={11} color="#6366f1" style={{ flexShrink: 0 }} />}
+        </div>
+        {currentTags.length > 0 && (
+          <div style={{ display: 'flex', gap: 4, marginTop: 4, flexWrap: 'wrap' }}>
+            {currentTags.slice(0, 5).map(t => (
+              <span key={t} style={{
+                fontSize: 8, fontWeight: 700, padding: '1px 6px', borderRadius: 6,
+                background: tagBg(t, tagColorMap), color: '#fff', letterSpacing: '0.03em',
+              }}>{t}</span>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Date */}
+      <div style={{ fontSize: 11, color: '#94a3b8', flexShrink: 0, whiteSpace: 'nowrap' }}>{timeAgo}</div>
+
+      {/* Actions (reserve width so the row doesn't shift on hover) */}
+      <div style={{ display: 'flex', gap: 6, flexShrink: 0, width: 62, justifyContent: 'flex-end' }}>
+        {hovered && (
+          <>
+            <button onClick={e => { e.stopPropagation(); onTagEdit() }} title="Edit tags"
+              style={{ width: 28, height: 28, borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', color: '#94a3b8', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Tag size={13} />
+            </button>
+            <button onClick={e => { e.stopPropagation(); setHovered(false); onDelete() }} title="Delete"
+              style={{ width: 28, height: 28, borderRadius: 8, border: '1px solid #fecaca', background: '#fff', cursor: 'pointer', color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Trash2 size={13} />
             </button>
           </>

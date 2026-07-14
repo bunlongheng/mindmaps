@@ -10,8 +10,8 @@
 # Report channel: Stickies (localhost:4444). Auto-fix: claude headless.
 
 set -uo pipefail
-export PATH="/Users/bheng/.nvm/versions/node/v20.19.5/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin"
-REPO="/Users/bheng/Sites/mindmaps"
+export PATH="$HOME/.nvm/versions/node/*/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+REPO="$HOME/Sites/mindmaps"
 STICKIES="http://localhost:4444/api/stickies/ext"
 LOG="$REPO/test-results/daily-health-$(date +%Y%m%d-%H%M%S).log"
 cd "$REPO" || exit 1

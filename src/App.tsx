@@ -139,6 +139,9 @@ export default function App() {
   const confettiCount = (() => { const t = new URLSearchParams(window.location.search).get('tokens'); return t ? Math.min(280, Math.max(40, Math.round(parseInt(t) / 1000 * 60))) : 60 })()
 
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // True when the editor was opened by pushing a new history entry from within the
+  // app (so the Back button can pop that entry like the browser's own Back button).
+  const pushedEditorEntry = useRef(false)
 
   // Load diagram or list once auth is ready
   const didLoad = useRef(false)
@@ -177,6 +180,7 @@ export default function App() {
       if (id) {
         setView('editor')
         window.history.pushState({}, '', `?map=${id}`)
+        pushedEditorEntry.current = true
       }
     })
     return () => setPasteImportFn(null)
@@ -207,12 +211,13 @@ export default function App() {
       const mapId = getMapParam()
       if (mapId) {
         loadDiagram(mapId).then(loaded => {
-          if (loaded) setView('editor')
-          else { loadDiagramList(); setView('home') }
+          if (loaded) { setView('editor'); pushedEditorEntry.current = true }
+          else { loadDiagramList(); setView('home'); pushedEditorEntry.current = false }
         })
       } else {
         loadDiagramList()
         setView('home')
+        pushedEditorEntry.current = false
       }
     }
     window.addEventListener('popstate', onPopState)
@@ -268,6 +273,7 @@ export default function App() {
     }
     setView('editor')
     window.history.pushState({}, '', `?map=${id}`)
+    pushedEditorEntry.current = true
     if (loaded.name) setTimeout(() => showToast(loaded.name, { color: '#1a1d2e', confetti: false }), 150)
   }, [loadDiagram])
 
@@ -277,11 +283,21 @@ export default function App() {
     const { activeMindmap: current, isDirty: dirty } = useMindmapStore.getState()
     if (dirty && current) await saveDiagram(current)
     setShowPanel(false); setSelectedPanelNodeId(null); setSelectedNodeIds([])
+
+    // Behave like the browser Back button: if we opened the editor by pushing a
+    // history entry, pop it so we return to the exact prior home state (and its
+    // tag filter, preserved in that entry's URL). The popstate handler restores
+    // the home view. Fall back to a fresh home nav for deep links / refreshes
+    // where there's no in-app entry to pop.
+    if (pushedEditorEntry.current) {
+      pushedEditorEntry.current = false
+      window.history.back()
+      return
+    }
     await loadDiagramList()
     setView('home')
-    // Restore the tag filter the user was viewing before opening this diagram
     const tag = current?.tags?.[0] ?? lastTagRef.current
-    window.history.pushState({}, '', tag ? `?tag=${tag}` : window.location.pathname)
+    window.history.replaceState({}, '', tag ? `?tag=${tag}` : window.location.pathname)
   }, [setSelectedNodeIds, loadDiagramList, saveDiagram])
 
   const handleNodeSelect = useCallback((nodeId: string | null) => {

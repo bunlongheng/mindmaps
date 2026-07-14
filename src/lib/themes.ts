@@ -61,3 +61,13 @@ export const THEME_MAP = Object.fromEntries(THEMES.map(t => [t.id, t]))
 export function getTheme(id: string): Theme {
   return THEME_MAP[id] ?? THEMES[0]
 }
+
+// True when a hex background is dark enough to need light text on top of it.
+export function isDarkBg(hex: string): boolean {
+  const h = hex.replace('#', '')
+  if (h.length < 6) return false
+  const r = parseInt(h.slice(0, 2), 16)
+  const g = parseInt(h.slice(2, 4), 16)
+  const b = parseInt(h.slice(4, 6), 16)
+  return 0.299 * r + 0.587 * g + 0.114 * b < 140
+}

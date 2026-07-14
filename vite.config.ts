@@ -60,6 +60,12 @@ export default defineConfig({
         target: 'https://mindmaps-bheng.vercel.app',
         changeOrigin: true,
         secure: true,
+        // Inject the AI bearer key from the dev machine's env so it is never bundled
+        // into client source. Prod trusts same-origin browser calls instead.
+        configure: (proxy) => {
+          const key = process.env.MINDMAP_AI_API_KEY
+          if (key) proxy.on('proxyReq', (proxyReq) => proxyReq.setHeader('Authorization', `Bearer ${key}`))
+        },
       },
     },
   },

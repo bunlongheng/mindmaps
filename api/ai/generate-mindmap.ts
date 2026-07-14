@@ -239,9 +239,14 @@ export default async function handler(req: any, res: any) {
   if (req.method === 'OPTIONS') return res.status(204).end()
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
+  // First-party browser calls (same origin) are trusted; external agents present the static key.
   const rawAuth = (req.headers.authorization ?? '').replace(/^Bearer\s+/i, '').trim()
   const staticKey = (process.env.MINDMAP_AI_API_KEY ?? '').trim()
-  if (!staticKey || rawAuth !== staticKey) return res.status(401).json({ error: 'Unauthorized' })
+  const host = (req.headers.host ?? '').toLowerCase()
+  const origin = (req.headers.origin ?? req.headers.referer ?? '').toLowerCase()
+  const sameOrigin = !!host && origin.includes(host)
+  const keyOk = !!staticKey && rawAuth === staticKey
+  if (!sameOrigin && !keyOk) return res.status(401).json({ error: 'Unauthorized' })
 
   const { prompt, userId = null, type = 'logic-chart', themeId = 'default' } = req.body || {}
   if (!prompt?.trim()) return res.status(400).json({ error: 'prompt is required' })
