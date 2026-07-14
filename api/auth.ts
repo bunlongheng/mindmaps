@@ -1,5 +1,5 @@
-import { signToken, sha256Hex } from './_lib/auth'
-import { corsHeaders } from './_lib/cors'
+import { signToken, sha256Hex } from './_lib/auth.js'
+import { corsHeaders } from './_lib/cors.js'
 
 export const config = { runtime: 'edge' }
 

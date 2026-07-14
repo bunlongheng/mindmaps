@@ -1,6 +1,6 @@
-import { pool } from './_lib/db'
-import { verifyToken, bearer } from './_lib/auth'
-import { corsHeaders } from './_lib/cors'
+import { pool } from './_lib/db.js'
+import { verifyToken, bearer } from './_lib/auth.js'
+import { corsHeaders } from './_lib/cors.js'
 
 const SECRET = () => (process.env.MINDMAP_JWT_SECRET ?? '').trim()
 

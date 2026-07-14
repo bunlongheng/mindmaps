@@ -1,7 +1,7 @@
 export const config = { runtime: "nodejs" }
 
-import { pool } from '../_lib/db'
-import { corsHeaders } from '../_lib/cors'
+import { pool } from '../_lib/db.js'
+import { corsHeaders } from '../_lib/cors.js'
 
 const DEFAULT_BRANCH_COLORS = [
   '#6366f1', '#8b5cf6', '#ec4899', '#ef4444',
