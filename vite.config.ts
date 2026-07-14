@@ -1,6 +1,21 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
+import { createHmac } from 'node:crypto'
+
+// Sign a long-lived dev session token from the machine's env, so local dev stays
+// authenticated against the (now token-gated) API without shipping any secret to the client.
+function devSessionToken(): string | null {
+  const secret = process.env.MINDMAP_JWT_SECRET
+  const sub = process.env.MINDMAP_USER_ID
+  const email = process.env.MINDMAP_AUTH_EMAIL || 'dev@localhost'
+  if (!secret || !sub) return null
+  const b64 = (o: object) => Buffer.from(JSON.stringify(o)).toString('base64url')
+  const head = b64({ alg: 'HS256', typ: 'JWT' })
+  const body = b64({ sub, email, role: 'authenticated', exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 365 })
+  const sig = createHmac('sha256', secret).update(`${head}.${body}`).digest('base64url')
+  return `${head}.${body}.${sig}`
+}
 
 export default defineConfig({
   plugins: [
@@ -60,11 +75,11 @@ export default defineConfig({
         target: 'https://mindmaps-bheng.vercel.app',
         changeOrigin: true,
         secure: true,
-        // Inject the AI bearer key from the dev machine's env so it is never bundled
-        // into client source. Prod trusts same-origin browser calls instead.
+        // Inject a dev session token (signed from the machine's env) so local dev is
+        // authenticated against the token-gated API. Never bundled into client source.
         configure: (proxy) => {
-          const key = process.env.MINDMAP_AI_API_KEY
-          if (key) proxy.on('proxyReq', (proxyReq) => proxyReq.setHeader('Authorization', `Bearer ${key}`))
+          const token = devSessionToken()
+          if (token) proxy.on('proxyReq', (proxyReq) => proxyReq.setHeader('Authorization', `Bearer ${token}`))
         },
       },
     },

@@ -1,38 +1,39 @@
+import { signToken, sha256Hex } from './_lib/auth'
+import { corsHeaders } from './_lib/cors'
+
 export const config = { runtime: 'edge' }
 
-const CORS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
-}
-
 export default async function handler(req: Request): Promise<Response> {
-  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS })
-  if (req.method !== 'POST') return new Response('Method not allowed', { status: 405, headers: CORS })
+  const cors = { ...corsHeaders(req.headers.get('origin'), 'POST, OPTIONS'), 'Content-Type': 'application/json' }
+  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors })
+  if (req.method !== 'POST') return new Response(JSON.stringify({ ok: false, error: 'Method not allowed' }), { status: 405, headers: cors })
 
-  const body = await req.text()
   let email = '', password = ''
   try {
-    const parsed = JSON.parse(body)
+    const parsed = JSON.parse(await req.text())
     email = parsed.email || ''
     password = parsed.password || ''
   } catch {
-    return new Response(JSON.stringify({ ok: false, error: 'Invalid JSON' }), { status: 400, headers: { ...CORS, 'Content-Type': 'application/json' } })
+    return new Response(JSON.stringify({ ok: false, error: 'Invalid JSON' }), { status: 400, headers: cors })
   }
 
-  const validEmail = 'bheng.code@gmail.com'
-  const validPassword = 'mindmaps2026'
-
-  if (email === validEmail && password === validPassword) {
-    const token = btoa(email + ':' + Date.now() + ':mindmaps')
-    return new Response(JSON.stringify({
-      ok: true,
-      token,
-      user: { email, name: 'Bunlong Heng', userId: '731ace87-64e5-44db-bf2a-82265f06f4d9' },
-    }), { status: 200, headers: { ...CORS, 'Content-Type': 'application/json' } })
+  const validEmail = (process.env.MINDMAP_AUTH_EMAIL ?? '').trim()
+  const validHash = (process.env.MINDMAP_AUTH_PASSWORD_HASH ?? '').trim()
+  const secret = (process.env.MINDMAP_JWT_SECRET ?? '').trim()
+  const userId = (process.env.MINDMAP_USER_ID ?? '').trim()
+  if (!validEmail || !validHash || !secret || !userId) {
+    return new Response(JSON.stringify({ ok: false, error: 'Auth not configured' }), { status: 500, headers: cors })
   }
 
-  return new Response(JSON.stringify({ ok: false, error: 'Invalid credentials' }), {
-    status: 401, headers: { ...CORS, 'Content-Type': 'application/json' },
-  })
+  const suppliedHash = await sha256Hex(password)
+  if (email !== validEmail || suppliedHash !== validHash) {
+    return new Response(JSON.stringify({ ok: false, error: 'Invalid credentials' }), { status: 401, headers: cors })
+  }
+
+  const token = await signToken({ sub: userId, email, role: 'authenticated' }, secret)
+  return new Response(JSON.stringify({
+    ok: true,
+    token,
+    user: { email, name: 'Bunlong Heng', userId },
+  }), { status: 200, headers: cors })
 }

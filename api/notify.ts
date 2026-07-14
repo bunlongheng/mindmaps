@@ -1,37 +1,22 @@
+import { verifyToken, bearer } from './_lib/auth'
+import { corsHeaders } from './_lib/cors'
+
 export const config = { runtime: 'edge' }
 
-const CORS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Authorization, Content-Type',
-}
-
-function json(data: unknown, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { ...CORS, 'Content-Type': 'application/json' },
-  })
-}
-
 export default async function handler(req: Request): Promise<Response> {
+  const CORS = corsHeaders(req.headers.get('origin'), 'POST, OPTIONS')
+  const json = (data: unknown, status = 200) =>
+    new Response(JSON.stringify(data), { status, headers: { ...CORS, 'Content-Type': 'application/json' } })
+
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS })
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
 
-  // Auth — same pattern as generate-mindmap
-  const rawAuth = (req.headers.get('authorization') ?? '').replace(/^Bearer\s+/i, '').trim()
+  // Auth: a cryptographically verified session token, or the static agent key.
+  const raw = bearer(req.headers)
   const staticKey = (process.env.MINDMAP_AI_API_KEY ?? '').trim()
-
-  let authorized = !!(staticKey && rawAuth === staticKey)
-  if (!authorized && rawAuth) {
-    try {
-      const [, payloadB64] = rawAuth.split('.')
-      if (payloadB64) {
-        const payload = JSON.parse(atob(payloadB64.replace(/-/g, '+').replace(/_/g, '/')))
-        if (payload.role === 'authenticated' && payload.exp > Date.now() / 1000) authorized = true
-      }
-    } catch { /* invalid JWT */ }
-  }
-  if (!authorized) return json({ error: 'Unauthorized' }, 401)
+  const keyOk = !!staticKey && raw === staticKey
+  const session = keyOk ? null : await verifyToken(raw, (process.env.MINDMAP_JWT_SECRET ?? '').trim())
+  if (!keyOk && !session) return json({ error: 'Unauthorized' }, 401)
 
   let body: { message?: string; color?: string; confetti?: boolean }
   try { body = await req.json() } catch { return json({ error: 'Invalid JSON' }, 400) }

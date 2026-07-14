@@ -1,10 +1,9 @@
 export const config = { runtime: "nodejs" }
 
-import { Pool } from 'pg'
-const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } })
+import { pool } from '../_lib/db'
+import { corsHeaders } from '../_lib/cors'
 
-
-const BRANCH_COLORS = [
+const DEFAULT_BRANCH_COLORS = [
   '#6366f1', '#8b5cf6', '#ec4899', '#ef4444',
   '#f97316', '#eab308', '#22c55e', '#14b8a6',
   '#3b82f6', '#06b6d4',
@@ -25,7 +24,7 @@ function computeWidth(title: string, depth: number): number {
   return Math.min(base, 260)
 }
 
-function parseOutline(text: string): MindmapNode[] {
+function parseOutline(text: string, BRANCH_COLORS: string[] = DEFAULT_BRANCH_COLORS): MindmapNode[] {
   const lines = text.split('\n').filter(l => l.trim())
   if (!lines.length) return []
 
@@ -91,7 +90,7 @@ function parseOutline(text: string): MindmapNode[] {
   })
 }
 
-function parseJsonOutline(json: unknown): { title: string; nodes: MindmapNode[] } | null {
+function parseJsonOutline(json: unknown, BRANCH_COLORS: string[] = DEFAULT_BRANCH_COLORS): { title: string; nodes: MindmapNode[] } | null {
   if (typeof json !== 'object' || json === null || Array.isArray(json)) return null
   const entries = Object.entries(json as Record<string, unknown>)
   if (!entries.length) return null
@@ -133,9 +132,7 @@ function parseJsonOutline(json: unknown): { title: string; nodes: MindmapNode[] 
 }
 
 export default async function handler(req: any, res: any) {
-  res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type')
+  Object.entries(corsHeaders(req.headers?.origin, 'POST, OPTIONS')).forEach(([k, v]) => res.setHeader(k, v))
   if (req.method === 'OPTIONS') return res.status(204).end()
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
@@ -145,8 +142,10 @@ export default async function handler(req: any, res: any) {
 
   const { title, outline, type = 'logic-chart', themeId = 'default', lineStyle = 'orthogonal', userId = null, colors } = req.body || {}
 
-  if (Array.isArray(colors) && colors.length > 0) {
-    colors.forEach((c: string, i: number) => { if (typeof c === 'string') BRANCH_COLORS[i % BRANCH_COLORS.length] = c })
+  // Per-request palette (no cross-request mutation of the shared default).
+  const palette = [...DEFAULT_BRANCH_COLORS]
+  if (Array.isArray(colors)) {
+    colors.forEach((c: string, i: number) => { if (typeof c === 'string') palette[i % palette.length] = c })
   }
   if (!title) return res.status(400).json({ error: 'title is required' })
 
@@ -156,9 +155,9 @@ export default async function handler(req: any, res: any) {
   if (outline) {
     const trimmed = outline.trim()
     if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
-      try { const result = parseJsonOutline(JSON.parse(trimmed)); if (result) nodes = result.nodes } catch {}
+      try { const result = parseJsonOutline(JSON.parse(trimmed), palette); if (result) nodes = result.nodes } catch {}
     }
-    if (!nodes.length) nodes = parseOutline(outline)
+    if (!nodes.length) nodes = parseOutline(outline, palette)
   }
 
   try {

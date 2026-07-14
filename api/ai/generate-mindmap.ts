@@ -1,7 +1,8 @@
 export const config = { runtime: "nodejs" }
 
-import { Pool } from 'pg'
-const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } })
+import { pool } from '../_lib/db'
+import { verifyToken, bearer } from '../_lib/auth'
+import { corsHeaders } from '../_lib/cors'
 
 const BRANCH_COLORS = [
   '#6366f1', '#8b5cf6', '#ec4899', '#ef4444',
@@ -233,20 +234,16 @@ function parseJsonOutline(json: unknown): { title: string; nodes: MindmapNode[] 
 }
 
 export default async function handler(req: any, res: any) {
-  res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type')
+  Object.entries(corsHeaders(req.headers?.origin, 'POST, OPTIONS')).forEach(([k, v]) => res.setHeader(k, v))
   if (req.method === 'OPTIONS') return res.status(204).end()
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
-  // First-party browser calls (same origin) are trusted; external agents present the static key.
-  const rawAuth = (req.headers.authorization ?? '').replace(/^Bearer\s+/i, '').trim()
+  // A verified first-party session token, or the static agent key.
+  const raw = bearer(req.headers)
   const staticKey = (process.env.MINDMAP_AI_API_KEY ?? '').trim()
-  const host = (req.headers.host ?? '').toLowerCase()
-  const origin = (req.headers.origin ?? req.headers.referer ?? '').toLowerCase()
-  const sameOrigin = !!host && origin.includes(host)
-  const keyOk = !!staticKey && rawAuth === staticKey
-  if (!sameOrigin && !keyOk) return res.status(401).json({ error: 'Unauthorized' })
+  const keyOk = !!staticKey && raw === staticKey
+  const session = keyOk ? null : await verifyToken(raw, (process.env.MINDMAP_JWT_SECRET ?? '').trim())
+  if (!keyOk && !session) return res.status(401).json({ error: 'Unauthorized' })
 
   const { prompt, userId = null, type = 'logic-chart', themeId = 'default' } = req.body || {}
   if (!prompt?.trim()) return res.status(400).json({ error: 'prompt is required' })

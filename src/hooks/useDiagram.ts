@@ -7,7 +7,15 @@ import type { Diagram, DiagramMeta, MindmapNode } from '../types'
 
 // ── API config ─────────────────────────────────────────────────────────────
 const API_BASE = '/api/mindmaps'
-const AUTH_HEADERS = { 'Content-Type': 'application/json' }
+
+// Attach the signed session token (set at login) to every API call.
+function authHeaders(): Record<string, string> {
+  const h: Record<string, string> = { 'Content-Type': 'application/json' }
+  let token: string | null = null
+  try { token = localStorage.getItem('mindmaps:token') } catch { /* no storage */ }
+  if (token) h['Authorization'] = `Bearer ${token}`
+  return h
+}
 
 // ── localStorage helpers ────────────────────────────────────────────────────
 
@@ -102,7 +110,7 @@ export function useDiagram(userId: string | null = null) {
     if (!userId) { setDiagrams([]); return }
 
     try {
-      const res = await fetch(`${API_BASE}?user_id=${userId}`, { headers: AUTH_HEADERS })
+      const res = await fetch(`${API_BASE}?user_id=${userId}`, { headers: authHeaders() })
       if (!res.ok) { setDiagrams([]); return }
       const data = await res.json() as Record<string, unknown>[]
 
@@ -131,7 +139,7 @@ export function useDiagram(userId: string | null = null) {
     const params = userId ? `id=${id}&user_id=${userId}` : `id=${id}`
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
-        const res = await fetch(`${API_BASE}?${params}`, { headers: AUTH_HEADERS })
+        const res = await fetch(`${API_BASE}?${params}`, { headers: authHeaders() })
         if (!res.ok) {
           // Retry 5xx once; treat 4xx (not found / not shared) as final.
           if (res.status >= 500 && attempt === 0) { await new Promise(r => setTimeout(r, 500)); continue }
@@ -172,7 +180,7 @@ export function useDiagram(userId: string | null = null) {
     try {
       await fetch(API_BASE, {
         method: 'POST',
-        headers: AUTH_HEADERS,
+        headers: authHeaders(),
         body: JSON.stringify({
           id:              diagram.id,
           user_id:         userId,
@@ -222,7 +230,7 @@ export function useDiagram(userId: string | null = null) {
     if (userId) {
       fetch(API_BASE, {
         method: 'POST',
-        headers: AUTH_HEADERS,
+        headers: authHeaders(),
         body: JSON.stringify({
           id, user_id: userId, name, type: 'logic-chart', line_style: 'orthogonal',
           sharing_enabled: false, nodes: laid,
@@ -252,7 +260,7 @@ export function useDiagram(userId: string | null = null) {
     if (userId) {
       fetch(API_BASE, {
         method: 'POST',
-        headers: AUTH_HEADERS,
+        headers: authHeaders(),
         body: JSON.stringify({
           id, user_id: userId, name: finalName, type: 'logic-chart', line_style: 'orthogonal',
           sharing_enabled: false, nodes,
@@ -275,7 +283,7 @@ export function useDiagram(userId: string | null = null) {
     showToast(`"${name ?? 'Map'}" deleted`, { color: '#1a1d2e' })
 
     if (userId) {
-      fetch(`${API_BASE}?id=${id}&user_id=${userId}`, { method: 'DELETE', headers: AUTH_HEADERS }).catch(() => {})
+      fetch(`${API_BASE}?id=${id}&user_id=${userId}`, { method: 'DELETE', headers: authHeaders() }).catch(() => {})
     }
   }, [setDiagrams, userId])
 
@@ -290,7 +298,7 @@ export function useDiagram(userId: string | null = null) {
     if (userId) {
       fetch(API_BASE, {
         method: 'PUT',
-        headers: AUTH_HEADERS,
+        headers: authHeaders(),
         body: JSON.stringify({ id, user_id: userId, tags }),
       }).catch(() => {})
     }
