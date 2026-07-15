@@ -25,7 +25,7 @@ describe('ImportModal', () => {
     expect(screen.getByText('1. Generate with AI')).toBeTruthy()
     expect(screen.getByText('2. Paste (⌘V) anywhere')).toBeTruthy()
     expect(screen.getByText('3. POST via API')).toBeTruthy()
-    expect(screen.getByText('AI agents — how to discover this API')).toBeTruthy()
+    expect(screen.getByText('AI agents - how to discover this API')).toBeTruthy()
   })
 
   it('uses the placeholder when no userId is supplied', () => {

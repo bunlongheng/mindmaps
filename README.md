@@ -56,7 +56,7 @@ flowchart LR
 | `src/lib/layout` | Pure `MindmapNode[] -> MindmapNode[]` engines, one per diagram type. The most testable seam in the app. |
 | `src/components/canvas` | SVG renderer: pan/zoom via a direct DOM transform, node drag/edit/resize, edge line styles. |
 | `src/hooks` | `useDiagram` persistence facade (localStorage-first, API sync, legacy-type healing) and keyboard shortcuts. |
-| `api/` | Vercel functions: Postgres CRUD, Open Graph image rendering, and Claude generation behind a same-origin / bearer gate. |
+| `api/` | Vercel functions: owner-scoped Postgres CRUD, `/api/auth` login, Open Graph image rendering, and Claude generation behind a signed-JWT / bearer gate. |
 
 ## How a map is generated
 
@@ -68,11 +68,11 @@ sequenceDiagram
     participant A as Claude API
     participant DB as Postgres
     U->>C: enter a prompt
-    C->>F: POST { prompt } (same-origin)
+    C->>F: POST { prompt } (Bearer: session JWT or agent key)
     F->>A: messages + forced tool schema
     A-->>F: structured node tree
     F->>DB: insert map
-    F-->>C: { id, tokens }
+    F-->>C: { id, title, url, nodeCount }
     C->>U: open the new map with confetti
 ```
 
@@ -113,16 +113,29 @@ Client variables go in `.env` (Vite reads `VITE_`-prefixed vars); server variabl
 | `VITE_SUPABASE_URL` | client | Supabase project URL for realtime notifications |
 | `VITE_SUPABASE_ANON_KEY` | client | Supabase anon key (public by design) |
 | `DATABASE_URL` | server | PostgreSQL connection string for map storage |
+| `DATABASE_CA_CERT` | server | PEM CA cert to verify the DB's TLS (blank = skip verify, dev only) |
 | `ANTHROPIC_API_KEY` | server | Claude API key for AI generation |
-| `MINDMAP_AI_API_KEY` | server | Bearer key gating the external agent import API |
+| `MINDMAP_AI_API_KEY` | server | Bearer key gating the external agent import API (not the CRUD API) |
+| `MINDMAP_JWT_SECRET` | server | HMAC secret used to sign/verify session tokens |
+| `MINDMAP_AUTH_EMAIL` | server | Login email |
+| `MINDMAP_AUTH_PASSWORD_HASH` | server | SHA-256 hex of the login password (never the plaintext) |
+| `MINDMAP_USER_ID` | server | Owner id embedded in the session token |
+| `SUPABASE_SERVICE_ROLE_KEY` | server | Server-only; used by `/api/notify` realtime broadcast |
+
+### Auth model
+
+`POST /api/auth` checks the email + SHA-256 password hash from env and issues a 30-day HMAC-SHA256 session token. The CRUD API (`/api/mindmaps`) requires that token and scopes every write to the owner; a public map (`sharing_enabled`) is readable by id without one. The AI/import endpoints (`/api/ai/*`, `/api/notify`) accept either the session token or the static `MINDMAP_AI_API_KEY` (for external agents) - the static key does **not** work on the CRUD API.
 
 ## Project layout
 
 ```
 mindmaps/
 ├── api/                    # Vercel serverless functions
+│   ├── _lib/               # shared: JWT auth, pg pool, CORS
 │   ├── ai/                 # Claude generation + agent import
-│   ├── mindmaps.ts         # Postgres CRUD
+│   ├── auth.ts             # login -> signed session token
+│   ├── mindmaps.ts         # owner-scoped Postgres CRUD
+│   ├── notify.ts           # realtime toast broadcast
 │   └── og*.ts              # Open Graph link previews
 ├── src/
 │   ├── store/              # Zustand store (single source of truth)

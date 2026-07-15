@@ -53,20 +53,27 @@ claude -p "The Mindmaps app daily health check failed:$FAILED. Read the log at $
 
 run npm run verify; REVERIFY=$?
 if [[ $REVERIFY -eq 0 ]]; then
-  git add -A
+  # Open a PR instead of pushing prod: unreviewed machine-written code must not auto-deploy.
+  BRANCH="auto-fix/$DATE"
+  git checkout -b "$BRANCH" >>"$LOG" 2>&1
+  # Stage only files the fixer changed vs the pre-fix commit (never git add -A, which sweeps in stray files).
+  CHANGED="$(git diff --name-only "$BASE_SHA")"
+  if [[ -n "$CHANGED" ]]; then git add $CHANGED >>"$LOG" 2>&1; fi
   git commit -m "fix: auto-repair from daily health check ($DATE)" >>"$LOG" 2>&1
-  git push >>"$LOG" 2>&1 && PUSHED=$? || PUSHED=$?
-  if [[ ${PUSHED:-1} -eq 0 ]]; then
-    post_sticky "Mindmaps Health - AUTO-FIXED + DEPLOYED ($DATE)" \
-      "<div style=\"font-family:system-ui;font-size:15px;line-height:1.6\"><div style=\"font-size:18px\">🛠️ <b>Found a problem, fixed it, deployed.</b></div><div style=\"margin-top:6px\">Failed:<b>$FAILED</b>. Fix verified green and pushed to production.</div><div style=\"margin-top:6px;color:#64748b;font-size:13px\">Review the commit when you can.</div></div>"
+  if git push -u origin "$BRANCH" >>"$LOG" 2>&1 && \
+     gh pr create --base main --head "$BRANCH" \
+       --title "fix: auto-repair from daily health check ($DATE)" \
+       --body "Automated fix for:$FAILED. Verified green locally by npm run verify. Review before merge - not deployed." >>"$LOG" 2>&1; then
+    post_sticky "Mindmaps Health - AUTO-FIX PR OPENED ($DATE)" \
+      "<div style=\"font-family:system-ui;font-size:15px;line-height:1.6\"><div style=\"font-size:18px\">🛠️ <b>Found a problem, fixed it, opened a PR.</b></div><div style=\"margin-top:6px\">Failed:<b>$FAILED</b>. Fix verified green on branch <code>$BRANCH</code>. Review + merge to deploy (nothing auto-deployed).</div></div>"
   else
-    post_sticky "Mindmaps Health - FIXED but PUSH FAILED ($DATE)" \
-      "<div style=\"font-family:system-ui;font-size:15px;line-height:1.6\"><div style=\"font-size:18px\">⚠️ <b>Fixed locally, couldn't push.</b></div><div style=\"margin-top:6px\">Tests are green but git push failed. Push manually: cd $REPO &amp;&amp; git push</div></div>"
+    post_sticky "Mindmaps Health - FIXED but PR FAILED ($DATE)" \
+      "<div style=\"font-family:system-ui;font-size:15px;line-height:1.6\"><div style=\"font-size:18px\">⚠️ <b>Fixed locally, couldn't open a PR.</b></div><div style=\"margin-top:6px\">Tests are green on branch <code>$BRANCH</code> but push/PR failed. Open it manually: cd $REPO &amp;&amp; git push -u origin $BRANCH</div></div>"
   fi
+  git checkout main >>"$LOG" 2>&1
 else
-  # auto-fix didn't get to green -> discard the attempt, report for manual review
-  git reset --hard "$BASE_SHA" >>"$LOG" 2>&1
-  git clean -fd >>"$LOG" 2>&1
+  # auto-fix didn't get to green -> revert only tracked working changes (no git clean -fd, which deletes untracked work)
+  git checkout -- . >>"$LOG" 2>&1
   post_sticky "Mindmaps Health - NEEDS YOU ($DATE)" \
     "<div style=\"font-family:system-ui;font-size:15px;line-height:1.6\"><div style=\"font-size:18px\">❌ <b>App check failed - auto-fix couldn't resolve it.</b></div><div style=\"margin-top:6px\">Failed:<b>$FAILED</b>. Nothing was pushed (no red code deployed).</div><div style=\"margin-top:6px;color:#64748b;font-size:13px\">Log: $LOG</div></div>"
 fi

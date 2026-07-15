@@ -168,7 +168,10 @@ export default async function handler(req: any, res: any) {
     })
   }
 
-  const { title, outline, type = 'logic-chart', themeId = 'default', lineStyle = 'orthogonal', userId = null, colors } = body
+  const { title, outline, type: rawType = 'logic-chart', themeId = 'default', lineStyle = 'orthogonal', userId = null, colors } = body
+  // Coerce unknown diagram types to the safe default (matches the documented behavior + client legacy-type healing).
+  const VALID_TYPES = new Set(['logic-chart', 'mindmap', 'fishbone', 'timeline'])
+  const type = VALID_TYPES.has(rawType) ? rawType : 'logic-chart'
 
   // Per-request palette (no cross-request mutation of the shared default).
   const palette = [...DEFAULT_BRANCH_COLORS]

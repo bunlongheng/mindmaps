@@ -212,7 +212,7 @@ Example prompt: "top 10 productivity habits for software engineers"`} />
   }'`} />
           </Row>
 
-          <Row title="AI agents — how to discover this API" badge="For Claude/LLM" badgeColor="#0ea5e9">
+          <Row title="AI agents - how to discover this API" badge="For Claude/LLM" badgeColor="#0ea5e9">
             <CodeBlock copyable code={`If you are an AI assistant, here is how to learn this endpoint:
 
 1. The Bearer token is auto-loaded in every shell at this Mac

@@ -17,6 +17,15 @@ function authHeaders(): Record<string, string> {
   return h
 }
 
+// Fire-and-forget server sync (localStorage already saved). On failure - network error
+// OR a non-2xx response - surface a non-blocking toast so a failed save/delete is not
+// silently mistaken for success and the local copy diverging from the server is visible.
+function syncToServer(url: string, init: RequestInit, label: string): Promise<void> {
+  return fetch(url, init)
+    .then(res => { if (!res.ok) throw new Error(`HTTP ${res.status}`) })
+    .catch(() => { showToast(`Saved locally - "${label}" not synced`, { color: '#f59e0b' }) })
+}
+
 // ── localStorage helpers ────────────────────────────────────────────────────
 
 const LS_LIST = 'mindmaps:list'
@@ -177,25 +186,21 @@ export function useDiagram(userId: string | null = null) {
       return
     }
 
-    try {
-      await fetch(API_BASE, {
-        method: 'POST',
-        headers: authHeaders(),
-        body: JSON.stringify({
-          id:              diagram.id,
-          user_id:         userId,
-          name:            diagram.name,
-          type:            diagram.type,
-          line_style:      diagram.lineStyle,
-          sharing_enabled: diagram.sharingEnabled ?? false,
-          theme_id:        diagram.themeId ?? 'default',
-          nodes:           diagram.nodes,
-          tags:            diagram.tags,
-        }),
-      })
-    } catch {
-      // Network error — localStorage saved above
-    }
+    await syncToServer(API_BASE, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({
+        id:              diagram.id,
+        user_id:         userId,
+        name:            diagram.name,
+        type:            diagram.type,
+        line_style:      diagram.lineStyle,
+        sharing_enabled: diagram.sharingEnabled ?? false,
+        theme_id:        diagram.themeId ?? 'default',
+        nodes:           diagram.nodes,
+        tags:            diagram.tags,
+      }),
+    }, diagram.name)
     setIsDirty(false)
     soundSave()
   }, [setIsDirty, userId])
@@ -228,14 +233,14 @@ export function useDiagram(userId: string | null = null) {
 
     // Sync to server in background
     if (userId) {
-      fetch(API_BASE, {
+      syncToServer(API_BASE, {
         method: 'POST',
         headers: authHeaders(),
         body: JSON.stringify({
           id, user_id: userId, name, type: 'logic-chart', line_style: 'orthogonal',
           sharing_enabled: false, nodes: laid,
         }),
-      }).catch(() => {})
+      }, name)
     }
     return id
   }, [setActiveMindmap, setDiagrams, userId])
@@ -258,14 +263,14 @@ export function useDiagram(userId: string | null = null) {
     showToast(`✦ "${finalName}" created`, { color: '#22c55e', confetti: true })
 
     if (userId) {
-      fetch(API_BASE, {
+      syncToServer(API_BASE, {
         method: 'POST',
         headers: authHeaders(),
         body: JSON.stringify({
           id, user_id: userId, name: finalName, type: 'logic-chart', line_style: 'orthogonal',
           sharing_enabled: false, nodes,
         }),
-      }).catch(() => {})
+      }, finalName)
     }
     return id
   }, [setActiveMindmap, setDiagrams, userId])
@@ -283,7 +288,7 @@ export function useDiagram(userId: string | null = null) {
     showToast(`"${name ?? 'Map'}" deleted`, { color: '#1a1d2e' })
 
     if (userId) {
-      fetch(`${API_BASE}?id=${id}&user_id=${userId}`, { method: 'DELETE', headers: authHeaders() }).catch(() => {})
+      syncToServer(`${API_BASE}?id=${id}&user_id=${userId}`, { method: 'DELETE', headers: authHeaders() }, name ?? 'Map')
     }
   }, [setDiagrams, userId])
 
@@ -296,11 +301,11 @@ export function useDiagram(userId: string | null = null) {
     if (cached) lsSaveDiagram({ ...cached, tags })
 
     if (userId) {
-      fetch(API_BASE, {
+      syncToServer(API_BASE, {
         method: 'PUT',
         headers: authHeaders(),
         body: JSON.stringify({ id, user_id: userId, tags }),
-      }).catch(() => {})
+      }, 'tags')
     }
   }, [setDiagrams, userId])
 
