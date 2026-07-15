@@ -246,6 +246,9 @@ export default async function handler(req: any, res: any) {
   if (!keyOk && !session) return res.status(401).json({ error: 'Unauthorized' })
 
   const { prompt, userId = null, type = 'logic-chart', themeId = 'default' } = req.body || {}
+  // When authed by a session token the map belongs to that user; only the trusted static
+  // agent key may attribute a map to an arbitrary owner supplied in the body.
+  const ownerId = session ? session.sub : (userId ?? null)
   if (!prompt?.trim()) return res.status(400).json({ error: 'prompt is required' })
 
   const anthropicKey = process.env.ANTHROPIC_API_KEY?.replace(/\\n/g, '').trim()
@@ -310,7 +313,7 @@ export default async function handler(req: any, res: any) {
       `INSERT INTO mindmaps (id, user_id, name, type, line_style, sharing_enabled, theme_id, nodes, tags)
        VALUES ($1,$2,$3,$4,'orthogonal',true,$5,$6,$7)
        ON CONFLICT (id) DO UPDATE SET name=$3, nodes=$6, updated_at=now()`,
-      [id, userId ?? null, title, type, themeId, JSON.stringify(nodes), ['AI']]
+      [id, ownerId, title, type, themeId, JSON.stringify(nodes), ['AI']]
     )
   } catch (e: any) {
     return res.status(500).json({ error: 'Failed to save diagram', detail: e.message })
