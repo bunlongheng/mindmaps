@@ -140,7 +140,35 @@ export default async function handler(req: any, res: any) {
   const expectedToken = (process.env.MINDMAP_AI_API_KEY ?? '').trim()
   if (!expectedToken || token !== expectedToken) return res.status(401).json({ error: 'Unauthorized' })
 
-  const { title, outline, type = 'logic-chart', themeId = 'default', lineStyle = 'orthogonal', userId = null, colors } = req.body || {}
+  // Self-documenting discovery: a call with no body returns a copy-paste-ready sample.
+  const body = req.body || {}
+  if (!body || Object.keys(body).length === 0) {
+    return res.status(200).json({
+      about: 'Create a mindmap in the mindmaps-bheng app. POST this shape with your Bearer key.',
+      sample_request: {
+        method: 'POST',
+        url: 'https://mindmaps-bheng.vercel.app/api/ai/mindmaps',
+        headers: { Authorization: 'Bearer $MINDMAP_AI_API_KEY', 'Content-Type': 'application/json' },
+        body: {
+          title: 'My Mindmap Title',
+          type: 'logic-chart',
+          outline: '{"Root":[{"icon":"brain","Category A":["item 1","item 2"]},{"icon":"zap","Category B":["item 3"]}]}',
+        },
+      },
+      fields: {
+        title: 'required string',
+        outline: 'optional; indented text OR a JSON string (auto-detected); omit for an empty root',
+        type: 'logic-chart | mindmap | fishbone | timeline (default logic-chart)',
+        themeId: 'optional (default "default")',
+        lineStyle: 'optional (default "orthogonal")',
+        userId: 'optional owner id so the map shows in the library',
+        colors: 'optional hex array to override the branch palette',
+      },
+      note: 'This static key authorizes only the AI/import endpoints. The CRUD API (/api/mindmaps) needs a signed session token.',
+    })
+  }
+
+  const { title, outline, type = 'logic-chart', themeId = 'default', lineStyle = 'orthogonal', userId = null, colors } = body
 
   // Per-request palette (no cross-request mutation of the shared default).
   const palette = [...DEFAULT_BRANCH_COLORS]
