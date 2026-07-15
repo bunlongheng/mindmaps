@@ -15,6 +15,7 @@ jobs:
         with:
           node-version: 20
           cache: npm
+      - run: npm install -g npm@latest # fixes npm/cli#4828 (npm ci skipping optional rollup platform binary)
       - run: npm ci
       - run: npm run lint
       - run: npx tsc -b
