@@ -825,7 +825,6 @@ function VisualPickerBlock({ icon, emoji, onSave }: {
   // Sync tab when node changes externally
   useEffect(() => {
     const isT = !!emoji && /^[\x20-\x7E]{1,3}$/.test(emoji)
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- deriving tab/draft from icon/emoji props
     setTab(icon ? 'icon' : emoji ? (isT ? 'text' : 'emoji') : 'icon')
     setTextDraft(isT ? emoji! : '')
     setEmojiDraft(!isT && emoji ? emoji : '')

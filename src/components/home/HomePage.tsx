@@ -841,7 +841,6 @@ function DiagramMinimap({ id, type }: { id: string; type: string }) {
         localStorage.getItem(`mindmaps:diagram:${id}`) ?? localStorage.getItem(`mindmaps:thumb:${id}`) ?? 'null',
       )
       if (data?.nodes?.length) {
-        // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing local state from an external fetch
         setNodes(data.nodes)
         setDiagramThemeId(data.themeId ?? 'default')
         setLineStyle(data.lineStyle ?? 'orthogonal')

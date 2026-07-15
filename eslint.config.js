@@ -24,6 +24,12 @@ export default defineConfig([
       'no-empty': ['error', { allowEmptyCatch: true }],
       // Honor the _-prefix convention for intentionally-unused args/vars.
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+      // eslint-plugin-react-hooks v6 ships the experimental react-compiler rules. This codebase
+      // predates react-compiler, so keep these as warnings (the core rules-of-hooks + exhaustive-deps
+      // still apply) until a dedicated compiler-readiness pass.
+      'react-hooks/set-state-in-effect': 'warn',
+      'react-hooks/refs': 'warn',
+      'react-hooks/purity': 'warn',
     },
   },
 ])
