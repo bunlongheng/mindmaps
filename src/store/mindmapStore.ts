@@ -98,9 +98,12 @@ function rebalanceColors(nodes: MindmapNode[], palette: string[]): MindmapNode[]
     }
   }
 
+  // Resolve the L1-ancestor color via an id->node map (O(1) parent lookup) instead of
+  // nodes.find per ancestor, which made rebalanceColors O(n^2) on every structural edit.
+  const byId = new Map(nodes.map(n => [n.id, n]))
   function inheritedColor(node: MindmapNode): string {
     if (node.depth === 1) return colorMap.get(node.id) ?? node.color
-    const parent = nodes.find(p => p.id === node.parentId)
+    const parent = node.parentId ? byId.get(node.parentId) : undefined
     return parent ? inheritedColor(parent) : node.color
   }
   return nodes.map(n => {

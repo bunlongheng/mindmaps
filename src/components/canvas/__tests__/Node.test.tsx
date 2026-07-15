@@ -58,6 +58,8 @@ function renderNode(node: MindmapNode, props: Partial<React.ComponentProps<typeo
         svgRef={svgRef as unknown as React.RefObject<SVGSVGElement>}
         readOnly={props.readOnly}
         l1Colors={props.l1Colors}
+        childCount={props.childCount}
+        descendantCount={props.descendantCount}
       />
     </svg>
   )
@@ -225,7 +227,7 @@ describe('Node — child / descendant counts (fireflies)', () => {
     const kid = makeNode({ id: 'k', parentId: 'p', depth: 2 })
     loadStore([makeRoot(), parent, kid])
     useMindmapStore.setState({ showChildCount: true })
-    const { container } = renderNode(parent)
+    const { container } = renderNode(parent, { childCount: 1, descendantCount: 1 })
     expect(container.textContent).toContain('(1)')
   })
 
@@ -233,7 +235,7 @@ describe('Node — child / descendant counts (fireflies)', () => {
     const parent = makeNode({ id: 'p' })
     const kid = makeNode({ id: 'k', parentId: 'p', depth: 2 })
     loadStore([makeRoot(), parent, kid])
-    const { container } = renderNode(parent)
+    const { container } = renderNode(parent, { childCount: 1, descendantCount: 1 })
     // Fireflies render extra <circle> glow + core elements
     expect(container.querySelectorAll('circle').length).toBeGreaterThan(0)
   })
@@ -651,7 +653,7 @@ describe('Node — color helper edge cases', () => {
     const parent = makeNode({ id: 'p', color: 'tomato' })
     const kid = makeNode({ id: 'k', parentId: 'p', depth: 2, color: 'tomato' })
     loadStore([makeRoot(), parent, kid])
-    const { container } = renderNode(parent)
+    const { container } = renderNode(parent, { childCount: 1, descendantCount: 1 })
     expect(container.querySelectorAll('circle').length).toBeGreaterThan(0)
   })
 

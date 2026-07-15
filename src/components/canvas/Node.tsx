@@ -17,6 +17,8 @@ interface NodeProps {
   svgRef: React.RefObject<SVGSVGElement>
   readOnly?: boolean
   l1Colors?: string[]
+  childCount?: number       // direct children, precomputed once by DiagramCanvas (was an O(n) per-node selector)
+  descendantCount?: number  // total subtree size, precomputed once (was an O(n^2) per-node selector)
 }
 
 function hexToRgb(hex: string): [number, number, number] {
@@ -55,7 +57,7 @@ function isLight(hex: string): boolean {
   return lum > 140
 }
 
-export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onDragMove, onRootDragOffset, svgRef, readOnly, l1Colors = [] }: NodeProps) {
+export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onDragMove, onRootDragOffset, svgRef, readOnly, l1Colors = [], childCount = 0, descendantCount = 0 }: NodeProps) {
   const isRoot = node.depth === 0
   const isL2Plus = node.depth >= 2
   const rx = isRoot ? 4 : 3
@@ -65,25 +67,6 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   const resizePreview = useMindmapStore(s => s.resizePreview)
   const diagramType = useMindmapStore(s => s.diagramType)
   const showChildCount = useMindmapStore(s => s.showChildCount)
-  const childCount = useMindmapStore(s =>
-    showChildCount && node.depth >= 1
-      ? (s.activeMindmap?.nodes.filter(n => n.parentId === node.id).length ?? 0)
-      : 0
-  )
-  // Total descendants under this node (for firefly count)
-  const descendantCount = useMindmapStore(s => {
-    if (node.depth < 1 || !s.activeMindmap) return 0
-    const nodes = s.activeMindmap.nodes
-    let count = 0
-    const stack = [node.id]
-    while (stack.length) {
-      const pid = stack.pop()!
-      for (const n of nodes) {
-        if (n.parentId === pid) { count++; stack.push(n.id) }
-      }
-    }
-    return count
-  })
   const canDrag = (isRoot && diagramType !== 'mindmap') || diagramType === 'logic-chart'
   // Root shape: in mindmap mode always circle; otherwise user-set or auto from title length
   const isRootPill = isRoot && diagramType !== 'mindmap' && (

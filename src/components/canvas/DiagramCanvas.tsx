@@ -1,4 +1,5 @@
-import { useRef, useState, useCallback, useEffect } from 'react'
+import { useRef, useState, useCallback, useEffect, useMemo } from 'react'
+import { useShallow } from 'zustand/react/shallow'
 import { useMindmapStore } from '../../store/mindmapStore'
 import { getTheme } from '../../lib/themes'
 import { EdgeLayer } from './EdgeLayer'
@@ -12,8 +13,45 @@ interface DiagramCanvasProps {
   onDelete?: () => void
 }
 
+// Direct-child and total-descendant counts for every node in one O(n) pass, so Node no
+// longer runs an O(n)/O(n^2) store selector each (which re-ran for every node on every change).
+function computeSubtreeCounts(nodes: { id: string; parentId: string | null }[]) {
+  const children = new Map<string, string[]>()
+  for (const n of nodes) {
+    if (n.parentId) {
+      const arr = children.get(n.parentId)
+      if (arr) arr.push(n.id); else children.set(n.parentId, [n.id])
+    }
+  }
+  const childCounts = new Map<string, number>()
+  const descendantCounts = new Map<string, number>()
+  const descOf = (id: string): number => {
+    const cached = descendantCounts.get(id)
+    if (cached !== undefined) return cached
+    const kids = children.get(id) ?? []
+    let total = kids.length
+    for (const k of kids) total += descOf(k)
+    descendantCounts.set(id, total)
+    return total
+  }
+  for (const n of nodes) {
+    childCounts.set(n.id, (children.get(n.id) ?? []).length)
+    descOf(n.id)
+  }
+  return { childCounts, descendantCounts }
+}
+
 export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
-  const { activeMindmap, selectedNodeIds, setSelectedNodeIds, diagramType, lineStyle, themeId, addNode, reorderNode, isImporting, hideDetails } = useMindmapStore()
+  // Shallow-selected slice so the canvas only re-renders when one of these actually changes,
+  // not on unrelated store writes (resizePreview, HUD flags, showChildCount, etc.).
+  const { activeMindmap, selectedNodeIds, setSelectedNodeIds, diagramType, lineStyle, themeId, addNode, reorderNode, isImporting, hideDetails } = useMindmapStore(
+    useShallow(s => ({
+      activeMindmap: s.activeMindmap, selectedNodeIds: s.selectedNodeIds, setSelectedNodeIds: s.setSelectedNodeIds,
+      diagramType: s.diagramType, lineStyle: s.lineStyle, themeId: s.themeId, addNode: s.addNode,
+      reorderNode: s.reorderNode, isImporting: s.isImporting, hideDetails: s.hideDetails,
+    })),
+  )
+  const counts = useMemo(() => computeSubtreeCounts(activeMindmap?.nodes ?? []), [activeMindmap?.nodes])
   const canvasBg = getTheme(themeId).canvasBg
   const svgRef = useRef<SVGSVGElement>(null!)
   const gRef = useRef<SVGGElement>(null!)
@@ -419,6 +457,8 @@ export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
               svgRef={svgRef}
               readOnly={readOnly}
               l1Colors={node.depth === 0 ? activeMindmap.nodes.filter(n => n.depth === 1).map(n => n.color) : undefined}
+              childCount={counts.childCounts.get(node.id) ?? 0}
+              descendantCount={counts.descendantCounts.get(node.id) ?? 0}
             />
           ))}
           {/* Rubber-band selection box */}
