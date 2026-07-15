@@ -71,7 +71,7 @@ function Row({ title, badge, badgeColor, children }: {
   )
 }
 
-const ALL_INSTRUCTIONS = `# Mindmaps — Import Guide for AI Agents
+const ALL_INSTRUCTIONS = `# Mindmaps - Import Guide for AI Agents
 
 Three ways to create a mindmap:
 
@@ -101,7 +101,7 @@ curl -X POST https://mindmaps-bheng.vercel.app/api/ai/mindmaps \\
   -H "Content-Type: application/json" \\
   -d '{ "title": "My Map", "outline": "Root\\n  Branch 1\\n    Item A", "type": "logic-chart", "userId": "<user-id>" }'
 
-Required: title. Optional: outline, type, userId, isFavorite, colors, lineStyle, themeId.
+Required: title. Optional: outline, type, userId, colors, lineStyle, themeId.
 Calling with no body returns a JSON sample. Search stickies for "Mindmaps Import API" for the full reference.
 `
 
@@ -216,13 +216,13 @@ Example prompt: "top 10 productivity habits for software engineers"`} />
             <CodeBlock copyable code={`If you are an AI assistant, here is how to learn this endpoint:
 
 1. The Bearer token is auto-loaded in every shell at this Mac
-   (via ~/.zshenv — works in non-interactive shells too):
+   (via ~/.zshenv - works in non-interactive shells too):
      echo $MINDMAP_AI_API_KEY
 
 2. Search the user's stickies for the full reference:
      stickies search "Mindmaps Import API"
 
-3. Or call the endpoint with no body — it returns a JSON
+3. Or call the endpoint with no body - it returns a JSON
    sample you can copy verbatim:
      curl -X POST https://mindmaps-bheng.vercel.app/api/ai/mindmaps \\
        -H "Authorization: Bearer $MINDMAP_AI_API_KEY"

@@ -1,4 +1,4 @@
-import { verifyToken, bearer } from './_lib/auth.js'
+import { verifyToken, bearer, secretEquals } from './_lib/auth.js'
 import { corsHeaders } from './_lib/cors.js'
 
 export const config = { runtime: 'edge' }
@@ -14,7 +14,7 @@ export default async function handler(req: Request): Promise<Response> {
   // Auth: a cryptographically verified session token, or the static agent key.
   const raw = bearer(req.headers)
   const staticKey = (process.env.MINDMAP_AI_API_KEY ?? '').trim()
-  const keyOk = !!staticKey && raw === staticKey
+  const keyOk = await secretEquals(raw, staticKey)
   const session = keyOk ? null : await verifyToken(raw, (process.env.MINDMAP_JWT_SECRET ?? '').trim())
   if (!keyOk && !session) return json({ error: 'Unauthorized' }, 401)
 
@@ -50,8 +50,8 @@ export default async function handler(req: Request): Promise<Response> {
   })
 
   if (!broadcastRes.ok) {
-    const err = await broadcastRes.text()
-    return json({ error: 'Broadcast failed', detail: err.slice(0, 200) }, 502)
+    console.error('notify: broadcast failed', (await broadcastRes.text()).slice(0, 500))
+    return json({ error: 'Broadcast failed' }, 502)
   }
 
   return json({ ok: true, message: message.trim() })

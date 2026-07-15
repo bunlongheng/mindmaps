@@ -1,7 +1,7 @@
 export const config = { runtime: "nodejs" }
 
 import { pool } from '../_lib/db.js'
-import { verifyToken, bearer } from '../_lib/auth.js'
+import { verifyToken, bearer, secretEquals } from '../_lib/auth.js'
 import { corsHeaders } from '../_lib/cors.js'
 
 const BRANCH_COLORS = [
@@ -241,7 +241,7 @@ export default async function handler(req: any, res: any) {
   // A verified first-party session token, or the static agent key.
   const raw = bearer(req.headers)
   const staticKey = (process.env.MINDMAP_AI_API_KEY ?? '').trim()
-  const keyOk = !!staticKey && raw === staticKey
+  const keyOk = await secretEquals(raw, staticKey)
   const session = keyOk ? null : await verifyToken(raw, (process.env.MINDMAP_JWT_SECRET ?? '').trim())
   if (!keyOk && !session) return res.status(401).json({ error: 'Unauthorized' })
 
@@ -268,13 +268,16 @@ export default async function handler(req: any, res: any) {
         messages: [{ role: 'user', content: prompt.trim() }],
       }),
     })
-  } catch (e: any) {
-    return res.status(502).json({ error: 'Failed to reach AI service', detail: e.message })
+  } catch (e: unknown) {
+    console.error('generate-mindmap: AI fetch failed', e)
+    return res.status(502).json({ error: 'Failed to reach AI service' })
   }
 
   if (!aiRes.ok) {
     const err = await aiRes.text()
-    return res.status(502).json({ error: 'AI generation failed', detail: err.slice(0, 200) })
+    console.error('generate-mindmap: AI non-ok', err.slice(0, 500))
+    const billing = /credit balance/i.test(err)
+    return res.status(502).json({ error: billing ? 'AI credits exhausted - top up Anthropic billing' : 'AI generation failed' })
   }
 
   const aiData = await aiRes.json() as { content: Array<{ type: string; text?: string; name?: string; input?: any }> }
@@ -315,8 +318,9 @@ export default async function handler(req: any, res: any) {
        ON CONFLICT (id) DO UPDATE SET name=$3, nodes=$6, updated_at=now()`,
       [id, ownerId, title, type, themeId, JSON.stringify(nodes), ['AI']]
     )
-  } catch (e: any) {
-    return res.status(500).json({ error: 'Failed to save diagram', detail: e.message })
+  } catch (e: unknown) {
+    console.error('generate-mindmap: save failed', e)
+    return res.status(500).json({ error: 'Failed to save diagram' })
   }
 
   const appUrl = process.env.MINDMAP_APP_URL ?? 'https://mindmaps-bheng.vercel.app'

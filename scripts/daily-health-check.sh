@@ -54,11 +54,11 @@ claude -p "The Mindmaps app daily health check failed:$FAILED. Read the log at $
 run npm run verify; REVERIFY=$?
 if [[ $REVERIFY -eq 0 ]]; then
   # Open a PR instead of pushing prod: unreviewed machine-written code must not auto-deploy.
-  BRANCH="auto-fix/$DATE"
+  BRANCH="auto-fix/$(date +%Y%m%d-%H%M)"  # ref-safe (git refnames forbid spaces); $DATE is for titles only
   git checkout -b "$BRANCH" >>"$LOG" 2>&1
   # Stage only files the fixer changed vs the pre-fix commit (never git add -A, which sweeps in stray files).
   CHANGED="$(git diff --name-only "$BASE_SHA")"
-  if [[ -n "$CHANGED" ]]; then git add $CHANGED >>"$LOG" 2>&1; fi
+  if [[ -n "$CHANGED" ]]; then git diff --name-only -z "$BASE_SHA" | xargs -0 git add >>"$LOG" 2>&1; fi
   git commit -m "fix: auto-repair from daily health check ($DATE)" >>"$LOG" 2>&1
   if git push -u origin "$BRANCH" >>"$LOG" 2>&1 && \
      gh pr create --base main --head "$BRANCH" \

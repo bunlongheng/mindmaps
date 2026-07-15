@@ -29,12 +29,19 @@ export async function sha256Hex(input: string): Promise<string> {
   return [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, '0')).join('')
 }
 
+// Compare two secrets without leaking their contents via timing: compare SHA-256 digests,
+// so the comparison time is independent of the secret bytes.
+export async function secretEquals(a: string, b: string): Promise<boolean> {
+  if (!a || !b) return false
+  return (await sha256Hex(a)) === (await sha256Hex(b))
+}
+
 export type TokenPayload = { sub: string; email: string; role: string; exp: number }
 
 export async function signToken(
   claims: Omit<TokenPayload, 'exp'>,
   secret: string,
-  expSeconds = 60 * 60 * 24 * 30,
+  expSeconds = 60 * 60 * 24 * 7,
 ): Promise<string> {
   const header = b64url(enc.encode(JSON.stringify({ alg: 'HS256', typ: 'JWT' })))
   const exp = Math.floor(Date.now() / 1000) + expSeconds

@@ -116,6 +116,7 @@ Client variables go in `.env` (Vite reads `VITE_`-prefixed vars); server variabl
 | `DATABASE_CA_CERT` | server | PEM CA cert to verify the DB's TLS (blank = skip verify, dev only) |
 | `ANTHROPIC_API_KEY` | server | Claude API key for AI generation |
 | `MINDMAP_AI_API_KEY` | server | Bearer key gating the external agent import API (not the CRUD API) |
+| `MINDMAP_APP_URL` | server | Base URL used in returned map links (defaults to the prod host) |
 | `MINDMAP_JWT_SECRET` | server | HMAC secret used to sign/verify session tokens |
 | `MINDMAP_AUTH_EMAIL` | server | Login email |
 | `MINDMAP_AUTH_PASSWORD_HASH` | server | SHA-256 hex of the login password (never the plaintext) |

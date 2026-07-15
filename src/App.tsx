@@ -40,9 +40,11 @@ function getShareParam(search = window.location.search) {
 export default function App() {
   // Simple auth — check localStorage for session
   const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-  const DEV_USER = { email: 'bheng.code@gmail.com', name: 'Bunlong Heng', userId: '731ace87-64e5-44db-bf2a-82265f06f4d9' }
   const [user, setUser] = useState<{ email: string; name: string; userId: string } | null>(() => {
-    if (isLocal) {
+    // import.meta.env.DEV is a compile-time constant, so Vite strips this whole branch -
+    // including the owner literals below - from the production bundle.
+    if (import.meta.env.DEV && isLocal) {
+      const DEV_USER = { email: 'bheng.code@gmail.com', name: 'Bunlong Heng', userId: '731ace87-64e5-44db-bf2a-82265f06f4d9' }
       localStorage.setItem('mindmaps:user', JSON.stringify(DEV_USER))
       return DEV_USER
     }

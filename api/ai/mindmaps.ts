@@ -2,6 +2,7 @@ export const config = { runtime: "nodejs" }
 
 import { pool } from '../_lib/db.js'
 import { corsHeaders } from '../_lib/cors.js'
+import { secretEquals } from '../_lib/auth.js'
 
 const DEFAULT_BRANCH_COLORS = [
   '#6366f1', '#8b5cf6', '#ec4899', '#ef4444',
@@ -138,7 +139,7 @@ export default async function handler(req: any, res: any) {
 
   const token = (req.headers.authorization ?? '').replace(/^Bearer\s+/i, '').trim()
   const expectedToken = (process.env.MINDMAP_AI_API_KEY ?? '').trim()
-  if (!expectedToken || token !== expectedToken) return res.status(401).json({ error: 'Unauthorized' })
+  if (!(await secretEquals(token, expectedToken))) return res.status(401).json({ error: 'Unauthorized' })
 
   // Self-documenting discovery: a call with no body returns a copy-paste-ready sample.
   const body = req.body || {}
@@ -198,8 +199,9 @@ export default async function handler(req: any, res: any) {
        ON CONFLICT (id) DO UPDATE SET name=$3, nodes=$7, updated_at=now()`,
       [id, userId ?? null, title, type, lineStyle, themeId, JSON.stringify(nodes), ['API']]
     )
-  } catch (e: any) {
-    return res.status(500).json({ error: 'Failed to save diagram', detail: e.message })
+  } catch (e: unknown) {
+    console.error('ai/mindmaps: save failed', e)
+    return res.status(500).json({ error: 'Failed to save diagram' })
   }
 
   const appUrl = process.env.MINDMAP_APP_URL ?? 'https://mindmaps-bheng.vercel.app'
