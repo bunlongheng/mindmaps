@@ -10,6 +10,7 @@ function textCount(page: Page) {
 }
 
 /** Center-click a node by its visible text label. Returns false if not found. */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function clickNodeByText(page: Page, label: string): Promise<boolean> {
   const box = await page.evaluate((text) => {
     const texts = document.querySelectorAll('.diagram-canvas-root svg text')

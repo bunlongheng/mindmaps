@@ -89,7 +89,6 @@ test.describe('Auth — User Menu', () => {
     await page.goto('/')
     await waitForApp(page)
     // Look for sign out in the user dropdown
-    const signOutBtn = page.locator('text="Sign out"').first()
     // This test verifies the button exists if user is logged in
     // If not logged in, we just verify app loads fine
     const hasHome = await page.locator('[title="New blank map"], [title="New Map"]').count()

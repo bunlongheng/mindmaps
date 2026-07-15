@@ -38,7 +38,6 @@ test.describe('Paste Import — JSON', () => {
     await waitForApp(page)
 
     // Remember we're on the home page
-    const beforeUrl = page.url()
 
     await page.evaluate(() => {
       const event = new ClipboardEvent('paste', {

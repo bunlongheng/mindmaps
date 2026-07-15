@@ -136,7 +136,7 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
     }
     document.addEventListener('paste', onDocPaste)
     return () => document.removeEventListener('paste', onDocPaste)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   }, [])
 
   // All unique tags (preset + any used in diagrams) — used by the tag editor modal.
@@ -841,6 +841,7 @@ function DiagramMinimap({ id, type }: { id: string; type: string }) {
         localStorage.getItem(`mindmaps:diagram:${id}`) ?? localStorage.getItem(`mindmaps:thumb:${id}`) ?? 'null',
       )
       if (data?.nodes?.length) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing local state from an external fetch
         setNodes(data.nodes)
         setDiagramThemeId(data.themeId ?? 'default')
         setLineStyle(data.lineStyle ?? 'orthogonal')

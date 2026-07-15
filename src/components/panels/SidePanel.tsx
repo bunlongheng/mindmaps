@@ -143,7 +143,7 @@ export function SidePanel({ nodeId, onClose, onDelete }: SidePanelProps) {
     let tokenCount = 0
     try {
       const nodeList = nodesWithoutIcons.map(n => ({ id: n.id, title: n.title, depth: n.depth }))
-      const prompt = `You are an icon assignment expert. For each mindmap node, pick the single best icon name.\n\nYou may use ANY icon from Lucide (lucide.dev) or Heroicons (heroicons.com) — use kebab-case names like: academic-cap, adjustments-horizontal, arrow-trending-up, banknotes, beaker, bolt, book-open, briefcase, building-office, calendar-days, chart-bar, chat-bubble-left, check-circle, chip, clock, cloud, code-bracket, cog, command-line, cpu-chip, credit-card, cube, currency-dollar, device-phone-mobile, document, eye, fire, flag, folder, gift, globe-alt, heart, home, key, light-bulb, link, lock-closed, magnifying-glass, map, map-pin, microphone, moon, musical-note, paint-brush, paper-airplane, photo, puzzle-piece, rocket-launch, server, shield-check, shopping-cart, signal, sparkles, star, sun, tag, trophy, user, video-camera, wifi, wrench, or any other valid lucide/heroicons icon name.\n\nRules:\n- You MUST assign an icon to EVERY node in the list. No exceptions.\n- Pick the most contextually relevant icon.\n- Respond ONLY with a valid JSON array, no explanation: [{\"id\":\"...\",\"icon\":\"...\"}, ...]\n\nNodes:\n${JSON.stringify(nodeList)}`
+      const prompt = `You are an icon assignment expert. For each mindmap node, pick the single best icon name.\n\nYou may use ANY icon from Lucide (lucide.dev) or Heroicons (heroicons.com) — use kebab-case names like: academic-cap, adjustments-horizontal, arrow-trending-up, banknotes, beaker, bolt, book-open, briefcase, building-office, calendar-days, chart-bar, chat-bubble-left, check-circle, chip, clock, cloud, code-bracket, cog, command-line, cpu-chip, credit-card, cube, currency-dollar, device-phone-mobile, document, eye, fire, flag, folder, gift, globe-alt, heart, home, key, light-bulb, link, lock-closed, magnifying-glass, map, map-pin, microphone, moon, musical-note, paint-brush, paper-airplane, photo, puzzle-piece, rocket-launch, server, shield-check, shopping-cart, signal, sparkles, star, sun, tag, trophy, user, video-camera, wifi, wrench, or any other valid lucide/heroicons icon name.\n\nRules:\n- You MUST assign an icon to EVERY node in the list. No exceptions.\n- Pick the most contextually relevant icon.\n- Respond ONLY with a valid JSON array, no explanation: [{"id":"...","icon":"..."}, ...]\n\nNodes:\n${JSON.stringify(nodeList)}`
       const res = await fetch('/api/ai/generate-mindmap', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -825,6 +825,7 @@ function VisualPickerBlock({ icon, emoji, onSave }: {
   // Sync tab when node changes externally
   useEffect(() => {
     const isT = !!emoji && /^[\x20-\x7E]{1,3}$/.test(emoji)
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- deriving tab/draft from icon/emoji props
     setTab(icon ? 'icon' : emoji ? (isT ? 'text' : 'emoji') : 'icon')
     setTextDraft(isT ? emoji! : '')
     setEmojiDraft(!isT && emoji ? emoji : '')

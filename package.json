@@ -15,7 +15,7 @@
     "test:coverage": "vitest run --coverage",
     "test:all": "vitest run && playwright test",
     "typecheck:api": "tsc -p tsconfig.api.json",
-    "verify": "tsc -b && tsc -p tsconfig.api.json && vitest run --coverage && playwright test",
+    "verify": "eslint . && tsc -b && tsc -p tsconfig.api.json && vitest run --coverage && playwright test",
     "smoke:prod": "node scripts/smoke-prod.mjs"
   },
   "dependencies": {

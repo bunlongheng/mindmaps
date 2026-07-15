@@ -17,7 +17,6 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run lint
-        continue-on-error: true # existing lint debt; tracked for cleanup, not yet a hard gate
       - run: npx tsc -b
       - run: npm run typecheck:api
       - run: npm test

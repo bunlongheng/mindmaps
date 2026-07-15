@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components, react-hooks/static-components -- dynamic Lucide icon component chosen at runtime */
 import * as LucideIcons from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import * as HeroOutline from '@heroicons/react/24/outline'

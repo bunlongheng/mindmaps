@@ -1,4 +1,5 @@
 export const config = { runtime: "nodejs" }
+import type { VercelRequest, VercelResponse } from '@vercel/node'
 
 import { pool } from '../_lib/db.js'
 import { corsHeaders } from '../_lib/cors.js'
@@ -132,7 +133,7 @@ function parseJsonOutline(json: unknown, BRANCH_COLORS: string[] = DEFAULT_BRANC
   return { title: rootKey.trim(), nodes }
 }
 
-export default async function handler(req: any, res: any) {
+export default async function handler(req: VercelRequest, res: VercelResponse) {
   Object.entries(corsHeaders(req.headers?.origin, 'POST, OPTIONS')).forEach(([k, v]) => res.setHeader(k, v))
   if (req.method === 'OPTIONS') return res.status(204).end()
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })

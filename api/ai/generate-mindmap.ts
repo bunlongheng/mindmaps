@@ -1,4 +1,5 @@
 export const config = { runtime: "nodejs" }
+import type { VercelRequest, VercelResponse } from '@vercel/node'
 
 import { pool } from '../_lib/db.js'
 import { verifyToken, bearer, secretEquals } from '../_lib/auth.js'
@@ -124,7 +125,7 @@ interface MindmapNode {
 // nothing parseable is found.
 function extractJson(text: string): unknown {
   if (!text) return undefined
-  let s = text.replace(/```(?:json)?/gi, '').trim()
+  const s = text.replace(/```(?:json)?/gi, '').trim()
 
   // Try the whole thing first.
   const tryParse = (str: string): unknown => {
@@ -233,7 +234,7 @@ function parseJsonOutline(json: unknown): { title: string; nodes: MindmapNode[] 
   return { title: rootKey.trim(), nodes }
 }
 
-export default async function handler(req: any, res: any) {
+export default async function handler(req: VercelRequest, res: VercelResponse) {
   Object.entries(corsHeaders(req.headers?.origin, 'POST, OPTIONS')).forEach(([k, v]) => res.setHeader(k, v))
   if (req.method === 'OPTIONS') return res.status(204).end()
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
@@ -280,10 +281,10 @@ export default async function handler(req: any, res: any) {
     return res.status(502).json({ error: billing ? 'AI credits exhausted - top up Anthropic billing' : 'AI generation failed' })
   }
 
-  const aiData = await aiRes.json() as { content: Array<{ type: string; text?: string; name?: string; input?: any }> }
+  const aiData = await aiRes.json() as { content: Array<{ type: string; text?: string; name?: string; input?: Record<string, unknown> }> }
 
   // Preferred path: forced tool_use returns a guaranteed-valid object.
-  const toolUse = aiData.content?.find((b: any) => b.type === 'tool_use' && b.name === MINDMAP_TOOL.name)
+  const toolUse = aiData.content?.find((b: { type: string; name?: string; text?: string }) => b.type === 'tool_use' && b.name === MINDMAP_TOOL.name)
   let parsed: unknown
   if (toolUse?.input && typeof toolUse.input === 'object') {
     const { title, branches } = toolUse.input as { title?: string; branches?: Array<{ label?: string; icon?: string; children?: string[] }> }
@@ -298,7 +299,7 @@ export default async function handler(req: any, res: any) {
 
   // Fallback: tolerant text extraction (in case the model emits text anyway).
   if (parsed === undefined) {
-    const rawText = aiData.content?.find((b: any) => b.type === 'text')?.text ?? ''
+    const rawText = aiData.content?.find((b: { type: string; name?: string; text?: string }) => b.type === 'text')?.text ?? ''
     parsed = extractJson(rawText)
     if (parsed === undefined) {
       return res.status(502).json({ error: 'AI returned invalid JSON', raw: rawText.slice(0, 200) })

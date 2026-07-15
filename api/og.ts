@@ -1,8 +1,9 @@
 import { pool } from './_lib/db.js'
+import type { VercelRequest, VercelResponse } from '@vercel/node'
 
 function esc(s: string) { return s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] || c)) }
 
-export default async function handler(req: any, res: any) {
+export default async function handler(req: VercelRequest, res: VercelResponse) {
   const id = (req.query.id ?? '') as string
   if (!id) return res.redirect(301, '/')
 

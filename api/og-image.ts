@@ -1,6 +1,7 @@
 import sharp from 'sharp'
+import type { VercelRequest, VercelResponse } from '@vercel/node'
 
-export default async function handler(req: any, res: any) {
+export default async function handler(req: VercelRequest, res: VercelResponse) {
   const name = (req.query.name as string) || 'Untitled'
   const nodes = (req.query.nodes as string) || '0'
   const type = (req.query.type as string) || 'logic-chart'
@@ -52,7 +53,8 @@ export default async function handler(req: any, res: any) {
     res.setHeader('Content-Type', 'image/png')
     res.setHeader('Cache-Control', 'public, max-age=3600')
     res.send(png)
-  } catch (e: any) {
-    res.status(500).json({ error: e.message })
+  } catch (e: unknown) {
+    console.error('og-image failed', e)
+    res.status(500).json({ error: 'Failed to render image' })
   }
 }

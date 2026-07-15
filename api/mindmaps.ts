@@ -1,10 +1,11 @@
 import { pool } from './_lib/db.js'
+import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { verifyToken, bearer } from './_lib/auth.js'
 import { corsHeaders } from './_lib/cors.js'
 
 const SECRET = () => (process.env.MINDMAP_JWT_SECRET ?? '').trim()
 
-export default async function handler(req: any, res: any) {
+export default async function handler(req: VercelRequest, res: VercelResponse) {
   Object.entries(corsHeaders(req.headers?.origin)).forEach(([k, v]) => res.setHeader(k, v))
   if (req.method === 'OPTIONS') return res.status(204).end()
 
