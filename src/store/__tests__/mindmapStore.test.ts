@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { useMindmapStore } from '../mindmapStore'
+import { useMindmapStore, flushMindmapPersist } from '../mindmapStore'
 import type { Diagram, MindmapNode } from '../../types'
 
 // Mock showToast (DOM-dependent)
@@ -960,6 +960,7 @@ describe('mindmapStore', () => {
       loadDiagram()
       // Trigger a dirty mutation
       useMindmapStore.getState().updateNode('c1', { title: 'Persisted' })
+      flushMindmapPersist() // persist is debounced; force the write for the assertion
       const cached = localStorage.getItem('mindmaps:diagram:test-diagram')
       expect(cached).toBeTruthy()
       const list = JSON.parse(localStorage.getItem('mindmaps:list')!)

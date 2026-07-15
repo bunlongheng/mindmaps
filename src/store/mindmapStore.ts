@@ -798,21 +798,46 @@ export const useMindmapStore = create<MindmapStore>()(
 // This is the safety net — no matter what, localStorage always has the latest
 const LS_KEY = (id: string) => `mindmaps:diagram:${id}`
 const LS_LIST = 'mindmaps:list'
+
+function writeMapToCache(map: Diagram) {
+  try {
+    const now = new Date().toISOString()
+    localStorage.setItem(LS_KEY(map.id), JSON.stringify({ ...map, updatedAt: now }))
+    // Update the list entry too
+    const list: { id: string; name: string; type: string; updatedAt: string; tags?: string[] }[] =
+      JSON.parse(localStorage.getItem(LS_LIST) ?? '[]')
+    const idx = list.findIndex(m => m.id === map.id)
+    const meta = { id: map.id, name: map.name, type: map.type, updatedAt: now, tags: map.tags ?? [] }
+    if (idx >= 0) list[idx] = meta; else list.unshift(meta)
+    localStorage.setItem(LS_LIST, JSON.stringify(list))
+  } catch { /* storage full / unavailable */ }
+}
+
+let persistTimer: ReturnType<typeof setTimeout> | null = null
+let persistPending: Diagram | null = null
+
+// Flush the pending debounced cache write immediately (tab hide/unload, and tests).
+export function flushMindmapPersist() {
+  if (persistTimer) { clearTimeout(persistTimer); persistTimer = null }
+  if (persistPending) { writeMapToCache(persistPending); persistPending = null }
+}
+
+// Throttle the localStorage mirror: a node drag calls updateNode per pointermove, so
+// serializing the whole diagram on every change fought the render loop. Collapse bursts
+// into one write per window; flush on tab hide/unload so nothing is lost.
 useMindmapStore.subscribe(
   (state) => ({ dirty: state.isDirty, map: state.activeMindmap }),
   ({ dirty, map }) => {
     if (!dirty || !map) return
-    try {
-      const now = new Date().toISOString()
-      localStorage.setItem(LS_KEY(map.id), JSON.stringify({ ...map, updatedAt: now }))
-      // Update the list entry too
-      const list: { id: string; name: string; type: string; updatedAt: string; tags?: string[] }[] =
-        JSON.parse(localStorage.getItem(LS_LIST) ?? '[]')
-      const idx = list.findIndex(m => m.id === map.id)
-      const meta = { id: map.id, name: map.name, type: map.type, updatedAt: now, tags: map.tags ?? [] }
-      if (idx >= 0) list[idx] = meta; else list.unshift(meta)
-      localStorage.setItem(LS_LIST, JSON.stringify(list))
-    } catch {}
+    persistPending = map
+    if (!persistTimer) persistTimer = setTimeout(flushMindmapPersist, 400)
   },
   { equalityFn: (a, b) => a.dirty === b.dirty && a.map === b.map }
 )
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeunload', flushMindmapPersist)
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flushMindmapPersist()
+  })
+}
