@@ -586,7 +586,7 @@ describe('DiagramCanvas — root drag auto-pan', () => {
     loadStore([makeRoot(), makeNode({ depth: 1, x: 800 })], 'logic-chart')
     const { container, g } = renderCanvas()
     const svg = g.ownerSVGElement as SVGSVGElement
-    let cur = { x: 0, y: 0 }
+    const cur = { x: 0, y: 0 }
     ;(svg as unknown as { createSVGPoint: () => DOMPoint }).createSVGPoint = () => {
       const pt = { x: 0, y: 0 } as DOMPoint
       ;(pt as unknown as { matrixTransform: () => DOMPoint }).matrixTransform = () => ({ x: cur.x, y: cur.y } as DOMPoint)

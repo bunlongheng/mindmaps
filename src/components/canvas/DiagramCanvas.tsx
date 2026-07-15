@@ -64,7 +64,7 @@ export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
   const rootAutoPanRafRef = useRef<number | null>(null)
 
   // Auto-recover: if diagram has no nodes, add a root
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   useEffect(() => {
     if (!activeMindmap) return
     if (activeMindmap.nodes.length === 0) {
