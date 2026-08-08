@@ -5,8 +5,10 @@ import { SidePanel } from './components/panels/SidePanel'
 import { ImportModal } from './components/modals/ImportModal'
 import { HomePage } from './components/home/HomePage'
 import { useDiagram } from './hooks/useDiagram'
+import { useIsMobile } from './hooks/useIsMobile'
 import { useMindmapStore } from './store/mindmapStore'
 import { decodeShareURL } from './lib/export/share'
+import { supabase } from './lib/supabase'
 import { ArrowLeft, SlidersHorizontal, Tag, X, FileDown, Trash2 } from 'lucide-react'
 import { Confetti } from './components/Confetti'
 
@@ -53,34 +55,55 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(false)
   const [loginError, setLoginError] = useState('')
 
-  async function handleLogin(email: string, password: string) {
+  // Kick off Google OAuth via Supabase; the redirect back is completed by the effect below.
+  async function handleGoogleSignIn() {
+    if (!supabase) { setLoginError('Sign-in is not configured'); return }
     setAuthLoading(true)
     setLoginError('')
-    try {
-      const res = await fetch('/api/auth', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      })
-      const data = await res.json()
-      if (data.ok) {
-        // Clear stale diagram cache so API is always the source of truth
-        Object.keys(localStorage).filter(k => k.startsWith('mindmaps:diagram:') || k === 'mindmaps:list').forEach(k => localStorage.removeItem(k))
-        localStorage.setItem('mindmaps:user', JSON.stringify(data.user))
-        localStorage.setItem('mindmaps:token', data.token)
-        setUser(data.user)
-        showToast("Welcome back, boss.", { color: '#1a1d2e', confetti: true })
-      } else {
-        setLoginError(data.error || 'Invalid credentials')
-      }
-    } catch { setLoginError('Network error') }
-    finally { setAuthLoading(false) }
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: window.location.origin },
+    })
+    if (error) { setLoginError(error.message); setAuthLoading(false) }
   }
+
+  // After Google redirects back, exchange the Supabase session for a Mindmaps token.
+  useEffect(() => {
+    if (!supabase || user) return
+    let cancelled = false
+    ;(async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session || cancelled) return
+      setAuthLoading(true)
+      try {
+        const res = await fetch('/api/auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ supabaseToken: session.access_token }),
+        })
+        const data = await res.json()
+        if (data.ok) {
+          // Clear stale diagram cache so API is always the source of truth
+          Object.keys(localStorage).filter(k => k.startsWith('mindmaps:diagram:') || k === 'mindmaps:list').forEach(k => localStorage.removeItem(k))
+          localStorage.setItem('mindmaps:user', JSON.stringify(data.user))
+          localStorage.setItem('mindmaps:token', data.token)
+          if (!cancelled) { setUser(data.user); showToast("Welcome back, boss.", { color: '#1a1d2e', confetti: true }) }
+        } else {
+          if (!cancelled) setLoginError(data.error || 'Not authorized')
+          await supabase.auth.signOut()
+        }
+      } catch { if (!cancelled) setLoginError('Network error') }
+      finally { if (!cancelled) setAuthLoading(false) }
+    })()
+    return () => { cancelled = true }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   function handleSignOut() {
     localStorage.removeItem('mindmaps:user')
     localStorage.removeItem('mindmaps:token')
     setUser(null)
+    supabase?.auth.signOut()
     showToast('See ya!', { color: '#64748b' })
   }
 
@@ -133,7 +156,7 @@ export default function App() {
   })
   const [selectedPanelNodeId, setSelectedPanelNodeId] = useState<string | null>(null)
   const [showPanel, setShowPanel] = useState(false)
-  const isMobile = window.innerWidth <= 768
+  const isMobile = useIsMobile()
   const [showImport, setShowImport] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [showConfetti, setShowConfetti] = useState(() => new URLSearchParams(window.location.search).has('imported'))
@@ -323,22 +346,23 @@ export default function App() {
     <>
       <CuteToast />
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8f9fb', fontFamily: 'Inter, system-ui, sans-serif' }}>
-        <form onSubmit={e => { e.preventDefault(); const fd = new FormData(e.currentTarget); handleLogin(fd.get('email') as string, fd.get('password') as string) }}
-          style={{ width: 340, background: '#fff', borderRadius: 16, padding: 32, boxShadow: '0 8px 32px rgba(0,0,0,0.08)' }}>
+        <div style={{ width: 340, background: '#fff', borderRadius: 16, padding: 32, boxShadow: '0 8px 32px rgba(0,0,0,0.08)' }}>
           <div style={{ textAlign: 'center', marginBottom: 24 }}>
             <div style={{ fontSize: 28, fontWeight: 700, color: '#1e293b' }}>Mindmaps</div>
             <div style={{ fontSize: 13, color: '#94a3b8', marginTop: 4 }}>Sign in to continue</div>
           </div>
-          <input name="email" type="email" placeholder="Email" autoComplete="email" required
-            style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: 10, border: '1.5px solid #e2e8f0', fontSize: 14, marginBottom: 12, outline: 'none', fontFamily: 'inherit' }} />
-          <input name="password" type="password" placeholder="Password" autoComplete="current-password" required
-            style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: 10, border: '1.5px solid #e2e8f0', fontSize: 14, marginBottom: 16, outline: 'none', fontFamily: 'inherit' }} />
-          {loginError && <div style={{ color: '#ef4444', fontSize: 12, marginBottom: 12 }}>{loginError}</div>}
-          <button type="submit" disabled={authLoading}
-            style={{ width: '100%', padding: '11px 0', borderRadius: 10, border: 'none', background: '#6366f1', color: '#fff', fontSize: 14, fontWeight: 600, cursor: authLoading ? 'wait' : 'pointer', fontFamily: 'inherit' }}>
-            {authLoading ? 'Signing in...' : 'Sign in'}
+          <button type="button" onClick={handleGoogleSignIn} disabled={authLoading}
+            style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '11px 0', borderRadius: 10, border: '1.5px solid #e2e8f0', background: '#fff', color: '#1f2937', fontSize: 14, fontWeight: 600, cursor: authLoading ? 'wait' : 'pointer', fontFamily: 'inherit' }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
+              <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+              <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+              <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+            </svg>
+            {authLoading ? 'Signing in...' : 'Continue with Google'}
           </button>
-        </form>
+          {loginError && <div style={{ color: '#ef4444', fontSize: 12, marginTop: 12, textAlign: 'center' }}>{loginError}</div>}
+        </div>
       </div>
     </>
   )
