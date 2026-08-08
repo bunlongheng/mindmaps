@@ -1,12 +1,14 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useMindmapStore } from '../../store/mindmapStore'
 import { useDiagram } from '../../hooks/useDiagram'
+import { useIsMobile } from '../../hooks/useIsMobile'
 import { showToast } from '../CuteToast'
 import type { DiagramMeta, MindmapNode } from '../../types'
 import { Plus, Search, Trash2, LayoutGrid, List, Globe, Sparkles, Loader2, Tag, X, Bot, Briefcase, User, BookOpen, Zap, GraduationCap, FlaskConical, Beaker, FileInput, type LucideIcon } from 'lucide-react'
 import { ImportModal } from '../modals/ImportModal'
 import { MindmapsLogo } from '../MindmapsLogo'
 import { getTheme } from '../../lib/themes'
+import { hexToRgb } from '../../lib/color'
 import { AIThinkingOverlay } from '../AIThinkingOverlay'
 import { soundHover, soundClick, soundPaste } from '../../lib/sounds'
 
@@ -54,7 +56,7 @@ interface HomePageProps {
 export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
   const { diagrams } = useMindmapStore()
   const { loadDiagramList, createDiagram, createDiagramFromNodes, deleteDiagram, updateTags } = useDiagram(user?.userId ?? null)
-  const isMobile = window.innerWidth <= 768
+  const isMobile = useIsMobile()
 
   // Compute a unique color per tag (sorted alphabetically → palette index)
   const tagColorMap = useMemo(() => {
@@ -78,6 +80,7 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
     window.history.replaceState({}, '', next)
   }
   const [tagModalId, setTagModalId] = useState<string | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<DiagramMeta | null>(null)
   const [bgLevel, _setBgLevel] = useState<0|1|2>(() => {
     const saved = localStorage.getItem('mindmaps:bgLevel')
     return (saved === '1' ? 1 : saved === '2' ? 2 : 0) as 0|1|2
@@ -90,6 +93,14 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
   useEffect(() => { localStorage.setItem('mindmaps:viewMode', viewMode) }, [viewMode])
   const menuRef = useRef<HTMLDivElement>(null)
   useEffect(() => { loadDiagramList() }, [])
+
+  // Close the delete-confirm modal on Escape
+  useEffect(() => {
+    if (!deleteTarget) return
+    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') setDeleteTarget(null) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [deleteTarget])
 
 
   // Close user menu on outside click
@@ -116,7 +127,7 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
     if (!trimmed) return
     const isJson = trimmed.startsWith('{') || trimmed.startsWith('[')
     const lines = trimmed.split('\n').filter(l => l.trim())
-    const hasIndent = lines.some(l => /^(\s{4}|\t)/.test(l))
+    const hasIndent = lines.some(l => /^[ \t]+/.test(l))
     if (isJson || (lines.length >= 2 && hasIndent)) {
       soundPaste()
       useMindmapStore.getState().loadFromOutline(trimmed)
@@ -509,7 +520,7 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
                 {filtered.map(d => (
                   <DiagramCard
                     key={d.id} diagram={d} timeAgo={timeAgo(d.updatedAt)}
-                    onOpen={() => onOpen(d.id)} onDelete={() => { deleteDiagram(d.id, d.name); setActiveTag(null) }}
+                    onOpen={() => onOpen(d.id)} onDelete={() => setDeleteTarget(d)}
                     isPublic={d.isPublic} tags={d.tags} tagColorMap={tagColorMap}
                     onTagEdit={() => { setTagModalId(d.id) }}
                     flash={flashId === d.id}
@@ -521,7 +532,7 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
                 {filtered.map(d => (
                   <DiagramRow
                     key={d.id} diagram={d} timeAgo={timeAgo(d.updatedAt)}
-                    onOpen={() => onOpen(d.id)} onDelete={() => { deleteDiagram(d.id, d.name); setActiveTag(null) }}
+                    onOpen={() => onOpen(d.id)} onDelete={() => setDeleteTarget(d)}
                     isPublic={d.isPublic} tags={d.tags} tagColorMap={tagColorMap}
                     onTagEdit={() => { setTagModalId(d.id) }}
                     flash={flashId === d.id}
@@ -680,6 +691,38 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
       <style>{`
         :root { --card-bg: ${SURFACE}; --card-border: ${BORDER}; --card-border-hover: ${BORDER_HOVER}; }
       `}</style>
+
+      {/* Delete confirm modal */}
+      {deleteTarget && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.25)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 500,
+        }} onClick={() => setDeleteTarget(null)}>
+          <div role="dialog" aria-modal="true" aria-labelledby="delete-confirm-title" style={{
+            background: '#fff', borderRadius: 16, padding: 24, width: 320,
+            boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
+          }} onClick={e => e.stopPropagation()}>
+            <h3 id="delete-confirm-title" style={{ fontSize: 15, fontWeight: 700, color: '#1e293b', marginBottom: 8 }}>Delete map?</h3>
+            <p style={{ fontSize: 13, color: '#64748b', marginBottom: 20 }}>
+              "<strong>{deleteTarget.name}</strong>" will be permanently deleted.
+            </p>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button onClick={() => setDeleteTarget(null)} style={{
+                padding: '8px 16px', border: '1px solid #e2e8f0', borderRadius: 9,
+                background: '#fff', cursor: 'pointer', fontSize: 13, fontFamily: 'inherit', color: '#64748b',
+              }}>Cancel</button>
+              <button onClick={() => {
+                deleteDiagram(deleteTarget.id, deleteTarget.name)
+                setActiveTag(null)
+                setDeleteTarget(null)
+              }} style={{
+                padding: '8px 18px', background: '#ef4444', color: '#fff',
+                border: 'none', borderRadius: 9, cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
+              }}>Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Tag edit modal */}
       {tagModalId && (() => {
@@ -890,10 +933,7 @@ function DiagramMinimap({ id, type }: { id: string; type: string }) {
   const canvasBg = theme.canvasBg
   // Root node fill: contrasting color for the theme's canvas
   const isDarkCanvas = (() => {
-    const hex = canvasBg.replace('#', '')
-    const r = parseInt(hex.slice(0, 2), 16)
-    const g = parseInt(hex.slice(2, 4), 16)
-    const b = parseInt(hex.slice(4, 6), 16)
+    const [r, g, b] = hexToRgb(canvasBg)
     return (r * 299 + g * 587 + b * 114) / 1000 < 128
   })()
   const rootFill = isDarkCanvas ? theme.colors[0] : '#1e293b'
@@ -1135,11 +1175,17 @@ function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isPublic, tags, tagCo
 
   return (
     <div
+      role="button"
+      tabIndex={0}
+      aria-label={`Open ${diagram.name}`}
       onMouseEnter={() => { setHovered(true); soundHover() }}
       onMouseLeave={() => setHovered(false)}
+      onFocus={() => setHovered(true)}
+      onBlur={() => setHovered(false)}
       onTouchStart={() => { longPressTimer.current = setTimeout(() => setHovered(true), 500) }}
       onTouchEnd={() => { if (longPressTimer.current) clearTimeout(longPressTimer.current) }}
       onTouchMove={() => { if (longPressTimer.current) clearTimeout(longPressTimer.current) }}
+      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); soundClick(); onOpen() } }}
       style={{
         background: 'var(--card-bg)',
         border: `1px solid ${flash ? '#6366f1' : hovered ? 'var(--card-border-hover)' : 'var(--card-border)'}`,
@@ -1166,7 +1212,7 @@ function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isPublic, tags, tagCo
           <div style={{ display: 'flex', gap: 4, marginTop: 5, flexWrap: 'wrap' }}>
             {currentTags.slice(0, 4).map(t => (
               <span key={t} style={{
-                fontSize: 7, fontWeight: 700, padding: '1px 5px', borderRadius: 6,
+                fontSize: 10, fontWeight: 700, padding: '1px 5px', borderRadius: 6,
                 background: tagBg(t, tagColorMap), color: '#fff', letterSpacing: '0.03em',
               }}>{t}</span>
             ))}
@@ -1179,11 +1225,11 @@ function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isPublic, tags, tagCo
         <DiagramMinimap id={diagram.id} type={diagram.type} />
         {hovered && (
           <>
-            <button onClick={e => { e.stopPropagation(); onTagEdit() }} title="Edit tags"
+            <button onClick={e => { e.stopPropagation(); onTagEdit() }} title="Edit tags" aria-label={`Edit tags for ${diagram.name}`}
               style={{ position: 'absolute', top: 8, left: 8, width: 28, height: 28, borderRadius: 8, border: '1px solid #e2e8f0', background: 'rgba(255,255,255,0.92)', cursor: 'pointer', color: '#94a3b8', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(8px)' }}>
               <Tag size={13} />
             </button>
-            <button onClick={e => { e.stopPropagation(); setHovered(false); onDelete() }}
+            <button onClick={e => { e.stopPropagation(); setHovered(false); onDelete() }} title="Delete map" aria-label={`Delete ${diagram.name}`}
               style={{ position: 'absolute', top: 8, right: 8, width: 28, height: 28, borderRadius: 8, border: '1px solid #fecaca', background: 'rgba(255,255,255,0.92)', cursor: 'pointer', color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(8px)' }}>
               <Trash2 size={13} />
             </button>
@@ -1206,9 +1252,15 @@ function DiagramRow({ diagram, timeAgo, onOpen, onDelete, isPublic, tags, tagCol
 
   return (
     <div
+      role="button"
+      tabIndex={0}
+      aria-label={`Open ${diagram.name}`}
       onMouseEnter={() => { setHovered(true); soundHover() }}
       onMouseLeave={() => setHovered(false)}
+      onFocus={() => setHovered(true)}
+      onBlur={() => setHovered(false)}
       onClick={() => { soundClick(); onOpen() }}
+      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); soundClick(); onOpen() } }}
       style={{
         display: 'flex', alignItems: 'center', gap: 12,
         background: 'var(--card-bg)',
@@ -1234,7 +1286,7 @@ function DiagramRow({ diagram, timeAgo, onOpen, onDelete, isPublic, tags, tagCol
           <div style={{ display: 'flex', gap: 4, marginTop: 4, flexWrap: 'wrap' }}>
             {currentTags.slice(0, 5).map(t => (
               <span key={t} style={{
-                fontSize: 8, fontWeight: 700, padding: '1px 6px', borderRadius: 6,
+                fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 6,
                 background: tagBg(t, tagColorMap), color: '#fff', letterSpacing: '0.03em',
               }}>{t}</span>
             ))}
@@ -1249,11 +1301,11 @@ function DiagramRow({ diagram, timeAgo, onOpen, onDelete, isPublic, tags, tagCol
       <div style={{ display: 'flex', gap: 6, flexShrink: 0, width: 62, justifyContent: 'flex-end' }}>
         {hovered && (
           <>
-            <button onClick={e => { e.stopPropagation(); onTagEdit() }} title="Edit tags"
+            <button onClick={e => { e.stopPropagation(); onTagEdit() }} title="Edit tags" aria-label={`Edit tags for ${diagram.name}`}
               style={{ width: 28, height: 28, borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', color: '#94a3b8', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Tag size={13} />
             </button>
-            <button onClick={e => { e.stopPropagation(); setHovered(false); onDelete() }} title="Delete"
+            <button onClick={e => { e.stopPropagation(); setHovered(false); onDelete() }} title="Delete" aria-label={`Delete ${diagram.name}`}
               style={{ width: 28, height: 28, borderRadius: 8, border: '1px solid #fecaca', background: '#fff', cursor: 'pointer', color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Trash2 size={13} />
             </button>

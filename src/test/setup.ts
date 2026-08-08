@@ -30,7 +30,11 @@ class MockObserver {
 ;(globalThis as unknown as { IntersectionObserver: unknown }).IntersectionObserver = MockObserver
 ;(globalThis as unknown as { ResizeObserver: unknown }).ResizeObserver = MockObserver
 
-if (!window.matchMedia) {
+// These DOM globals only exist under the jsdom test environment - api/ tests run under
+// the plain 'node' environment (via a @vitest-environment node file comment), where
+// window/Element/SVGElement are undefined and this setup file would otherwise throw
+// before any test runs.
+if (typeof window !== 'undefined' && !window.matchMedia) {
   window.matchMedia = (q: string) => ({
     matches: false, media: q, onchange: null,
     addListener() {}, removeListener() {}, addEventListener() {}, removeEventListener() {}, dispatchEvent() { return false },
@@ -42,7 +46,7 @@ if (typeof SVGElement !== 'undefined') {
   ;(SVGElement.prototype as unknown as { getBBox: () => DOMRect }).getBBox =
     () => ({ x: 0, y: 0, width: 100, height: 40, top: 0, left: 0, right: 100, bottom: 40, toJSON() {} } as DOMRect)
 }
-if (!Element.prototype.scrollIntoView) Element.prototype.scrollIntoView = () => {}
+if (typeof Element !== 'undefined' && !Element.prototype.scrollIntoView) Element.prototype.scrollIntoView = () => {}
 
 // Stable randomUUID for deterministic tests
 if (!globalThis.crypto) (globalThis as unknown as { crypto: Crypto }).crypto = {} as Crypto

@@ -4,6 +4,7 @@ import { useMindmapStore } from '../../store/mindmapStore'
 import { NodeIcon, getLucideIcon } from './NodeIcon'
 import { wrapText } from '../../lib/layout/mindmap'
 import { rootPillWidth, rootPillFontSize, rootTitleNeedsPill, rootCircleDiameter } from '../../lib/rootPill'
+import { hexToRgb } from '../../lib/color'
 
 interface NodeProps {
   node: MindmapNode
@@ -19,11 +20,6 @@ interface NodeProps {
   l1Colors?: string[]
   childCount?: number       // direct children, precomputed once by DiagramCanvas (was an O(n) per-node selector)
   descendantCount?: number  // total subtree size, precomputed once (was an O(n^2) per-node selector)
-}
-
-function hexToRgb(hex: string): [number, number, number] {
-  const h = hex.replace('#', '')
-  return [parseInt(h.slice(0,2),16), parseInt(h.slice(2,4),16), parseInt(h.slice(4,6),16)]
 }
 
 function lighten(hex: string, amount = 0.85): string {

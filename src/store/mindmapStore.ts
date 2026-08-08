@@ -13,6 +13,7 @@ import type { Diagram, DiagramMeta, DiagramType, LineStyle, MindmapNode } from '
 import { computeMindmapsLayout } from '../lib/layout/mindmaps-layout'
 import { computeMindmapLayout } from '../lib/layout/mindmap'
 import { computeFishboneLayout } from '../lib/layout/fishbone'
+import { parseIndentedOutline } from '../lib/outline'
 import { computeTimelineLayout } from '../lib/layout/timeline'
 import { getTheme } from '../lib/themes'
 import { rootPillWidth } from '../lib/rootPill'
@@ -705,15 +706,8 @@ export const useMindmapStore = create<MindmapStore>()(
 
       // Fall back to indented text
       if (parsed.length === 0) {
-        const lines = text.split('\n').filter(l => l.trim())
-        if (lines.length === 0) return
-        parsed = lines.map(line => {
-          const raw = line.match(/^(\s*)(.+)$/)
-          if (!raw) return null
-          const ws = raw[1]
-          const indent = ws.includes('\t') ? (ws.match(/\t/g)?.length ?? 0) : Math.floor(ws.length / 4)
-          return { title: raw[2].trim(), indent }
-        }).filter(Boolean) as FlatItem[]
+        if (!text.split('\n').some(l => l.trim())) return
+        parsed = parseIndentedOutline(text)
       }
 
       if (parsed.length === 0) return

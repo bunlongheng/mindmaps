@@ -110,22 +110,28 @@ Client variables go in `.env` (Vite reads `VITE_`-prefixed vars); server variabl
 
 | Env var | Scope | Purpose |
 |---------|-------|---------|
-| `VITE_SUPABASE_URL` | client | Supabase project URL for realtime notifications |
-| `VITE_SUPABASE_ANON_KEY` | client | Supabase anon key (public by design) |
+| `VITE_SUPABASE_URL` | client | Legacy/unused - client-side Supabase was removed; nothing currently reads this |
+| `VITE_SUPABASE_ANON_KEY` | client | Legacy/unused - public by design, but no live caller (see `SUPABASE_SERVICE_ROLE_KEY` below) |
 | `DATABASE_URL` | server | PostgreSQL connection string for map storage |
 | `DATABASE_CA_CERT` | server | PEM CA cert to verify the DB's TLS (blank = skip verify, dev only) |
 | `ANTHROPIC_API_KEY` | server | Claude API key for AI generation |
 | `MINDMAP_AI_API_KEY` | server | Bearer key gating the external agent import API (not the CRUD API) |
-| `MINDMAP_APP_URL` | server | Base URL used in returned map links (defaults to the prod host) |
+| `MINDMAP_APP_URL` | server | Base URL used in returned map links, and also the CORS allow-origin (defaults to the prod host) - required if self-hosting on a different domain |
 | `MINDMAP_JWT_SECRET` | server | HMAC secret used to sign/verify session tokens |
 | `MINDMAP_AUTH_EMAIL` | server | Login email |
-| `MINDMAP_AUTH_PASSWORD_HASH` | server | SHA-256 hex of the login password (never the plaintext) |
+| `MINDMAP_AUTH_PASSWORD_HASH` | server | `salt:iterations:hash` from `node scripts/hash-password.mjs '<password>'` (never the plaintext) |
 | `MINDMAP_USER_ID` | server | Owner id embedded in the session token |
-| `SUPABASE_SERVICE_ROLE_KEY` | server | Server-only; used by `/api/notify` realtime broadcast |
+| `MINDMAP_TOKEN_MIN_IAT` | server | Optional; set to a unix timestamp to instantly revoke all outstanding sessions issued before it |
+| `SUPABASE_SERVICE_ROLE_KEY` | server | Legacy/unused - only read by `/api/notify`, which has no caller anywhere in this app |
+| `MINDMAP_SMOKE_SAMPLE` | scripts | Optional; how many maps `scripts/smoke-prod.mjs` samples per run (default 8) |
 
 ### Auth model
 
-`POST /api/auth` checks the email + SHA-256 password hash from env and issues a 30-day HMAC-SHA256 session token. The CRUD API (`/api/mindmaps`) requires that token and scopes every write to the owner; a public map (`sharing_enabled`) is readable by id without one. The AI/import endpoints (`/api/ai/*`, `/api/notify`) accept either the session token or the static `MINDMAP_AI_API_KEY` (for external agents) - the static key does **not** work on the CRUD API.
+`POST /api/auth` checks the email + a salted PBKDF2 (310k iterations) password hash from env, rate-limited to 5 attempts per 15 minutes per IP, and issues a 24-hour HMAC-SHA256 session token (set `MINDMAP_TOKEN_MIN_IAT` to instantly revoke every outstanding session). The CRUD API (`/api/mindmaps`) requires that token and scopes every write to the owner; a public map (`sharing_enabled`) is readable by id without one. The AI/import endpoints (`/api/ai/*`) accept either the session token or the static `MINDMAP_AI_API_KEY` (for external agents) - the static key does **not** work on the CRUD API. `/api/notify` uses the same dual-auth pattern but is legacy/unused - no code in this app calls it.
+
+### Database migrations
+
+`supabase/migrations/*.sql` is tracked in a `schema_migrations` ledger via `scripts/migrate.mjs` (`npm run migrate -- <status|backfill|up>`), reading `DATABASE_URL`/`DATABASE_CA_CERT` from the environment. On an existing database where these files were already applied by hand, run `backfill` once to seed the ledger without re-executing any SQL (re-running the oldest migration for real would `DROP TABLE ... CASCADE`); after that, `up` applies only new files.
 
 ## Project layout
 
@@ -136,7 +142,7 @@ mindmaps/
 │   ├── ai/                 # Claude generation + agent import
 │   ├── auth.ts             # login -> signed session token
 │   ├── mindmaps.ts         # owner-scoped Postgres CRUD
-│   ├── notify.ts           # realtime toast broadcast
+│   ├── notify.ts           # realtime toast broadcast (legacy/unused, no caller)
 │   └── og*.ts              # Open Graph link previews
 ├── src/
 │   ├── store/              # Zustand store (single source of truth)

@@ -93,8 +93,7 @@ Indented outlines also work. Icons: kebab-case names from lucide.dev/icons.
 Diagram types: logic-chart | mindmap | fishbone | timeline
 
 ## 3. POST via API
-Bearer token is auto-loaded into every shell on this Mac via ~/.zshenv:
-  echo $MINDMAP_AI_API_KEY
+Export MINDMAP_AI_API_KEY in your shell, then:
 
 curl -X POST https://mindmaps-bheng.vercel.app/api/ai/mindmaps \\
   -H "Authorization: Bearer $MINDMAP_AI_API_KEY" \\
@@ -102,7 +101,7 @@ curl -X POST https://mindmaps-bheng.vercel.app/api/ai/mindmaps \\
   -d '{ "title": "My Map", "outline": "Root\\n  Branch 1\\n    Item A", "type": "logic-chart", "userId": "<user-id>" }'
 
 Required: title. Optional: outline, type, userId, colors, lineStyle, themeId.
-Calling with no body returns a JSON sample. Search stickies for "Mindmaps Import API" for the full reference.
+Calling with no body returns a JSON sample with the full field reference.
 `
 
 export function ImportModal({ onClose, userId }: ImportModalProps) {
@@ -215,21 +214,13 @@ Example prompt: "top 10 productivity habits for software engineers"`} />
           <Row title="AI agents - how to discover this API" badge="For Claude/LLM" badgeColor="#0ea5e9">
             <CodeBlock copyable code={`If you are an AI assistant, here is how to learn this endpoint:
 
-1. The Bearer token is auto-loaded in every shell at this Mac
-   (via ~/.zshenv - works in non-interactive shells too):
+1. Make sure MINDMAP_AI_API_KEY is set in your environment:
      echo $MINDMAP_AI_API_KEY
 
-2. Search the user's stickies for the full reference:
-     stickies search "Mindmaps Import API"
-
-3. Or call the endpoint with no body - it returns a JSON
-   sample you can copy verbatim:
+2. Call the endpoint with no body - it returns a JSON
+   sample plus the full field reference, verbatim:
      curl -X POST https://mindmaps-bheng.vercel.app/api/ai/mindmaps \\
-       -H "Authorization: Bearer $MINDMAP_AI_API_KEY"
-
-4. Project memory at:
-   ~/.claude/projects/-Users-bheng-Sites-mindmaps/memory/
-     reference_mindmaps_import_api.md`} />
+       -H "Authorization: Bearer $MINDMAP_AI_API_KEY"`} />
           </Row>
 
 </div>

@@ -975,6 +975,19 @@ describe('mindmapStore', () => {
       const entries = list.filter((m: { id: string }) => m.id === 'test-diagram')
       expect(entries).toHaveLength(1)
     })
+
+    it('flushes the pending persist immediately when the tab is hidden', () => {
+      loadDiagram()
+      localStorage.clear()
+      useMindmapStore.getState().updateNode('c1', { title: 'Hidden-flush' })
+      // Persist is normally debounced 400ms - going hidden must not wait for that timer.
+      Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true })
+      document.dispatchEvent(new Event('visibilitychange'))
+      const cached = localStorage.getItem('mindmaps:diagram:test-diagram')
+      expect(cached).toBeTruthy()
+      expect(JSON.parse(cached!).nodes.find((n: { id: string }) => n.id === 'c1').title).toBe('Hidden-flush')
+      Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true })
+    })
   })
 
   // ── Remaining helper / callback branches ──────────────────────────────────

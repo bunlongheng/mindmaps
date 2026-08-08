@@ -293,7 +293,7 @@ describe('HomePage — create flows', () => {
 })
 
 describe('HomePage — delete & tag editing', () => {
-  it('deletes a map from the card hover delete button', () => {
+  it('asks for confirmation before deleting, and only deletes on confirm', () => {
     seedDiagrams(SAMPLE)
     render(<HomePage onOpen={vi.fn()} user={USER} onSignOut={vi.fn()} />)
     const card = screen.getByText('Project Plan').closest('div[style*="cursor: pointer"]')!
@@ -303,7 +303,26 @@ describe('HomePage — delete & tag editing', () => {
       b => b.style.border === '1px solid rgb(254, 202, 202)'
     )!
     fireEvent.click(delBtn)
+    // Clicking the card's delete icon opens a confirm dialog - the map is not gone yet.
+    expect(screen.getByText('Delete map?')).toBeInTheDocument()
+    expect(useMindmapStore.getState().diagrams.find(d => d.id === 'm1')).toBeDefined()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
     expect(useMindmapStore.getState().diagrams.find(d => d.id === 'm1')).toBeUndefined()
+  })
+
+  it('does not delete when the confirm dialog is cancelled', () => {
+    seedDiagrams(SAMPLE)
+    render(<HomePage onOpen={vi.fn()} user={USER} onSignOut={vi.fn()} />)
+    const card = screen.getByText('Project Plan').closest('div[style*="cursor: pointer"]')!
+    fireEvent.mouseEnter(card)
+    const delBtn = (Array.from(card.querySelectorAll('button')) as HTMLElement[]).find(
+      b => b.style.border === '1px solid rgb(254, 202, 202)'
+    )!
+    fireEvent.click(delBtn)
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByText('Delete map?')).not.toBeInTheDocument()
+    expect(useMindmapStore.getState().diagrams.find(d => d.id === 'm1')).toBeDefined()
   })
 
   it('opens the tag edit modal from the card hover tag button', () => {

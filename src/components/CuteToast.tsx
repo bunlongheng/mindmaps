@@ -121,7 +121,7 @@ export function CuteToast() {
           </span>
           <span style={{
             fontFamily: 'Inter, system-ui, sans-serif',
-            fontSize: 8, fontWeight: 900, letterSpacing: '0.08em',
+            fontSize: 12, fontWeight: 900, letterSpacing: '0.04em',
             textTransform: 'uppercase', lineHeight: 1, whiteSpace: 'nowrap',
           }}>
             {toast.msg}

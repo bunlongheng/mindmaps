@@ -4,6 +4,10 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { pool } from '../_lib/db.js'
 import { verifyToken, bearer, secretEquals } from '../_lib/auth.js'
 import { corsHeaders } from '../_lib/cors.js'
+import { checkRateLimit, clientIp } from '../_lib/rateLimit.js'
+
+const PROMPT_MAX_LENGTH = 2000
+const GENERATE_RATE_LIMIT = { max: 20, windowMs: 15 * 60 * 1000 }
 
 const BRANCH_COLORS = [
   '#6366f1', '#8b5cf6', '#ec4899', '#ef4444',
@@ -246,14 +250,51 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const session = keyOk ? null : await verifyToken(raw, (process.env.MINDMAP_JWT_SECRET ?? '').trim())
   if (!keyOk && !session) return res.status(401).json({ error: 'Unauthorized' })
 
-  const { prompt, userId = null, type = 'logic-chart', themeId = 'default' } = req.body || {}
+  const rate = checkRateLimit(`generate:${clientIp(req.headers)}`, GENERATE_RATE_LIMIT)
+  if (!rate.allowed) {
+    res.setHeader('Retry-After', String(rate.retryAfterSeconds))
+    return res.status(429).json({ error: 'Too many generation requests, try again later' })
+  }
+
+  const { prompt, userId = null, type = 'logic-chart', themeId = 'default', sharing = false, mode } = req.body || {}
   // When authed by a session token the map belongs to that user; only the trusted static
   // agent key may attribute a map to an arbitrary owner supplied in the body.
   const ownerId = session ? session.sub : (userId ?? null)
   if (!prompt?.trim()) return res.status(400).json({ error: 'prompt is required' })
+  if (prompt.length > PROMPT_MAX_LENGTH) return res.status(413).json({ error: `prompt must be under ${PROMPT_MAX_LENGTH} characters` })
 
   const anthropicKey = process.env.ANTHROPIC_API_KEY?.replace(/\\n/g, '').trim()
   if (!anthropicKey) return res.status(500).json({ error: 'Missing ANTHROPIC_API_KEY' })
+
+  // mode:'icons' (SidePanel's "assign icons to existing nodes") asks for a plain JSON
+  // array back, not a new mindmap - it must never fall through to the create-map path
+  // below, which previously ran anyway and inserted a junk public map per icon click.
+  if (mode === 'icons') {
+    let iconRes
+    try {
+      iconRes = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'x-api-key': anthropicKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 4096,
+          messages: [{ role: 'user', content: prompt.trim() }],
+        }),
+      })
+    } catch (e: unknown) {
+      console.error('generate-mindmap: icons AI fetch failed', e)
+      return res.status(502).json({ error: 'Failed to reach AI service' })
+    }
+    if (!iconRes.ok) {
+      const err = await iconRes.text()
+      console.error('generate-mindmap: icons AI non-ok', err.slice(0, 500))
+      return res.status(502).json({ error: 'AI icon assignment failed' })
+    }
+    const iconData = await iconRes.json() as { content: Array<{ type: string; text?: string }>; usage?: { input_tokens?: number; output_tokens?: number } }
+    const text = iconData.content?.find(b => b.type === 'text')?.text ?? ''
+    const totalTokens = (iconData.usage?.input_tokens ?? 0) + (iconData.usage?.output_tokens ?? 0)
+    return res.status(200).json({ outline: text, usage: { total_tokens: totalTokens } })
+  }
 
   let aiRes
   try {
@@ -281,7 +322,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(502).json({ error: billing ? 'AI credits exhausted - top up Anthropic billing' : 'AI generation failed' })
   }
 
-  const aiData = await aiRes.json() as { content: Array<{ type: string; text?: string; name?: string; input?: Record<string, unknown> }> }
+  const aiData = await aiRes.json() as { content: Array<{ type: string; text?: string; name?: string; input?: Record<string, unknown> }>; usage?: { input_tokens?: number; output_tokens?: number } }
 
   // Preferred path: forced tool_use returns a guaranteed-valid object.
   const toolUse = aiData.content?.find((b: { type: string; name?: string; text?: string }) => b.type === 'tool_use' && b.name === MINDMAP_TOOL.name)
@@ -302,7 +343,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const rawText = aiData.content?.find((b: { type: string; name?: string; text?: string }) => b.type === 'text')?.text ?? ''
     parsed = extractJson(rawText)
     if (parsed === undefined) {
-      return res.status(502).json({ error: 'AI returned invalid JSON', raw: rawText.slice(0, 200) })
+      console.error('generate-mindmap: unparseable AI response', rawText.slice(0, 500))
+      return res.status(502).json({ error: 'AI returned invalid JSON' })
     }
   }
 
@@ -315,9 +357,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     await pool.query(
       `INSERT INTO mindmaps (id, user_id, name, type, line_style, sharing_enabled, theme_id, nodes, tags)
-       VALUES ($1,$2,$3,$4,'orthogonal',true,$5,$6,$7)
-       ON CONFLICT (id) DO UPDATE SET name=$3, nodes=$6, updated_at=now()`,
-      [id, ownerId, title, type, themeId, JSON.stringify(nodes), ['AI']]
+       VALUES ($1,$2,$3,$4,'orthogonal',$5,$6,$7,$8)
+       ON CONFLICT (id) DO UPDATE SET name=$3, nodes=$7, updated_at=now()`,
+      [id, ownerId, title, type, sharing === true, themeId, JSON.stringify(nodes), ['AI']]
     )
   } catch (e: unknown) {
     console.error('generate-mindmap: save failed', e)
@@ -325,5 +367,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const appUrl = process.env.MINDMAP_APP_URL ?? 'https://mindmaps-bheng.vercel.app'
-  return res.status(201).json({ id, title, url: `${appUrl}/?id=${id}`, nodeCount: nodes.length })
+  const totalTokens = (aiData.usage?.input_tokens ?? 0) + (aiData.usage?.output_tokens ?? 0)
+  return res.status(201).json({ id, title, url: `${appUrl}/?id=${id}`, nodeCount: nodes.length, usage: { total_tokens: totalTokens } })
 }

@@ -4,6 +4,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { pool } from '../_lib/db.js'
 import { corsHeaders } from '../_lib/cors.js'
 import { secretEquals } from '../_lib/auth.js'
+import { parseIndentedOutline } from '../../src/lib/outline.js'
 
 const DEFAULT_BRANCH_COLORS = [
   '#6366f1', '#8b5cf6', '#ec4899', '#ef4444',
@@ -27,17 +28,8 @@ function computeWidth(title: string, depth: number): number {
 }
 
 function parseOutline(text: string, BRANCH_COLORS: string[] = DEFAULT_BRANCH_COLORS): MindmapNode[] {
-  const lines = text.split('\n').filter(l => l.trim())
-  if (!lines.length) return []
-
-  type Item = { title: string; indent: number }
-  const parsed: Item[] = lines.map(line => {
-    const match = line.match(/^(\s*)(.+)$/)
-    if (!match) return null
-    const ws = match[1]
-    const indent = ws.includes('\t') ? (ws.match(/\t/g)?.length ?? 0) : Math.floor(ws.length / 2)
-    return { title: match[2].trim(), indent }
-  }).filter(Boolean) as Item[]
+  const parsed = parseIndentedOutline(text)
+  if (!parsed.length) return []
 
   const minIndent = Math.min(...parsed.map(p => p.indent))
   parsed.forEach(p => { p.indent -= minIndent })
@@ -163,17 +155,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         type: 'logic-chart | mindmap | fishbone | timeline (default logic-chart)',
         themeId: 'optional (default "default")',
         lineStyle: 'optional (default "orthogonal")',
-        userId: 'optional owner id so the map shows in the library',
+        userId: 'optional; must equal the configured owner id, otherwise the map is created unowned',
+        sharing: 'optional bool, default false; set true to make the map readable by id without auth',
         colors: 'optional hex array to override the branch palette',
       },
       note: 'This static key authorizes only the AI/import endpoints. The CRUD API (/api/mindmaps) needs a signed session token.',
     })
   }
 
-  const { title, outline, type: rawType = 'logic-chart', themeId = 'default', lineStyle = 'orthogonal', userId = null, colors } = body
+  const { title, outline, type: rawType = 'logic-chart', themeId = 'default', lineStyle = 'orthogonal', userId = null, sharing = false, colors } = body
   // Coerce unknown diagram types to the safe default (matches the documented behavior + client legacy-type healing).
   const VALID_TYPES = new Set(['logic-chart', 'mindmap', 'fishbone', 'timeline'])
   const type = VALID_TYPES.has(rawType) ? rawType : 'logic-chart'
+
+  // The static key is shared by any external agent, so it must not be able to attribute a
+  // map to an arbitrary owner - only accept a userId that matches the configured owner.
+  const ownerId = (process.env.MINDMAP_USER_ID ?? '').trim()
+  const ownedUserId = userId && userId === ownerId ? userId : null
 
   // Per-request palette (no cross-request mutation of the shared default).
   const palette = [...DEFAULT_BRANCH_COLORS]
@@ -196,9 +194,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     await pool.query(
       `INSERT INTO mindmaps (id, user_id, name, type, line_style, sharing_enabled, theme_id, nodes, tags)
-       VALUES ($1,$2,$3,$4,$5,true,$6,$7,$8)
-       ON CONFLICT (id) DO UPDATE SET name=$3, nodes=$7, updated_at=now()`,
-      [id, userId ?? null, title, type, lineStyle, themeId, JSON.stringify(nodes), ['API']]
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+       ON CONFLICT (id) DO UPDATE SET name=$3, nodes=$8, updated_at=now()`,
+      [id, ownedUserId, title, type, lineStyle, sharing === true, themeId, JSON.stringify(nodes), ['API']]
     )
   } catch (e: unknown) {
     console.error('ai/mindmaps: save failed', e)

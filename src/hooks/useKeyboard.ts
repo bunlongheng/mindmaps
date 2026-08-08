@@ -10,7 +10,7 @@ export function useKeyboard() {
       if (!trimmed) return
       const isJson = trimmed.startsWith('{') || trimmed.startsWith('[')
       const lines = text.split('\n').filter(l => l.trim())
-      const hasIndent = lines.some(l => /^(\s{4}|\t)/.test(l))
+      const hasIndent = lines.some(l => /^[ \t]+/.test(l))
       if (isJson || (lines.length >= 2 && hasIndent)) {
         useMindmapStore.getState().loadFromOutline(text)
         showToast('Loaded diagram', { color: '#22c55e', confetti: true })
