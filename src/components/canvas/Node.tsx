@@ -338,7 +338,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
     >
       {/* Fireflies around nodes with children — count = all descendants */}
       {node.depth >= 1 && descendantCount > 0 && (
-        <Fireflies cx={displayW / 2} cy={node.height / 2} r={Math.max(displayW, node.height) * 0.45} color={node.color} count={descendantCount} />
+        <Fireflies cx={displayW / 2} cy={node.height / 2} r={Math.max(displayW, node.height) * 0.45} color={col} count={descendantCount} />
       )}
 
       {isRoot ? (
@@ -537,7 +537,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
             const textX = sq + 14 + skOff
             return (
               <>
-                <NodeIcon icon={resolvedIcon} x={iconX} y={iconY} size={iconSize} color={node.color} strokeWidth={node.depth === 1 ? 2.5 : 1.8} />
+                <NodeIcon icon={resolvedIcon} x={iconX} y={iconY} size={iconSize} color={col} strokeWidth={node.depth === 1 ? 2.5 : 1.8} />
                 <text
                   x={textX}
                   y={node.height / 2 + fontSize * 0.38}
