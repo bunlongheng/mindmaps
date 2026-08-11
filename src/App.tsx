@@ -9,8 +9,25 @@ import { useIsMobile } from './hooks/useIsMobile'
 import { useMindmapStore } from './store/mindmapStore'
 import { decodeShareURL } from './lib/export/share'
 import { supabase } from './lib/supabase'
-import { ArrowLeft, SlidersHorizontal, Tag, X, FileDown, Trash2 } from 'lucide-react'
+import { ArrowLeft, SlidersHorizontal, Tag, X, FileDown, Trash2, Network, Share2, Sparkles, GitBranch, Lightbulb, Workflow, ListTree, Waypoints, Image as ImageIcon } from 'lucide-react'
 import { Confetti } from './components/Confetti'
+import { MindmapsLogo } from './components/MindmapsLogo'
+
+// Faint feature icons that float behind the login card (mind maps, AI, sharing,
+// branching, tags, export, import, outlines) - purely decorative.
+const LOGIN_ICONS = [
+  { Icon: Network,   top: '13%', left: '11%', size: 44, dur: 6.0, delay: 0.0 },
+  { Icon: Waypoints, top: '9%',  left: '53%', size: 34, dur: 6.8, delay: 1.5 },
+  { Icon: Share2,    top: '20%', left: '82%', size: 34, dur: 7.0, delay: 1.2 },
+  { Icon: Tag,       top: '34%', left: '22%', size: 26, dur: 5.2, delay: 0.4 },
+  { Icon: Lightbulb, top: '44%', left: '6%',  size: 30, dur: 5.0, delay: 0.3 },
+  { Icon: Workflow,  top: '50%', left: '88%', size: 36, dur: 7.5, delay: 0.9 },
+  { Icon: Sparkles,  top: '66%', left: '14%', size: 38, dur: 5.5, delay: 0.6 },
+  { Icon: FileDown,  top: '62%', left: '72%', size: 28, dur: 6.2, delay: 1.1 },
+  { Icon: ListTree,  top: '84%', left: '44%', size: 32, dur: 6.0, delay: 2.1 },
+  { Icon: GitBranch, top: '80%', left: '82%', size: 40, dur: 6.5, delay: 1.8 },
+  { Icon: ImageIcon, top: '18%', left: '70%', size: 30, dur: 5.8, delay: 0.8 },
+]
 
 // 8 cohesive colors — all Tailwind-500 level, same saturation family
 const TAG_PALETTE = [
@@ -345,14 +362,28 @@ export default function App() {
   if (!user && !isShareLink && !activeMindmap) return (
     <>
       <CuteToast />
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8f9fb', fontFamily: 'Inter, system-ui, sans-serif' }}>
-        <div style={{ width: 340, background: '#fff', borderRadius: 16, padding: 32, boxShadow: '0 8px 32px rgba(0,0,0,0.08)' }}>
-          <div style={{ textAlign: 'center', marginBottom: 24 }}>
-            <div style={{ fontSize: 28, fontWeight: 700, color: '#1e293b' }}>Mindmaps</div>
-            <div style={{ fontSize: 13, color: '#94a3b8', marginTop: 4 }}>Sign in to continue</div>
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, position: 'relative', overflow: 'hidden', background: 'linear-gradient(160deg, #f8f9fb 0%, #eef2ff 55%, #f5f3ff 100%)', fontFamily: 'Inter, system-ui, sans-serif' }}>
+        {/* Floating feature icons (decorative) */}
+        <div aria-hidden="true" style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none' }}>
+          {LOGIN_ICONS.map(({ Icon, top, left, size, dur, delay }, i) => (
+            <div key={i} style={{ position: 'absolute', top, left, color: '#cbd5e1', opacity: 0.5, animation: `mmFloat ${dur}s ease-in-out ${delay}s infinite` }}>
+              <Icon size={size} strokeWidth={1.5} />
+            </div>
+          ))}
+        </div>
+        {/* Sign-in card */}
+        <div style={{ position: 'relative', zIndex: 1, width: 'min(380px, 92vw)', boxSizing: 'border-box', background: '#fff', borderRadius: 20, padding: 'clamp(28px, 6vw, 40px)', boxShadow: '0 24px 60px rgba(80, 60, 180, 0.14)', animation: 'mmCardIn 0.6s cubic-bezier(0.16, 1, 0.3, 1)' }}>
+          <div style={{ textAlign: 'center', marginBottom: 28 }}>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16, animation: 'mmFloat 3.6s ease-in-out infinite' }}>
+              <MindmapsLogo size={68} />
+            </div>
+            <div style={{ fontSize: 'clamp(24px, 5vw, 30px)', fontWeight: 700, color: '#1e293b' }}>Mindmaps</div>
+            <div style={{ fontSize: 13.5, color: '#94a3b8', marginTop: 6 }}>Sign in to continue</div>
           </div>
           <button type="button" onClick={handleGoogleSignIn} disabled={authLoading}
-            style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '11px 0', borderRadius: 10, border: '1.5px solid #e2e8f0', background: '#fff', color: '#1f2937', fontSize: 14, fontWeight: 600, cursor: authLoading ? 'wait' : 'pointer', fontFamily: 'inherit' }}>
+            style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '12px 0', borderRadius: 12, border: '1.5px solid #e2e8f0', background: '#fff', color: '#1f2937', fontSize: 14.5, fontWeight: 600, cursor: authLoading ? 'wait' : 'pointer', fontFamily: 'inherit', transition: 'border-color 0.15s, box-shadow 0.15s, transform 0.05s' }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = '#c7d2fe'; e.currentTarget.style.boxShadow = '0 4px 14px rgba(99,102,241,0.15)' }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.boxShadow = 'none' }}>
             <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
               <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
               <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
@@ -363,6 +394,11 @@ export default function App() {
           </button>
           {loginError && <div style={{ color: '#ef4444', fontSize: 12, marginTop: 12, textAlign: 'center' }}>{loginError}</div>}
         </div>
+        <style>{`
+          @keyframes mmFloat { 0%, 100% { transform: translateY(0) } 50% { transform: translateY(-14px) } }
+          @keyframes mmCardIn { from { opacity: 0; transform: translateY(18px) scale(0.98) } to { opacity: 1; transform: translateY(0) scale(1) } }
+          @media (prefers-reduced-motion: reduce) { .mm-noanim, [style*="mmFloat"], [style*="mmCardIn"] { animation: none !important } }
+        `}</style>
       </div>
     </>
   )

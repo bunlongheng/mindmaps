@@ -721,7 +721,8 @@ describe('HomePage — DiagramCard interactions (coverage)', () => {
   it('renders an avatar image from cache and handles its onError', () => {
     localStorage.setItem('mindmaps:avatarB64', 'data:image/png;base64,AAAA')
     const { container } = render(<HomePage onOpen={vi.fn()} user={USER} onSignOut={vi.fn()} />)
-    const img = container.querySelector('img')!
+    // Target the avatar specifically (the header also renders the app-logo img).
+    const img = container.querySelector('img[src^="data:image"]')!
     expect(img).toBeTruthy()
     fireEvent.error(img)
     expect((img as HTMLImageElement).style.display).toBe('none')
