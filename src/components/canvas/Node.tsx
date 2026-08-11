@@ -80,9 +80,6 @@ function isLight(hex: string): boolean {
 export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onDragMove, onRootDragOffset, svgRef, readOnly, l1Colors = [], childCount = 0, descendantCount = 0 }: NodeProps) {
   const isRoot = node.depth === 0
   const isL2Plus = node.depth >= 2
-  const isL1 = node.depth === 1
-  const gradId = `nodegrad-${node.id}`
-  const useL1Grad = isL1 && node.color.startsWith('#')
   // Brighter/more-vivid version of the node colour, used for all coloured fills.
   const col = node.color.startsWith('#') ? vivify(node.color) : node.color
   const rx = isRoot ? 4 : 3
@@ -155,7 +152,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   // Depth-based bg opacity only (text stays fully opaque)
   const bgOpacity = 1
   // L1 nodes get a diagonal gradient fill (lighter top-left -> base -> darker bottom-right).
-  const nodeFill = useL1Grad ? `url(#${gradId})` : bg
+  const nodeFill = bg
   const fontStyle = node.italic ? 'italic' : 'normal'
   // Text alignment — default left for non-root nodes
   const align = isRoot ? 'center' : node.depth === 1 ? (node.textAlign ?? 'left') : 'left'
@@ -326,13 +323,6 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
         <clipPath id={clipId}>
           <rect x={0} y={0} width={displayW} height={node.height} rx={effectiveRx} ry={effectiveRx} />
         </clipPath>
-        {useL1Grad && (
-          <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor={lighten(col, 0.20)} />
-            <stop offset="55%" stopColor={col} />
-            <stop offset="100%" stopColor={darkenColor(col, 0.20)} />
-          </linearGradient>
-        )}
       </defs>
     )}
     <g
@@ -381,12 +371,10 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
           {isRootPill ? (
             <rect x={0} y={0} width={displayW} height={node.height}
               rx={node.height / 2} ry={node.height / 2}
-              fill={bg} fillOpacity={0.8} stroke={strokeColor} strokeWidth={strokeW}
-              filter="drop-shadow(0 4px 16px rgba(0,0,0,0.35))" />
+              fill={bg} fillOpacity={0.8} stroke={strokeColor} strokeWidth={strokeW} />
           ) : (
             <circle cx={cx} cy={cy} r={r} fill={bg} fillOpacity={0.8}
-              stroke={strokeColor} strokeWidth={strokeW}
-              filter="drop-shadow(0 4px 16px rgba(0,0,0,0.35))" />
+              stroke={strokeColor} strokeWidth={strokeW} />
           )}
 
           {/* Front ring glints — circle root only */}
