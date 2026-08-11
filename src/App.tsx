@@ -374,7 +374,7 @@ export default function App() {
         {/* Sign-in card */}
         <div style={{ position: 'relative', zIndex: 1, width: 'min(380px, 92vw)', boxSizing: 'border-box', background: '#fff', borderRadius: 20, padding: 'clamp(28px, 6vw, 40px)', boxShadow: '0 24px 60px rgba(80, 60, 180, 0.14)', animation: 'mmCardIn 0.6s cubic-bezier(0.16, 1, 0.3, 1)' }}>
           <div style={{ textAlign: 'center', marginBottom: 28 }}>
-            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16, animation: 'mmFloat 3.6s ease-in-out infinite' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
               <MindmapsLogo size={68} />
             </div>
             <div style={{ fontSize: 'clamp(24px, 5vw, 30px)', fontWeight: 700, color: '#1e293b' }}>Mindmaps</div>
