@@ -60,10 +60,10 @@ function BracketConnector({ parent, children, goRight = true, showOrderNumbers =
             <path d={d} stroke={child.color} strokeWidth={2} fill="none" strokeLinecap="round" />
             {showOrderNumbers && parent.depth === 0 && (
               <>
-                <circle cx={numX} cy={cy} r={13} fill={child.color} />
-                <text x={numX} y={cy + 5}
-                  textAnchor="middle" fontSize={13} fontWeight="700"
-                  fontFamily="Inter, system-ui, sans-serif" fill="#fff"
+                <circle cx={numX} cy={cy} r={10} fill="#ffffff" stroke={child.color} strokeWidth={2} />
+                <text x={numX} y={cy + 4}
+                  textAnchor="middle" fontSize={11} fontWeight="700"
+                  fontFamily="Inter, system-ui, sans-serif" fill={child.color}
                   style={{ pointerEvents: 'none' }}>
                   {(child.sortOrder ?? 0) + 1}
                 </text>
@@ -118,10 +118,10 @@ export function EdgeLayer({ nodes, lineStyle, diagramType }: EdgeLayerProps) {
                 stroke={l1.color} strokeWidth={4} strokeLinecap="round" />
               {showOrderNumbers && (
                 <>
-                  <circle cx={midX} cy={stubY} r={13} fill={l1.color} />
-                  <text x={midX} y={stubY + 5}
-                    textAnchor="middle" fontSize={13} fontWeight="700"
-                    fontFamily="Inter, system-ui, sans-serif" fill="#fff"
+                  <circle cx={midX} cy={stubY} r={10} fill="#ffffff" stroke={l1.color} strokeWidth={2} />
+                  <text x={midX} y={stubY + 4}
+                    textAnchor="middle" fontSize={11} fontWeight="700"
+                    fontFamily="Inter, system-ui, sans-serif" fill={l1.color}
                     style={{ pointerEvents: 'none' }}>
                     {(l1.sortOrder ?? 0) + 1}
                   </text>
@@ -209,10 +209,10 @@ export function EdgeLayer({ nodes, lineStyle, diagramType }: EdgeLayerProps) {
               />
               {isL1 && showOrderNumbers && (
                 <g style={{ pointerEvents: 'none' }}>
-                  <circle cx={ox} cy={oy} r={11} fill={n.color} />
+                  <circle cx={ox} cy={oy} r={9} fill="#ffffff" stroke={n.color} strokeWidth={2} />
                   <text x={ox} y={oy} textAnchor="middle" dominantBaseline="central"
-                    fontSize={11} fontWeight="700"
-                    fontFamily="Inter, system-ui, sans-serif" fill="#fff"
+                    fontSize={10} fontWeight="700"
+                    fontFamily="Inter, system-ui, sans-serif" fill={n.color}
                   >{(n.sortOrder ?? 0) + 1}</text>
                 </g>
               )}

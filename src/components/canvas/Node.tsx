@@ -38,6 +38,30 @@ function darkenColor(hex: string, amount = 0.35): string {
   return `rgb(${nr},${ng},${nb})`
 }
 
+// Boost saturation so the palette reads brighter / more vivid (keeps hue + ~lightness).
+function vivify(hex: string, sat = 1.35, light = 1.04): string {
+  const clean = hex.replace('#', '')
+  if (clean.length !== 6) return hex
+  const r = parseInt(clean.slice(0, 2), 16) / 255
+  const g = parseInt(clean.slice(2, 4), 16) / 255
+  const b = parseInt(clean.slice(4, 6), 16) / 255
+  const max = Math.max(r, g, b), min = Math.min(r, g, b), l = (max + min) / 2
+  let h = 0, s = 0
+  const d = max - min
+  if (d) {
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min)
+    h = max === r ? (g - b) / d + (g < b ? 6 : 0) : max === g ? (b - r) / d + 2 : (r - g) / d + 4
+    h /= 6
+  }
+  s = Math.min(1, s * sat)
+  const l2 = Math.min(0.94, l * light)
+  const q = l2 < 0.5 ? l2 * (1 + s) : l2 + s - l2 * s
+  const p = 2 * l2 - q
+  const hue = (t: number) => { if (t < 0) t += 1; if (t > 1) t -= 1; if (t < 1/6) return p + (q - p) * 6 * t; if (t < 1/2) return q; if (t < 2/3) return p + (q - p) * (2/3 - t) * 6; return p }
+  const toHex = (x: number) => Math.round(x * 255).toString(16).padStart(2, '0')
+  return s === 0 ? hex : `#${toHex(hue(h + 1/3))}${toHex(hue(h))}${toHex(hue(h - 1/3))}`
+}
+
 /** Open a node's hyperlink in a new tab, adding https:// if no protocol given */
 function openNodeUrl(url: string) {
   const href = /^https?:\/\//i.test(url) ? url : `https://${url}`
@@ -59,6 +83,8 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   const isL1 = node.depth === 1
   const gradId = `nodegrad-${node.id}`
   const useL1Grad = isL1 && node.color.startsWith('#')
+  // Brighter/more-vivid version of the node colour, used for all coloured fills.
+  const col = node.color.startsWith('#') ? vivify(node.color) : node.color
   const rx = isRoot ? 4 : 3
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
@@ -95,21 +121,21 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
     strokeW = 5
   } else if (isL2Plus) {
     const lightenAmt = node.depth === 2 ? 0.58 : node.depth === 3 ? 0.68 : 0.76
-    bg = node.color.startsWith('#') ? lighten(node.color, lightenAmt) : '#f8fafc'
-    textColor = node.color.startsWith('#') ? darkenColor(node.color, 0.55) : node.color
-    strokeColor = node.color
+    bg = col.startsWith('#') ? lighten(col, lightenAmt) : '#f8fafc'
+    textColor = col.startsWith('#') ? darkenColor(col, 0.55) : col
+    strokeColor = col
     strokeW = 2
   } else if (isMindmapCircle) {
     // L1 mindmap: solid color fill with darker border, same as logic chart
-    bg = node.color
-    textColor = isLight(node.color) ? '#1a1d2e' : '#ffffff'
-    strokeColor = node.color.startsWith('#') ? darkenColor(node.color, 0.25) : node.color
+    bg = col
+    textColor = isLight(col) ? '#1a1d2e' : '#ffffff'
+    strokeColor = col.startsWith('#') ? darkenColor(col, 0.25) : col
     strokeW = 2
   } else {
     // L1 all other diagrams: solid color fill, darker border so white badge is framed
-    bg = node.color
-    textColor = isLight(node.color) ? '#1a1d2e' : '#ffffff'
-    strokeColor = node.color.startsWith('#') ? darkenColor(node.color, 0.25) : node.color
+    bg = col
+    textColor = isLight(col) ? '#1a1d2e' : '#ffffff'
+    strokeColor = col.startsWith('#') ? darkenColor(col, 0.25) : col
     strokeW = 2
   }
 
@@ -118,7 +144,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   if (node.borderColor) { strokeColor = node.borderColor; strokeW = Math.max(strokeW, node.borderWidth ?? 1.5) }
 
   // Depth-based font sizes
-  const defaultFontSize = node.depth === 0 ? 28 : node.depth === 1 ? 22 : node.depth === 2 ? 16 : node.depth === 3 ? 13 : 11
+  const defaultFontSize = node.depth === 0 ? 34 : node.depth === 1 ? 26 : node.depth === 2 ? 19 : node.depth === 3 ? 16 : 13
   const baseFontSize = node.fontSize ?? defaultFontSize
   // Root pill grows to fit the title up to a max width; past that the font shrinks
   // so long titles never overflow. Shared with the layout (src/lib/rootPill) so
@@ -302,9 +328,9 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
         </clipPath>
         {useL1Grad && (
           <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor={lighten(node.color, 0.22)} />
-            <stop offset="55%" stopColor={node.color} />
-            <stop offset="100%" stopColor={darkenColor(node.color, 0.22)} />
+            <stop offset="0%" stopColor={lighten(col, 0.20)} />
+            <stop offset="55%" stopColor={col} />
+            <stop offset="100%" stopColor={darkenColor(col, 0.20)} />
           </linearGradient>
         )}
       </defs>
