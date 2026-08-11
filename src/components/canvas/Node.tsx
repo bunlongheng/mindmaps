@@ -56,6 +56,9 @@ function isLight(hex: string): boolean {
 export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onDragMove, onRootDragOffset, svgRef, readOnly, l1Colors = [], childCount = 0, descendantCount = 0 }: NodeProps) {
   const isRoot = node.depth === 0
   const isL2Plus = node.depth >= 2
+  const isL1 = node.depth === 1
+  const gradId = `nodegrad-${node.id}`
+  const useL1Grad = isL1 && node.color.startsWith('#')
   const rx = isRoot ? 4 : 3
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
@@ -125,6 +128,8 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
 
   // Depth-based bg opacity only (text stays fully opaque)
   const bgOpacity = 1
+  // L1 nodes get a diagonal gradient fill (lighter top-left -> base -> darker bottom-right).
+  const nodeFill = useL1Grad ? `url(#${gradId})` : bg
   const fontStyle = node.italic ? 'italic' : 'normal'
   // Text alignment — default left for non-root nodes
   const align = isRoot ? 'center' : node.depth === 1 ? (node.textAlign ?? 'left') : 'left'
@@ -295,6 +300,13 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
         <clipPath id={clipId}>
           <rect x={0} y={0} width={displayW} height={node.height} rx={effectiveRx} ry={effectiveRx} />
         </clipPath>
+        {useL1Grad && (
+          <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor={lighten(node.color, 0.22)} />
+            <stop offset="55%" stopColor={node.color} />
+            <stop offset="100%" stopColor={darkenColor(node.color, 0.22)} />
+          </linearGradient>
+        )}
       </defs>
     )}
     <g
@@ -385,7 +397,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
           filter="drop-shadow(0 1px 4px rgba(0,0,0,0.1))">
           <rect x={0} y={0} width={displayW} height={node.height}
             rx={effectiveRx} ry={effectiveRx}
-            fill={bg} fillOpacity={bgOpacity} />
+            fill={nodeFill} fillOpacity={bgOpacity} />
           <rect x={0} y={0} width={displayW} height={node.height}
             rx={effectiveRx} ry={effectiveRx}
             fill="none" stroke={strokeColor} strokeWidth={strokeW * 2} />
@@ -405,7 +417,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
         <polygon points={pts} fill="transparent" />
         <g style={{ pointerEvents: 'none' }}
           filter="drop-shadow(0 1px 4px rgba(0,0,0,0.1))">
-          <polygon points={pts} fill={bg} fillOpacity={bgOpacity} />
+          <polygon points={pts} fill={nodeFill} fillOpacity={bgOpacity} />
           {(hasEmoji || hasIcon) && (() => {
             // White badge area as a clipped rect inside the parallelogram
             const badgeW = node.height + 1
@@ -425,7 +437,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
            so no corner colour-bleed regardless of what's inside (white badge, coloured bg, etc.) */}
         <g clipPath={`url(#${clipId})`} style={{ pointerEvents: 'none' }}
           filter={previewW !== null ? 'drop-shadow(0 0 8px rgba(59,130,246,0.7))' : 'drop-shadow(0 1px 4px rgba(0,0,0,0.1))'}>
-          <rect x={0} y={0} width={displayW} height={node.height} fill={bg} fillOpacity={bgOpacity} />
+          <rect x={0} y={0} width={displayW} height={node.height} fill={nodeFill} fillOpacity={bgOpacity} />
           {/* White badge behind border — border ring sits on top */}
           {(hasEmoji || hasIcon) && !isMindmapL2Plus && (
             <rect x={0} y={0} width={node.height + 1} height={node.height} fill="#ffffff" />
