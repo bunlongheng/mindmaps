@@ -4,7 +4,7 @@ import { useMindmapStore } from '../../store/mindmapStore'
 import { NodeIcon, getLucideIcon } from './NodeIcon'
 import { wrapText } from '../../lib/layout/mindmap'
 import { rootPillWidth, rootPillFontSize, rootTitleNeedsPill, rootCircleDiameter } from '../../lib/rootPill'
-import { hexToRgb } from '../../lib/color'
+import { hexToRgb, l1PaletteColor } from '../../lib/color'
 
 interface NodeProps {
   node: MindmapNode
@@ -81,7 +81,10 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   const isRoot = node.depth === 0
   const isL2Plus = node.depth >= 2
   // Brighter/more-vivid version of the node colour, used for all coloured fills.
-  const col = node.color.startsWith('#') ? vivify(node.color) : node.color
+  // L1 and descendants take their colour from the 12-colour wheel by L1 order;
+  // fall back to the node's own (vivified) colour if there's no L1 ancestor.
+  const paletteBase = isRoot ? null : l1PaletteColor(node, useMindmapStore.getState().activeMindmap?.nodes ?? [])
+  const col = paletteBase ?? (node.color.startsWith('#') ? vivify(node.color) : node.color)
   const rx = isRoot ? 4 : 3
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')

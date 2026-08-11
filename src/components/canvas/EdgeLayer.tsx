@@ -3,6 +3,7 @@ import type { LineStyle, DiagramType } from '../../types'
 import { Edge } from './Edge'
 import { FISHBONE_SLANT } from '../../lib/layout/fishbone'
 import { useMindmapStore } from '../../store/mindmapStore'
+import { l1PaletteColor } from '../../lib/color'
 
 
 interface EdgeLayerProps {
@@ -79,6 +80,8 @@ function BracketConnector({ parent, children, goRight = true, showOrderNumbers =
 export function EdgeLayer({ nodes, lineStyle, diagramType }: EdgeLayerProps) {
   const showOrderNumbers = useMindmapStore(s => s.showOrderNumbers)
   const nodeMap = new Map(nodes.map(n => [n.id, n]))
+  // Connector/badge colour from the 12-colour wheel, matching the node fills.
+  const pc = (n: MindmapNode) => l1PaletteColor(n, nodes) ?? n.color
 
   // ── Logic Chart ───────────────────────────────────────────────────────────
   if (diagramType === 'logic-chart') {
@@ -106,7 +109,7 @@ export function EdgeLayer({ nodes, lineStyle, diagramType }: EdgeLayerProps) {
             <line key={`vbar-${l1.id}`}
               x1={barX} y1={l1.y + l1.height / 2}
               x2={barX} y2={nextL1.y + nextL1.height / 2}
-              stroke={l1.color} strokeWidth={4} strokeLinecap="square" />
+              stroke={pc(l1)} strokeWidth={4} strokeLinecap="square" />
           )
         })}
         {l1Nodes.map(l1 => {
@@ -115,13 +118,13 @@ export function EdgeLayer({ nodes, lineStyle, diagramType }: EdgeLayerProps) {
           return (
             <g key={l1.id}>
               <line x1={barX} y1={stubY} x2={l1.x} y2={stubY}
-                stroke={l1.color} strokeWidth={4} strokeLinecap="round" />
+                stroke={pc(l1)} strokeWidth={4} strokeLinecap="round" />
               {showOrderNumbers && (
                 <>
-                  <circle cx={midX} cy={stubY} r={10} fill="#ffffff" stroke={l1.color} strokeWidth={2} />
+                  <circle cx={midX} cy={stubY} r={10} fill="#ffffff" stroke={pc(l1)} strokeWidth={2} />
                   <text x={midX} y={stubY + 4}
                     textAnchor="middle" fontSize={11} fontWeight="700"
-                    fontFamily="Inter, system-ui, sans-serif" fill={l1.color}
+                    fontFamily="Inter, system-ui, sans-serif" fill={pc(l1)}
                     style={{ pointerEvents: 'none' }}>
                     {(l1.sortOrder ?? 0) + 1}
                   </text>
@@ -204,15 +207,15 @@ export function EdgeLayer({ nodes, lineStyle, diagramType }: EdgeLayerProps) {
             <g key={n.id}>
               <path
                 d={edgePath}
-                stroke={n.color} strokeWidth={isL1 ? 3 : isL2 ? 2.5 : 2}
+                stroke={pc(n)} strokeWidth={isL1 ? 3 : isL2 ? 2.5 : 2}
                 fill="none" strokeLinecap="round"
               />
               {isL1 && showOrderNumbers && (
                 <g style={{ pointerEvents: 'none' }}>
-                  <circle cx={ox} cy={oy} r={9} fill="#ffffff" stroke={n.color} strokeWidth={2} />
+                  <circle cx={ox} cy={oy} r={9} fill="#ffffff" stroke={pc(n)} strokeWidth={2} />
                   <text x={ox} y={oy} textAnchor="middle" dominantBaseline="central"
                     fontSize={10} fontWeight="700"
-                    fontFamily="Inter, system-ui, sans-serif" fill={n.color}
+                    fontFamily="Inter, system-ui, sans-serif" fill={pc(n)}
                   >{(n.sortOrder ?? 0) + 1}</text>
                 </g>
               )}
@@ -252,7 +255,7 @@ export function EdgeLayer({ nodes, lineStyle, diagramType }: EdgeLayerProps) {
             <line key={l1.id}
               x1={attachX} y1={spineY}
               x2={l1CX} y2={l1EdgeY}
-              stroke={l1.color} strokeWidth={2.5} strokeLinecap="round" />
+              stroke={pc(l1)} strokeWidth={2.5} strokeLinecap="round" />
           )
         })}
 
@@ -278,7 +281,7 @@ export function EdgeLayer({ nodes, lineStyle, diagramType }: EdgeLayerProps) {
             <line key={l2.id}
               x1={diagX} y1={l2CY}
               x2={nodeEdgeX} y2={l2CY}
-              stroke={l2.color} strokeWidth={1.5} strokeLinecap="round" />
+              stroke={pc(l2)} strokeWidth={1.5} strokeLinecap="round" />
           )
         })}
 
@@ -290,7 +293,7 @@ export function EdgeLayer({ nodes, lineStyle, diagramType }: EdgeLayerProps) {
             <line key={n.id}
               x1={parent.x + parent.width} y1={parent.y + parent.height / 2}
               x2={n.x} y2={n.y + n.height / 2}
-              stroke={n.color} strokeWidth={1.5} strokeLinecap="round" />
+              stroke={pc(n)} strokeWidth={1.5} strokeLinecap="round" />
           )
         })}
       </g>
@@ -341,7 +344,7 @@ export function EdgeLayer({ nodes, lineStyle, diagramType }: EdgeLayerProps) {
               {/* Vertical branch from L1 edge through all descendants */}
               {descendants.length > 0 && (
                 <line x1={branchX} y1={l1SpineEdge} x2={branchX} y2={farY}
-                  stroke={l1.color} strokeWidth={1.8} strokeLinecap="round" />
+                  stroke={pc(l1)} strokeWidth={1.8} strokeLinecap="round" />
               )}
               {/* Orthogonal horizontal connector from branch line to each node's left-center */}
               {descendants.map(n => {
@@ -349,7 +352,7 @@ export function EdgeLayer({ nodes, lineStyle, diagramType }: EdgeLayerProps) {
                 return (
                   <line key={`h-${n.id}`}
                     x1={branchX} y1={nodeCY} x2={n.x} y2={nodeCY}
-                    stroke={l1.color} strokeWidth={1.5} strokeLinecap="round" />
+                    stroke={pc(l1)} strokeWidth={1.5} strokeLinecap="round" />
                 )
               })}
             </g>
