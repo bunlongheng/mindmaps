@@ -8,7 +8,7 @@ import { useDiagram } from './hooks/useDiagram'
 import { useIsMobile } from './hooks/useIsMobile'
 import { useMindmapStore } from './store/mindmapStore'
 import { decodeShareURL } from './lib/export/share'
-import { supabase } from './lib/supabase'
+import { hasGoogleAuth, renderGoogleButton } from './lib/googleAuth'
 import { ArrowLeft, SlidersHorizontal, Tag, X, FileDown, Trash2, Network, Share2, Sparkles, GitBranch, Lightbulb, Workflow, ListTree, Waypoints, Image as ImageIcon } from 'lucide-react'
 import { Confetti } from './components/Confetti'
 import { MindmapsLogo } from './components/MindmapsLogo'
@@ -72,55 +72,46 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(false)
   const [loginError, setLoginError] = useState('')
 
-  // Kick off Google OAuth via Supabase; the redirect back is completed by the effect below.
-  async function handleGoogleSignIn() {
-    if (!supabase) { setLoginError('Sign-in is not configured'); return }
+  const googleBtnRef = useRef<HTMLDivElement>(null)
+  const googleRendered = useRef(false)
+
+  // Exchange the Google ID token (from the GIS button) for a Mindmaps session token.
+  async function exchangeGoogleToken(idToken: string) {
     setAuthLoading(true)
     setLoginError('')
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: { redirectTo: window.location.origin },
-    })
-    if (error) { setLoginError(error.message); setAuthLoading(false) }
+    try {
+      const res = await fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken }),
+      })
+      const data = await res.json()
+      if (data.ok) {
+        // Clear stale diagram cache so API is always the source of truth
+        Object.keys(localStorage).filter(k => k.startsWith('mindmaps:diagram:') || k === 'mindmaps:list').forEach(k => localStorage.removeItem(k))
+        localStorage.setItem('mindmaps:user', JSON.stringify(data.user))
+        localStorage.setItem('mindmaps:token', data.token)
+        setUser(data.user)
+        showToast("Welcome back, boss.", { color: '#1a1d2e', confetti: true })
+      } else {
+        setLoginError(data.error || 'Not authorized')
+      }
+    } catch { setLoginError('Network error') }
+    finally { setAuthLoading(false) }
   }
 
-  // After Google redirects back, exchange the Supabase session for a Mindmaps token.
+  // Render the Google sign-in button once the login screen is on screen.
   useEffect(() => {
-    if (!supabase || user) return
-    let cancelled = false
-    ;(async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session || cancelled) return
-      setAuthLoading(true)
-      try {
-        const res = await fetch('/api/auth', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ supabaseToken: session.access_token }),
-        })
-        const data = await res.json()
-        if (data.ok) {
-          // Clear stale diagram cache so API is always the source of truth
-          Object.keys(localStorage).filter(k => k.startsWith('mindmaps:diagram:') || k === 'mindmaps:list').forEach(k => localStorage.removeItem(k))
-          localStorage.setItem('mindmaps:user', JSON.stringify(data.user))
-          localStorage.setItem('mindmaps:token', data.token)
-          if (!cancelled) { setUser(data.user); showToast("Welcome back, boss.", { color: '#1a1d2e', confetti: true }) }
-        } else {
-          if (!cancelled) setLoginError(data.error || 'Not authorized')
-          await supabase.auth.signOut()
-        }
-      } catch { if (!cancelled) setLoginError('Network error') }
-      finally { if (!cancelled) setAuthLoading(false) }
-    })()
-    return () => { cancelled = true }
+    if (user || googleRendered.current || !googleBtnRef.current || !hasGoogleAuth) return
+    googleRendered.current = true
+    renderGoogleButton(googleBtnRef.current, exchangeGoogleToken).catch(() => setLoginError('Could not load Google sign-in'))
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [user])
 
   function handleSignOut() {
     localStorage.removeItem('mindmaps:user')
     localStorage.removeItem('mindmaps:token')
     setUser(null)
-    supabase?.auth.signOut()
     showToast('See ya!', { color: '#64748b' })
   }
 
@@ -138,7 +129,7 @@ export default function App() {
   }, [])
 
 
-  // Local dev: fall back to the hardcoded dev user ID so Supabase queries work without auth.
+  // Local dev: fall back to the hardcoded dev user ID so DB queries work without auth.
   // Triple-locked: only when (1) isLocal, (2) no real session, (3) env var is set.
   const effectiveUserId = user?.userId ?? null
   const { loadDiagramList, loadDiagram, saveDiagram, createDiagramFromNodes, deleteDiagram, updateTags } = useDiagram(effectiveUserId)
@@ -380,18 +371,9 @@ export default function App() {
             <div style={{ fontSize: 'clamp(24px, 5vw, 30px)', fontWeight: 700, color: '#1e293b' }}>Mindmaps</div>
             <div style={{ fontSize: 13.5, color: '#94a3b8', marginTop: 6 }}>Sign in to continue</div>
           </div>
-          <button type="button" onClick={handleGoogleSignIn} disabled={authLoading}
-            style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '12px 0', borderRadius: 12, border: '1.5px solid #e2e8f0', background: '#fff', color: '#1f2937', fontSize: 14.5, fontWeight: 600, cursor: authLoading ? 'wait' : 'pointer', fontFamily: 'inherit', transition: 'border-color 0.15s, box-shadow 0.15s, transform 0.05s' }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = '#c7d2fe'; e.currentTarget.style.boxShadow = '0 4px 14px rgba(99,102,241,0.15)' }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.boxShadow = 'none' }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
-              <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-              <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
-              <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-            </svg>
-            {authLoading ? 'Signing in...' : 'Continue with Google'}
-          </button>
+          {hasGoogleAuth
+            ? <div ref={googleBtnRef} style={{ display: 'flex', justifyContent: 'center', minHeight: 44 }} />
+            : <div style={{ fontSize: 13, color: '#94a3b8', textAlign: 'center' }}>Sign-in is not configured</div>}
           {loginError && <div style={{ color: '#ef4444', fontSize: 12, marginTop: 12, textAlign: 'center' }}>{loginError}</div>}
         </div>
         <style>{`

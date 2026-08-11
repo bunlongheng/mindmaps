@@ -110,8 +110,8 @@ Client variables go in `.env` (Vite reads `VITE_`-prefixed vars); server variabl
 
 | Env var | Scope | Purpose |
 |---------|-------|---------|
-| `VITE_SUPABASE_URL` | client | Legacy/unused - client-side Supabase was removed; nothing currently reads this |
-| `VITE_SUPABASE_ANON_KEY` | client | Legacy/unused - public by design, but no live caller (see `SUPABASE_SERVICE_ROLE_KEY` below) |
+| `VITE_GOOGLE_CLIENT_ID` | client | Google OAuth client ID; renders the "Continue with Google" button (Google Identity Services) |
+| `GOOGLE_CLIENT_ID` | server | Audience the Google ID token must match when `/api/auth` verifies a sign-in |
 | `DATABASE_URL` | server | PostgreSQL connection string for map storage |
 | `DATABASE_CA_CERT` | server | PEM CA cert to verify the DB's TLS (blank = skip verify, dev only) |
 | `ANTHROPIC_API_KEY` | server | Claude API key for AI generation |
@@ -122,7 +122,6 @@ Client variables go in `.env` (Vite reads `VITE_`-prefixed vars); server variabl
 | `MINDMAP_AUTH_PASSWORD_HASH` | server | `salt:iterations:hash` from `node scripts/hash-password.mjs '<password>'` (never the plaintext) |
 | `MINDMAP_USER_ID` | server | Owner id embedded in the session token |
 | `MINDMAP_TOKEN_MIN_IAT` | server | Optional; set to a unix timestamp to instantly revoke all outstanding sessions issued before it |
-| `SUPABASE_SERVICE_ROLE_KEY` | server | Legacy/unused - only read by `/api/notify`, which has no caller anywhere in this app |
 | `MINDMAP_SMOKE_SAMPLE` | scripts | Optional; how many maps `scripts/smoke-prod.mjs` samples per run (default 8) |
 
 ### Auth model
@@ -131,7 +130,7 @@ Client variables go in `.env` (Vite reads `VITE_`-prefixed vars); server variabl
 
 ### Database migrations
 
-`supabase/migrations/*.sql` is tracked in a `schema_migrations` ledger via `scripts/migrate.mjs` (`npm run migrate -- <status|backfill|up>`), reading `DATABASE_URL`/`DATABASE_CA_CERT` from the environment. On an existing database where these files were already applied by hand, run `backfill` once to seed the ledger without re-executing any SQL (re-running the oldest migration for real would `DROP TABLE ... CASCADE`); after that, `up` applies only new files.
+`db/migrations/*.sql` is tracked in a `schema_migrations` ledger via `scripts/migrate.mjs` (`npm run migrate -- <status|backfill|up>`), reading `DATABASE_URL`/`DATABASE_CA_CERT` from the environment. On an existing database where these files were already applied by hand, run `backfill` once to seed the ledger without re-executing any SQL (re-running the oldest migration for real would `DROP TABLE ... CASCADE`); after that, `up` applies only new files.
 
 ## Project layout
 
@@ -154,7 +153,7 @@ mindmaps/
 │   │   ├── home/           # gallery, tags, thumbnails
 │   │   └── panels/         # style + share side panel
 │   └── hooks/              # persistence facade, keyboard shortcuts
-├── supabase/migrations/    # SQL migrations
+├── db/migrations/          # SQL migrations
 ├── e2e/                    # Playwright specs
 └── scripts/                # icon generation, prod smoke test
 ```

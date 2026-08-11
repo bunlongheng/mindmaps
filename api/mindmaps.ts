@@ -12,7 +12,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const { id, user_id } = req.query as Record<string, string>
     void user_id
-    const auth = await verifyToken(bearer(req.headers), SECRET())
+    // Owner session token, OR the static service key (used by the prod smoke test /
+    // AI agents) which authenticates headlessly as the owner.
+    const raw = bearer(req.headers)
+    const aiKey = (process.env.MINDMAP_AI_API_KEY ?? '').trim()
+    const ownerId = (process.env.MINDMAP_USER_ID ?? '').trim()
+    const auth = (aiKey && ownerId && raw === aiKey)
+      ? { sub: ownerId, email: '', role: 'service' }
+      : await verifyToken(raw, SECRET())
 
     // Public reads: a single shared map by id needs no token; everything else requires the owner.
     if (req.method === 'GET') {

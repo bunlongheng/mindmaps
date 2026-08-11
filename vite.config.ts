@@ -60,11 +60,6 @@ export default defineConfig({
             handler: 'NetworkFirst',
             options: { cacheName: 'html-cache', networkTimeoutSeconds: 5 },
           },
-          {
-            urlPattern: /^https:\/\/.*\.supabase\.co\/.*/i,
-            handler: 'NetworkFirst',
-            options: { cacheName: 'supabase-cache', expiration: { maxEntries: 50, maxAgeSeconds: 86400 } },
-          },
         ],
       },
     }),

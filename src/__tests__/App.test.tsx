@@ -52,20 +52,19 @@ vi.mock('../lib/export/share', () => ({
 }))
 vi.mock('../lib/export/exportPdf', () => ({ exportDiagramAsPdf: vi.fn() }))
 
-// Controllable Supabase auth mock (Google sign-in). getSession drives the
-// post-redirect exchange; signInWithOAuth is what the button triggers.
-const supa = vi.hoisted(() => ({
-  signInWithOAuth: vi.fn(async () => ({ error: null as { message: string } | null })),
-  getSession: vi.fn(async () => ({ data: { session: null as null | { access_token: string } } })),
-  signOut: vi.fn(async () => ({ error: null })),
+// Controllable Google Identity Services mock. renderGoogleButton captures the
+// onCredential callback so a test can simulate a Google sign-in.
+const google = vi.hoisted(() => ({
+  lastCredentialCb: null as null | ((idToken: string) => void),
+  renderGoogleButton: vi.fn(),
 }))
-vi.mock('../lib/supabase', () => ({
-  hasSupabase: true,
-  supabase: { auth: {
-    signInWithOAuth: supa.signInWithOAuth,
-    getSession: supa.getSession,
-    signOut: supa.signOut,
-  } },
+vi.mock('../lib/googleAuth', () => ({
+  hasGoogleAuth: true,
+  renderGoogleButton: (el: HTMLElement, cb: (idToken: string) => void) => {
+    google.lastCredentialCb = cb
+    google.renderGoogleButton(el, cb)
+    return Promise.resolve()
+  },
 }))
 
 import App from '../App'
@@ -137,22 +136,16 @@ afterEach(() => {
 describe('App — login screen (non-local, no user)', () => {
   beforeEach(() => {
     setHostname('app.example.com')
-    supa.getSession.mockResolvedValue({ data: { session: null } })
+    google.lastCredentialCb = null
   })
 
-  it('shows the Google sign-in button when not authenticated', () => {
+  it('renders the Google sign-in button when not authenticated', async () => {
     render(<App />)
-    expect(screen.getByText('Continue with Google')).toBeInTheDocument()
+    expect(screen.getByText('Sign in to continue')).toBeInTheDocument()
+    await waitFor(() => expect(google.renderGoogleButton).toHaveBeenCalled())
   })
 
-  it('starts Google OAuth when the button is clicked', async () => {
-    render(<App />)
-    await act(async () => { fireEvent.click(screen.getByText('Continue with Google')) })
-    expect(supa.signInWithOAuth).toHaveBeenCalled()
-  })
-
-  it('completes the post-redirect exchange and renders home', async () => {
-    supa.getSession.mockResolvedValue({ data: { session: { access_token: 'sbtok' } } })
+  it('exchanges a Google credential and renders home', async () => {
     vi.stubGlobal('fetch', vi.fn(async (url: string) => {
       if (typeof url === 'string' && url.includes('/api/auth')) {
         return { ok: true, json: async () => ({ ok: true, user: { email: 'x@y.com', name: 'X', userId: 'uX' }, token: 'tok' }) }
@@ -160,29 +153,33 @@ describe('App — login screen (non-local, no user)', () => {
       return { ok: true, json: async () => [] }
     }))
     render(<App />)
+    await waitFor(() => expect(google.lastCredentialCb).toBeTruthy())
+    await act(async () => { google.lastCredentialCb!('id-token') })
     await waitFor(() => expect(screen.getByTestId('home')).toBeInTheDocument())
     expect(localStorage.getItem('mindmaps:token')).toBe('tok')
   })
 
-  it('shows an error and signs out when the exchange is rejected', async () => {
-    supa.getSession.mockResolvedValue({ data: { session: { access_token: 'sbtok' } } })
+  it('shows an error when the exchange is rejected', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ ok: false, error: 'Not authorized' }) })))
     render(<App />)
+    await waitFor(() => expect(google.lastCredentialCb).toBeTruthy())
+    await act(async () => { google.lastCredentialCb!('id-token') })
     await waitFor(() => expect(screen.getByText('Not authorized')).toBeInTheDocument())
-    expect(supa.signOut).toHaveBeenCalled()
   })
 
   it('shows the default error message when none provided', async () => {
-    supa.getSession.mockResolvedValue({ data: { session: { access_token: 'sbtok' } } })
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ ok: false }) })))
     render(<App />)
+    await waitFor(() => expect(google.lastCredentialCb).toBeTruthy())
+    await act(async () => { google.lastCredentialCb!('id-token') })
     await waitFor(() => expect(screen.getByText('Not authorized')).toBeInTheDocument())
   })
 
   it('shows a network error when the exchange fetch throws', async () => {
-    supa.getSession.mockResolvedValue({ data: { session: { access_token: 'sbtok' } } })
     vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('down') }))
     render(<App />)
+    await waitFor(() => expect(google.lastCredentialCb).toBeTruthy())
+    await act(async () => { google.lastCredentialCb!('id-token') })
     await waitFor(() => expect(screen.getByText('Network error')).toBeInTheDocument())
   })
 })
@@ -206,7 +203,7 @@ describe('App — local auto-login & home view', () => {
     localStorage.setItem('mindmaps:user', 'not-json{')
     render(<App />)
     // falls back to login screen
-    expect(screen.getByText('Continue with Google')).toBeInTheDocument()
+    expect(screen.getByText('Sign in to continue')).toBeInTheDocument()
   })
 
   it('signs out from home', () => {
@@ -619,13 +616,15 @@ describe('App — extra coverage', () => {
   // to clear stale cache. The setup's mock localStorage is a plain object, so
   // Object.keys returns its method names, not stored keys — the removal is a
   // no-op here. We exercise the code path and assert sign-in succeeds + token stored.
-  it('the post-redirect exchange runs the stale-cache cleanup and stores the token', async () => {
+  it('the Google credential exchange runs the stale-cache cleanup and stores the token', async () => {
     setHostname('app.example.com')
-    supa.getSession.mockResolvedValue({ data: { session: { access_token: 'sbtok' } } })
+    google.lastCredentialCb = null
     localStorage.setItem('mindmaps:diagram:old', '{}')
     localStorage.setItem('mindmaps:list', '[]')
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ ok: true, user: { email: 'x@y.com', name: 'X', userId: 'uX' }, token: 't' }) })))
     render(<App />)
+    await waitFor(() => expect(google.lastCredentialCb).toBeTruthy())
+    await act(async () => { google.lastCredentialCb!('id-token') })
     await waitFor(() => expect(screen.getByTestId('home')).toBeInTheDocument())
     expect(localStorage.getItem('mindmaps:token')).toBe('t')
   })

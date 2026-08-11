@@ -6,10 +6,11 @@ export const config = { runtime: 'edge' }
 
 const RATE_LIMIT = { max: 10, windowMs: 15 * 60 * 1000 }
 
-// Exchanges a Google session (via Supabase Auth) for a Mindmaps session token.
-// The client signs in with Google through Supabase, then posts the resulting
-// Supabase access token here; we confirm it with Supabase and that it belongs
-// to the single owner email before minting our own JWT.
+// Verifies a Google Identity Services ID token (pure Google, no third-party broker) and
+// issues a Mindmaps session token for the single owner. The client signs in with
+// the Google button, gets an ID token, and posts it here; we confirm it with
+// Google (tokeninfo checks the signature + expiry), that its audience is our
+// client, and that it belongs to the owner email, then mint our own JWT.
 export default async function handler(req: Request): Promise<Response> {
   const cors = { ...corsHeaders(req.headers.get('origin'), 'POST, OPTIONS'), 'Content-Type': 'application/json' }
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors })
@@ -23,41 +24,41 @@ export default async function handler(req: Request): Promise<Response> {
     })
   }
 
-  let supabaseToken = ''
+  let idToken = ''
   try {
-    const parsed = JSON.parse(await req.text())
-    supabaseToken = parsed.supabaseToken || ''
+    idToken = JSON.parse(await req.text()).idToken || ''
   } catch {
     return new Response(JSON.stringify({ ok: false, error: 'Invalid JSON' }), { status: 400, headers: cors })
   }
-  if (!supabaseToken) return new Response(JSON.stringify({ ok: false, error: 'Missing token' }), { status: 400, headers: cors })
+  if (!idToken) return new Response(JSON.stringify({ ok: false, error: 'Missing token' }), { status: 400, headers: cors })
 
   const validEmail = (process.env.MINDMAP_AUTH_EMAIL ?? '').trim().toLowerCase()
   const secret = (process.env.MINDMAP_JWT_SECRET ?? '').trim()
   const userId = (process.env.MINDMAP_USER_ID ?? '').trim()
-  const supabaseUrl = (process.env.SUPABASE_URL ?? '').trim().replace(/\\n/g, '').replace(/\/+$/, '')
-  const supabaseAnon = (process.env.SUPABASE_ANON_KEY ?? '').trim()
-  if (!validEmail || !secret || !userId || !supabaseUrl || !supabaseAnon) {
+  const clientId = (process.env.GOOGLE_CLIENT_ID ?? '').trim()
+  if (!validEmail || !secret || !userId || !clientId) {
     return new Response(JSON.stringify({ ok: false, error: 'Auth not configured' }), { status: 500, headers: cors })
   }
 
-  // Ask Supabase who this token belongs to; a bad/expired token fails here.
-  const userRes = await fetch(`${supabaseUrl}/auth/v1/user`, {
-    headers: { Authorization: `Bearer ${supabaseToken}`, apikey: supabaseAnon },
-  })
-  if (!userRes.ok) {
+  // Google validates the token's signature and expiry; a bad/expired token fails here.
+  const info = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`)
+  if (!info.ok) {
     return new Response(JSON.stringify({ ok: false, error: 'Invalid session' }), { status: 401, headers: cors })
   }
-  const gUser = (await userRes.json()) as { email?: string }
-  const email = (gUser.email ?? '').trim().toLowerCase()
-  if (!email || email !== validEmail) {
+  const claims = (await info.json()) as { aud?: string; email?: string; email_verified?: string; iss?: string }
+
+  const audOk = claims.aud === clientId
+  const emailOk = (claims.email ?? '').trim().toLowerCase() === validEmail
+  const verifiedOk = claims.email_verified === 'true'
+  const issOk = claims.iss === 'https://accounts.google.com' || claims.iss === 'accounts.google.com'
+  if (!audOk || !emailOk || !verifiedOk || !issOk) {
     return new Response(JSON.stringify({ ok: false, error: 'Not authorized' }), { status: 403, headers: cors })
   }
 
-  const token = await signToken({ sub: userId, email, role: 'authenticated' }, secret)
+  const token = await signToken({ sub: userId, email: validEmail, role: 'authenticated' }, secret)
   return new Response(JSON.stringify({
     ok: true,
     token,
-    user: { email, name: 'Bunlong Heng', userId },
+    user: { email: validEmail, name: 'Bunlong Heng', userId },
   }), { status: 200, headers: cors })
 }

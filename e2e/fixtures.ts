@@ -32,7 +32,6 @@ export const test = base.extend<{ _consoleCheck: void; _mapCleanup: void }>({
         if (lower.includes('third-party cookie')) return
         if (lower.includes('favicon')) return
         if (lower.includes('websocket')) return
-        if (lower.includes('supabase')) return
         if (lower.includes('failed to fetch')) return
         if (lower.includes('http authentication')) return
         if (lower.includes('no valid credentials')) return

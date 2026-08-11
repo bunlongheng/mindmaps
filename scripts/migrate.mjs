@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// SQL migration runner for supabase/migrations/*.sql, tracked in a schema_migrations ledger.
+// SQL migration runner for db/migrations/*.sql, tracked in a schema_migrations ledger.
 //
 // Usage:
 //   node scripts/migrate.mjs status     Show which migrations are applied vs pending (read-only)
@@ -20,7 +20,7 @@ import { resolve, dirname, join } from 'path'
 import { fileURLToPath } from 'url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-const MIGRATIONS_DIR = resolve(__dirname, '..', 'supabase', 'migrations')
+const MIGRATIONS_DIR = resolve(__dirname, '..', 'db', 'migrations')
 
 const mode = process.argv[2]
 if (!['status', 'backfill', 'up'].includes(mode)) {
