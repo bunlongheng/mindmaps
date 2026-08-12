@@ -2,7 +2,7 @@ export const config = { runtime: "nodejs" }
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 
 import { pool } from '../_lib/db.js'
-import { verifyToken, bearer, secretEquals } from '../_lib/auth.js'
+import { authorizeOwner } from '../_lib/authorizeOwner.js'
 import { corsHeaders } from '../_lib/cors.js'
 import { checkRateLimit, clientIp } from '../_lib/rateLimit.js'
 
@@ -243,12 +243,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'OPTIONS') return res.status(204).end()
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
-  // A verified first-party session token, or the static agent key.
-  const raw = bearer(req.headers)
-  const staticKey = (process.env.MINDMAP_AI_API_KEY ?? '').trim()
-  const keyOk = await secretEquals(raw, staticKey)
-  const session = keyOk ? null : await verifyToken(raw, (process.env.MINDMAP_JWT_SECRET ?? '').trim())
-  if (!keyOk && !session) return res.status(401).json({ error: 'Unauthorized' })
+  // AI generation spends Anthropic credits -> ADMIN ONLY. The static Bearer API key is
+  // REJECTED here (allowBearer:false); only the logged-in owner session (or local dev)
+  // can trigger a model call. Public callers must never be able to spend Anthropic $.
+  if (!(await authorizeOwner(req.headers, { allowBearer: false }))) {
+    return res.status(401).json({ error: 'Unauthorized' })
+  }
 
   const rate = checkRateLimit(`generate:${clientIp(req.headers)}`, GENERATE_RATE_LIMIT)
   if (!rate.allowed) {
