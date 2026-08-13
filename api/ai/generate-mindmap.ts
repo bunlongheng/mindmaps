@@ -2,7 +2,7 @@ export const config = { runtime: "nodejs" }
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 
 import { pool } from '../_lib/db.js'
-import { authorizeOwner } from '../_lib/authorizeOwner.js'
+import { authorizeOwner, ownerId } from '../_lib/authorizeOwner.js'
 import { corsHeaders } from '../_lib/cors.js'
 import { checkRateLimit, clientIp } from '../_lib/rateLimit.js'
 
@@ -257,9 +257,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const { prompt, userId = null, type = 'logic-chart', themeId = 'default', sharing = false, mode } = req.body || {}
-  // When authed by a session token the map belongs to that user; only the trusted static
-  // agent key may attribute a map to an arbitrary owner supplied in the body.
-  const ownerId = session ? session.sub : (userId ?? null)
+  // Admin-only endpoint (allowBearer:false above), so the map always belongs to the
+  // configured owner. Fall back to a body userId only in local dev where MINDMAP_USER_ID
+  // may be unset.
+  const mapOwnerId = ownerId() || (userId ?? null)
   if (!prompt?.trim()) return res.status(400).json({ error: 'prompt is required' })
   if (prompt.length > PROMPT_MAX_LENGTH) return res.status(413).json({ error: `prompt must be under ${PROMPT_MAX_LENGTH} characters` })
 
@@ -359,7 +360,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       `INSERT INTO mindmaps (id, user_id, name, type, line_style, sharing_enabled, theme_id, nodes, tags)
        VALUES ($1,$2,$3,$4,'orthogonal',$5,$6,$7,$8)
        ON CONFLICT (id) DO UPDATE SET name=$3, nodes=$7, updated_at=now()`,
-      [id, ownerId, title, type, sharing === true, themeId, JSON.stringify(nodes), ['AI']]
+      [id, mapOwnerId, title, type, sharing === true, themeId, JSON.stringify(nodes), ['AI']]
     )
   } catch (e: unknown) {
     console.error('generate-mindmap: save failed', e)

@@ -63,7 +63,13 @@ export default function App() {
     // import.meta.env.DEV is a compile-time constant, so Vite strips this whole branch -
     // including the owner literals below - from the production bundle.
     if (import.meta.env.DEV && isLocal) {
-      const DEV_USER = { email: 'bheng.code@gmail.com', name: 'Bunlong Heng', userId: '731ace87-64e5-44db-bf2a-82265f06f4d9' }
+      // Owner identity for local dev, read from env so no personal literal ships in public source.
+      // Set VITE_DEV_USER_* in .env.local to match your owner row; the fallbacks are placeholders.
+      const DEV_USER = {
+        email: import.meta.env.VITE_DEV_USER_EMAIL ?? 'dev@example.com',
+        name: import.meta.env.VITE_DEV_USER_NAME ?? 'Dev User',
+        userId: import.meta.env.VITE_DEV_USER_ID ?? '00000000-0000-4000-8000-000000000000',
+      }
       localStorage.setItem('mindmaps:user', JSON.stringify(DEV_USER))
       return DEV_USER
     }
