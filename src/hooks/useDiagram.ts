@@ -9,7 +9,7 @@ import type { Diagram, DiagramMeta, MindmapNode } from '../types'
 const API_BASE = '/api/mindmaps'
 
 // Attach the signed session token (set at login) to every API call.
-function authHeaders(): Record<string, string> {
+export function authHeaders(): Record<string, string> {
   const h: Record<string, string> = { 'Content-Type': 'application/json' }
   let token: string | null = null
   try { token = localStorage.getItem('mindmaps:token') } catch { /* no storage */ }

@@ -68,13 +68,44 @@ sequenceDiagram
     participant A as Claude API
     participant DB as Postgres
     U->>C: enter a prompt
-    C->>F: POST { prompt } (Bearer: session JWT or agent key)
+    C->>F: POST { prompt } (Bearer: owner session JWT - admin only)
     F->>A: messages + forced tool schema
     A-->>F: structured node tree
     F->>DB: insert map
     F-->>C: { id, title, url, nodeCount }
     C->>U: open the new map with confetti
 ```
+
+## AI / Agent API
+
+There is **exactly one** published way for an external agent to create a map, and it is
+**render-only** (it never calls a model, so it spends **zero** Anthropic credits):
+
+```
+POST https://mindmaps-bheng.vercel.app/api/ai/mindmaps
+Authorization: Bearer $MINDMAP_AI_API_KEY
+Content-Type: application/json
+
+{ "title": "My Map",
+  "type": "logic-chart",
+  "outline": "{\"Root\":[{\"icon\":\"rocket\",\"Category A\":[\"item 1\",\"item 2\"]}]}" }
+```
+
+Response `201`: `{ "id": "...", "url": "https://.../?id=...", "nodeCount": N }`. Bad input
+returns a `400` with a sample request; a bad/missing key returns `401` (no row created).
+The caller supplies the finished structure (the `outline` is indented text **or** a JSON
+string, auto-detected); we render it, we do not think for them.
+
+Everything else is **internal / admin-only**:
+
+| Endpoint | Who | Notes |
+|---|---|---|
+| `POST /api/ai/mindmaps` | Bearer key **or** owner session | **The one public contract.** Render-only, no AI spend |
+| `POST /api/ai/generate-mindmap` | **owner session only** | Calls Claude. The Bearer key is **rejected** (`allowBearer:false`) so public callers can never spend Anthropic $ |
+| `GET/POST/PUT/DELETE /api/mindmaps` | signed owner session | First-party CRUD for the app |
+
+Auth is centralized in `api/_lib/authorizeOwner.ts` (local-dev bypass, gated off in prod →
+static Bearer key via constant-time compare → owner-email session JWT).
 
 ## Design decisions and trade-offs
 

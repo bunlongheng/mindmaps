@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useMindmapStore } from '../../store/mindmapStore'
-import { useDiagram } from '../../hooks/useDiagram'
+import { useDiagram, authHeaders } from '../../hooks/useDiagram'
 import { useIsMobile } from '../../hooks/useIsMobile'
 import { showToast } from '../CuteToast'
 import type { DiagramMeta, MindmapNode } from '../../types'
@@ -198,9 +198,7 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
     try {
       const res = await fetch('/api/ai/generate-mindmap', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: authHeaders(), // admin-only endpoint: must send the owner session token, not just Content-Type
         body: JSON.stringify({
           prompt: aiPrompt.trim(),
           userId: user?.userId ?? null,

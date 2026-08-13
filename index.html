@@ -44,10 +44,8 @@
     <meta name="twitter:description" content="Visual mind map and diagram tool." />
     <meta name="twitter:image" content="/icons/android-chrome-512x512.png" />
 
-    <!-- ── Fonts ─────────────────────────────────────── -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+    <!-- Fonts are self-hosted via @fontsource/inter (imported in main.tsx) so the
+         strict CSP (font-src 'self') is satisfied with no external CDN. -->
   </head>
   <body style="touch-action: manipulation;">
     <div id="root"></div>

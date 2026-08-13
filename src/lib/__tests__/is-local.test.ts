@@ -51,7 +51,7 @@ describe('isLocal', () => {
   })
 
   it('returns false for unrelated IPs', () => {
-    setHostname('45.79.212.154')
+    setHostname('203.0.113.10') // TEST-NET-3 documentation range (RFC 5737)
     expect(isLocal()).toBe(false)
   })
 })

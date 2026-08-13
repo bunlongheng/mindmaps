@@ -6,6 +6,9 @@ function esc(s: string) { return s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<'
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const id = (req.query.id ?? '') as string
   if (!id) return res.redirect(301, '/')
+  // id is interpolated into the response HTML (og:url + the meta refresh below), so constrain it
+  // to a UUID - this closes the reflected-XSS / open-redirect vector a crafted id would otherwise open.
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) return res.redirect(301, '/')
 
   let name = 'Mindmaps'
   let desc = 'Visual mind map and diagram tool'

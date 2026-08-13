@@ -3,7 +3,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 
 import { pool } from '../_lib/db.js'
 import { corsHeaders } from '../_lib/cors.js'
-import { secretEquals } from '../_lib/auth.js'
+import { authorizeOwner } from '../_lib/authorizeOwner.js'
 import { parseIndentedOutline } from '../../src/lib/outline.js'
 
 const DEFAULT_BRANCH_COLORS = [
@@ -130,9 +130,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'OPTIONS') return res.status(204).end()
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
-  const token = (req.headers.authorization ?? '').replace(/^Bearer\s+/i, '').trim()
-  const expectedToken = (process.env.MINDMAP_AI_API_KEY ?? '').trim()
-  if (!(await secretEquals(token, expectedToken))) return res.status(401).json({ error: 'Unauthorized' })
+  // Public RENDER-ONLY endpoint: static Bearer key (external agents), owner session, or
+  // local dev. It never calls a model - it renders the caller's own structure.
+  if (!(await authorizeOwner(req.headers, { allowBearer: true }))) {
+    return res.status(401).json({ error: 'Unauthorized' })
+  }
 
   // Self-documenting discovery: a call with no body returns a copy-paste-ready sample.
   const body = req.body || {}

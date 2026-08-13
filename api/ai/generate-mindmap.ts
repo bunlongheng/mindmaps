@@ -2,7 +2,7 @@ export const config = { runtime: "nodejs" }
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 
 import { pool } from '../_lib/db.js'
-import { verifyToken, bearer, secretEquals } from '../_lib/auth.js'
+import { authorizeOwner, ownerId } from '../_lib/authorizeOwner.js'
 import { corsHeaders } from '../_lib/cors.js'
 import { checkRateLimit, clientIp } from '../_lib/rateLimit.js'
 
@@ -243,12 +243,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'OPTIONS') return res.status(204).end()
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
-  // A verified first-party session token, or the static agent key.
-  const raw = bearer(req.headers)
-  const staticKey = (process.env.MINDMAP_AI_API_KEY ?? '').trim()
-  const keyOk = await secretEquals(raw, staticKey)
-  const session = keyOk ? null : await verifyToken(raw, (process.env.MINDMAP_JWT_SECRET ?? '').trim())
-  if (!keyOk && !session) return res.status(401).json({ error: 'Unauthorized' })
+  // AI generation spends Anthropic credits -> ADMIN ONLY. The static Bearer API key is
+  // REJECTED here (allowBearer:false); only the logged-in owner session (or local dev)
+  // can trigger a model call. Public callers must never be able to spend Anthropic $.
+  if (!(await authorizeOwner(req.headers, { allowBearer: false }))) {
+    return res.status(401).json({ error: 'Unauthorized' })
+  }
 
   const rate = checkRateLimit(`generate:${clientIp(req.headers)}`, GENERATE_RATE_LIMIT)
   if (!rate.allowed) {
@@ -257,9 +257,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const { prompt, userId = null, type = 'logic-chart', themeId = 'default', sharing = false, mode } = req.body || {}
-  // When authed by a session token the map belongs to that user; only the trusted static
-  // agent key may attribute a map to an arbitrary owner supplied in the body.
-  const ownerId = session ? session.sub : (userId ?? null)
+  // Admin-only endpoint (allowBearer:false above), so the map always belongs to the
+  // configured owner. Fall back to a body userId only in local dev where MINDMAP_USER_ID
+  // may be unset.
+  const mapOwnerId = ownerId() || (userId ?? null)
   if (!prompt?.trim()) return res.status(400).json({ error: 'prompt is required' })
   if (prompt.length > PROMPT_MAX_LENGTH) return res.status(413).json({ error: `prompt must be under ${PROMPT_MAX_LENGTH} characters` })
 
@@ -359,7 +360,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       `INSERT INTO mindmaps (id, user_id, name, type, line_style, sharing_enabled, theme_id, nodes, tags)
        VALUES ($1,$2,$3,$4,'orthogonal',$5,$6,$7,$8)
        ON CONFLICT (id) DO UPDATE SET name=$3, nodes=$7, updated_at=now()`,
-      [id, ownerId, title, type, sharing === true, themeId, JSON.stringify(nodes), ['AI']]
+      [id, mapOwnerId, title, type, sharing === true, themeId, JSON.stringify(nodes), ['AI']]
     )
   } catch (e: unknown) {
     console.error('generate-mindmap: save failed', e)

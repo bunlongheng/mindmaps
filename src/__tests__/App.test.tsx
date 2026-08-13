@@ -188,7 +188,10 @@ describe('App — local auto-login & home view', () => {
   it('auto-logs in the dev user on localhost and shows home', () => {
     render(<App />)
     expect(screen.getByTestId('home')).toBeInTheDocument()
-    expect(localStorage.getItem('mindmaps:user')).toContain('bheng.code')
+    // The dev identity is env-driven (VITE_DEV_USER_*), so assert its shape, not a literal email.
+    const stored = localStorage.getItem('mindmaps:user')
+    expect(stored).toBeTruthy()
+    expect(JSON.parse(stored!)).toMatchObject({ email: expect.stringContaining('@'), userId: expect.any(String) })
   })
 
   it('reads a persisted user from localStorage on non-local host', () => {

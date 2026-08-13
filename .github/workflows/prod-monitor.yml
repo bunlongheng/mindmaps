@@ -1,0 +1,31 @@
+name: prod-monitor
+
+# Proves prod is alive + auth-gated. Runs every 15 min, on every push to main, and
+# on demand. Side-effect-free: the bad-token probe is rejected (401) before any row
+# is created, so it never writes to the database.
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Health endpoint must be 200
+        run: |
+          code=$(curl -s -o /tmp/health.json -w '%{http_code}' https://mindmaps-bheng.vercel.app/api/health)
+          echo "GET /api/health -> $code"; cat /tmp/health.json; echo
+          [ "$code" = "200" ] || { echo "::error::/api/health returned $code (expected 200)"; exit 1; }
+
+      - name: Import route is alive AND auth-gated (bad token -> 401, no row created)
+        run: |
+          code=$(curl -s -o /tmp/ai.json -w '%{http_code}' -X POST \
+            https://mindmaps-bheng.vercel.app/api/ai/mindmaps \
+            -H 'Authorization: Bearer deliberately-invalid-token' \
+            -H 'Content-Type: application/json' \
+            -d '{"title":"prod-monitor probe","outline":"probe"}')
+          echo "POST /api/ai/mindmaps (bad token) -> $code"; cat /tmp/ai.json; echo
+          [ "$code" = "401" ] || { echo "::error::expected 401 from a bad token, got $code"; exit 1; }
