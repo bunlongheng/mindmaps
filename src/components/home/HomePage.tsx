@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
+import { useShallow } from 'zustand/react/shallow'
 import { useMindmapStore } from '../../store/mindmapStore'
 import { useDiagram, authHeaders } from '../../hooks/useDiagram'
 import { useIsMobile } from '../../hooks/useIsMobile'
@@ -54,7 +55,9 @@ interface HomePageProps {
 }
 
 export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
-  const { diagrams } = useMindmapStore()
+  // Shallow-selected slice so the home page only re-renders when the list changes,
+  // not on every store write (canvas drags, resizePreview, HUD flags, etc.).
+  const { diagrams } = useMindmapStore(useShallow(s => ({ diagrams: s.diagrams })))
   const { loadDiagramList, createDiagram, createDiagramFromNodes, deleteDiagram, updateTags } = useDiagram(user?.userId ?? null)
   const isMobile = useIsMobile()
 

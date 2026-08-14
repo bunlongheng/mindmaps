@@ -3,13 +3,15 @@ import type { LineStyle, DiagramType } from '../../types'
 import { Edge } from './Edge'
 import { FISHBONE_SLANT } from '../../lib/layout/fishbone'
 import { useMindmapStore } from '../../store/mindmapStore'
-import { l1PaletteColor } from '../../lib/color'
 
 
 interface EdgeLayerProps {
   nodes: MindmapNode[]
   lineStyle: LineStyle
   diagramType: DiagramType
+  // 12-colour-wheel colour per node id, precomputed once by DiagramCanvas (was an
+  // O(n) l1PaletteColor walk per edge per render).
+  paletteColors?: Map<string, string | null>
 }
 
 /** Curved bezier connecting parent center-edge to child center-edge (auto-detects direction) */
@@ -77,11 +79,11 @@ function BracketConnector({ parent, children, goRight = true, showOrderNumbers =
   )
 }
 
-export function EdgeLayer({ nodes, lineStyle, diagramType }: EdgeLayerProps) {
+export function EdgeLayer({ nodes, lineStyle, diagramType, paletteColors }: EdgeLayerProps) {
   const showOrderNumbers = useMindmapStore(s => s.showOrderNumbers)
   const nodeMap = new Map(nodes.map(n => [n.id, n]))
   // Connector/badge colour from the 12-colour wheel, matching the node fills.
-  const pc = (n: MindmapNode) => l1PaletteColor(n, nodes) ?? n.color
+  const pc = (n: MindmapNode) => paletteColors?.get(n.id) ?? n.color
 
   // ── Logic Chart ───────────────────────────────────────────────────────────
   if (diagramType === 'logic-chart') {

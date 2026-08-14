@@ -4,7 +4,11 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { pool } from '../_lib/db.js'
 import { corsHeaders } from '../_lib/cors.js'
 import { authorizeOwner } from '../_lib/authorizeOwner.js'
-import { parseIndentedOutline } from '../../src/lib/outline.js'
+import {
+  parseIndentedOutline, normalizeOutlineRoots, assembleOutlineTree,
+  flattenJsonOutline, computeImportNodeWidth, OUTLINE_META_KEYS,
+  type OutlineNode,
+} from '../../src/lib/outline.js'
 
 const DEFAULT_BRANCH_COLORS = [
   '#6366f1', '#8b5cf6', '#ec4899', '#ef4444',
@@ -12,61 +16,20 @@ const DEFAULT_BRANCH_COLORS = [
   '#3b82f6', '#06b6d4',
 ]
 
-const META_KEYS = new Set(['icon', 'emoji', 'bold', 'italic', 'fontSize', 'textAlign', 'title', 'name', 'children', 'type', 'lineStyle', 'color'])
-
-interface MindmapNode {
-  id: string; title: string; parentId: string | null; depth: number
-  x: number; y: number; width: number; height: number
-  color: string; sortOrder: number; manuallyPositioned: boolean
-  icon?: string; emoji?: string
-}
-
-function computeWidth(title: string, depth: number): number {
-  if (depth === 0) return 180
-  const base = Math.max(100, title.length * 7.5 + 32)
-  return Math.min(base, 260)
-}
-
-function parseOutline(text: string, BRANCH_COLORS: string[] = DEFAULT_BRANCH_COLORS): MindmapNode[] {
-  const parsed = parseIndentedOutline(text)
+function parseOutline(text: string, BRANCH_COLORS: string[] = DEFAULT_BRANCH_COLORS): OutlineNode[] {
+  const parsed = normalizeOutlineRoots(parseIndentedOutline(text))
   if (!parsed.length) return []
 
-  const minIndent = Math.min(...parsed.map(p => p.indent))
-  parsed.forEach(p => { p.indent -= minIndent })
-
-  const rootCount = parsed.filter(p => p.indent === 0).length
-  if (rootCount > 1) {
-    const firstTitle = parsed[0].title
-    parsed.forEach(p => { p.indent += 1 })
-    parsed.unshift({ title: firstTitle, indent: 0 })
-  }
-
+  const { parentIndex, depths, siblingTotals } = assembleOutlineTree(parsed)
   const nodeIds = parsed.map(() => crypto.randomUUID())
-  const parentIds: (string | null)[] = []
-  const depths: number[] = []
-  const siblingCount = new Map<string | null, number>()
-  const parentStack: number[] = []
-
-  for (let i = 0; i < parsed.length; i++) {
-    const { indent } = parsed[i]
-    while (parentStack.length > 0 && parsed[parentStack[parentStack.length - 1]].indent >= indent) {
-      parentStack.pop()
-    }
-    const parentIdx = parentStack.length > 0 ? parentStack[parentStack.length - 1] : null
-    const parentId = parentIdx !== null ? nodeIds[parentIdx] : null
-    const order = siblingCount.get(parentId) ?? 0
-    siblingCount.set(parentId, order + 1)
-    parentIds.push(parentId)
-    depths.push(indent)
-    parentStack.push(i)
-  }
 
   let branchIdx = 0
   const colorById = new Map<string, string>()
 
   return parsed.map((p, i) => {
     const depth = depths[i]
-    const parentId = parentIds[i]
+    const parentIdx = parentIndex[i]
+    const parentId = parentIdx !== null ? nodeIds[parentIdx] : null
     let color: string
     if (depth === 0) color = BRANCH_COLORS[0]
     else if (depth === 1) color = BRANCH_COLORS[branchIdx++ % BRANCH_COLORS.length]
@@ -76,53 +39,25 @@ function parseOutline(text: string, BRANCH_COLORS: string[] = DEFAULT_BRANCH_COL
     return {
       id: nodeIds[i], title: p.title, parentId,
       depth, x: 0, y: 0,
-      width: computeWidth(p.title, depth),
+      width: computeImportNodeWidth(p.title, depth),
       height: depth === 0 ? 180 : 40,
-      color, sortOrder: siblingCount.get(parentId) ?? 0,
+      // Legacy quirk kept as-is: sortOrder here is the parent's total child count, not
+      // the per-child index. Layouts sort stably, so render order is unchanged.
+      color, sortOrder: siblingTotals.get(parentIdx) ?? 0,
       manuallyPositioned: false,
     }
   })
 }
 
-function parseJsonOutline(json: unknown, BRANCH_COLORS: string[] = DEFAULT_BRANCH_COLORS): { title: string; nodes: MindmapNode[] } | null {
-  if (typeof json !== 'object' || json === null || Array.isArray(json)) return null
-  const entries = Object.entries(json as Record<string, unknown>)
-  if (!entries.length) return null
-
-  const [rootKey, rootChildren] = entries[0]
-  const nodes: MindmapNode[] = []
-  let branchColorIdx = 0
-  const colorById = new Map<string, string>()
-  const rootId = crypto.randomUUID()
-  colorById.set(rootId, BRANCH_COLORS[0])
-
-  nodes.push({
-    id: rootId, title: rootKey.trim(), parentId: null, depth: 0,
-    x: 0, y: 0, width: 180, height: 180,
-    color: BRANCH_COLORS[0], sortOrder: 0, manuallyPositioned: false,
+function parseJsonOutline(json: unknown, BRANCH_COLORS: string[] = DEFAULT_BRANCH_COLORS): { title: string; nodes: OutlineNode[] } | null {
+  return flattenJsonOutline(json, {
+    metaKeys: OUTLINE_META_KEYS,
+    computeWidth: computeImportNodeWidth,
+    rootColor: BRANCH_COLORS[0],
+    branchColor: (i) => BRANCH_COLORS[i % BRANCH_COLORS.length],
+    useExplicitColor: true,
+    useEmoji: true,
   })
-
-  function flattenNode(obj: Record<string, unknown> | string, parentId: string, depth: number, sortOrder: number) {
-    const parentColor = colorById.get(parentId) ?? BRANCH_COLORS[0]
-    if (typeof obj === 'string') {
-      const id = crypto.randomUUID()
-      colorById.set(id, parentColor)
-      nodes.push({ id, title: obj.trim(), parentId, depth, x: 0, y: 0, width: computeWidth(obj.trim(), depth), height: 40, color: parentColor, sortOrder, manuallyPositioned: false })
-      return
-    }
-    const titleKey = Object.keys(obj).find(k => !META_KEYS.has(k))
-    if (!titleKey) return
-    const id = crypto.randomUUID()
-    const autoColor = depth === 1 ? BRANCH_COLORS[branchColorIdx++ % BRANCH_COLORS.length] : parentColor
-    const color = (typeof obj.color === 'string' && obj.color.trim()) ? obj.color.trim() : autoColor
-    colorById.set(id, color)
-    nodes.push({ id, title: titleKey.trim(), parentId, depth, x: 0, y: 0, width: computeWidth(titleKey.trim(), depth), height: 40, color, sortOrder, manuallyPositioned: false, icon: obj.icon as string | undefined, emoji: obj.emoji as string | undefined })
-    const kids = obj[titleKey]
-    if (Array.isArray(kids)) kids.slice(0, 10).forEach((child, i) => flattenNode(child as Record<string, unknown> | string, id, depth + 1, i))
-  }
-
-  if (Array.isArray(rootChildren)) rootChildren.slice(0, 12).forEach((child, i) => flattenNode(child as Record<string, unknown> | string, rootId, 1, i))
-  return { title: rootKey.trim(), nodes }
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -184,7 +119,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const id = crypto.randomUUID()
 
-  let nodes: MindmapNode[] = []
+  let nodes: OutlineNode[] = []
   if (outline) {
     const trimmed = outline.trim()
     if (trimmed.startsWith('{') || trimmed.startsWith('[')) {

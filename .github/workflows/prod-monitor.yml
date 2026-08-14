@@ -4,6 +4,8 @@ name: prod-monitor
 # on demand. Side-effect-free: the bad-token probe is rejected (401) before any row
 # is created, so it never writes to the database.
 on:
+  # Note: GitHub disables scheduled workflows after 60 days of repo inactivity,
+  # so this */15 monitor can silently lapse if the repo goes quiet.
   schedule:
     - cron: '*/15 * * * *'
   push:
@@ -13,6 +15,7 @@ on:
 jobs:
   monitor:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Health endpoint must be 200
         run: |

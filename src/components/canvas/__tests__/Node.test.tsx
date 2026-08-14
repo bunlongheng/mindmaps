@@ -58,8 +58,10 @@ function renderNode(node: MindmapNode, props: Partial<React.ComponentProps<typeo
         svgRef={svgRef as unknown as React.RefObject<SVGSVGElement>}
         readOnly={props.readOnly}
         l1Colors={props.l1Colors}
+        paletteColor={props.paletteColor}
         childCount={props.childCount}
         descendantCount={props.descendantCount}
+        nodeCount={props.nodeCount}
       />
     </svg>
   )
@@ -238,6 +240,29 @@ describe('Node — child / descendant counts (fireflies)', () => {
     const { container } = renderNode(parent, { childCount: 1, descendantCount: 1 })
     // Fireflies render extra <circle> glow + core elements
     expect(container.querySelectorAll('circle').length).toBeGreaterThan(0)
+  })
+
+  it('skips decorative fireflies when the map exceeds the decor node limit', () => {
+    const parent = makeNode({ id: 'p' })
+    const kid = makeNode({ id: 'k', parentId: 'p', depth: 2 })
+    loadStore([makeRoot(), parent, kid])
+    const { container } = renderNode(parent, { childCount: 1, descendantCount: 1, nodeCount: 100 })
+    // Fireflies are the only animated elements on a non-root node
+    expect(container.querySelector('animate')).toBeFalsy()
+  })
+
+  it('skips the root SiriWave on large maps (no blur filter)', () => {
+    const root = makeRoot()
+    loadStore([root, makeNode()])
+    const { container } = renderNode(root, { l1Colors: ['#ef4444'], nodeCount: 100 })
+    expect(container.querySelector('filter')).toBeFalsy()
+  })
+
+  it('uses the precomputed paletteColor for fills when provided', () => {
+    const n = makeNode()
+    loadStore([makeRoot(), n])
+    const { container } = renderNode(n, { paletteColor: '#ED1C24' })
+    expect(container.querySelector('rect[fill="#ED1C24"]')).toBeTruthy()
   })
 })
 

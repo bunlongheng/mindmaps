@@ -4,7 +4,7 @@ import { useMindmapStore } from '../../store/mindmapStore'
 import { NodeIcon, getLucideIcon } from './NodeIcon'
 import { wrapText } from '../../lib/layout/mindmap'
 import { rootPillWidth, rootPillFontSize, rootTitleNeedsPill, rootCircleDiameter } from '../../lib/rootPill'
-import { hexToRgb, l1PaletteColor } from '../../lib/color'
+import { hexToRgb, darken } from '../../lib/color'
 
 interface NodeProps {
   node: MindmapNode
@@ -12,29 +12,29 @@ interface NodeProps {
   onSelect: (id: string, multi: boolean) => void
   onDragEnd: (id: string, dx: number, dy: number) => void
   onDoubleClick: (node: MindmapNode) => void
-  onAddChild?: (parentId: string) => void
   onDragMove?: (id: string, cx: number, cy: number) => void
   onRootDragOffset?: (offset: { dx: number; dy: number; clientX: number; clientY: number } | null) => void
   svgRef: React.RefObject<SVGSVGElement>
   readOnly?: boolean
   l1Colors?: string[]
+  paletteColor?: string | null  // 12-colour-wheel colour, precomputed once by DiagramCanvas (was an O(n) l1PaletteColor walk per node per render)
   childCount?: number       // direct children, precomputed once by DiagramCanvas (was an O(n) per-node selector)
   descendantCount?: number  // total subtree size, precomputed once (was an O(n^2) per-node selector)
+  nodeCount?: number        // total nodes in the map, used to gate decorative animations on large maps
 }
+
+// Decorative SMIL animations (fireflies, SiriWave) burn CPU/GPU at idle, so skip them
+// on large maps and for reduced-motion users.
+const DECOR_MAX_NODES = 60
+const prefersReducedMotion = typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+  ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  : false
 
 function lighten(hex: string, amount = 0.85): string {
   const [r,g,b] = hexToRgb(hex)
   const nr = Math.round(r + (255 - r) * amount)
   const ng = Math.round(g + (255 - g) * amount)
   const nb = Math.round(b + (255 - b) * amount)
-  return `rgb(${nr},${ng},${nb})`
-}
-
-function darkenColor(hex: string, amount = 0.35): string {
-  const [r,g,b] = hexToRgb(hex)
-  const nr = Math.round(r * (1 - amount))
-  const ng = Math.round(g * (1 - amount))
-  const nb = Math.round(b * (1 - amount))
   return `rgb(${nr},${ng},${nb})`
 }
 
@@ -77,14 +77,15 @@ function isLight(hex: string): boolean {
   return lum > 140
 }
 
-export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onDragMove, onRootDragOffset, svgRef, readOnly, l1Colors = [], childCount = 0, descendantCount = 0 }: NodeProps) {
+export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onDragMove, onRootDragOffset, svgRef, readOnly, l1Colors = [], paletteColor = null, childCount = 0, descendantCount = 0, nodeCount = 0 }: NodeProps) {
   const isRoot = node.depth === 0
   const isL2Plus = node.depth >= 2
   // Brighter/more-vivid version of the node colour, used for all coloured fills.
   // L1 and descendants take their colour from the 12-colour wheel by L1 order;
   // fall back to the node's own (vivified) colour if there's no L1 ancestor.
-  const paletteBase = isRoot ? null : l1PaletteColor(node, useMindmapStore.getState().activeMindmap?.nodes ?? [])
+  const paletteBase = isRoot ? null : paletteColor
   const col = paletteBase ?? (node.color.startsWith('#') ? vivify(node.color) : node.color)
+  const showDecor = nodeCount <= DECOR_MAX_NODES && !prefersReducedMotion
   const rx = isRoot ? 4 : 3
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
@@ -108,9 +109,6 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   const effectiveRx = isFishboneNode ? 0 : rx
   const previewW = (!isRoot && resizePreview?.depth === node.depth) ? resizePreview.width : null
 
-  // Mindmap circles: keep text horizontal for readability
-  const mindmapAngle: number | null = null
-
   // Styling per depth
   let bg: string, textColor: string, strokeColor: string, strokeW: number
 
@@ -122,20 +120,20 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   } else if (isL2Plus) {
     const lightenAmt = node.depth === 2 ? 0.58 : node.depth === 3 ? 0.68 : 0.76
     bg = col.startsWith('#') ? lighten(col, lightenAmt) : '#f8fafc'
-    textColor = col.startsWith('#') ? darkenColor(col, 0.55) : col
+    textColor = col.startsWith('#') ? darken(col, 0.55) : col
     strokeColor = col
     strokeW = 2
   } else if (isMindmapCircle) {
     // L1 mindmap: solid color fill with darker border, same as logic chart
     bg = col
     textColor = isLight(col) ? '#1a1d2e' : '#ffffff'
-    strokeColor = col.startsWith('#') ? darkenColor(col, 0.25) : col
+    strokeColor = col.startsWith('#') ? darken(col, 0.25) : col
     strokeW = 2
   } else {
     // L1 all other diagrams: solid color fill, darker border so white badge is framed
     bg = col
     textColor = isLight(col) ? '#1a1d2e' : '#ffffff'
-    strokeColor = col.startsWith('#') ? darkenColor(col, 0.25) : col
+    strokeColor = col.startsWith('#') ? darken(col, 0.25) : col
     strokeW = 2
   }
 
@@ -262,7 +260,6 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   // Mindmap L2+ circles: force width = height so it's always a circle
   const circleW = isMindmapL2Plus ? Math.max(node.width, node.height) : null
   const displayW = previewW ?? (autoPillW ?? circleW ?? node.width)
-  void ((hasIcon || hasEmoji) ? displayW * 0.2 : 0) // iconZoneW — reserved for future use
   const label = (showChildCount && node.depth >= 1 && childCount > 0)
     ? `${node.title} (${childCount})`
     : node.title
@@ -316,9 +313,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
 
   return (
     <g data-node-id={node.id} style={{
-      transform: mindmapAngle !== null
-        ? `translate(${node.x + node.width / 2}px, ${node.y + node.height / 2}px) rotate(${mindmapAngle}deg) translate(${-node.width / 2}px, ${-node.height / 2}px)`
-        : `translate(${node.x}px, ${node.y}px)`,
+      transform: `translate(${node.x}px, ${node.y}px)`,
       transition: isDragging ? 'none' : 'transform 0.22s cubic-bezier(0.4,0,0.2,1)',
     }}>
     {!isRoot && (
@@ -337,7 +332,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
       style={{ cursor: editing ? 'default' : canDrag ? 'grab' : 'pointer', userSelect: 'none' }}
     >
       {/* Fireflies around nodes with children — count = all descendants */}
-      {node.depth >= 1 && descendantCount > 0 && (
+      {showDecor && node.depth >= 1 && descendantCount > 0 && (
         <Fireflies cx={displayW / 2} cy={node.height / 2} r={Math.max(displayW, node.height) * 0.45} color={col} count={descendantCount} />
       )}
 
@@ -346,7 +341,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
           {/* Siri glow + spinning rings — circle root only */}
           {!isRootPill && (() => { const ar = r; return (
           <>
-          <SiriWave cx={cx} cy={cy} r={ar} colors={l1Colors} />
+          {showDecor && <SiriWave cx={cx} cy={cy} r={ar} colors={l1Colors} />}
 
           {/* Back ring — horizontal orbit, spinning */}
           <ellipse cx={cx} cy={cy} rx={ar * 2.0} ry={ar * 0.32}
@@ -402,7 +397,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
           </>)})()}
 
           {/* Roaming fireflies in the L1 colours — twinkle around the root */}
-          {l1Colors.length > 0 && (
+          {showDecor && l1Colors.length > 0 && (
             <Fireflies cx={cx} cy={cy} r={Math.max(displayW, node.height) / 2}
               colors={l1Colors} count={Math.min(20, Math.max(10, l1Colors.length))} color={l1Colors[0]} />
           )}

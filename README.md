@@ -9,7 +9,7 @@ A PWA mind-mapping studio where maps are drawn by hand, pasted from an outline, 
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6?logo=typescript)
 ![Vite](https://img.shields.io/badge/Vite-7-646cff?logo=vite)
 ![PWA](https://img.shields.io/badge/PWA-installable-5a0fc8?logo=pwa)
-![Tests](https://img.shields.io/badge/tests-731%20passing-1a7f37?logo=vitest)
+![Tests](https://img.shields.io/badge/tests-800%2B%20passing-1a7f37?logo=vitest)
 
 ## Contents
 
@@ -102,7 +102,9 @@ Everything else is **internal / admin-only**:
 |---|---|---|
 | `POST /api/ai/mindmaps` | Bearer key **or** owner session | **The one public contract.** Render-only, no AI spend |
 | `POST /api/ai/generate-mindmap` | **owner session only** | Calls Claude. The Bearer key is **rejected** (`allowBearer:false`) so public callers can never spend Anthropic $ |
-| `GET/POST/PUT/DELETE /api/mindmaps` | signed owner session | First-party CRUD for the app |
+| `GET/POST/PUT/DELETE /api/mindmaps` | signed owner session **or** Bearer key | First-party CRUD; the static key mints an owner-scoped identity, so it passes both reads and writes |
+| `GET /api/health` | public, no auth | Readiness probe: 200 only when required env is present and the DB responds, 503 otherwise |
+| `GET /api/og`, `GET /api/og-image` | public, no auth | Renders the Open Graph share-card image for a map link preview |
 
 Auth is centralized in `api/_lib/authorizeOwner.ts` (local-dev bypass, gated off in prod →
 static Bearer key via constant-time compare → owner-email session JWT).
@@ -122,7 +124,7 @@ static Bearer key via constant-time compare → owner-email session JWT).
 - **Frontend** - React 19, TypeScript (strict), Vite 7, Tailwind 4, Zustand
 - **Backend** - Vercel serverless functions, `pg` to PostgreSQL, Claude API for generation, Sharp for OG images
 - **PWA** - vite-plugin-pwa (installable, NetworkFirst navigation, auto-updating service worker)
-- **Testing** - Vitest (731 unit tests) and Playwright end-to-end specs
+- **Testing** - Vitest (800+ unit tests) and Playwright end-to-end specs
 
 ## Quick start
 
@@ -149,15 +151,28 @@ Client variables go in `.env` (Vite reads `VITE_`-prefixed vars); server variabl
 | `MINDMAP_AI_API_KEY` | server | Bearer key gating the external agent import API (not the CRUD API) |
 | `MINDMAP_APP_URL` | server | Base URL used in returned map links, and also the CORS allow-origin (defaults to the prod host) - required if self-hosting on a different domain |
 | `MINDMAP_JWT_SECRET` | server | HMAC secret used to sign/verify session tokens |
-| `MINDMAP_AUTH_EMAIL` | server | Login email |
-| `MINDMAP_AUTH_PASSWORD_HASH` | server | `salt:iterations:hash` from `node scripts/hash-password.mjs '<password>'` (never the plaintext) |
+| `MINDMAP_AUTH_EMAIL` | server | Owner email that a Google sign-in must match |
 | `MINDMAP_USER_ID` | server | Owner id embedded in the session token |
 | `MINDMAP_TOKEN_MIN_IAT` | server | Optional; set to a unix timestamp to instantly revoke all outstanding sessions issued before it |
 | `MINDMAP_SMOKE_SAMPLE` | scripts | Optional; how many maps `scripts/smoke-prod.mjs` samples per run (default 8) |
+| `LOCAL_DEV` | server, dev-only | Optional; set to `true` to force the local auth bypass when running with `NODE_ENV=production` locally. Never set in Vercel - prod hard-disables the bypass regardless of this var |
 
 ### Auth model
 
-`POST /api/auth` checks the email + a salted PBKDF2 (310k iterations) password hash from env, rate-limited to 5 attempts per 15 minutes per IP, and issues a 24-hour HMAC-SHA256 session token (set `MINDMAP_TOKEN_MIN_IAT` to instantly revoke every outstanding session). The CRUD API (`/api/mindmaps`) requires that token and scopes every write to the owner; a public map (`sharing_enabled`) is readable by id without one. The AI/import endpoints (`/api/ai/*`) accept either the session token or the static `MINDMAP_AI_API_KEY` (for external agents) - the static key does **not** work on the CRUD API. `/api/notify` uses the same dual-auth pattern but is legacy/unused - no code in this app calls it.
+Sign-in is pure Google Identity Services - no password, no third-party broker. The client
+gets a Google ID token from the "Continue with Google" button and posts it to `POST
+/api/auth`, which is rate-limited to 10 attempts per 15 minutes per IP. The server confirms
+the token with Google's `tokeninfo` endpoint (signature + expiry), checks that its audience
+matches `GOOGLE_CLIENT_ID`, and that its email matches `MINDMAP_AUTH_EMAIL`, then issues a
+24-hour HMAC-SHA256 session token (set `MINDMAP_TOKEN_MIN_IAT` to instantly revoke every
+outstanding session).
+
+The CRUD API (`/api/mindmaps`) requires that token *or* the static `MINDMAP_AI_API_KEY` -
+the static key is an owner-scoped service credential and passes both reads and writes there.
+The render-only import endpoint (`/api/ai/mindmaps`) also accepts the static key or the
+session token. Generation (`/api/ai/generate-mindmap`), which spends Anthropic credits, is
+owner-session only - the static key is explicitly rejected (`allowBearer:false`) so no
+external caller can trigger a model call.
 
 ### Database migrations
 
@@ -170,9 +185,9 @@ mindmaps/
 ├── api/                    # Vercel serverless functions
 │   ├── _lib/               # shared: JWT auth, pg pool, CORS
 │   ├── ai/                 # Claude generation + agent import
-│   ├── auth.ts             # login -> signed session token
+│   ├── auth.ts             # Google ID token verify -> signed session token
 │   ├── mindmaps.ts         # owner-scoped Postgres CRUD
-│   ├── notify.ts           # realtime toast broadcast (legacy/unused, no caller)
+│   ├── health.ts           # readiness probe
 │   └── og*.ts              # Open Graph link previews
 ├── src/
 │   ├── store/              # Zustand store (single source of truth)

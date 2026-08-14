@@ -5,6 +5,7 @@ import { pool } from '../_lib/db.js'
 import { authorizeOwner, ownerId } from '../_lib/authorizeOwner.js'
 import { corsHeaders } from '../_lib/cors.js'
 import { checkRateLimit, clientIp } from '../_lib/rateLimit.js'
+import { flattenJsonOutline, computeGeneratedNodeWidth, OUTLINE_META_KEYS, type OutlineNode } from '../../src/lib/outline.js'
 
 const PROMPT_MAX_LENGTH = 2000
 const GENERATE_RATE_LIMIT = { max: 20, windowMs: 15 * 60 * 1000 }
@@ -104,25 +105,9 @@ function wantsFlatList(prompt: string): boolean {
   return false
 }
 
-const META_KEYS = new Set([
-  'icon', 'emoji', 'bold', 'italic', 'fontSize',
-  'textAlign', 'title', 'name', 'children', 'type', 'lineStyle',
-])
-
-interface MindmapNode {
-  id: string
-  title: string
-  parentId: string | null
-  depth: number
-  x: number
-  y: number
-  width: number
-  height: number
-  color: string
-  sortOrder: number
-  manuallyPositioned: boolean
-  icon?: string
-}
+// This endpoint predates explicit per-node color support: 'color' is NOT metadata
+// here (a stray 'color' key in fallback-parsed model text stays a title candidate).
+const META_KEYS = new Set([...OUTLINE_META_KEYS].filter(k => k !== 'color'))
 
 // Pull a JSON object out of whatever the model returns: tolerates markdown
 // fences, leading/trailing prose, and trailing commas. Returns undefined if
@@ -159,83 +144,13 @@ function extractJson(text: string): unknown {
   return undefined
 }
 
-function computeWidth(title: string, depth: number): number {
-  if (depth === 0) return 180
-  const charW = depth === 1 ? 10.24 : depth === 2 ? 8.19 : 7.04
-  return Math.max(120, Math.min(300, Math.ceil(title.length * charW) + 32))
-}
-
-function parseJsonOutline(json: unknown): { title: string; nodes: MindmapNode[] } | null {
-  if (typeof json !== 'object' || json === null || Array.isArray(json)) return null
-  const entries = Object.entries(json as Record<string, unknown>)
-  if (!entries.length) return null
-
-  const [rootKey, rootChildren] = entries[0]
-  const nodes: MindmapNode[] = []
-  let branchColorIdx = 0
-  const colorById = new Map<string, string>()
-
-  const rootId = crypto.randomUUID()
-  colorById.set(rootId, BRANCH_COLORS[0])
-  nodes.push({
-    id: rootId, title: rootKey.trim(), parentId: null, depth: 0,
-    x: 0, y: 0, width: 180, height: 180,
-    color: BRANCH_COLORS[0], sortOrder: 0, manuallyPositioned: false,
+function parseJsonOutline(json: unknown): { title: string; nodes: OutlineNode[] } | null {
+  return flattenJsonOutline(json, {
+    metaKeys: META_KEYS,
+    computeWidth: computeGeneratedNodeWidth,
+    rootColor: BRANCH_COLORS[0],
+    branchColor,
   })
-
-  function flattenNode(
-    obj: Record<string, unknown> | string,
-    parentId: string,
-    depth: number,
-    sortOrder: number,
-    maxChildren: number,
-    branchTotal: number,
-  ) {
-    const parentColor = colorById.get(parentId) ?? BRANCH_COLORS[0]
-
-    if (typeof obj === 'string') {
-      const id = crypto.randomUUID()
-      colorById.set(id, parentColor)
-      nodes.push({
-        id, title: obj.trim(), parentId, depth,
-        x: 0, y: 0, width: computeWidth(obj.trim(), depth), height: 40,
-        color: parentColor, sortOrder, manuallyPositioned: false,
-      })
-      return
-    }
-
-    const titleKey = Object.keys(obj).find(k => !META_KEYS.has(k))
-    if (!titleKey) return
-
-    const icon = obj.icon as string | undefined
-    const id = crypto.randomUUID()
-    const color = depth === 1
-      ? branchColor(branchColorIdx++, branchTotal)
-      : parentColor
-    colorById.set(id, color)
-
-    nodes.push({
-      id, title: titleKey.trim(), parentId, depth,
-      x: 0, y: 0, width: computeWidth(titleKey.trim(), depth), height: 40,
-      color, sortOrder, manuallyPositioned: false, icon,
-    })
-
-    const kids = obj[titleKey]
-    if (Array.isArray(kids)) {
-      kids.slice(0, maxChildren).forEach((child, i) => {
-        flattenNode(child as Record<string, unknown> | string, id, depth + 1, i, 10, branchTotal)
-      })
-    }
-  }
-
-  if (Array.isArray(rootChildren)) {
-    const branches = rootChildren.slice(0, 12)
-    branches.forEach((child, i) => {
-      flattenNode(child as Record<string, unknown> | string, rootId, 1, i, 10, branches.length)
-    })
-  }
-
-  return { title: rootKey.trim(), nodes }
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {

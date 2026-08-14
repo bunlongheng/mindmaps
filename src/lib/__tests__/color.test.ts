@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { hexToRgb, applyDepthTransparency, applyDepthBackground, darken } from '../color'
+import { hexToRgb, applyDepthTransparency, applyDepthBackground, darken, l1PaletteColor, L1_PALETTE } from '../color'
 
 describe('hexToRgb', () => {
   it('parses standard hex', () => {
@@ -73,5 +73,43 @@ describe('darken', () => {
   it('uses default amount 0.3', () => {
     const result = darken('#ffffff')
     expect(result).toContain('179')
+  })
+})
+
+describe('l1PaletteColor', () => {
+  const root = { id: 'root', parentId: null, depth: 0, sortOrder: 0 }
+  const l1a = { id: 'a', parentId: 'root', depth: 1, sortOrder: 0 }
+  const l1b = { id: 'b', parentId: 'root', depth: 1, sortOrder: 3 }
+  const l2 = { id: 'c', parentId: 'b', depth: 2, sortOrder: 0 }
+  const l3 = { id: 'd', parentId: 'c', depth: 3, sortOrder: 0 }
+  const all = [root, l1a, l1b, l2, l3]
+
+  it('returns null for the root', () => {
+    expect(l1PaletteColor(root, all)).toBeNull()
+  })
+
+  it('indexes L1 nodes into the palette by sortOrder', () => {
+    expect(l1PaletteColor(l1a, all)).toBe(L1_PALETTE[0])
+    expect(l1PaletteColor(l1b, all)).toBe(L1_PALETTE[3])
+  })
+
+  it('walks descendants up to their L1 ancestor colour', () => {
+    expect(l1PaletteColor(l2, all)).toBe(L1_PALETTE[3])
+    expect(l1PaletteColor(l3, all)).toBe(L1_PALETTE[3])
+  })
+
+  it('wraps sortOrder past 12 around the palette', () => {
+    const l1far = { id: 'e', parentId: 'root', depth: 1, sortOrder: 13 }
+    expect(l1PaletteColor(l1far, [root, l1far])).toBe(L1_PALETTE[1])
+  })
+
+  it('missing sortOrder falls back to index 0', () => {
+    const l1none = { id: 'f', parentId: 'root', depth: 1 }
+    expect(l1PaletteColor(l1none, [root, l1none])).toBe(L1_PALETTE[0])
+  })
+
+  it('returns null when no L1 ancestor exists (broken chain)', () => {
+    const orphan = { id: 'g', parentId: 'ghost', depth: 2, sortOrder: 0 }
+    expect(l1PaletteColor(orphan, [root, orphan])).toBeNull()
   })
 })

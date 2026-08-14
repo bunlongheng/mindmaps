@@ -8,6 +8,7 @@ const REQUIRED = [
   'MINDMAP_AUTH_EMAIL',
   'GOOGLE_CLIENT_ID',
   'MINDMAP_AI_API_KEY',
+  'DATABASE_CA_CERT',
 ] as const
 
 export function missingEnv(): string[] {

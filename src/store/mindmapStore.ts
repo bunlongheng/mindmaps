@@ -13,24 +13,13 @@ import type { Diagram, DiagramMeta, DiagramType, LineStyle, MindmapNode } from '
 import { computeMindmapsLayout } from '../lib/layout/mindmaps-layout'
 import { computeMindmapLayout } from '../lib/layout/mindmap'
 import { computeFishboneLayout } from '../lib/layout/fishbone'
-import { parseIndentedOutline } from '../lib/outline'
+import { parseIndentedOutline, normalizeOutlineRoots, assembleOutlineTree, computeNodeWidth, OUTLINE_META_KEYS } from '../lib/outline'
 import { computeTimelineLayout } from '../lib/layout/timeline'
 import { getTheme } from '../lib/themes'
 import { rootPillWidth } from '../lib/rootPill'
 import { guessIcon } from '../lib/autoIcon'
 import { ICON_MAP } from '../lib/icons'
 import { showToast } from '../components/CuteToast'
-
-/** Compute a node width that fits its title text — font sizes must match Node.tsx */
-function computeNodeWidth(title: string, depth: number, hasIcon: boolean): number {
-  const fontSize = depth === 1 ? 22 : depth === 2 ? 16 : depth === 3 ? 13 : 11
-  const charW = fontSize * 0.64
-  const textPad = 24
-  const textW = Math.ceil(title.length * charW) + textPad
-  // icon zone takes ~20% of node width, so text zone = 80% of total
-  const total = hasIcon ? Math.ceil(textW / 0.8) : textW
-  return Math.max(140, Math.min(400, total))
-}
 
 /** Make all nodes at the same depth share the width of the widest node at that depth */
 function normalizeWidthsPerDepth(nodes: MindmapNode[], type?: DiagramType): MindmapNode[] {
@@ -677,11 +666,10 @@ export const useMindmapStore = create<MindmapStore>()(
         try {
           const json = JSON.parse(trimmed)
           // Flatten recursive { title, icon?, children? } tree into indent list
-          const META_KEYS = new Set(['icon', 'emoji', 'bold', 'italic', 'fontSize', 'textAlign', 'title', 'name', 'children', 'type', 'lineStyle', 'color'])
           function flattenJson(node: Record<string, unknown> | string, depth: number, inheritColor?: string) {
             if (typeof node === 'string') { parsed.push({ title: node.trim(), indent: depth, color: inheritColor }); return }
             // New format: title is the non-metadata key, its value is children array
-            const titleKey = Object.keys(node).find(k => !META_KEYS.has(k))
+            const titleKey = Object.keys(node).find(k => !OUTLINE_META_KEYS.has(k))
             const nodeColor = (typeof node.color === 'string' && node.color.trim()) ? node.color.trim() : inheritColor
             if (titleKey) {
               parsed.push({ title: titleKey, indent: depth, icon: normalizeIcon(node.icon as string | undefined), emoji: node.emoji as string | undefined, color: nodeColor })
@@ -712,39 +700,11 @@ export const useMindmapStore = create<MindmapStore>()(
 
       if (parsed.length === 0) return
 
-      // Normalize: shift all indents so minimum is 0
-      const minIndent = Math.min(...parsed.map(p => p.indent))
-      if (minIndent > 0) parsed.forEach(p => { p.indent -= minIndent })
-
-      // If multiple items at indent 0, wrap them under a single root
-      const rootCount = parsed.filter(p => p.indent === 0).length
-      if (rootCount > 1) {
-        const rootTitle = parsed[0].title
-        parsed.forEach(p => { p.indent += 1 })
-        parsed.unshift({ title: rootTitle, indent: 0 })
-      }
-
+      // Normalize indents and wrap multiple roots, then assemble the parent tree
+      normalizeOutlineRoots(parsed)
+      const { parentIndex, depths, sortOrders } = assembleOutlineTree(parsed)
       const nodeIds = parsed.map(() => uuid())
-      const parentIds: (string | null)[] = []
-      const depths: number[] = []
-      const sortOrders: number[] = []
-      const siblingCount = new Map<string | null, number>()
-      const parentStack: number[] = []
-
-      for (let i = 0; i < parsed.length; i++) {
-        const { indent } = parsed[i]
-        while (parentStack.length > 0 && parsed[parentStack[parentStack.length - 1]].indent >= indent) {
-          parentStack.pop()
-        }
-        const parentIdx = parentStack.length > 0 ? parentStack[parentStack.length - 1] : null
-        const parentId = parentIdx !== null ? nodeIds[parentIdx] : null
-        const order = siblingCount.get(parentId) ?? 0
-        siblingCount.set(parentId, order + 1)
-        sortOrders.push(order)
-        parentIds.push(parentId)
-        depths.push(indent)
-        parentStack.push(i)
-      }
+      const parentIds = parentIndex.map(pi => (pi !== null ? nodeIds[pi] : null))
 
       const palette = getTheme(state.themeId).colors
       const hasExplicitColors = parsed.some(p => p.color)

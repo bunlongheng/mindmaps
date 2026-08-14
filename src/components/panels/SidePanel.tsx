@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
+import { useShallow } from 'zustand/react/shallow'
 import { NODE_ICONS } from '../../lib/icons'
 import { useMindmapStore } from '../../store/mindmapStore'
 import { getTheme, THEMES, isDarkBg } from '../../lib/themes'
@@ -83,12 +84,23 @@ type Tab = 'style' | 'map' | 'share'
 
 
 export function SidePanel({ nodeId, onClose, onDelete }: SidePanelProps) {
+  // Shallow-selected slice so the panel only re-renders when one of these actually
+  // changes, not on every store write (resizePreview during drags, HUD flags, etc.).
   const {
     activeMindmap, updateNode, batchUpdateNodes, selectedNodeIds,
     lineStyle, setLineStyle, diagramType, setDiagramType, setShareEnabled, rerunLayout,
     themeId, setTheme, showOrderNumbers, setShowOrderNumbers, showChildCount, setShowChildCount, autoAssignIcons,
     resizeNodeDepth,
-  } = useMindmapStore()
+  } = useMindmapStore(
+    useShallow(s => ({
+      activeMindmap: s.activeMindmap, updateNode: s.updateNode, batchUpdateNodes: s.batchUpdateNodes, selectedNodeIds: s.selectedNodeIds,
+      lineStyle: s.lineStyle, setLineStyle: s.setLineStyle, diagramType: s.diagramType, setDiagramType: s.setDiagramType,
+      setShareEnabled: s.setShareEnabled, rerunLayout: s.rerunLayout,
+      themeId: s.themeId, setTheme: s.setTheme, showOrderNumbers: s.showOrderNumbers, setShowOrderNumbers: s.setShowOrderNumbers,
+      showChildCount: s.showChildCount, setShowChildCount: s.setShowChildCount, autoAssignIcons: s.autoAssignIcons,
+      resizeNodeDepth: s.resizeNodeDepth,
+    })),
+  )
   const themeColors = getTheme(themeId).colors
 
   const [tab, setTab] = useState<Tab>('map')

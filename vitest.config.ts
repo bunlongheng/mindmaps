@@ -10,17 +10,23 @@ export default defineConfig({
     include: ['src/**/*.test.{ts,tsx}', 'api/**/*.test.ts'],
     coverage: {
       provider: 'v8',
-      // Scoped to src/ only - api/ has real tests now (see api/**/__tests__) but not full
-      // coverage yet, and folding untested api/ files into this gate would either tank the
-      // pinned thresholds or force diluting them. Track api/ coverage separately once more
-      // of it is under test.
-      include: ['src/**/*.{ts,tsx}'],
-      exclude: ['src/**/*.test.{ts,tsx}', 'src/test/**', 'src/main.tsx', 'src/types/**', 'src/**/*.d.ts'],
+      include: ['src/**/*.{ts,tsx}', 'api/**/*.ts'],
+      exclude: [
+        'src/**/*.test.{ts,tsx}', 'src/test/**', 'src/main.tsx', 'src/types/**', 'src/**/*.d.ts',
+        'api/**/*.test.ts', 'api/**/__tests__/**',
+      ],
       reporter: ['text-summary'],
-      // Regression gate, now enforced in CI (see .github/workflows/ci.yml). Achieved ~97%
-      // functions as of 2026-07-22; thresholds sit ~1pt below the achieved level so normal
-      // day-to-day changes have headroom and only a real coverage drop fails the run.
-      thresholds: { statements: 96, branches: 87, functions: 95, lines: 98 },
+      // Regression gates, enforced in CI (see .github/workflows/ci.yml). Two independent
+      // glob gates, each checked against the aggregate of its own matched files:
+      // - src/ gate: achieved ~97% functions as of 2026-07-22; pinned ~1pt below achieved
+      //   so day-to-day changes have headroom and only a real coverage drop fails the run.
+      // - api/ gate: achieved 31.93/29.15/35.21/33.12 (stmts/branch/fn/lines) as of
+      //   2026-08-14; pinned ~2pts below achieved so api/ regressions trip the gate.
+      //   Raise as api/ tests grow.
+      thresholds: {
+        'src/**/*.{ts,tsx}': { statements: 96, branches: 87, functions: 95, lines: 98 },
+        'api/**/*.ts': { statements: 30, branches: 27, functions: 33, lines: 31 },
+      },
     },
   },
 })
