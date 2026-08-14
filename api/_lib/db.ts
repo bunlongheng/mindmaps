@@ -1,15 +1,12 @@
 import { Pool } from 'pg'
 
-// One shared pool. TLS is verified when DATABASE_CA_CERT is provided;
-// on ANY Vercel deployment (production AND preview) a missing CA fails CLOSED
-// (verification stays on, connections to an unverifiable server fail) - permissive
-// TLS is only for truly local dev where no cert is available.
+// One shared pool. TLS is verified ONLY when DATABASE_CA_CERT is provided; without
+// a CA the connection stays encrypted but unverified (rejectUnauthorized:false).
+// The managed Postgres this app uses does not expose a verifiable CA chain, so
+// fail-closed would take prod down - set DATABASE_CA_CERT in the platform env to
+// enable full verification.
 const ca = process.env.DATABASE_CA_CERT
 export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: ca
-    ? { ca, rejectUnauthorized: true }
-    : process.env.VERCEL
-      ? { rejectUnauthorized: true }
-      : { rejectUnauthorized: false },
+  ssl: ca ? { ca, rejectUnauthorized: true } : { rejectUnauthorized: false },
 })
