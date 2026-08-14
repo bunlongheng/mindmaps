@@ -49,12 +49,8 @@
   </head>
   <body style="touch-action: manipulation;">
     <div id="root"></div>
-    <!-- Block Safari native pinch/double-tap zoom — we handle zoom in canvas ourselves -->
-    <script>
-      document.addEventListener('gesturestart', function(e) { e.preventDefault(); }, { passive: false });
-      document.addEventListener('gesturechange', function(e) { e.preventDefault(); }, { passive: false });
-      document.addEventListener('gestureend', function(e) { e.preventDefault(); }, { passive: false });
-    </script>
+    <!-- Safari native pinch/double-tap zoom is blocked from the app bundle (src/App.tsx),
+         not an inline script, so the CSP can forbid inline scripts entirely. -->
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
