@@ -1,5 +1,5 @@
 import { test, expect } from './fixtures'
-import { waitForApp } from './helpers'
+import { waitForApp, expectLoginScreen } from './helpers'
 import type { Page } from '@playwright/test'
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -82,11 +82,9 @@ test.describe('Home — header controls', () => {
     await page.locator('[title="Bunlong Heng"]').click()
     await page.getByText('Sign out').click()
     // handleSignOut clears localStorage + setUser(null). On localhost the app
-    // re-seeds DEV_USER only on initial mount, so after sign out the login
-    // form shows until reload. Assert the Sign in screen appears.
-    await expect(page.getByRole('button', { name: /Sign in/ })).toBeVisible({ timeout: 5_000 })
-    await expect(page.locator('input[type="email"]')).toBeVisible()
-    await expect(page.locator('input[type="password"]')).toBeVisible()
+    // re-seeds DEV_USER only on initial mount, so after sign out the Google-only
+    // login screen (logo + "Sign in to continue" + GIS mount) shows until reload.
+    await expectLoginScreen(page)
   })
 
   test('clicking outside the user menu closes it', async ({ page }) => {
@@ -183,9 +181,9 @@ test.describe('Home — tag filter chips', () => {
   })
 
   test('Research preset chip is present and toggles', async ({ page }) => {
-    await page.goto('/')
-    await waitForApp(page)
-    await expect(page.locator('.home-grid')).toBeVisible({ timeout: 10_000 })
+    // Seed a Research-tagged card via the mocked API so the chip is present
+    // regardless of what the real prod library currently contains.
+    await mountSingleCard(page, 'Research Seed', ['Research'])
     const chip = page.locator('button', { hasText: /^Research/ }).first()
     await expect(chip).toBeVisible()
     await chip.click()

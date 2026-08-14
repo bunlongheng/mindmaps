@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
+import { useShallow } from 'zustand/react/shallow'
 import { CuteToast, showToast } from './components/CuteToast'
 import { DiagramCanvas } from './components/canvas/DiagramCanvas'
 import { SidePanel } from './components/panels/SidePanel'
@@ -141,7 +142,14 @@ export default function App() {
   const { loadDiagramList, loadDiagram, saveDiagram, createDiagramFromNodes, deleteDiagram, updateTags } = useDiagram(effectiveUserId)
 
   // Realtime removed — data now on Linode PostgreSQL
-  const { activeMindmap, isDirty, setActiveMindmap, addNode, selectedNodeIds, setSelectedNodeIds, setPasteImportFn, diagrams } = useMindmapStore()
+  // Shallow-selected slice so App only re-renders when one of these actually changes,
+  // not on every store write (resizePreview, HUD flags, etc.). Actions are stable refs.
+  const { activeMindmap, isDirty, setActiveMindmap, addNode, selectedNodeIds, setSelectedNodeIds, setPasteImportFn, diagrams } = useMindmapStore(
+    useShallow(s => ({
+      activeMindmap: s.activeMindmap, isDirty: s.isDirty, setActiveMindmap: s.setActiveMindmap, addNode: s.addNode,
+      selectedNodeIds: s.selectedNodeIds, setSelectedNodeIds: s.setSelectedNodeIds, setPasteImportFn: s.setPasteImportFn, diagrams: s.diagrams,
+    })),
+  )
   const [flashDiagramId] = useState<string | null>(null)
   const [showTagFooter, setShowTagFooter] = useState(false)
   const [tagInput, setTagInput] = useState('')

@@ -4,7 +4,17 @@ import { test as base, expect } from '@playwright/test'
 //   _consoleCheck — fails a test if it logged console errors/warnings
 //   _mapCleanup   — deletes any maps the test created so runs don't pile up
 //                   throwaway maps in the backing store (tests proxy to the real API)
-export const test = base.extend<{ _consoleCheck: void; _mapCleanup: void }>({
+export const test = base.extend<{ _consoleCheck: void; _mapCleanup: void; _seedViewMode: void }>({
+  // The home library defaults to LIST view (persisted in localStorage). These specs
+  // assert on the grid (.home-grid cards), so deterministically seed grid view before
+  // every navigation instead of relying on whatever viewMode a prior context left behind.
+  _seedViewMode: [async ({ page }, use) => {
+    await page.addInitScript(() => {
+      try { localStorage.setItem('mindmaps:viewMode', 'grid') } catch { /* no storage */ }
+    })
+    await use()
+  }, { auto: true }],
+
   _mapCleanup: [async ({ page }, use) => {
     const createdIds = new Set<string>()
     page.on('request', req => {

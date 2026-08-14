@@ -9,6 +9,8 @@ import { verifyToken, bearer, secretEquals } from './auth.js'
 // can flip the bypass on in prod.
 function isLocalDev(): boolean {
   if (process.env.VERCEL_ENV === 'production') return false
+  // Any Vercel deployment (including previews) is not local - the bypass stays local-only.
+  if (process.env.VERCEL) return false
   return process.env.NODE_ENV !== 'production' || process.env.LOCAL_DEV === 'true'
 }
 

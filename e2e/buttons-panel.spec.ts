@@ -147,22 +147,21 @@ test.describe('SidePanel — Map tab', () => {
 
   test('Show order # toggle removes and re-adds the order-number badges', async ({ page }) => {
     await openEditorWithPanel(page)
-    // Default ON for a blank logic-chart → order-number circles (r=13) exist
+    // Default ON for a blank logic-chart: EdgeLayer draws a white badge circle
+    // (r=10, fill #ffffff) with the order number on each L1 connector stub.
     const orderCircles = () => page.evaluate(() =>
       [...document.querySelectorAll('.diagram-canvas-root svg circle')]
-        .filter(c => c.getAttribute('r') === '13').length
+        .filter(c => c.getAttribute('r') === '10' && c.getAttribute('fill') === '#ffffff').length
     )
-    expect(await orderCircles()).toBeGreaterThan(0)
+    await expect.poll(orderCircles, { timeout: 5_000 }).toBeGreaterThan(0)
 
     const toggle = page.getByText('Show order #', { exact: true }).locator('..').locator('button')
     await toggle.click()
-    await page.waitForTimeout(400)
-    expect(await orderCircles()).toBe(0)
+    await expect.poll(orderCircles, { timeout: 5_000 }).toBe(0)
 
     // Toggle back ON
     await toggle.click()
-    await page.waitForTimeout(400)
-    expect(await orderCircles()).toBeGreaterThan(0)
+    await expect.poll(orderCircles, { timeout: 5_000 }).toBeGreaterThan(0)
   })
 
   test('Show count toggle appends child counts to L1 labels', async ({ page }) => {
@@ -221,41 +220,74 @@ test.describe('SidePanel — Map tab', () => {
 
 // ── Style tab: Text / Shape / Visual / Branch ────────────────────────────────
 
+// First 5 entries of the 12-colour wheel (L1_PALETTE in src/lib/color.ts).
+// Since the wheel landed, a depth-1 node's rendered fill is derived from its
+// sortOrder (L1_PALETTE[sortOrder]), NOT from its stored custom colour.
+const WHEEL = ['#ed1c24', '#f26522', '#f7941e', '#faa61a', '#ffd500']
+
 test.describe('SidePanel — Style tab', () => {
-  test('color swatch changes the selected node fill; custom color input also applies', async ({ page }) => {
+  test('Fill swatch + custom color persist to the node; L1 fill stays wheel-driven', async ({ page }) => {
     await openEditorWithPanel(page)
     await clickNode(page, 'Main Topic 1')
 
-    const before = await fillOf(page, 'Main Topic 1')
-    expect(before).not.toBeNull()
+    // Rendered fill of an L1 node comes from the 12-colour wheel by order.
+    await expect.poll(async () => (await fillOf(page, 'Main Topic 1'))?.toLowerCase(), { timeout: 5_000 })
+      .toBe(WHEEL[0])
 
-    // Swatches are square buttons with aspect-ratio styling inside the Shape > Fill row.
-    const swatches = page.locator('button[style*="aspect-ratio"]')
-    const count = await swatches.count()
-    expect(count).toBeGreaterThan(0)
-    let changed = false
-    for (let i = 0; i < count && !changed; i++) {
-      await swatches.nth(i).click()
-      await page.waitForTimeout(250)
-      changed = (await fillOf(page, 'Main Topic 1')) !== before
-    }
-    expect(changed).toBe(true)
-
-    // Custom color: the hidden <input type=color> as the last tile in the grid.
-    // Setting its value + firing input/change drives the same onChange the picker uses.
-    const swatchFill = await fillOf(page, 'Main Topic 1')
+    // The picker's <input type=color> is controlled by node.color, so it proves the
+    // store round-trip: click a swatch and the input must take that swatch's colour.
     const colorInput = page.locator('input[type="color"]').first()
+    // Use the 2nd swatch so the value provably CHANGES (the 1st swatch equals the
+    // node's seeded colour #ef4444, which would pass without any store write).
+    const swatch = page.locator('button[style*="aspect-ratio"]').nth(1)
+    const swatchColor = await swatch.evaluate(el => {
+      const bg = getComputedStyle(el).backgroundColor
+      const m = bg.match(/\d+/g)!.map(Number)
+      return '#' + m.slice(0, 3).map(n => n.toString(16).padStart(2, '0')).join('')
+    })
+    expect(swatchColor).not.toBe(await colorInput.inputValue())
+    await swatch.click()
+    await expect.poll(() => colorInput.inputValue(), { timeout: 5_000 }).toBe(swatchColor)
+
+    // Custom color: setting the hidden <input type=color> drives the same onChange.
     await colorInput.evaluate((el: HTMLInputElement) => {
       const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
       setter.call(el, '#123456')
       el.dispatchEvent(new Event('input', { bubbles: true }))
       el.dispatchEvent(new Event('change', { bubbles: true }))
     })
-    await page.waitForTimeout(400)
-    const after = await fillOf(page, 'Main Topic 1')
-    // L1 fill is the raw node.color in logic-chart → custom hex applied
-    expect((after ?? '').toLowerCase()).toContain('#123456')
-    expect(after).not.toBe(swatchFill)
+    await expect.poll(() => colorInput.inputValue(), { timeout: 5_000 }).toBe('#123456')
+
+    // Regression guard for the wheel: the L1 fill is order-driven, so the custom
+    // colour must NOT repaint the node - the wheel colour wins.
+    await expect.poll(async () => (await fillOf(page, 'Main Topic 1'))?.toLowerCase(), { timeout: 5_000 })
+      .toBe(WHEEL[0])
+  })
+
+  test('reordering an L1 node recolours it along the 12-colour wheel', async ({ page }) => {
+    await openEditorWithPanel(page)
+
+    // Fresh blank map: Main Topic 1..5 render the first 5 wheel colours in order.
+    for (let i = 0; i < 5; i++) {
+      await expect.poll(async () => (await fillOf(page, `Main Topic ${i + 1}`))?.toLowerCase(), { timeout: 5_000 })
+        .toBe(WHEEL[i])
+    }
+
+    // Drag "Main Topic 1" below the last sibling: it takes the last order slot
+    // (wheel colour 5) and "Main Topic 2" moves up to first (wheel colour 1).
+    const from = await nodeBox(page, 'Main Topic 1')
+    const last = await nodeBox(page, 'Main Topic 5')
+    expect(from).not.toBeNull()
+    expect(last).not.toBeNull()
+    await page.mouse.move(from!.x + from!.width / 2, from!.y + from!.height / 2)
+    await page.mouse.down()
+    await page.mouse.move(last!.x + last!.width / 2, last!.y + last!.height + 40, { steps: 12 })
+    await page.mouse.up()
+
+    await expect.poll(async () => (await fillOf(page, 'Main Topic 1'))?.toLowerCase(), { timeout: 5_000 })
+      .toBe(WHEEL[4])
+    await expect.poll(async () => (await fillOf(page, 'Main Topic 2'))?.toLowerCase(), { timeout: 5_000 })
+      .toBe(WHEEL[0])
   })
 
   test('Bold and Italic toggles change the rendered font weight/style', async ({ page }) => {

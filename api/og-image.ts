@@ -3,7 +3,8 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const name = (req.query.name as string) || 'Untitled'
-  const nodes = (req.query.nodes as string) || '0'
+  // Only digits reach the SVG - a non-numeric ?nodes param coerces to 0.
+  const nodes = String(parseInt((req.query.nodes as string) || '0', 10) || 0)
   const type = (req.query.type as string) || 'logic-chart'
   const tags = ((req.query.tags as string) || '').split(',').filter(Boolean)
 
@@ -13,7 +14,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     'fishbone': 'Fishbone',
     'timeline': 'Timeline',
   }
-  const label = typeLabel[type] || type
+  // The fallback is the raw ?type param, so escape it like the name before it hits the SVG.
+  const label = (typeLabel[type] || type).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 
   const displayName = name.length > 50 ? name.slice(0, 47) + '...' : name
   const safeName = displayName.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')

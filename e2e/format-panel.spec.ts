@@ -131,10 +131,39 @@ test.describe('Format Panel — Node Editing', () => {
     }
   })
 
-  test('changing a node color updates the node fill', async ({ page }) => {
+  test('node colours follow the L1 order: deleting the first topic recolours the rest', async ({ page }) => {
     await createMapAndOpenFormat(page)
 
-    // Select "Main Topic 1"
+    // Since the 12-colour wheel (L1_PALETTE in src/lib/color.ts), a depth-1 node's
+    // rendered fill is derived from its sortOrder, not its stored custom colour.
+    // So the colour feature to verify is: fills match the wheel in order, and an
+    // order change (delete reindexes sortOrder) re-derives the colours.
+    const WHEEL = ['#ed1c24', '#f26522', '#f7941e']
+
+    // The node <g> has several layers (glow, selection outline); read the one shape
+    // that carries a concrete colour fill (not none/transparent).
+    const fillOf = (label: string) => page.evaluate((lbl) => {
+      const texts = document.querySelectorAll('.diagram-canvas-root svg text')
+      for (const t of texts) {
+        if (t.textContent?.includes(lbl)) {
+          const g = (t as SVGTextElement).closest('g[data-node-id]')
+          const shapes = g ? [...g.querySelectorAll('rect, circle, path, ellipse')] : []
+          for (const s of shapes) {
+            const v = s.getAttribute('fill')
+            if (v && /^#|^rgb/.test(v) && v !== 'transparent') return v
+          }
+        }
+      }
+      return null
+    }, label)
+
+    // Fresh blank map: topics take the first wheel colours, top to bottom.
+    await expect.poll(async () => (await fillOf('Main Topic 1'))?.toLowerCase(), { timeout: 5_000 }).toBe(WHEEL[0])
+    await expect.poll(async () => (await fillOf('Main Topic 2'))?.toLowerCase(), { timeout: 5_000 }).toBe(WHEEL[1])
+    await expect.poll(async () => (await fillOf('Main Topic 3'))?.toLowerCase(), { timeout: 5_000 }).toBe(WHEEL[2])
+
+    // Select "Main Topic 1" and delete it: the remaining topics shift up one
+    // order slot each and their fills re-derive from the wheel.
     const box = await page.evaluate(() => {
       const texts = document.querySelectorAll('.diagram-canvas-root svg text')
       for (const t of texts) {
@@ -149,38 +178,11 @@ test.describe('Format Panel — Node Editing', () => {
     expect(box).not.toBeNull()
     await page.mouse.click(box!.x + box!.width / 2, box!.y + box!.height / 2)
     await page.waitForTimeout(400)
+    await page.keyboard.press('Delete')
 
-    // The node <g> has several layers (glow, selection outline); read the one shape
-    // that carries a concrete colour fill (not none/transparent), which is node.color.
-    const fillOf = () => page.evaluate(() => {
-      const texts = document.querySelectorAll('.diagram-canvas-root svg text')
-      for (const t of texts) {
-        if (t.textContent?.includes('Main Topic 1')) {
-          const g = (t as SVGTextElement).closest('g[data-node-id]')
-          const shapes = g ? [...g.querySelectorAll('rect, circle, path, ellipse')] : []
-          for (const s of shapes) {
-            const v = s.getAttribute('fill')
-            if (v && /^#|^rgb/.test(v) && v !== 'transparent') return v
-          }
-        }
-      }
-      return null
-    })
-
-    const before = await fillOf()
-    // Color swatches in the panel are square buttons with an inline aspect-ratio.
-    const swatches = page.locator('aside button[style*="aspect-ratio"], button[style*="aspect-ratio"]')
-    const count = await swatches.count()
-    expect(count).toBeGreaterThan(0)
-
-    // Click swatches until the node fill actually changes (skip the one matching current).
-    let changed = false
-    for (let i = 0; i < count && !changed; i++) {
-      await swatches.nth(i).click()
-      await page.waitForTimeout(300)
-      changed = (await fillOf()) !== before
-    }
-    expect(changed).toBe(true)
+    await expect.poll(async () => await fillOf('Main Topic 1'), { timeout: 5_000 }).toBeNull()
+    await expect.poll(async () => (await fillOf('Main Topic 2'))?.toLowerCase(), { timeout: 5_000 }).toBe(WHEEL[0])
+    await expect.poll(async () => (await fillOf('Main Topic 3'))?.toLowerCase(), { timeout: 5_000 }).toBe(WHEEL[1])
   })
 
   test('text alignment buttons work', async ({ page }) => {

@@ -1,6 +1,6 @@
 import { pool } from './_lib/db.js'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { verifyToken, bearer } from './_lib/auth.js'
+import { verifyToken, bearer, secretEquals } from './_lib/auth.js'
 import { corsHeaders } from './_lib/cors.js'
 
 const SECRET = () => (process.env.MINDMAP_JWT_SECRET ?? '').trim()
@@ -17,19 +17,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const raw = bearer(req.headers)
     const aiKey = (process.env.MINDMAP_AI_API_KEY ?? '').trim()
     const ownerId = (process.env.MINDMAP_USER_ID ?? '').trim()
-    const auth = (aiKey && ownerId && raw === aiKey)
+    const auth = (aiKey && ownerId && (await secretEquals(raw, aiKey)))
       ? { sub: ownerId, email: '', role: 'service' }
       : await verifyToken(raw, SECRET())
 
     // Public reads: a single shared map by id needs no token; everything else requires the owner.
     if (req.method === 'GET') {
       if (id) {
-        const r = await pool.query('SELECT * FROM mindmaps WHERE id=$1', [id])
+        const r = await pool.query(
+          'SELECT id, user_id, name, type, line_style, sharing_enabled, theme_id, nodes, tags, updated_at FROM mindmaps WHERE id=$1',
+          [id],
+        )
         if (!r.rows.length) return res.status(404).json({ error: 'Not found' })
         const row = r.rows[0]
         const isOwner = auth && auth.sub === row.user_id
         if (!isOwner && !row.sharing_enabled) return res.status(403).json({ error: 'Not shared' })
-        return res.json(row)
+        if (isOwner) return res.json(row)
+        // Public share view: never expose the owner's user_id to unauthenticated callers.
+        const { user_id: rowOwner, ...shared } = row
+        void rowOwner
+        return res.json(shared)
       }
       // Listing a user's maps requires being that user.
       if (!auth) return res.status(401).json({ error: 'Unauthorized' })
@@ -46,7 +53,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (req.method === 'POST') {
       const b = req.body
-      await pool.query(
+      const result = await pool.query(
         `INSERT INTO mindmaps (id, user_id, name, type, line_style, sharing_enabled, theme_id, nodes, tags)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
          ON CONFLICT (id) DO UPDATE SET
@@ -56,6 +63,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
          b.line_style ?? 'orthogonal', b.sharing_enabled ?? false,
          b.theme_id ?? 'default', JSON.stringify(b.nodes ?? []), b.tags ?? []],
       )
+      // rowCount 0 means the id exists but belongs to someone else - nothing was written.
+      if (result.rowCount === 0) return res.status(404).json({ error: 'Not found' })
       return res.status(201).json({ id: b.id })
     }
 
@@ -74,7 +83,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (!fields.length) return res.status(400).json({ error: 'Nothing to update' })
       fields.push(`updated_at=now()`)
       vals.push(targetId, uid)
-      await pool.query(`UPDATE mindmaps SET ${fields.join(',')} WHERE id=$${i++} AND user_id=$${i}`, vals)
+      const result = await pool.query(`UPDATE mindmaps SET ${fields.join(',')} WHERE id=$${i++} AND user_id=$${i}`, vals)
+      // rowCount 0 means no map with that id is owned by this user - nothing was updated.
+      if (result.rowCount === 0) return res.status(404).json({ error: 'Not found' })
       return res.json({ ok: true })
     }
 

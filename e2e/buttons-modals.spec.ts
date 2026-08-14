@@ -1,5 +1,5 @@
 import { test, expect } from './fixtures'
-import { waitForApp } from './helpers'
+import { waitForApp, expectLoginScreen } from './helpers'
 import type { Page } from '@playwright/test'
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -24,7 +24,7 @@ test.describe('Import modal — structure & method tiles', () => {
     await expect(page.getByText('1. Generate with AI')).toBeVisible()
     await expect(page.getByText('2. Paste (⌘V) anywhere')).toBeVisible()
     await expect(page.getByText('3. POST via API')).toBeVisible()
-    await expect(page.getByText('AI agents — how to discover this API')).toBeVisible()
+    await expect(page.getByText('AI agents - how to discover this API')).toBeVisible()
     // Badges.
     await expect(page.getByText('Built-in')).toBeVisible()
     await expect(page.getByText('Auto-detect')).toBeVisible()
@@ -118,61 +118,52 @@ test.describe('Import modal — close behaviors', () => {
 })
 
 test.describe('Auth — login screen', () => {
-  // Force the unauthenticated state by clearing the localStorage seed before
-  // the app mounts. On localhost App seeds DEV_USER in the useState initializer,
-  // so we sign out via the menu to reach the login form deterministically.
-  test('sign out reveals a login form with email + password + Sign in button', async ({ page }) => {
+  // The app is Google-only sign-in (GIS): the login card renders the Mindmaps
+  // logo, "Sign in to continue", and a mount div Google renders the "Continue
+  // with Google" button into. On localhost App seeds DEV_USER in the useState
+  // initializer, so we sign out via the menu to reach the login screen
+  // deterministically.
+  test('sign out reveals the Google login screen (logo + Sign in to continue + Google mount)', async ({ page }) => {
     await page.goto('/')
     await waitForApp(page)
     await page.locator('[title="Bunlong Heng"]').click()
     await page.getByText('Sign out').click()
-    await expect(page.getByRole('button', { name: /Sign in/ })).toBeVisible({ timeout: 5_000 })
-    await expect(page.locator('input[type="email"]')).toBeVisible()
-    await expect(page.locator('input[type="password"]')).toBeVisible()
-    await expect(page.getByText('Sign in to continue')).toBeVisible()
+    await expectLoginScreen(page)
   })
 
-  test('login with invalid credentials surfaces an error (no navigation)', async ({ page }) => {
-    // Stub the auth endpoint to reject so we never hit the real API.
-    await page.route('**/api/auth', route =>
-      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: false, error: 'Invalid credentials' }) }),
-    )
+  test('sign out clears the session and the login screen blocks the app chrome', async ({ page }) => {
     await page.goto('/')
     await waitForApp(page)
     await page.locator('[title="Bunlong Heng"]').click()
     await page.getByText('Sign out').click()
-    await expect(page.locator('input[type="email"]')).toBeVisible({ timeout: 5_000 })
-
-    await page.locator('input[type="email"]').fill('nope@example.com')
-    await page.locator('input[type="password"]').fill('wrongpass')
-    await page.getByRole('button', { name: /Sign in/ }).click()
-
-    // Error renders, form stays.
-    await expect(page.getByText('Invalid credentials')).toBeVisible({ timeout: 5_000 })
-    await expect(page.locator('input[type="email"]')).toBeVisible()
+    await expectLoginScreen(page)
+    // handleSignOut wipes the stored session.
+    const session = await page.evaluate(() => ({
+      user: localStorage.getItem('mindmaps:user'),
+      token: localStorage.getItem('mindmaps:token'),
+    }))
+    expect(session.user).toBeNull()
+    expect(session.token).toBeNull()
+    // The app chrome is gone until the next sign-in: no home grid, no avatar menu.
+    await expect(page.locator('.home-grid')).toHaveCount(0)
+    await expect(page.locator('[title="Bunlong Heng"]')).toHaveCount(0)
   })
 
-  test('submitting login shows the loading spinner then recovers on error', async ({ page }) => {
-    // Delay the auth response so we can observe the in-flight loading state.
-    // App replaces the whole form with a full-page spinner while authLoading is
-    // true, so we assert the spinner appears, then the form returns with the error.
-    await page.route('**/api/auth', async route => {
-      await new Promise(r => setTimeout(r, 1000))
-      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: false, error: 'Invalid credentials' }) })
-    })
+  test('login screen offers exactly one Google affordance and no password fallback', async ({ page }) => {
     await page.goto('/')
     await waitForApp(page)
     await page.locator('[title="Bunlong Heng"]').click()
     await page.getByText('Sign out').click()
-    await expect(page.locator('input[type="email"]')).toBeVisible({ timeout: 5_000 })
-    await page.locator('input[type="email"]').fill('a@b.com')
-    await page.locator('input[type="password"]').fill('secret')
-    await page.locator('form button[type="submit"]').click()
-    // In-flight: the form is replaced by the spinner (the email input disappears).
-    await expect(page.locator('input[type="email"]')).toBeHidden({ timeout: 2_000 })
-    // After the response resolves, the form returns with the error message.
-    await expect(page.getByText('Invalid credentials')).toBeVisible({ timeout: 5_000 })
-    await expect(page.locator('input[type="email"]')).toBeVisible()
+    await expectLoginScreen(page)
+    // Exactly one sign-in affordance renders: the GIS button mount when a Google
+    // client id is configured, otherwise the "Sign-in is not configured" notice.
+    const mounts = await page.locator('div[style*="min-height: 44px"]').count()
+    const notice = await page.getByText('Sign-in is not configured').count()
+    expect(mounts + notice).toBe(1)
+    // No leftover form-based login: no <form>, no page-level Sign in button
+    // (the Google button lives inside the GIS iframe, never in the page DOM).
+    await expect(page.locator('form')).toHaveCount(0)
+    await expect(page.getByRole('button', { name: /sign in/i })).toHaveCount(0)
   })
 })
 

@@ -1,4 +1,5 @@
 import { useCallback } from 'react'
+import { useShallow } from 'zustand/react/shallow'
 import { showToast } from '../components/CuteToast'
 import { useMindmapStore } from '../store/mindmapStore'
 import { ROOT_COLORS } from '../lib/color'
@@ -113,7 +114,11 @@ function rowToDiagram(row: Record<string, unknown>): Diagram {
 // ── hook ────────────────────────────────────────────────────────────────────
 
 export function useDiagram(userId: string | null = null) {
-  const { setActiveMindmap, setDiagrams, setIsDirty } = useMindmapStore()
+  // Shallow-selected actions only (stable refs) so this hook never re-renders its
+  // host component on store data writes.
+  const { setActiveMindmap, setDiagrams, setIsDirty } = useMindmapStore(
+    useShallow(s => ({ setActiveMindmap: s.setActiveMindmap, setDiagrams: s.setDiagrams, setIsDirty: s.setIsDirty })),
+  )
 
   const loadDiagramList = useCallback(async () => {
     if (!userId) { setDiagrams([]); return }

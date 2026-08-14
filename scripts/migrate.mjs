@@ -31,7 +31,11 @@ if (!['status', 'backfill', 'up'].includes(mode)) {
 const ca = process.env.DATABASE_CA_CERT
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: ca ? { ca, rejectUnauthorized: true } : { rejectUnauthorized: false },
+  ssl: ca
+    ? { ca, rejectUnauthorized: true }
+    : process.env.VERCEL
+      ? { rejectUnauthorized: true }
+      : { rejectUnauthorized: false },
 })
 
 function migrationFiles() {

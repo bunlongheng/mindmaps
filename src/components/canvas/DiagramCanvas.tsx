@@ -5,7 +5,8 @@ import { getTheme } from '../../lib/themes'
 import { EdgeLayer } from './EdgeLayer'
 import { Node } from './Node'
 import { useKeyboard } from '../../hooks/useKeyboard'
-import { soundClick, soundCreate } from '../../lib/sounds'
+import { soundClick } from '../../lib/sounds'
+import { L1_PALETTE } from '../../lib/color'
 
 interface DiagramCanvasProps {
   onNodeSelect: (nodeId: string | null) => void
@@ -41,6 +42,29 @@ function computeSubtreeCounts(nodes: { id: string; parentId: string | null }[]) 
   return { childCounts, descendantCounts }
 }
 
+// Resolve every node's 12-colour-wheel palette colour in one O(n) pass, so Node and
+// EdgeLayer no longer each run l1PaletteColor's O(n) ancestor walk per node per render
+// (which was O(n^2) per render). Same semantics as l1PaletteColor in src/lib/color.ts:
+// null for the root or when no L1 ancestor exists (callers fall back to the stored colour).
+function computePaletteColors(nodes: { id: string; parentId: string | null; depth: number; sortOrder?: number }[]) {
+  const byId = new Map(nodes.map(n => [n.id, n]))
+  const colors = new Map<string, string | null>()
+  const resolve = (n: { id: string; parentId: string | null; depth: number; sortOrder?: number }): string | null => {
+    const cached = colors.get(n.id)
+    if (cached !== undefined) return cached
+    let c: string | null = null
+    if (n.depth === 1) c = L1_PALETTE[(((n.sortOrder ?? 0) % 12) + 12) % 12]
+    else if (n.depth > 1) {
+      const parent = n.parentId ? byId.get(n.parentId) : undefined
+      c = parent ? resolve(parent) : null
+    }
+    colors.set(n.id, c)
+    return c
+  }
+  for (const n of nodes) resolve(n)
+  return colors
+}
+
 export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
   // Shallow-selected slice so the canvas only re-renders when one of these actually changes,
   // not on unrelated store writes (resizePreview, HUD flags, showChildCount, etc.).
@@ -52,6 +76,7 @@ export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
     })),
   )
   const counts = useMemo(() => computeSubtreeCounts(activeMindmap?.nodes ?? []), [activeMindmap?.nodes])
+  const paletteColors = useMemo(() => computePaletteColors(activeMindmap?.nodes ?? []), [activeMindmap?.nodes])
   const canvasBg = getTheme(themeId).canvasBg
   const svgRef = useRef<SVGSVGElement>(null!)
   const gRef = useRef<SVGGElement>(null!)
@@ -442,7 +467,7 @@ export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
         style={{ userSelect: 'none', touchAction: 'none' }}
       >
         <g ref={gRef}>
-          <EdgeLayer nodes={hideDetails ? activeMindmap.nodes.filter(n => n.depth <= 2) : activeMindmap.nodes} lineStyle={lineStyle} diagramType={diagramType} />
+          <EdgeLayer nodes={hideDetails ? activeMindmap.nodes.filter(n => n.depth <= 2) : activeMindmap.nodes} lineStyle={lineStyle} diagramType={diagramType} paletteColors={paletteColors} />
           {(hideDetails ? activeMindmap.nodes.filter(n => n.depth <= 2) : activeMindmap.nodes).map(node => (
             <Node
               key={node.id}
@@ -453,12 +478,13 @@ export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
               onDragMove={handleDragMove}
               onRootDragOffset={handleRootDragOffset}
               onDoubleClick={n => { setSelectedNodeIds([n.id]); onNodeSelect(n.id) }}
-              onAddChild={id => { soundCreate(); addNode(id) }}
               svgRef={svgRef}
               readOnly={readOnly}
               l1Colors={node.depth === 0 ? activeMindmap.nodes.filter(n => n.depth === 1).map(n => n.color) : undefined}
+              paletteColor={paletteColors.get(node.id) ?? null}
               childCount={counts.childCounts.get(node.id) ?? 0}
               descendantCount={counts.descendantCounts.get(node.id) ?? 0}
+              nodeCount={activeMindmap.nodes.length}
             />
           ))}
           {/* Rubber-band selection box */}
