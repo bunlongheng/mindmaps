@@ -1,3 +1,13 @@
+<div align="center">
+  <img src="docs/icon.png" alt="Mindmaps" width="96" height="96" />
+  <h1>Mindmaps</h1>
+  <p><em>Claude Haiku turns a prompt into a structured mind map in one call</em></p>
+  <p><a href="https://mindmaps-bheng.vercel.app">Live</a> &middot; <a href="https://github.com/bunlongheng/mindmaps">Repo</a> &middot; <a href="https://bunlongheng.com/projects?name=mindmaps">Portfolio</a></p>
+  <img src="docs/social-preview.png" alt="Mindmaps - preview" width="820" />
+</div>
+
+---
+
 # Mindmaps
 
 A PWA mind-mapping studio where maps are drawn by hand, pasted from an outline, or generated end to end by Claude, then styled, themed, auto-saved, shared as link previews, and exported to PDF.
