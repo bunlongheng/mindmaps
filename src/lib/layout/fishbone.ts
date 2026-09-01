@@ -1,4 +1,4 @@
-import type { MindmapNode } from '../../types'
+import type { MindmapNode } from '../../types/index.js'
 
 export const FISHBONE_SLANT = 90
 

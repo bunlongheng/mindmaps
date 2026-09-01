@@ -1,5 +1,5 @@
-import type { MindmapNode } from '../../types'
-import { rootPillWidth, rootCircleDiameter, rootTitleNeedsPill } from '../rootPill'
+import type { MindmapNode } from '../../types/index.js'
+import { rootPillWidth, rootCircleDiameter, rootTitleNeedsPill } from '../rootPill.js'
 
 const DEFAULT_H: Record<number, number> = { 1: 54, 2: 38, 3: 34 }
 const DEFAULT_HEIGHT = 30

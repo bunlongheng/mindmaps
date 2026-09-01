@@ -1,4 +1,4 @@
-import type { MindmapNode } from '../../types'
+import type { MindmapNode } from '../../types/index.js'
 
 const ROOT_RADIUS = 260   // root center → L1 center
 const L1_EXTRA   = 140   // L1 center → L2 center

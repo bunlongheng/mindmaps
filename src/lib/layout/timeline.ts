@@ -1,4 +1,4 @@
-import type { MindmapNode } from '../../types'
+import type { MindmapNode } from '../../types/index.js'
 
 const SPINE_Y = 400
 const ROOT_X = 80

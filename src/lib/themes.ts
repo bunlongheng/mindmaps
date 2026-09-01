@@ -1,4 +1,4 @@
-import { hexToRgb } from './color'
+import { hexToRgb } from './color.js'
 
 export interface Theme {
   id: string
