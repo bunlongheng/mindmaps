@@ -4,6 +4,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { pool } from '../_lib/db.js'
 import { corsHeaders } from '../_lib/cors.js'
 import { authorizeOwner } from '../_lib/authorizeOwner.js'
+import { renderMindmapSvg } from '../_lib/render-svg.js'
 import {
   parseIndentedOutline, normalizeOutlineRoots, assembleOutlineTree,
   flattenJsonOutline, computeImportNodeWidth, OUTLINE_META_KEYS,
@@ -141,5 +142,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const appUrl = process.env.MINDMAP_APP_URL ?? 'https://mindmaps-bheng.vercel.app'
-  return res.status(201).json({ id, url: `${appUrl}/?id=${id}`, nodeCount: nodes.length })
+  const out: Record<string, unknown> = {
+    id,
+    url: `${appUrl}/?id=${id}`,
+    svg_url: `${appUrl}/api/mindmaps?id=${id}&format=svg`,
+    nodeCount: nodes.length,
+  }
+  // A remote agent (e.g. docs pipeline) can ask for the SVG inline in one round
+  // trip: POST ...?format=svg  or  body { "return": "svg" } / { "format": "svg" }.
+  const wantSvg = req.query?.format === 'svg' || body.return === 'svg' || body.format === 'svg'
+  if (wantSvg) {
+    try {
+      out.svg = renderMindmapSvg({ id, name: title, type, line_style: lineStyle, theme_id: themeId, nodes })
+    } catch (e: unknown) {
+      // Never fail the create because of a render hiccup - the map is saved and
+      // the caller can still fetch svg_url. Surface the reason instead.
+      out.svg_error = e instanceof Error ? e.message : String(e)
+    }
+  }
+  return res.status(201).json(out)
 }

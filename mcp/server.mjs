@@ -55,22 +55,28 @@ server.registerTool(
   {
     title: 'Create mindmap',
     description:
-      'Create a mind map in the Mindmaps app from an outline YOU write (no server-side AI, no Anthropic spend). `outline` is a JSON string like {"Root":[{"icon":"brain","Category A":["item 1","item 2"]}]} OR indented text (2 spaces per level). Returns the id, shareable url, and node count.',
+      'Create a mind map in the Mindmaps app from an outline YOU write (no server-side AI, no Anthropic spend). `outline` is a JSON string like {"Root":[{"icon":"brain","Category A":["item 1","item 2"]}]} OR indented text (2 spaces per level). Returns the id, shareable url, svg_url, and node count; pass format:"svg" to also get the inline SVG string.',
     inputSchema: {
       title: z.string().describe('The map title / root label, e.g. "Machine Learning"'),
       outline: z.string().describe('JSON-string outline (categories with items, optional per-category "icon") OR indented text. Omit for an empty root.').optional(),
       type: z.enum(VALID_TYPES).optional().describe('Layout (default logic-chart). "top 10"-style flat lists read well as logic-chart/mindmap.'),
       sharing: z.boolean().optional().describe('Make the map readable by URL without auth (default true so the link opens for anyone).'),
       colors: z.array(z.string()).optional().describe('Optional hex colors to override the branch palette.'),
+      format: z.enum(['svg']).optional().describe('Pass "svg" to also return the rendered map as an inline self-contained SVG string.'),
     },
   },
-  async ({ title, outline, type = 'logic-chart', sharing = true, colors }) => {
+  async ({ title, outline, type = 'logic-chart', sharing = true, colors, format }) => {
     try {
       const body = { title, type, userId: OWNER_ID, sharing }
       if (outline != null) body.outline = outline
       if (colors) body.colors = colors
+      if (format === 'svg') body.format = 'svg'
       const r = await api('/api/ai/mindmaps', { method: 'POST', body })
-      return ok({ id: r.id, url: r.url, nodeCount: r.nodeCount })
+      return ok({
+        id: r.id, url: r.url, svg_url: r.svg_url, nodeCount: r.nodeCount,
+        ...(r.svg ? { svg: r.svg } : {}),
+        ...(r.svg_error ? { svg_error: r.svg_error } : {}),
+      })
     } catch (e) { return fail(`create failed: ${e.message}`) }
   },
 )

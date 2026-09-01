@@ -2,6 +2,7 @@ import { pool } from './_lib/db.js'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { verifyToken, bearer, secretEquals } from './_lib/auth.js'
 import { corsHeaders } from './_lib/cors.js'
+import { renderMindmapSvg } from './_lib/render-svg.js'
 
 const SECRET = () => (process.env.MINDMAP_JWT_SECRET ?? '').trim()
 
@@ -12,12 +13,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const { id, user_id } = req.query as Record<string, string>
     void user_id
-    // Owner session token, OR the static service key (used by the prod smoke test /
-    // AI agents) which authenticates headlessly as the owner.
+    // Owner session token, OR a static service key (used by the prod smoke test /
+    // AI agents / partners) which authenticates headlessly as the owner.
     const raw = bearer(req.headers)
-    const aiKey = (process.env.MINDMAP_AI_API_KEY ?? '').trim()
+    const aiKeys = [process.env.MINDMAP_AI_API_KEY, process.env.MINDMAP_AI_API_KEY_PARTNER]
+      .map(k => (k ?? '').trim()).filter(Boolean)
     const ownerId = (process.env.MINDMAP_USER_ID ?? '').trim()
-    const auth = (aiKey && ownerId && (await secretEquals(raw, aiKey)))
+    let isServiceKey = false
+    if (ownerId) {
+      for (const key of aiKeys) {
+        if (await secretEquals(raw, key)) { isServiceKey = true; break }
+      }
+    }
+    const auth = isServiceKey
       ? { sub: ownerId, email: '', role: 'service' }
       : await verifyToken(raw, SECRET())
 
@@ -32,6 +40,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const row = r.rows[0]
         const isOwner = auth && auth.sub === row.user_id
         if (!isOwner && !row.sharing_enabled) return res.status(403).json({ error: 'Not shared' })
+        // ?format=svg -> render the map to a self-contained SVG (docs-ready).
+        // Same visibility rules as the JSON read (public if shared, else owner).
+        if ((req.query as Record<string, string>).format === 'svg') {
+          try {
+            const svg = renderMindmapSvg(row)
+            res.setHeader('Content-Type', 'image/svg+xml; charset=utf-8')
+            res.setHeader('Cache-Control', 'public, max-age=60')
+            return res.status(200).send(svg)
+          } catch (e: unknown) {
+            return res.status(500).json({ error: 'Failed to render SVG', detail: e instanceof Error ? e.message : String(e) })
+          }
+        }
         if (isOwner) return res.json(row)
         // Public share view: never expose the owner's user_id to unauthenticated callers.
         const { user_id: rowOwner, ...shared } = row

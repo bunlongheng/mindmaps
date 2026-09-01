@@ -31,12 +31,16 @@ export async function authorizeOwner(
   const raw = bearer(headers)
   if (!raw) return false
 
-  // 2. Static API key (external scripts / AI agents), constant-time compare via
-  //    SHA-256 digests (secretEquals never throws / never leaks length). Skipped
-  //    entirely when the caller MUST be the owner (allowBearer:false).
+  // 2. Static API keys (external scripts / AI agents / partners), constant-time
+  //    compare via SHA-256 digests (secretEquals never throws / never leaks
+  //    length). Skipped entirely when the caller MUST be the owner
+  //    (allowBearer:false). The partner key is optional - unset means not accepted.
   if (allowBearer) {
-    const key = (process.env.MINDMAP_AI_API_KEY ?? '').trim()
-    if (key && (await secretEquals(raw, key))) return true
+    const keys = [process.env.MINDMAP_AI_API_KEY, process.env.MINDMAP_AI_API_KEY_PARTNER]
+      .map(k => (k ?? '').trim()).filter(Boolean)
+    for (const key of keys) {
+      if (await secretEquals(raw, key)) return true
+    }
   }
 
   // 3. Owner session JWT - only the configured owner email passes.
