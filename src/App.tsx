@@ -10,7 +10,7 @@ import { useIsMobile } from './hooks/useIsMobile'
 import { useMindmapStore } from './store/mindmapStore'
 import { decodeShareURL } from './lib/export/share'
 import { hasGoogleAuth, renderGoogleButton } from './lib/googleAuth'
-import { ArrowLeft, SlidersHorizontal, Tag, X, FileDown, Trash2, Network, Share2, Sparkles, GitBranch, Lightbulb, Workflow, ListTree, Waypoints, Image as ImageIcon } from 'lucide-react'
+import { ArrowLeft, SlidersHorizontal, Tag, X, FileDown, Trash2, Copy, Check, Network, Share2, Sparkles, GitBranch, Lightbulb, Workflow, ListTree, Waypoints, Image as ImageIcon } from 'lucide-react'
 import { Confetti } from './components/Confetti'
 import { MindmapsLogo } from './components/MindmapsLogo'
 
@@ -181,6 +181,7 @@ export default function App() {
   const isMobile = useIsMobile()
   const [showImport, setShowImport] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [copiedImage, setCopiedImage] = useState(false)
   const [showConfetti, setShowConfetti] = useState(() => new URLSearchParams(window.location.search).has('imported'))
   const confettiCount = (() => { const t = new URLSearchParams(window.location.search).get('tokens'); return t ? Math.min(280, Math.max(40, Math.round(parseInt(t) / 1000 * 60))) : 60 })()
 
@@ -617,6 +618,25 @@ export default function App() {
                 color: '#64748b', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 4,
               }}>
                 <FileDown size={11} /> PDF
+              </button>
+              <button
+                onClick={() => {
+                  import('./lib/export/copyImage').then(async m => {
+                    if (await m.copyDiagramImage()) {
+                      setCopiedImage(true)
+                      setTimeout(() => setCopiedImage(false), 2000)
+                    }
+                  })
+                }}
+                title="Copy diagram image (HD)"
+                style={{
+                  height: 22, padding: '0 8px', borderRadius: 6,
+                  border: `1px solid ${copiedImage ? '#bbf7d0' : '#e2e8f0'}`,
+                  background: 'transparent', cursor: 'pointer', fontSize: 11, fontWeight: 500,
+                  color: copiedImage ? '#16a34a' : '#64748b', fontFamily: 'inherit',
+                  display: 'flex', alignItems: 'center', gap: 4,
+                }}>
+                {copiedImage ? <Check size={11} /> : <Copy size={11} />} {copiedImage ? 'Copied' : 'Copy'}
               </button>
 <button onClick={() => setShowDeleteConfirm(true)} title="Delete map" style={{
                 height: 22, padding: '0 8px', border: '1px solid #fecaca', borderRadius: 6,
