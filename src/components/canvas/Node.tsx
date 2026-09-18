@@ -3,7 +3,7 @@ import type { MindmapNode } from '../../types'
 import { useMindmapStore } from '../../store/mindmapStore'
 import { NodeIcon, getLucideIcon } from './NodeIcon'
 import { wrapText } from '../../lib/layout/mindmap'
-import { rootPillWidth, rootPillFontSize, rootTitleNeedsPill, rootCircleDiameter } from '../../lib/rootPill'
+import { rootPillWidth, rootPillFontSize, rootTitleNeedsPill, rootCircleDiameter, rootDrawnWidth } from '../../lib/rootPill'
 import { hexToRgb, darken } from '../../lib/color'
 
 interface NodeProps {
@@ -256,7 +256,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   const resolvedIcon = isRoot ? undefined : (!hasEmoji ? node.icon : undefined)
   const hasIcon = !!resolvedIcon && !!getLucideIcon(resolvedIcon)
   // Root pill: always auto-size from title so it never relies on stale stored width.
-  const autoPillW = isRootPill ? rootPillWidth(node.title, baseFontSize) : null
+  const autoPillW = isRootPill ? rootDrawnWidth(node, diagramType) : null
   // Mindmap L2+ circles: force width = height so it's always a circle
   const circleW = isMindmapL2Plus ? Math.max(node.width, node.height) : null
   const displayW = previewW ?? (autoPillW ?? circleW ?? node.width)
