@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { rootPillWidth, rootPillFontSize, ROOT_PILL_MAX, rootCircleDiameter, rootTitleNeedsPill, ROOT_CIRCLE_MAX } from '../rootPill'
+import { rootPillWidth, rootPillFontSize, ROOT_PILL_MAX, rootCircleDiameter, rootTitleNeedsPill, ROOT_CIRCLE_MAX, rootDrawnWidth } from '../rootPill'
 
 describe('rootPillFontSize', () => {
   it('keeps the base font when the title fits within the max width', () => {
@@ -61,5 +61,37 @@ describe('rootTitleNeedsPill', () => {
 
   it('switches to a pill once a fitting circle would exceed the max', () => {
     expect(rootTitleNeedsPill('This title is far too long for a circle', 28)).toBe(true)
+  })
+})
+
+describe('rootDrawnWidth', () => {
+  const pillRoot = { depth: 0, title: 'Ping Network Utility', width: 488 }
+
+  it('returns the stored width for non-root nodes', () => {
+    expect(rootDrawnWidth({ depth: 1, title: 'Child', width: 160 }, 'logic-chart')).toBe(160)
+  })
+
+  it('ignores a stale stored width on a pill root', () => {
+    // The trunk used to start at the stored 488 while the pill was drawn wider,
+    // so the line ran inside the translucent pill.
+    const drawn = rootDrawnWidth(pillRoot, 'logic-chart')
+    expect(drawn).toBe(rootPillWidth(pillRoot.title, 34))
+    expect(drawn).toBeGreaterThan(pillRoot.width)
+  })
+
+  it('honours an explicit shape over the title heuristic', () => {
+    expect(rootDrawnWidth({ ...pillRoot, shape: 'circle' }, 'logic-chart')).toBe(488)
+    expect(rootDrawnWidth({ depth: 0, title: 'Short', width: 200, shape: 'pill' }, 'logic-chart'))
+      .toBe(rootPillWidth('Short', 34))
+  })
+
+  it('never pills the root in mindmap mode', () => {
+    expect(rootDrawnWidth(pillRoot, 'mindmap')).toBe(488)
+  })
+
+  it('respects a node font size override', () => {
+    expect(rootDrawnWidth({ ...pillRoot, fontSize: 30 }, 'logic-chart')).toBe(rootPillWidth(pillRoot.title, 30))
+    // A small enough font lets the title fit a circle, so it stops being a pill.
+    expect(rootDrawnWidth({ ...pillRoot, fontSize: 20 }, 'logic-chart')).toBe(488)
   })
 })

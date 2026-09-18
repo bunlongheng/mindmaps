@@ -3,6 +3,7 @@ import type { LineStyle, DiagramType } from '../../types'
 import { Edge } from './Edge'
 import { FISHBONE_SLANT } from '../../lib/layout/fishbone'
 import { useMindmapStore } from '../../store/mindmapStore'
+import { rootDrawnWidth } from '../../lib/rootPill'
 
 
 interface EdgeLayerProps {
@@ -84,6 +85,9 @@ export function EdgeLayer({ nodes, lineStyle, diagramType, paletteColors }: Edge
   const nodeMap = new Map(nodes.map(n => [n.id, n]))
   // Connector/badge colour from the 12-colour wheel, matching the node fills.
   const pc = (n: MindmapNode) => paletteColors?.get(n.id) ?? n.color
+  // The root pill auto-sizes from its title, so measure what is drawn - a stored
+  // width can be stale and the trunk would start inside the translucent pill.
+  const rootRight = (r: MindmapNode) => r.x + rootDrawnWidth(r, diagramType)
 
   // ── Logic Chart ───────────────────────────────────────────────────────────
   if (diagramType === 'logic-chart') {
@@ -92,7 +96,7 @@ export function EdgeLayer({ nodes, lineStyle, diagramType, paletteColors }: Edge
 
     const l1Nodes = nodes.filter(n => n.parentId === root.id)
       .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
-    const rootRightX = root.x + root.width
+    const rootRightX = rootRight(root)
     const rootCY = root.y + root.height / 2
     const l1LeftX = l1Nodes.length > 0 ? l1Nodes[0].x : rootRightX + 120
     const barX = l1LeftX - 60
@@ -238,12 +242,12 @@ export function EdgeLayer({ nodes, lineStyle, diagramType, paletteColors }: Edge
     // Spine extends to the rightmost L1 attachment point
     const spineEndX = l1s.length > 0
       ? Math.max(...l1s.map(n => n.x + n.width / 2 - FISHBONE_SLANT)) + FISHBONE_SLANT * 1.3
-      : root.x + root.width + 400
+      : rootRight(root) + 400
 
     return (
       <g>
         {/* Spine */}
-        <line x1={root.x + root.width} y1={spineY} x2={spineEndX} y2={spineY}
+        <line x1={rootRight(root)} y1={spineY} x2={spineEndX} y2={spineY}
           stroke="#64748b" strokeWidth={3} strokeLinecap="round" />
 
         {/* L1: colored diagonal from spine attachment to L1 */}
@@ -310,12 +314,12 @@ export function EdgeLayer({ nodes, lineStyle, diagramType, paletteColors }: Edge
     const spineY = root.y + root.height / 2
     const spineEndX = l1s.length > 0
       ? l1s[l1s.length - 1].x + l1s[l1s.length - 1].width + 24
-      : root.x + root.width + 400
+      : rootRight(root) + 400
 
     return (
       <g>
         {/* Horizontal spine */}
-        <line x1={root.x + root.width} y1={spineY} x2={spineEndX} y2={spineY}
+        <line x1={rootRight(root)} y1={spineY} x2={spineEndX} y2={spineY}
           stroke="#94a3b8" strokeWidth={2.5} strokeLinecap="round" />
 
         {/* Per L1: spine tick + vertical branch through all descendants (L2+L3 centered at l1CX) */}

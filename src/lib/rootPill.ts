@@ -44,3 +44,23 @@ export function rootPillWidth(title: string, baseFontSize = 28): number {
   const fs = rootPillFontSize(title, baseFontSize)
   return Math.max(180, Math.min(ROOT_PILL_MAX, Math.ceil(len * fs * CHAR_RATIO + ROOT_PILL_PAD)))
 }
+
+/**
+ * Width the canvas actually DRAWS a node at. The root pill auto-sizes from its
+ * title, so a stored width computed at a different font size leaves the trunk
+ * starting inside the pill - and the pill is translucent, so the line shows
+ * through it. Edges and the node must both measure with this.
+ */
+export function rootDrawnWidth(
+  node: { depth: number; title: string; width: number; shape?: string; fontSize?: number },
+  diagramType: string,
+): number {
+  if (node.depth !== 0) return node.width
+  const isPill = diagramType !== 'mindmap' && (
+    node.shape === 'pill' ? true :
+    node.shape === 'circle' ? false :
+    rootTitleNeedsPill(node.title, node.fontSize ?? 28)
+  )
+  // 34 is the depth-0 default font size on the canvas.
+  return isPill ? rootPillWidth(node.title, node.fontSize ?? 34) : node.width
+}
