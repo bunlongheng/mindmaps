@@ -51,6 +51,7 @@ vi.mock('../lib/export/share', () => ({
   encodeShareURL: () => '',
 }))
 vi.mock('../lib/export/exportPdf', () => ({ exportDiagramAsPdf: vi.fn() }))
+vi.mock('../lib/export/copyImage', () => ({ copyDiagramImage: vi.fn(async () => true) }))
 
 // Controllable Google Identity Services mock. renderGoogleButton captures the
 // onCredential callback so a test can simulate a Google sign-in.
@@ -70,6 +71,7 @@ vi.mock('../lib/googleAuth', () => ({
 import App from '../App'
 import { showToast } from '../components/CuteToast'
 import { exportDiagramAsPdf } from '../lib/export/exportPdf'
+import { copyDiagramImage } from '../lib/export/copyImage'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function makeDiagram(overrides: Partial<Diagram> = {}): Diagram {
@@ -303,6 +305,24 @@ describe('App — editor view, panel, footer', () => {
     await waitFor(() => expect(screen.getByTestId('canvas')).toBeInTheDocument())
     fireEvent.click(screen.getByText('PDF'))
     await waitFor(() => expect(exportDiagramAsPdf).toHaveBeenCalledWith('My Map'))
+  })
+
+  it('copies the diagram image from the footer button', async () => {
+    renderEditor()
+    render(<App />)
+    await waitFor(() => expect(screen.getByTestId('canvas')).toBeInTheDocument())
+    await act(async () => { fireEvent.click(screen.getByText('Copy')) })
+    expect(copyDiagramImage).toHaveBeenCalled()
+    expect(screen.getByText('Copied')).toBeInTheDocument()
+  })
+
+  it('leaves the footer copy label alone when the copy fails', async () => {
+    vi.mocked(copyDiagramImage).mockResolvedValueOnce(false)
+    renderEditor()
+    render(<App />)
+    await waitFor(() => expect(screen.getByTestId('canvas')).toBeInTheDocument())
+    await act(async () => { fireEvent.click(screen.getByText('Copy')) })
+    expect(screen.getByText('Copy')).toBeInTheDocument()
   })
 
   it('adds and removes tags in the footer', async () => {
