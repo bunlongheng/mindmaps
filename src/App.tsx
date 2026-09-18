@@ -181,7 +181,7 @@ export default function App() {
   const isMobile = useIsMobile()
   const [showImport, setShowImport] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
-  const [copiedImage, setCopiedImage] = useState(false)
+  const [copiedSvg, setCopiedSvg] = useState(false)
   const [showConfetti, setShowConfetti] = useState(() => new URLSearchParams(window.location.search).has('imported'))
   const confettiCount = (() => { const t = new URLSearchParams(window.location.search).get('tokens'); return t ? Math.min(280, Math.max(40, Math.round(parseInt(t) / 1000 * 60))) : 60 })()
 
@@ -621,22 +621,22 @@ export default function App() {
               </button>
               <button
                 onClick={() => {
-                  import('./lib/export/copyImage').then(async m => {
-                    if (await m.copyDiagramImage()) {
-                      setCopiedImage(true)
-                      setTimeout(() => setCopiedImage(false), 2000)
+                  import('./lib/export/copySvg').then(async m => {
+                    if (await m.copyDiagramSvg()) {
+                      setCopiedSvg(true)
+                      setTimeout(() => setCopiedSvg(false), 2000)
                     }
                   })
                 }}
-                title="Copy diagram image (HD)"
+                title="Copy diagram SVG"
                 style={{
                   height: 22, padding: '0 8px', borderRadius: 6,
-                  border: `1px solid ${copiedImage ? '#bbf7d0' : '#e2e8f0'}`,
+                  border: `1px solid ${copiedSvg ? '#bbf7d0' : '#e2e8f0'}`,
                   background: 'transparent', cursor: 'pointer', fontSize: 11, fontWeight: 500,
-                  color: copiedImage ? '#16a34a' : '#64748b', fontFamily: 'inherit',
+                  color: copiedSvg ? '#16a34a' : '#64748b', fontFamily: 'inherit',
                   display: 'flex', alignItems: 'center', gap: 4,
                 }}>
-                {copiedImage ? <Check size={11} /> : <Copy size={11} />} {copiedImage ? 'Copied' : 'Copy'}
+                {copiedSvg ? <Check size={11} /> : <Copy size={11} />} {copiedSvg ? 'Copied' : 'SVG'}
               </button>
 <button onClick={() => setShowDeleteConfirm(true)} title="Delete map" style={{
                 height: 22, padding: '0 8px', border: '1px solid #fecaca', borderRadius: 6,

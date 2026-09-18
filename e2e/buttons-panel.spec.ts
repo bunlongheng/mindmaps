@@ -676,22 +676,25 @@ test.describe('Canvas — node interactions', () => {
   })
 })
 
-// ── Share tab: copy diagram image ───────────────────────────────────────────
+// ── Share tab: copy diagram SVG ─────────────────────────────────────────────
 
-test('Copy Image (HD) puts a fitted HD PNG on the clipboard', async ({ page, context }) => {
+test('Copy SVG puts the diagram markup on the clipboard', async ({ page, context }) => {
   await context.grantPermissions(['clipboard-read', 'clipboard-write'])
   await openEditorWithPanel(page)
   await page.getByText('Share', { exact: true }).click()
-  await page.getByRole('button', { name: /Copy Image/ }).click()
-  await expect(page.getByText('Image copied!')).toBeVisible({ timeout: 20_000 })
+  const btn = page.getByRole('button', { name: /Copy SVG/ })
+  await btn.click()
+  await expect(page.getByRole('button', { name: 'SVG copied!' })).toBeVisible({ timeout: 20_000 })
 
-  const img = await page.evaluate(async () => {
-    const items = await navigator.clipboard.read()
-    const blob = await items[0].getType('image/png')
-    const bmp = await createImageBitmap(blob)
-    return { types: items.flatMap(i => i.types), w: bmp.width, h: bmp.height }
-  })
-  expect(img.types).toContain('image/png')
-  // Fitted to the whole map and rendered at HD, never below 100%.
-  expect(Math.max(img.w, img.h)).toBeGreaterThanOrEqual(1200)
+  const svg = await page.evaluate(() => navigator.clipboard.readText())
+  expect(svg).toContain('<svg')
+  expect(svg).toContain('xmlns="http://www.w3.org/2000/svg"')
+  // Fitted to the whole map, pan/zoom dropped, and it parses as real XML.
+  expect(svg).toMatch(/viewBox="[-\d.]+ [-\d.]+ [\d.]+ [\d.]+"/)
+  const parsed = await page.evaluate(m => {
+    const doc = new DOMParser().parseFromString(m, 'image/svg+xml')
+    return { error: doc.querySelector('parsererror') !== null, texts: doc.querySelectorAll('text').length }
+  }, svg)
+  expect(parsed.error).toBe(false)
+  expect(parsed.texts).toBeGreaterThan(0)
 })

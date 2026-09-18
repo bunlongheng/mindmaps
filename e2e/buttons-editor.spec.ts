@@ -93,19 +93,14 @@ test.describe('Editor chrome — App.tsx', () => {
     expect(await textCount(page)).toBe(before)
   })
 
-  test('Copy button in footer puts an HD png on the clipboard', async ({ page, context }) => {
+  test('Copy button in footer puts the diagram SVG on the clipboard', async ({ page, context }) => {
     await context.grantPermissions(['clipboard-read', 'clipboard-write'])
     await createMap(page)
-    await page.locator('[title="Copy diagram image (HD)"]').click()
+    await page.locator('[title="Copy diagram SVG"]').click()
     await expect(page.getByText('Copied', { exact: true })).toBeVisible({ timeout: 20_000 })
-    const img = await page.evaluate(async () => {
-      const items = await navigator.clipboard.read()
-      const blob = await items[0].getType('image/png')
-      const bmp = await createImageBitmap(blob)
-      return { types: items.flatMap(i => i.types), w: bmp.width, h: bmp.height }
-    })
-    expect(img.types).toContain('image/png')
-    expect(Math.max(img.w, img.h)).toBeGreaterThanOrEqual(1200)
+    const svg = await page.evaluate(() => navigator.clipboard.readText())
+    expect(svg).toContain('<svg')
+    expect(svg).toContain('xmlns="http://www.w3.org/2000/svg"')
   })
 
   test('Delete map footer button opens confirm modal; Cancel keeps the map', async ({ page }) => {
