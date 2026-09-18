@@ -675,3 +675,23 @@ test.describe('Canvas — node interactions', () => {
     expect(await g.getAttribute('transform')).not.toBe(before)
   })
 })
+
+// ── Share tab: copy diagram image ───────────────────────────────────────────
+
+test('Copy Image (HD) puts a fitted HD PNG on the clipboard', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write'])
+  await openEditorWithPanel(page)
+  await page.getByText('Share', { exact: true }).click()
+  await page.getByRole('button', { name: /Copy Image/ }).click()
+  await expect(page.getByText('Image copied!')).toBeVisible({ timeout: 20_000 })
+
+  const img = await page.evaluate(async () => {
+    const items = await navigator.clipboard.read()
+    const blob = await items[0].getType('image/png')
+    const bmp = await createImageBitmap(blob)
+    return { types: items.flatMap(i => i.types), w: bmp.width, h: bmp.height }
+  })
+  expect(img.types).toContain('image/png')
+  // Fitted to the whole map and rendered at HD, never below 100%.
+  expect(Math.max(img.w, img.h)).toBeGreaterThanOrEqual(1200)
+})

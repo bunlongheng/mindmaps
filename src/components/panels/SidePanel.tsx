@@ -3,7 +3,7 @@ import { useShallow } from 'zustand/react/shallow'
 import { NODE_ICONS } from '../../lib/icons'
 import { useMindmapStore } from '../../store/mindmapStore'
 import { getTheme, THEMES, isDarkBg } from '../../lib/themes'
-import { X, AlignLeft, AlignCenter, AlignRight, Copy, Check, FileDown, Trash2, Sparkles } from 'lucide-react'
+import { X, AlignLeft, AlignCenter, AlignRight, Copy, Check, FileDown, Trash2, Sparkles, Image as ImageIcon } from 'lucide-react'
 import { getLucideIcon } from '../canvas/NodeIcon'
 import { showToast, dismissToast } from '../CuteToast'
 import { soundChaChing } from '../../lib/sounds'
@@ -106,6 +106,7 @@ export function SidePanel({ nodeId, onClose, onDelete }: SidePanelProps) {
   const [tab, setTab] = useState<Tab>('map')
   const [iconLoading, setIconLoading] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [copiedImage, setCopiedImage] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const node = nodeId ? (activeMindmap?.nodes.find(n => n.id === nodeId) ?? null) : null
   const [title, setTitle] = useState(node?.title ?? '')
@@ -681,6 +682,27 @@ export function SidePanel({ nodeId, onClose, onDelete }: SidePanelProps) {
             }}>
               {copied ? <Check size={13} /> : <Copy size={13} />}
               {copied ? 'Copied!' : 'Copy Link'}
+            </button>
+            <button
+              onClick={() => {
+                import('../../lib/export/copyImage').then(async m => {
+                  if (await m.copyDiagramImage()) {
+                    setCopiedImage(true)
+                    setTimeout(() => setCopiedImage(false), 2000)
+                  }
+                })
+              }}
+              style={{
+                width: '100%', padding: '9px', borderRadius: 8, marginTop: 6,
+                border: '1px solid #e0e2e7',
+                background: copiedImage ? '#f0fdf4' : '#fff',
+                cursor: 'pointer', fontSize: 12, fontWeight: 500,
+                color: copiedImage ? '#16a34a' : '#374151', fontFamily: 'inherit',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                transition: 'all 0.15s',
+              }}>
+              {copiedImage ? <Check size={13} /> : <ImageIcon size={13} />}
+              {copiedImage ? 'Image copied!' : 'Copy Image (HD)'}
             </button>
             <p style={{ fontSize: 10, color: '#9ca3af', margin: 0, lineHeight: 1.5 }}>
               Anyone with the link can view (read only).
