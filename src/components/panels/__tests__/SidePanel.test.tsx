@@ -14,8 +14,13 @@ vi.mock('../../CuteToast', () => ({
 vi.mock('../../../lib/export/exportPdf', () => ({
   exportDiagramAsPdf: vi.fn(),
 }))
+// Avoid a real clipboard image render (html2canvas)
+vi.mock('../../../lib/export/copyImage', () => ({
+  copyDiagramImage: vi.fn(async () => true),
+}))
 
 import { exportDiagramAsPdf } from '../../../lib/export/exportPdf'
+import { copyDiagramImage } from '../../../lib/export/copyImage'
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 function makeDiagram(overrides: Partial<Diagram> = {}): Diagram {
@@ -546,6 +551,28 @@ describe('SidePanel — Share tab', () => {
     fireEvent.click(screen.getByText('Share'))
     fireEvent.click(screen.getByText('Export PDF'))
     await waitFor(() => expect(exportDiagramAsPdf).toHaveBeenCalledWith('Root Topic'))
+  })
+
+  it('Copy Image (HD) copies the diagram and flips the label back after the timeout', async () => {
+    vi.useFakeTimers()
+    loadDiagram()
+    render(<SidePanel nodeId={null} onClose={vi.fn()} />)
+    fireEvent.click(screen.getByText('Share'))
+    await act(async () => { fireEvent.click(screen.getByText('Copy Image (HD)')) })
+    expect(copyDiagramImage).toHaveBeenCalled()
+    expect(screen.getByText('Image copied!')).toBeInTheDocument()
+    await act(async () => { vi.advanceTimersByTime(2100) })
+    expect(screen.getByText('Copy Image (HD)')).toBeInTheDocument()
+    vi.useRealTimers()
+  })
+
+  it('Copy Image (HD) leaves the label alone when the copy fails', async () => {
+    vi.mocked(copyDiagramImage).mockResolvedValueOnce(false)
+    loadDiagram()
+    render(<SidePanel nodeId={null} onClose={vi.fn()} />)
+    fireEvent.click(screen.getByText('Share'))
+    await act(async () => { fireEvent.click(screen.getByText('Copy Image (HD)')) })
+    expect(screen.getByText('Copy Image (HD)')).toBeInTheDocument()
   })
 
   it('delete flow: opens confirm modal, cancel closes it', () => {
