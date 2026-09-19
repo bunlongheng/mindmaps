@@ -23,7 +23,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
 
 const APP_URL = (process.env.MINDMAP_APP_URL || 'https://mindmaps-bheng.vercel.app').replace(/\/$/, '')
-const SECRET = process.env.MINDMAP_AI_API_KEY
+const SECRET = process.env.MINDMAPS_API_SECRET || process.env.MINDMAP_AI_API_KEY
 const OWNER_ID = process.env.MINDMAP_USER_ID || '731ace87-64e5-44db-bf2a-82265f06f4d9'
 const VALID_TYPES = ['logic-chart', 'mindmap', 'fishbone', 'timeline']
 
@@ -31,7 +31,7 @@ const ok = obj => ({ content: [{ type: 'text', text: JSON.stringify(obj, null, 2
 const fail = msg => ({ isError: true, content: [{ type: 'text', text: msg }] })
 
 async function api(path, { method = 'POST', body } = {}) {
-  if (!SECRET) throw new Error('MINDMAP_AI_API_KEY not set — export it or add it to .env.local')
+  if (!SECRET) throw new Error('MINDMAPS_API_SECRET not set — export it or add it to .env.local')
   const res = await fetch(`${APP_URL}${path}`, {
     method,
     headers: { Authorization: `Bearer ${SECRET}`, ...(body ? { 'Content-Type': 'application/json' } : {}) },
