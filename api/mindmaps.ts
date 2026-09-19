@@ -16,7 +16,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Owner session token, OR a static service key (used by the prod smoke test /
     // AI agents / partners) which authenticates headlessly as the owner.
     const raw = bearer(req.headers)
-    const aiKeys = [process.env.MINDMAP_AI_API_KEY, process.env.MINDMAP_AI_API_KEY_PARTNER]
+    const aiKeys = [process.env.MINDMAPS_API_SECRET, process.env.MINDMAPS_API_SECRET_PARTNER, process.env.MINDMAP_AI_API_KEY, process.env.MINDMAP_AI_API_KEY_PARTNER]
       .map(k => (k ?? '').trim()).filter(Boolean)
     const ownerId = (process.env.MINDMAP_USER_ID ?? '').trim()
     let isServiceKey = false

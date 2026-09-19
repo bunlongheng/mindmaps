@@ -36,7 +36,7 @@ export async function authorizeOwner(
   //    length). Skipped entirely when the caller MUST be the owner
   //    (allowBearer:false). The partner key is optional - unset means not accepted.
   if (allowBearer) {
-    const keys = [process.env.MINDMAP_AI_API_KEY, process.env.MINDMAP_AI_API_KEY_PARTNER]
+    const keys = [process.env.MINDMAPS_API_SECRET, process.env.MINDMAPS_API_SECRET_PARTNER, process.env.MINDMAP_AI_API_KEY, process.env.MINDMAP_AI_API_KEY_PARTNER]
       .map(k => (k ?? '').trim()).filter(Boolean)
     for (const key of keys) {
       if (await secretEquals(raw, key)) return true

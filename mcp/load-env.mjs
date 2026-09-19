@@ -6,8 +6,9 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
-const need = ['MINDMAP_AI_API_KEY', 'MINDMAP_USER_ID', 'MINDMAP_APP_URL']
-if (need.some(k => !process.env[k])) {
+const need = ['MINDMAP_USER_ID', 'MINDMAP_APP_URL']
+const needKey = !process.env.MINDMAPS_API_SECRET && !process.env.MINDMAP_AI_API_KEY
+if (needKey || need.some(k => !process.env[k])) {
   for (const file of ['../.env.local', '../.env']) {
     try {
       const envPath = fileURLToPath(new URL(file, import.meta.url))

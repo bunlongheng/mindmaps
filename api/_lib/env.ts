@@ -7,11 +7,16 @@ const REQUIRED = [
   'MINDMAP_USER_ID',
   'MINDMAP_AUTH_EMAIL',
   'GOOGLE_CLIENT_ID',
-  'MINDMAP_AI_API_KEY',
 ] as const
 
 export function missingEnv(): string[] {
-  return REQUIRED.filter(k => !(process.env[k] ?? '').trim())
+  const missing: string[] = REQUIRED.filter(k => !(process.env[k] ?? '').trim())
+  // The Bearer service key accepts either the consistent MINDMAPS_API_SECRET or
+  // the legacy MINDMAP_AI_API_KEY - require that at least one is set.
+  if (!(process.env.MINDMAPS_API_SECRET ?? '').trim() && !(process.env.MINDMAP_AI_API_KEY ?? '').trim()) {
+    missing.push('MINDMAPS_API_SECRET')
+  }
+  return missing
 }
 
 export function assertEnv(): void {
