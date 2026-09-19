@@ -11,7 +11,7 @@ import { useMindmapStore } from './store/mindmapStore'
 import { decodeShareURL } from './lib/export/share'
 import { hasGoogleAuth, renderGoogleButton } from './lib/googleAuth'
 import { readSession, saveSession, clearSession, SESSION_EXPIRED } from './lib/session'
-import { emberVanish } from './lib/emberVanish'
+import { emberVanish, damageFlash } from './lib/emberVanish'
 import { ArrowLeft, SlidersHorizontal, Tag, X, FileDown, Trash2, Copy, Check, Network, Share2, Sparkles, GitBranch, Lightbulb, Workflow, ListTree, Waypoints, Image as ImageIcon } from 'lucide-react'
 import { Confetti } from './components/Confetti'
 import { MindmapsLogo } from './components/MindmapsLogo'
@@ -561,9 +561,14 @@ export default function App() {
                 if (activeMindmap) {
                   const id = activeMindmap.id
                   const name = activeMindmap.name
-                  // The map on screen comes apart before we drop back to the library.
-                  emberVanish(document.querySelector('.diagram-canvas-root'))
-                  deleteDiagram(id, name).finally(() => handleBack())
+                  // You took the hit: the screen flashes red, then the map on
+                  // screen comes apart before we drop back to the library.
+                  const wait = damageFlash()
+                  const go = () => {
+                    emberVanish(document.querySelector('.diagram-canvas-root'))
+                    deleteDiagram(id, name).finally(() => handleBack())
+                  }
+                  if (wait) setTimeout(go, wait); else go()
                 }
               }} style={{
                 padding: '8px 18px', background: '#ef4444', color: '#fff',

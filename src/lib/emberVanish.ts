@@ -34,8 +34,7 @@ function ashKeyframes(dx: number, dy: number): Keyframe[] {
  * has no box or the viewer asked for less motion.
  */
 export function emberVanish(el: Element | null): number {
-  if (!el) return 0
-  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return 0
+  if (!el || !stillMoves()) return 0
 
   const box = el.getBoundingClientRect()
   if (!box.width || !box.height) return 0
@@ -70,4 +69,65 @@ export function emberVanish(el: Element | null): number {
   document.body.append(field)
   setTimeout(() => field.remove(), LIFETIME_MS)
   return LIFETIME_MS
+}
+
+// ── What happens before the dust ────────────────────────────────────────────
+
+const BLINK_MS = 300
+const BLINKS = 2
+/** Blinks, plus the beat drops leaves before the card comes apart. */
+export const DOOMED_MS = BLINK_MS * BLINKS + 20
+
+const RED = '#ef4444'
+const RED_WASH = 'rgba(239,68,68,0.16)'
+
+function stillMoves(): boolean {
+  // No Web Animations API (very old browsers, jsdom) means no effect to play -
+  // deletion must still work, just without the show.
+  if (typeof Element.prototype.animate !== 'function') return false
+  return !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+}
+
+/**
+ * Two hard red blinks on the thing that is about to go - the drops board's
+ * `.going` state. Hard on/off, never a fade: it reads as an alarm, not a
+ * transition. Returns how long to wait before scattering it.
+ */
+export function blinkDoomed(el: Element | null): number {
+  if (!el || !stillMoves()) return 0
+  const style = getComputedStyle(el)
+  const base: Keyframe = { borderColor: style.borderTopColor, background: style.backgroundColor }
+  const hit: Keyframe = { borderColor: RED, background: RED_WASH }
+  el.animate(
+    [{ ...hit, offset: 0 }, { ...hit, offset: 0.499 }, { ...base, offset: 0.5 }, { ...base, offset: 1 }],
+    { duration: BLINK_MS, iterations: BLINKS, easing: 'linear', fill: 'none' },
+  )
+  return DOOMED_MS
+}
+
+/**
+ * The map view has no card to blink, so the screen takes the hit instead: a red
+ * vignette that punches twice from the edges, the way an FPS tells you that you
+ * were shot. The canvas comes apart behind it.
+ */
+export function damageFlash(): number {
+  if (!stillMoves()) return 0
+  const skin = document.createElement('div')
+  skin.setAttribute('aria-hidden', 'true')
+  skin.style.cssText =
+    'position:fixed;inset:0;z-index:69;pointer-events:none;' +
+    'background:radial-gradient(ellipse at center, rgba(239,68,68,0) 38%, rgba(239,68,68,0.55) 100%)'
+  document.body.append(skin)
+  skin.animate(
+    [
+      { opacity: 0, offset: 0 },
+      { opacity: 1, offset: 0.08 },
+      { opacity: 0.15, offset: 0.34 },
+      { opacity: 0.9, offset: 0.5 },
+      { opacity: 0, offset: 1 },
+    ],
+    { duration: 520, easing: 'ease-out', fill: 'both' },
+  )
+  setTimeout(() => skin.remove(), 600)
+  return 300
 }

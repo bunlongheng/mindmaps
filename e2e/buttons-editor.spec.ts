@@ -144,4 +144,26 @@ test.describe('Editor chrome — App.tsx', () => {
     await expect(page.getByRole('heading', { name: 'Delete map?' })).toHaveCount(0)
     await expect(page.locator('.diagram-canvas-root')).toBeVisible()
   })
+
+  test('map view: screen takes a red hit then the canvas comes apart', async ({ page }) => {
+    await createMap(page)
+    await page.locator('[title="Delete map"]').first().click()
+    await expect(page.getByText('Delete map?')).toBeVisible({ timeout: 5000 })
+    // the editor's confirm modal renders at root level, after the footer button
+    await page.locator('button').filter({ hasText: /^Delete$/ }).last().click()
+    await page.waitForTimeout(120)
+    const hit = await page.evaluate(() => {
+      const skins = Array.from(document.querySelectorAll('div[aria-hidden="true"]')) as HTMLElement[]
+      const skin = skins.find(s => s.style.background.includes('radial-gradient'))
+      if (!skin) return null
+      return { opacity: getComputedStyle(skin).opacity, fixed: getComputedStyle(skin).position, red: skin.style.background.includes('239,68,68') }
+    })
+    console.log('HIT ' + JSON.stringify(hit))
+    expect(hit).not.toBeNull()
+    expect(Number(hit!.opacity)).toBeGreaterThan(0)
+    await page.waitForTimeout(500)
+    const specks = await page.evaluate(() => document.querySelectorAll('div[aria-hidden="true"] i').length)
+    console.log('CANVAS-SCATTER ' + specks)
+    expect(specks).toBeGreaterThan(50)
+  })
 })
