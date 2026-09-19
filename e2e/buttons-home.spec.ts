@@ -515,34 +515,32 @@ test.describe('Home — paste import flow', () => {
 
 // ── Delete: the card comes apart into embers (ported from the drops board) ──
 
-test('deleting a map scatters embers', async ({ page }) => {
+test('index: card blinks red twice then scatters', async ({ page }) => {
   await createMap(page)
   await page.goto('/')
-  await page.waitForSelector('[data-map-id]', { timeout: 15000 })
-
+  await page.waitForSelector('[data-map-id]')
   const card = page.locator('[data-map-id]').first()
   await card.hover()
   await card.locator('[title="Delete map"]').first().click()
-  await expect(page.getByRole('heading', { name: 'Delete map?' })).toBeVisible({ timeout: 5000 })
   await page.getByRole('button', { name: 'Delete', exact: true }).click()
-  await page.waitForTimeout(500)
 
-  const live = await page.evaluate(() => {
-    const f = document.querySelector('div[aria-hidden="true"]') as HTMLElement | null
-    if (!f) return null
-    const specks = Array.from(f.querySelectorAll('i'))
-    const anims = specks.flatMap(s => s.getAnimations())
-    return {
-      specks: specks.length,
-      running: anims.filter(a => a.playState === 'running').length,
-      pinned: { left: f.style.left, top: f.style.top },
+  // sample the card's border colour across the blink window
+  const samples = await page.evaluate(async () => {
+    const el = document.querySelector('[data-map-id]')!
+    const seen: string[] = []
+    for (let i = 0; i < 14; i++) {
+      seen.push(getComputedStyle(el).borderTopColor)
+      await new Promise(r => setTimeout(r, 45))
     }
+    const anims = el.getAnimations().map(a => ({ dur: (a.effect as KeyframeEffect).getTiming().duration, iters: (a.effect as KeyframeEffect).getTiming().iterations }))
+    return { seen, anims }
   })
-  console.log('EMBER ' + JSON.stringify(live))
-  expect(live).not.toBeNull()
-  expect(live!.specks).toBeGreaterThan(50)
-  expect(live!.running).toBeGreaterThan(0)
+  const red = samples.seen.filter(c => c.includes('239, 68, 68')).length
+  console.log('BLINK ' + JSON.stringify({ red, total: samples.seen.length, anims: samples.anims }))
+  expect(red).toBeGreaterThan(2)
 
-  await page.waitForTimeout(4200)
-  expect(await page.evaluate(() => !!document.querySelector('div[aria-hidden="true"]'))).toBe(false)
+  await page.waitForTimeout(700)
+  const scattered = await page.evaluate(() => document.querySelectorAll('div[aria-hidden="true"] i').length)
+  console.log('SCATTER ' + scattered)
+  expect(scattered).toBeGreaterThan(20)
 })

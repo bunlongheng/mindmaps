@@ -9,7 +9,7 @@ import { Plus, Search, Trash2, LayoutGrid, List, Globe, Sparkles, Loader2, Tag, 
 import { ImportModal } from '../modals/ImportModal'
 import { MindmapsLogo } from '../MindmapsLogo'
 import { getTheme } from '../../lib/themes'
-import { emberVanish } from '../../lib/emberVanish'
+import { emberVanish, blinkDoomed } from '../../lib/emberVanish'
 import { hexToRgb } from '../../lib/color'
 import { AIThinkingOverlay } from '../AIThinkingOverlay'
 import { soundHover, soundClick, soundPaste } from '../../lib/sounds'
@@ -714,10 +714,16 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
                 background: '#fff', cursor: 'pointer', fontSize: 13, fontFamily: 'inherit', color: '#64748b',
               }}>Cancel</button>
               <button onClick={() => {
-                // The card comes apart where it sits, then the row goes.
-                emberVanish(document.querySelector(`[data-map-id="${deleteTarget.id}"]`))
-                deleteDiagram(deleteTarget.id, deleteTarget.name)
-                setActiveTag(null)
+                // Two red blinks on the card, then it comes apart where it sits.
+                const { id, name } = deleteTarget
+                const card = document.querySelector(`[data-map-id="${id}"]`)
+                const wait = blinkDoomed(card)
+                const go = () => {
+                  emberVanish(card)
+                  deleteDiagram(id, name)
+                  setActiveTag(null)
+                }
+                if (wait) setTimeout(go, wait); else go()
                 setDeleteTarget(null)
               }} style={{
                 padding: '8px 18px', background: '#ef4444', color: '#fff',
