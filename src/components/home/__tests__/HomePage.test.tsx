@@ -158,6 +158,25 @@ describe('HomePage — search & tag filtering', () => {
     expect(screen.getByText('Project Plan')).toBeInTheDocument()
   })
 
+  it('stops repeating the filtered tag on every card, but keeps the others', () => {
+    seedDiagrams(SAMPLE)
+    const { container } = render(<HomePage onOpen={vi.fn()} user={USER} onSignOut={vi.fn()} />)
+    const badges = () => Array.from(container.querySelectorAll('[data-map-id] span')).map(n => n.textContent?.trim())
+
+    // unfiltered: "Project Plan" wears both of its tags
+    expect(badges()).toContain('Work')
+    expect(badges()).toContain('AI')
+
+    fireEvent.click(container.querySelector('[data-tag="Work"]')!)
+
+    // every card left has Work, so saying so on each of them adds nothing
+    expect(badges()).not.toContain('Work')
+    expect(badges()).toContain('AI')
+
+    fireEvent.click(container.querySelector('[data-tag="__all__"]')!)
+    expect(badges()).toContain('Work')
+  })
+
   it('initializes activeTag from the URL ?tag= param', () => {
     window.history.replaceState({}, '', '/?tag=Personal')
     seedDiagrams(SAMPLE)
