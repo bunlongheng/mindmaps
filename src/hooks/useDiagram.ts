@@ -4,6 +4,7 @@ import { showToast } from '../components/CuteToast'
 import { useMindmapStore } from '../store/mindmapStore'
 import { ROOT_COLORS } from '../lib/color'
 import { soundCreate, soundDelete, soundSave, soundPaste } from '../lib/sounds'
+import { endSession } from '../lib/session'
 import type { Diagram, DiagramMeta, MindmapNode } from '../types'
 
 // ── API config ─────────────────────────────────────────────────────────────
@@ -125,6 +126,9 @@ export function useDiagram(userId: string | null = null) {
 
     try {
       const res = await fetch(`${API_BASE}?user_id=${userId}`, { headers: authHeaders() })
+      // A rejected token means the session is gone. Say so instead of rendering a
+      // signed-in shell with an empty library in it.
+      if (res.status === 401 || res.status === 403) { setDiagrams([]); endSession(); return }
       if (!res.ok) { setDiagrams([]); return }
       const data = await res.json() as Record<string, unknown>[]
 
@@ -157,6 +161,9 @@ export function useDiagram(userId: string | null = null) {
         if (!res.ok) {
           // Retry 5xx once; treat 4xx (not found / not shared) as final.
           if (res.status >= 500 && attempt === 0) { await new Promise(r => setTimeout(r, 500)); continue }
+          // Only a signed-in read can be an expired session; an anonymous 401 on a
+          // private map is just "not shared with you".
+          if (userId && res.status === 401) endSession()
           return cached ?? null
         }
         const data = await res.json()
