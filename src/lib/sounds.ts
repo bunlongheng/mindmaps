@@ -71,17 +71,19 @@ export function soundSave() {
   } catch {}
 }
 
-/** Swoosh down — delete */
+/** Soft note — delete */
 export function soundDelete() {
   try {
     const c = ac(); const now = c.currentTime
-    const g = gain(c, 0.14)
-    g.gain.exponentialRampToValueAtTime(0.0001, now + 0.25)
-    const o = c.createOscillator()
-    o.type = 'sawtooth'
-    o.frequency.setValueAtTime(400, now)
-    o.frequency.exponentialRampToValueAtTime(80, now + 0.22)
-    o.connect(g); o.start(now); o.stop(now + 0.25)
+    // A soft note, not a whoosh: a sine that fades out under a fainter fifth
+    // above it, so a delete sounds like the embers drifting up look.
+    const g = gain(c, 0.10)
+    g.gain.exponentialRampToValueAtTime(0.0001, now + 0.18)
+    osc(c, 'sine', 880, g, now, now + 0.18)
+
+    const shimmer = gain(c, 0.035)
+    shimmer.gain.exponentialRampToValueAtTime(0.0001, now + 0.26)
+    osc(c, 'sine', 1320, shimmer, now + 0.02, now + 0.26)
   } catch {}
 }
 

@@ -1,5 +1,5 @@
 import { test, expect } from './fixtures'
-import { waitForApp, expectLoginScreen } from './helpers'
+import { waitForApp, expectLoginScreen, createMap } from './helpers'
 import type { Page } from '@playwright/test'
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -511,4 +511,38 @@ test.describe('Home — paste import flow', () => {
     await expect(page.locator('.home-main')).toBeVisible()
     await expect(page.locator('.diagram-canvas-root')).toHaveCount(0)
   })
+})
+
+// ── Delete: the card comes apart into embers (ported from the drops board) ──
+
+test('deleting a map scatters embers', async ({ page }) => {
+  await createMap(page)
+  await page.goto('/')
+  await page.waitForSelector('[data-map-id]', { timeout: 15000 })
+
+  const card = page.locator('[data-map-id]').first()
+  await card.hover()
+  await card.locator('[title="Delete map"]').first().click()
+  await expect(page.getByRole('heading', { name: 'Delete map?' })).toBeVisible({ timeout: 5000 })
+  await page.getByRole('button', { name: 'Delete', exact: true }).click()
+  await page.waitForTimeout(500)
+
+  const live = await page.evaluate(() => {
+    const f = document.querySelector('div[aria-hidden="true"]') as HTMLElement | null
+    if (!f) return null
+    const specks = Array.from(f.querySelectorAll('i'))
+    const anims = specks.flatMap(s => s.getAnimations())
+    return {
+      specks: specks.length,
+      running: anims.filter(a => a.playState === 'running').length,
+      pinned: { left: f.style.left, top: f.style.top },
+    }
+  })
+  console.log('EMBER ' + JSON.stringify(live))
+  expect(live).not.toBeNull()
+  expect(live!.specks).toBeGreaterThan(50)
+  expect(live!.running).toBeGreaterThan(0)
+
+  await page.waitForTimeout(4200)
+  expect(await page.evaluate(() => !!document.querySelector('div[aria-hidden="true"]'))).toBe(false)
 })

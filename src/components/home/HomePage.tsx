@@ -9,6 +9,7 @@ import { Plus, Search, Trash2, LayoutGrid, List, Globe, Sparkles, Loader2, Tag, 
 import { ImportModal } from '../modals/ImportModal'
 import { MindmapsLogo } from '../MindmapsLogo'
 import { getTheme } from '../../lib/themes'
+import { emberVanish } from '../../lib/emberVanish'
 import { hexToRgb } from '../../lib/color'
 import { AIThinkingOverlay } from '../AIThinkingOverlay'
 import { soundHover, soundClick, soundPaste } from '../../lib/sounds'
@@ -713,6 +714,8 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
                 background: '#fff', cursor: 'pointer', fontSize: 13, fontFamily: 'inherit', color: '#64748b',
               }}>Cancel</button>
               <button onClick={() => {
+                // The card comes apart where it sits, then the row goes.
+                emberVanish(document.querySelector(`[data-map-id="${deleteTarget.id}"]`))
                 deleteDiagram(deleteTarget.id, deleteTarget.name)
                 setActiveTag(null)
                 setDeleteTarget(null)
@@ -1178,6 +1181,7 @@ function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isPublic, tags, tagCo
     <div
       role="button"
       tabIndex={0}
+      data-map-id={diagram.id}
       aria-label={`Open ${diagram.name}`}
       onMouseEnter={() => { setHovered(true); soundHover() }}
       onMouseLeave={() => setHovered(false)}
@@ -1255,6 +1259,7 @@ function DiagramRow({ diagram, timeAgo, onOpen, onDelete, isPublic, tags, tagCol
     <div
       role="button"
       tabIndex={0}
+      data-map-id={diagram.id}
       aria-label={`Open ${diagram.name}`}
       onMouseEnter={() => { setHovered(true); soundHover() }}
       onMouseLeave={() => setHovered(false)}
