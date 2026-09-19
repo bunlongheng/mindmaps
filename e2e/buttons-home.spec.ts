@@ -124,16 +124,16 @@ test.describe('Home — tag filter chips', () => {
     // Effect: URL records ?tag=AI.
     await expect.poll(() => new URL(page.url()).searchParams.get('tag')).toBe('AI')
 
-    // Every visible card that has tags must include the AI badge; cards with no
-    // tags are filtered out. We assert the grid only shows AI-tagged maps OR is
-    // empty (valid when no AI maps exist in the shared store).
+    // The grid now shows only AI maps - and none of them repeats the AI badge,
+    // because the filter already said it (see the dedicated test below).
     const cardCount = await page.locator('.home-grid > div').count()
     if (cardCount > 0) {
-      // Each rendered card must contain an "AI" tag badge.
-      const cardsWithoutAi = await page.locator('.home-grid > div').evaluateAll(cards =>
-        cards.filter(c => !Array.from(c.querySelectorAll('span')).some(s => s.textContent === 'AI')).length,
+      const cardsWearingAi = await page.locator('.home-grid > div').evaluateAll(cards =>
+        cards.filter(c => Array.from(c.querySelectorAll('span')).some(s => s.textContent === 'AI')).length,
       )
-      expect(cardsWithoutAi).toBe(0)
+      expect(cardsWearingAi).toBe(0)
+      // and the filter really is on
+      await expect(page.locator('[data-tag="AI"]')).toBeVisible()
     } else {
       await expect(page.getByText('No maps yet')).toBeVisible()
     }
@@ -543,4 +543,31 @@ test('index: card blinks red twice then scatters', async ({ page }) => {
   const scattered = await page.evaluate(() => document.querySelectorAll('div[aria-hidden="true"] i').length)
   console.log('SCATTER ' + scattered)
   expect(scattered).toBeGreaterThan(20)
+})
+
+// ── A filtered view does not repeat the tag that filtered it ────────────────
+
+test('selecting a tag hides that tag on every card, and keeps the others', async ({ page }) => {
+  await page.goto('/')
+  await page.waitForSelector('[data-map-id]', { timeout: 15_000 })
+
+  // whichever tag this library happens to have
+  const pill = page.locator('[data-tag]:not([data-tag="__all__"]):not([data-tag="__no_tag__"])').first()
+  test.skip(await pill.count() === 0, 'no tags in this library')
+  const tag = (await pill.getAttribute('data-tag'))!
+
+  await pill.click()
+  await page.waitForTimeout(600)
+  test.skip(await page.locator('[data-map-id]').count() === 0, 'tag has no maps')
+
+  const countShowing = () => page.evaluate(t => Array.from(document.querySelectorAll('[data-map-id]'))
+    .filter(c => Array.from(c.querySelectorAll('span')).some(s => s.textContent?.trim() === t)).length, tag)
+
+  // the tag that filtered the view says nothing on each card, so it is gone
+  expect(await countShowing()).toBe(0)
+
+  // and it is back once the filter is cleared
+  await page.locator('[data-tag="__all__"]').click()
+  await page.waitForTimeout(600)
+  expect(await countShowing()).toBeGreaterThan(0)
 })

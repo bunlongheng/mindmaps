@@ -415,7 +415,7 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
         {(() => {
           const isActive = activeTag === null
           return (
-            <button onClick={() => setActiveTag(null)} style={{
+            <button data-tag="__all__" onClick={() => setActiveTag(null)} style={{
               display: 'flex', alignItems: 'center', gap: 5,
               padding: '5px 13px', borderRadius: 999, fontSize: 12, fontWeight: 600,
               fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
@@ -437,7 +437,7 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
           const isActive = activeTag === tag
           const count = searchFiltered.filter(d => (d.tags ?? []).includes(tag)).length
           return (
-            <button key={tag} onClick={() => setActiveTag(isActive ? null : tag)}
+            <button key={tag} data-tag={tag} onClick={() => setActiveTag(isActive ? null : tag)}
               style={{
                 display: 'flex', alignItems: 'center', gap: 5,
                 padding: '5px 13px', borderRadius: 999, fontSize: 12, fontWeight: 600,
@@ -526,6 +526,7 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
                     isPublic={d.isPublic} tags={d.tags} tagColorMap={tagColorMap}
                     onTagEdit={() => { setTagModalId(d.id) }}
                     flash={flashId === d.id}
+                    hideTag={activeTag}
                   />
                 ))}
               </div>
@@ -538,6 +539,7 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
                     isPublic={d.isPublic} tags={d.tags} tagColorMap={tagColorMap}
                     onTagEdit={() => { setTagModalId(d.id) }}
                     flash={flashId === d.id}
+                    hideTag={activeTag}
                   />
                 ))}
               </div>
@@ -1174,14 +1176,17 @@ function DiagramMinimap({ id, type }: { id: string; type: string }) {
 
 // ── DiagramCard ────────────────────────────────────────────────────────────
 
-function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isPublic, tags, tagColorMap, onTagEdit, flash }: {
+function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isPublic, tags, tagColorMap, onTagEdit, flash, hideTag }: {
   diagram: DiagramMeta; timeAgo: string; onOpen: () => void; onDelete: () => void
   isPublic?: boolean; tags?: string[]
   tagColorMap: Map<string, string>; onTagEdit: () => void; flash?: boolean
+  hideTag?: string | null
 }) {
   const [hovered, setHovered] = useState(false)
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const currentTags = tags ?? []
+  // Every card in a filtered view carries the tag that filtered it - showing it
+  // again on each one says nothing, so it is dropped while that filter is on.
+  const currentTags = (tags ?? []).filter(t => t !== hideTag)
 
   return (
     <div
@@ -1253,13 +1258,16 @@ function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isPublic, tags, tagCo
 
 // ── DiagramRow (list view) ───────────────────────────────────────────────────
 
-function DiagramRow({ diagram, timeAgo, onOpen, onDelete, isPublic, tags, tagColorMap, onTagEdit, flash }: {
+function DiagramRow({ diagram, timeAgo, onOpen, onDelete, isPublic, tags, tagColorMap, onTagEdit, flash, hideTag }: {
   diagram: DiagramMeta; timeAgo: string; onOpen: () => void; onDelete: () => void
   isPublic?: boolean; tags?: string[]
   tagColorMap: Map<string, string>; onTagEdit: () => void; flash?: boolean
+  hideTag?: string | null
 }) {
   const [hovered, setHovered] = useState(false)
-  const currentTags = tags ?? []
+  // Every card in a filtered view carries the tag that filtered it - showing it
+  // again on each one says nothing, so it is dropped while that filter is on.
+  const currentTags = (tags ?? []).filter(t => t !== hideTag)
 
   return (
     <div
