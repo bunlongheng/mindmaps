@@ -147,6 +147,44 @@ describe('App — login screen (non-local, no user)', () => {
     await waitFor(() => expect(google.renderGoogleButton).toHaveBeenCalled())
   })
 
+  it('shows the login screen when the cached session has expired', async () => {
+    // The bug: a cached user with a dead token rendered the signed-in shell -
+    // avatar, tag filters, "No maps yet" - while every API call 401'd.
+    const dead = `h.${btoa(JSON.stringify({ sub: 'u1', exp: Math.floor(Date.now() / 1000) - 3600 }))}.s`
+    localStorage.setItem('mindmaps:user', JSON.stringify({ email: 'a@b.c', name: 'Owner', userId: 'u1' }))
+    localStorage.setItem('mindmaps:token', dead)
+    localStorage.setItem('mindmaps:list', '[{"id":"stale","name":"Stale Map"}]')
+
+    render(<App />)
+
+    expect(screen.getByText('Sign in to continue')).toBeInTheDocument()
+    expect(screen.queryByText('No maps yet')).not.toBeInTheDocument()
+    expect(localStorage.getItem('mindmaps:user')).toBeNull()
+    expect(localStorage.getItem('mindmaps:list')).toBeNull()
+  })
+
+  it('keeps a live cached session signed in', async () => {
+    const live = `h.${btoa(JSON.stringify({ sub: 'u1', exp: Math.floor(Date.now() / 1000) + 3600 }))}.s`
+    localStorage.setItem('mindmaps:user', JSON.stringify({ email: 'a@b.c', name: 'Owner', userId: 'u1' }))
+    localStorage.setItem('mindmaps:token', live)
+
+    render(<App />)
+
+    expect(screen.queryByText('Sign in to continue')).not.toBeInTheDocument()
+  })
+
+  it('falls back to the login screen when the server rejects the token', async () => {
+    const live = `h.${btoa(JSON.stringify({ sub: 'u1', exp: Math.floor(Date.now() / 1000) + 3600 }))}.s`
+    localStorage.setItem('mindmaps:user', JSON.stringify({ email: 'a@b.c', name: 'Owner', userId: 'u1' }))
+    localStorage.setItem('mindmaps:token', live)
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 401, json: async () => ({}) })))
+
+    render(<App />)
+
+    await waitFor(() => expect(screen.getByText('Sign in to continue')).toBeInTheDocument())
+    expect(localStorage.getItem('mindmaps:token')).toBeNull()
+  })
+
   it('exchanges a Google credential and renders home', async () => {
     vi.stubGlobal('fetch', vi.fn(async (url: string) => {
       if (typeof url === 'string' && url.includes('/api/auth')) {
@@ -199,6 +237,7 @@ describe('App — local auto-login & home view', () => {
   it('reads a persisted user from localStorage on non-local host', () => {
     setHostname('app.example.com')
     localStorage.setItem('mindmaps:user', JSON.stringify({ email: 'p@q.com', name: 'P', userId: 'uP' }))
+    localStorage.setItem('mindmaps:token', `h.${btoa(JSON.stringify({ sub: 'uP', exp: Math.floor(Date.now() / 1000) + 3600 }))}.s`)
     render(<App />)
     expect(screen.getByTestId('home')).toBeInTheDocument()
   })

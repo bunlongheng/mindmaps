@@ -10,6 +10,7 @@ import { useIsMobile } from './hooks/useIsMobile'
 import { useMindmapStore } from './store/mindmapStore'
 import { decodeShareURL } from './lib/export/share'
 import { hasGoogleAuth, renderGoogleButton } from './lib/googleAuth'
+import { readSession, saveSession, clearSession, SESSION_EXPIRED } from './lib/session'
 import { ArrowLeft, SlidersHorizontal, Tag, X, FileDown, Trash2, Copy, Check, Network, Share2, Sparkles, GitBranch, Lightbulb, Workflow, ListTree, Waypoints, Image as ImageIcon } from 'lucide-react'
 import { Confetti } from './components/Confetti'
 import { MindmapsLogo } from './components/MindmapsLogo'
@@ -74,7 +75,8 @@ export default function App() {
       localStorage.setItem('mindmaps:user', JSON.stringify(DEV_USER))
       return DEV_USER
     }
-    try { return JSON.parse(localStorage.getItem('mindmaps:user') ?? 'null') } catch { return null }
+    // A cached user with a dead token is not a session - show the login screen.
+    return readSession()
   })
   const [authLoading, setAuthLoading] = useState(false)
   const [loginError, setLoginError] = useState('')
@@ -94,10 +96,9 @@ export default function App() {
       })
       const data = await res.json()
       if (data.ok) {
-        // Clear stale diagram cache so API is always the source of truth
-        Object.keys(localStorage).filter(k => k.startsWith('mindmaps:diagram:') || k === 'mindmaps:list').forEach(k => localStorage.removeItem(k))
-        localStorage.setItem('mindmaps:user', JSON.stringify(data.user))
-        localStorage.setItem('mindmaps:token', data.token)
+        // Clear any stale cache so the API is the source of truth for the new session.
+        clearSession()
+        saveSession(data.user, data.token)
         setUser(data.user)
         showToast("Welcome back, boss.", { color: '#1a1d2e', confetti: true })
       } else {
@@ -115,9 +116,19 @@ export default function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user])
 
+  // The server rejected our token (expired, revoked, secret rotated): drop straight
+  // to the login screen instead of leaving a signed-in shell with no data in it.
+  useEffect(() => {
+    function onExpired() {
+      setUser(null)
+      showToast('Session expired - sign in again', { color: '#f59e0b' })
+    }
+    window.addEventListener(SESSION_EXPIRED, onExpired)
+    return () => window.removeEventListener(SESSION_EXPIRED, onExpired)
+  }, [])
+
   function handleSignOut() {
-    localStorage.removeItem('mindmaps:user')
-    localStorage.removeItem('mindmaps:token')
+    clearSession()
     setUser(null)
     showToast('See ya!', { color: '#64748b' })
   }
