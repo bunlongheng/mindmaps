@@ -223,7 +223,7 @@ test.describe('SidePanel — Map tab', () => {
 // First 5 entries of the 12-colour wheel (L1_PALETTE in src/lib/color.ts).
 // Since the wheel landed, a depth-1 node's rendered fill is derived from its
 // sortOrder (L1_PALETTE[sortOrder]), NOT from its stored custom colour.
-const WHEEL = ['#ed1c24', '#f26522', '#f7941e', '#faa61a', '#ffd500']
+const WHEEL = ['#d94f3a', '#3ad9bf', '#d93abf', '#8fd93a', '#473ad9']  // first 5 of L1_PALETTE in src/lib/color.ts
 
 test.describe('SidePanel — Style tab', () => {
   test('Fill swatch + custom color persist to the node; L1 fill stays wheel-driven', async ({ page }) => {

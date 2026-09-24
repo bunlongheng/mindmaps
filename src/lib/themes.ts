@@ -1,4 +1,4 @@
-import { hexToRgb } from './color.js'
+import { hexToRgb, L1_PALETTE } from './color.js'
 
 export interface Theme {
   id: string
@@ -12,10 +12,13 @@ export const THEMES: Theme[] = [
     id: 'default',
     label: 'Rainbow Light',
     canvasBg: '#ffffff',
+    // First 12 are the branch wheel (rebalanceColors uses colors.slice(0, 12)) - kept
+    // identical to L1_PALETTE in color.ts so this theme's swatches and initial branch
+    // assignment match what the canvas actually renders (the canvas always resolves L1
+    // colour from L1_PALETTE by sortOrder, regardless of theme). The trailing 8 are
+    // neutrals for backgrounds/root picks and are unchanged.
     colors: [
-      '#ef4444', '#f97316', '#f59e0b', '#eab308',
-      '#22c55e', '#14b8a6', '#06b6d4', '#3b82f6',
-      '#6366f1', '#8b5cf6', '#ec4899', '#f43f5e',
+      ...L1_PALETTE,
       '#ffffff', '#f1f5f9', '#94a3b8', '#475569',
       '#1e293b', '#1a1d2e', '#000000', '#fde68a',
     ],

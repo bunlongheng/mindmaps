@@ -167,8 +167,8 @@ test.describe('Auth — login screen', () => {
   })
 })
 
-test.describe('Viewer — decoded share (?d=) VIEW ONLY', () => {
-  test('a ?d= encoded diagram renders the read-only viewer', async ({ page }) => {
+test.describe('Viewer — decoded share (?d=) document page', () => {
+  test('a ?d= encoded diagram renders the document viewer', async ({ page }) => {
     // Build a minimal diagram and encode it the same way share.ts does.
     const diagram = {
       id: 'e2e-shared',
@@ -186,15 +186,19 @@ test.describe('Viewer — decoded share (?d=) VIEW ONLY', () => {
     const b64 = await page.evaluate((d) => btoa(unescape(encodeURIComponent(JSON.stringify(d)))), diagram)
     await page.goto(`/?d=${encodeURIComponent(b64)}`)
 
-    // Effect: VIEW ONLY badge + canvas with the shared nodes, no editor chrome.
+    // Effect: Sequences-style document page - wordmark header, injected SVG card,
+    // no editor chrome, no canvas (the page scrolls; it never captures the wheel).
     // (Multi-word root titles wrap into tspans that concatenate without spaces,
     //  so we assert on a single-line leaf node whose text is rendered verbatim.)
-    await expect(page.getByText('VIEW ONLY')).toBeVisible({ timeout: 10_000 })
-    await expect(page.locator('.diagram-canvas-root')).toBeVisible()
-    await expect(page.locator('.diagram-canvas-root svg text').filter({ hasText: 'Branch One' }).first()).toBeVisible({ timeout: 5_000 })
-    // No back/format chrome in the viewer.
+    await expect(page.getByText('Mindmaps')).toBeVisible({ timeout: 10_000 })
+    await expect(page.locator('.mm-viewer-card svg')).toBeVisible()
+    await expect(page.locator('.mm-viewer-card svg text').filter({ hasText: 'Branch One' }).first()).toBeVisible({ timeout: 5_000 })
+    await expect(page.locator('.diagram-canvas-root')).toHaveCount(0)
+    // No back/format chrome in the viewer. A ?d= decoded share carries no id, so
+    // no Download SVG link either.
     await expect(page.locator('[title="All maps"]')).toHaveCount(0)
     await expect(page.locator('[title="Settings"]')).toHaveCount(0)
+    await expect(page.getByText('Download SVG')).toHaveCount(0)
   })
 
   test('a malformed ?d= payload falls back to the normal app (no crash)', async ({ page }) => {
@@ -202,12 +206,12 @@ test.describe('Viewer — decoded share (?d=) VIEW ONLY', () => {
     await waitForApp(page)
     // decodeShareURL returns null → app renders home (auto-login on localhost).
     await expect(page.locator('[title="New blank map"], [title="New Map"]').first()).toBeVisible({ timeout: 10_000 })
-    await expect(page.getByText('VIEW ONLY')).toHaveCount(0)
+    await expect(page.locator('.mm-viewer-card svg')).toHaveCount(0)
   })
 })
 
-test.describe('Viewer — ?share= id VIEW ONLY', () => {
-  test('a ?share=<id> link loads the read-only viewer from the API', async ({ page }) => {
+test.describe('Viewer — ?share= id document page', () => {
+  test('a ?share=<id> link loads the document viewer from the API', async ({ page }) => {
     // Stub the single-map load the viewer performs for the share id.
     await page.route(/\/api\/mindmaps\?.*\bid=e2e-share-id/, route =>
       route.fulfill({
@@ -223,9 +227,11 @@ test.describe('Viewer — ?share= id VIEW ONLY', () => {
       }),
     )
     await page.goto('/?share=e2e-share-id')
-    await expect(page.getByText('VIEW ONLY')).toBeVisible({ timeout: 10_000 })
-    await expect(page.locator('.diagram-canvas-root')).toBeVisible()
+    await expect(page.getByText('Mindmaps')).toBeVisible({ timeout: 10_000 })
+    await expect(page.locator('.mm-viewer-card svg')).toBeVisible()
     // Assert on the single-line child node (root titles wrap across tspans).
-    await expect(page.locator('.diagram-canvas-root svg text').filter({ hasText: 'Child' }).first()).toBeVisible({ timeout: 5_000 })
+    await expect(page.locator('.mm-viewer-card svg text').filter({ hasText: 'Child' }).first()).toBeVisible({ timeout: 5_000 })
+    await expect(page.locator('.diagram-canvas-root')).toHaveCount(0)
+    await expect(page.getByText('Download SVG')).toBeVisible()
   })
 })

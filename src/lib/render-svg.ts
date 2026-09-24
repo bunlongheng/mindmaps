@@ -11,13 +11,13 @@
 // render as a tiny neutral placeholder instead of pulling the icon library.
 import type { MindmapNode, DiagramType, LineStyle } from '../types/index.js'
 import { computeMindmapsLayout } from './layout/mindmaps-layout.js'
-import { computeMindmapLayout, wrapText, initialFontSize, nodeInitial, RADIAL_ROOT_FONT } from './layout/mindmap.js'
+import { computeMindmapLayout, wrapText, initialFontSize, nodeInitial, radialLabelFor, radialNodeExtent, LABEL_FONT, RADIAL_ROOT_FONT } from './layout/mindmap.js'
 import { computeFishboneLayout, FISHBONE_SLANT } from './layout/fishbone.js'
 import { computeTimelineLayout } from './layout/timeline.js'
 import { getTheme } from './themes.js'
 import { L1_PALETTE, hexToRgb, darken, depthFill, applyDepthTransparency, edgeWidthForDepth, radialEdgeWidth, RADIAL_EDGE_OPACITY } from './color.js'
 import { rootPillWidth, rootPillFontSize, rootTitleNeedsPill, ROOT_FONT } from './rootPill.js'
-import { nodeMetrics, ICON_GAP, estimateTextWidth } from './nodeMetrics.js'
+import { nodeMetrics, ICON_GAP } from './nodeMetrics.js'
 import { shapeRx } from './nodeShape.js'
 import { parseLinkedTitle, sliceSegments, lineRanges, type LinkSegment } from './links.js'
 import { nodeCenter, nodeCenterLeft, nodeCenterRight, buildStraightPath, buildCurvedPath, buildOrthogonalPath, buildRadialBranchPath } from './geometry.js'
@@ -310,7 +310,7 @@ function centeredWrappedText(label: string, segments: LinkSegment[], cx: number,
   return `<text text-anchor="middle" font-size="${fontSize}" font-weight="${fontWeight}" fill="${esc(fill)}">${tspans}</text>`
 }
 
-function renderNode(node: MindmapNode, type: DiagramType, paletteColor: string | null, descendants = 0): string {
+function renderNode(node: MindmapNode, type: DiagramType, paletteColor: string | null, descendants = 0, rootCenter: { x: number; y: number } | null = null): string {
   const isRoot = node.depth === 0
   const isL2Plus = node.depth >= 2
   const isFishboneNode = type === 'fishbone' && node.depth >= 1
@@ -426,8 +426,10 @@ function renderNode(node: MindmapNode, type: DiagramType, paletteColor: string |
   // ── Label + badge ──
   const skOff = isFishboneNode ? (h * 0.35) / 2 : 0
   if (isRadial) {
-    // Same three bands the canvas draws: initial inside, name + subtree size under a
-    // depth-1 circle, name beside a depth-2 circle, nothing beside a dot.
+    // Same three bands the canvas draws, from the same helper the layout reserved
+    // room with: the initial inside the circle, the name and subtree size under a
+    // depth-1 circle, the name pointing OUTWARD from a depth-2 one, and nothing
+    // beside a dot. The whole title always survives in <title> for hover.
     parts.push(`<title>${esc(label)}</title>`)
     if (!isRadialDot) {
       const glyph = Number(node.fontSize) || initialFontSize(node.depth, displayW)
@@ -440,13 +442,16 @@ function renderNode(node: MindmapNode, type: DiagramType, paletteColor: string |
         parts.push(`<text x="${r2(cx)}" y="${r2(cy + glyph * 0.36)}" text-anchor="middle" font-size="${glyph}" font-weight="600" fill="${esc(textColor)}">${esc(nodeInitial(node.title))}</text>`)
       }
     }
-    if (node.depth === 1) {
-      parts.push(`<text x="${r2(cx)}" y="${r2(h + 16)}" text-anchor="middle" font-size="13" font-weight="600" fill="#1a1d2e">${labelBody}</text>`)
-      if (descendants > 0) {
-        parts.push(`<text x="${r2(cx)}" y="${r2(h + 31)}" text-anchor="middle" font-size="11" font-weight="600" fill="${esc(col)}">${descendants}</text>`)
+    const lbl = radialLabelFor(node, rootCenter?.x ?? 0, rootCenter?.y ?? 0)
+    if (lbl) {
+      const body = lbl.text === label ? labelBody : esc(lbl.text)
+      const size = node.depth === 1 ? LABEL_FONT.title1 : LABEL_FONT.title2
+      const weight = node.depth === 1 ? '600' : '400'
+      const fill = node.depth === 1 ? '#1a1d2e' : '#475569'
+      parts.push(`<text x="${r2(lbl.tx)}" y="${r2(lbl.ty)}" text-anchor="${lbl.anchor}" font-size="${size}" font-weight="${weight}" fill="${fill}">${body}</text>`)
+      if (lbl.countY !== null && descendants > 0) {
+        parts.push(`<text x="${r2(lbl.tx)}" y="${r2(lbl.countY)}" text-anchor="${lbl.anchor}" font-size="${LABEL_FONT.count1}" font-weight="600" fill="${esc(col)}">${descendants}</text>`)
       }
-    } else if (node.depth === 2) {
-      parts.push(`<text x="${r2(displayW + 8)}" y="${r2(cy + 4)}" text-anchor="start" font-size="11" fill="#475569">${labelBody}</text>`)
     }
   } else if (drawCircle || (isRoot && type === 'mindmap')) {
     parts.push(centeredWrappedText(label, parsedTitle.segments, cx, cy, fontSize, fontWeight, textColor))
@@ -472,31 +477,22 @@ function renderNode(node: MindmapNode, type: DiagramType, paletteColor: string |
 }
 
 /**
- * Drawn extent of a node, labels included. The radial mind map hangs a name (and a
- * subtree count) UNDER every depth-1 circle and beside every depth-2 circle, so the
- * home card and the share image have to reserve room for text that lives outside the
- * node's own box - otherwise the outermost labels are cropped off the preview.
+ * Drawn extent of a node, labels included. The radial mind map hangs its names
+ * outside the circles, so the home card and the share image have to reserve room for
+ * text that lives beyond the node's own box - otherwise the outermost labels are
+ * cropped off the preview. The extent comes from the same helper the layout reserved
+ * the space with (src/lib/layout/mindmap radialNodeExtent).
  */
-function nodeBounds(n: MindmapNode, type: DiagramType): { left: number; right: number; top: number; bottom: number } {
-  const b = { left: n.x, right: n.x + n.width, top: n.y, bottom: n.y + n.height }
-  if (type !== 'mindmap' || n.depth === 0 || n.shape) return b
-  const label = parseLinkedTitle(n.title).text
-  if (n.depth === 1) {
-    const halfW = Math.max(estimateTextWidth(label, 13), 24) / 2
-    const cx = n.x + n.width / 2
-    return { left: Math.min(b.left, cx - halfW), right: Math.max(b.right, cx + halfW), top: b.top, bottom: b.bottom + 36 }
-  }
-  if (n.depth === 2) {
-    return { ...b, right: b.right + 8 + estimateTextWidth(label, 11) }
-  }
-  return b
+function nodeBounds(n: MindmapNode, type: DiagramType, rootCenter: { x: number; y: number } | null): { left: number; right: number; top: number; bottom: number } {
+  if (type === 'mindmap' && rootCenter) return radialNodeExtent(n, rootCenter.x, rootCenter.y)
+  return { left: n.x, right: n.x + n.width, top: n.y, bottom: n.y + n.height }
 }
 
 // ── Entry point ──────────────────────────────────────────────────────────────
 
 export function renderMindmapSvg(row: MindmapRow): string {
   const type: DiagramType = VALID_TYPES.has(row.type) ? row.type as DiagramType : 'logic-chart'
-  const lineStyle: LineStyle = VALID_LINE_STYLES.has(row.line_style ?? '') ? row.line_style as LineStyle : 'orthogonal'
+  const lineStyle: LineStyle = VALID_LINE_STYLES.has(row.line_style ?? '') ? row.line_style as LineStyle : 'curved'
   const theme = getTheme(row.theme_id ?? 'default')
 
   const raw: MindmapNode[] = Array.isArray(row.nodes)
@@ -514,8 +510,10 @@ export function renderMindmapSvg(row: MindmapRow): string {
 
   // Draw order: edges under nodes (DiagramCanvas)
   const edges = renderEdges(nodes, type, lineStyle, pc)
+  const rootNode = nodes.find(n => n.parentId === null)
+  const rootCenter = rootNode ? { x: rootNode.x + rootNode.width / 2, y: rootNode.y + rootNode.height / 2 } : null
   const nodeMarkup = nodes.map(n =>
-    renderNode(n, type, paletteColors.get(n.id) ?? null, descendantCounts.get(n.id) ?? 0)).join('')
+    renderNode(n, type, paletteColors.get(n.id) ?? null, descendantCounts.get(n.id) ?? 0, rootCenter)).join('')
   // One blur filter for every glow in the map: the radial mind map's soft coloured
   // halo. Defined once so a 200-node map carries one filter, not 200.
   const defs = type === 'mindmap'
@@ -524,7 +522,7 @@ export function renderMindmapSvg(row: MindmapRow): string {
 
   // viewBox from laid-out bounds (+ slack for spines that extend past the nodes)
   const pad = 60
-  const box = nodes.map(n => nodeBounds(n, type))
+  const box = nodes.map(n => nodeBounds(n, type, rootCenter))
   const minX = Math.min(...box.map(b => b.left)) - pad
   const minY = Math.min(...box.map(b => b.top)) - pad
   const maxX = Math.max(...box.map(b => b.right)) + pad + (type === 'fishbone' || type === 'timeline' ? 120 : 0)

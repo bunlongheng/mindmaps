@@ -186,7 +186,7 @@ export const useMindmapStore = create<MindmapStore>()(
     selectedNodeIds: [],
     isDirty: false,
     diagramType: 'logic-chart',
-    lineStyle: 'orthogonal',
+    lineStyle: 'curved',
     themeId: localStorage.getItem('mindmaps:themeId') ?? 'default',
     showOrderNumbers: true,
     showChildCount: false,

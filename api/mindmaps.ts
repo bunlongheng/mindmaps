@@ -80,7 +80,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
            name=$3, type=$4, line_style=$5, sharing_enabled=$6, theme_id=$7, nodes=$8, tags=$9, updated_at=now()
          WHERE mindmaps.user_id=$2`,
         [b.id, uid, b.name ?? 'Untitled', b.type ?? 'logic-chart',
-         b.line_style ?? 'orthogonal', b.sharing_enabled ?? false,
+         b.line_style ?? 'curved', b.sharing_enabled ?? false,
          b.theme_id ?? 'default', JSON.stringify(b.nodes ?? []), b.tags ?? []],
       )
       // rowCount 0 means the id exists but belongs to someone else - nothing was written.

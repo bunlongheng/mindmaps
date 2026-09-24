@@ -362,6 +362,7 @@ describe('createDiagram', () => {
     expect(id).toBeTruthy()
     const map = useMindmapStore.getState().activeMindmap!
     expect(map.name).toBe('Fresh')
+    expect(map.lineStyle).toBe('curved')
     expect(map.nodes.filter(n => n.depth === 1)).toHaveLength(5)
     expect(localStorage.getItem('activeMindmapId')).toBe(id)
     expect(soundCreate).toHaveBeenCalled()
@@ -377,6 +378,7 @@ describe('createDiagram', () => {
     const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string)
     expect(body.name).toBe('Synced')
     expect(body.user_id).toBe('u1')
+    expect(body.line_style).toBe('curved')
   })
 
   it('swallows a background sync failure', async () => {

@@ -399,31 +399,23 @@ describe('App — delete confirm modal', () => {
 })
 
 describe('App — viewer / share view', () => {
-  it('renders the read-only viewer for a ?share= link without a user', async () => {
+  it('renders the document viewer for a ?share= link without a user', async () => {
     setHostname('app.example.com')
     setUrl('/?share=abc')
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ id: 'abc', name: 'Shared', type: 'logic-chart', nodes: makeDiagram().nodes, line_style: 'orthogonal', theme_id: 'default' }) })))
     render(<App />)
-    await waitFor(() => expect(screen.getByText('VIEW ONLY')).toBeInTheDocument())
-    expect(screen.getByTestId('canvas').getAttribute('data-readonly')).toBe('1')
+    await waitFor(() => expect(screen.getByText('Mindmaps')).toBeInTheDocument())
+    expect(screen.queryByTestId('canvas')).toBeNull()
+    expect(screen.getByText('Download SVG')).toBeInTheDocument()
   })
 
-  it('renders the viewer from a decoded share URL', async () => {
+  it('renders the viewer from a decoded share URL, with no Download SVG link', async () => {
     setHostname('app.example.com')
     decodeShareURL.mockReturnValue(makeDiagram({ name: 'Decoded' }))
     render(<App />)
-    await waitFor(() => expect(screen.getByText('VIEW ONLY')).toBeInTheDocument())
-  })
-
-  it('a node select in the read-only viewer is a no-op (no panel, no crash)', async () => {
-    setHostname('app.example.com')
-    decodeShareURL.mockReturnValue(makeDiagram({ name: 'Decoded' }))
-    render(<App />)
-    await waitFor(() => expect(screen.getByText('VIEW ONLY')).toBeInTheDocument())
-    expect(() => fireEvent.click(screen.getByTestId('select-node'))).not.toThrow()
-    // The viewer never mounts a side panel - selecting a node there has nowhere to go.
-    expect(screen.queryByTestId('side-panel')).toBeNull()
-    expect(screen.getByText('VIEW ONLY')).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByText('Mindmaps')).toBeInTheDocument())
+    expect(screen.queryByTestId('canvas')).toBeNull()
+    expect(screen.queryByText('Download SVG')).toBeNull()
   })
 })
 

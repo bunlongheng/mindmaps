@@ -235,7 +235,7 @@ export function useDiagram(userId: string | null = null) {
     ]
     const { computeMindmapsLayout } = await import('../lib/layout/mindmaps-layout')
     const laid = computeMindmapsLayout(allNodes)
-    const diagram: Diagram = { id, name, type: 'logic-chart', lineStyle: 'orthogonal', createdAt: now, updatedAt: now, nodes: laid }
+    const diagram: Diagram = { id, name, type: 'logic-chart', lineStyle: 'curved', createdAt: now, updatedAt: now, nodes: laid }
 
     lsSaveDiagram(diagram)
     setActiveMindmap(diagram)
@@ -250,7 +250,7 @@ export function useDiagram(userId: string | null = null) {
         method: 'POST',
         headers: authHeaders(),
         body: JSON.stringify({
-          id, user_id: userId, name, type: 'logic-chart', line_style: 'orthogonal',
+          id, user_id: userId, name, type: 'logic-chart', line_style: 'curved',
           sharing_enabled: false, nodes: laid,
         }),
       }, name)
@@ -266,7 +266,7 @@ export function useDiagram(userId: string | null = null) {
 
     const id = crypto.randomUUID()
     const now = new Date().toISOString()
-    const diagram: Diagram = { id, name: finalName, type: 'logic-chart', lineStyle: 'orthogonal', createdAt: now, updatedAt: now, nodes }
+    const diagram: Diagram = { id, name: finalName, type: 'logic-chart', lineStyle: 'curved', createdAt: now, updatedAt: now, nodes }
 
     lsSaveDiagram(diagram)
     setActiveMindmap(diagram)
@@ -280,7 +280,7 @@ export function useDiagram(userId: string | null = null) {
         method: 'POST',
         headers: authHeaders(),
         body: JSON.stringify({
-          id, user_id: userId, name: finalName, type: 'logic-chart', line_style: 'orthogonal',
+          id, user_id: userId, name: finalName, type: 'logic-chart', line_style: 'curved',
           sharing_enabled: false, nodes,
         }),
       }, finalName)

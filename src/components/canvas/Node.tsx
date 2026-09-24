@@ -2,7 +2,7 @@ import { useRef, useState, useCallback } from 'react'
 import type { MindmapNode } from '../../types'
 import { useMindmapStore } from '../../store/mindmapStore'
 import { NodeIcon, getLucideIcon } from './NodeIcon'
-import { wrapText, initialFontSize, nodeInitial, RADIAL_ROOT_FONT } from '../../lib/layout/mindmap'
+import { wrapText, initialFontSize, nodeInitial, radialLabelFor, LABEL_FONT, RADIAL_ROOT_FONT } from '../../lib/layout/mindmap'
 import { rootPillWidth, rootPillFontSize, rootTitleNeedsPill, rootCircleDiameter, rootDrawnWidth, ROOT_FONT } from '../../lib/rootPill'
 import { hexToRgb, darken, depthFill } from '../../lib/color'
 import { shapeRx } from '../../lib/nodeShape'
@@ -25,6 +25,7 @@ interface NodeProps {
   childCount?: number       // direct children, precomputed once by DiagramCanvas (was an O(n) per-node selector)
   descendantCount?: number  // total subtree size, precomputed once (was an O(n^2) per-node selector)
   nodeCount?: number        // total nodes in the map, used to gate decorative animations on large maps
+  rootCenter?: { x: number; y: number } | null  // the radial mind map measures "outward" from here; precomputed once by DiagramCanvas
 }
 
 // Decorative SMIL animations (fireflies, SiriWave) burn CPU/GPU at idle, so skip them
@@ -100,7 +101,7 @@ function isLight(hex: string): boolean {
   return lum > 140
 }
 
-export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onDragMove, onRootDragOffset, svgRef, readOnly, noInteract = false, l1Colors = [], paletteColor = null, childCount = 0, descendantCount = 0, nodeCount = 0 }: NodeProps) {
+export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onDragMove, onRootDragOffset, svgRef, readOnly, noInteract = false, l1Colors = [], paletteColor = null, childCount = 0, descendantCount = 0, nodeCount = 0, rootCenter = null }: NodeProps) {
   const isRoot = node.depth === 0
   const isL2Plus = node.depth >= 2
   // Brighter/more-vivid version of the node colour, used for all coloured fills.
@@ -571,11 +572,19 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
         </foreignObject>
       ) : isRadial ? (() => {
         // Labels live OUTSIDE the circle, so this group is never clipped to the box.
+        // Where each one sits, and how far it is cut, comes from the same helper the
+        // layout used to reserve room for it (src/lib/layout/mindmap radialLabelFor),
+        // so a label can never land where nothing was kept clear for it.
         const glyph = node.fontSize ?? initialFontSize(node.depth, displayW)
-        // A markdown link in the title still renders as a real anchor in the label.
-        const titleBody = parsedTitle.segments.some(seg => !!seg.url)
+        // Selecting a node shows its whole title, however long; otherwise it is cut.
+        const label = radialLabelFor(node, rootCenter?.x ?? 0, rootCenter?.y ?? 0, isSelected)
+        // A markdown link in the title still renders as a real anchor in the label -
+        // but only while the whole title is on show, since a cut one no longer lines
+        // up with the runs.
+        const hasLinkRuns = parsedTitle.segments.some(seg => !!seg.url)
+        const titleBody = label && hasLinkRuns && label.text === plainLabel
           ? renderRuns(parsedTitle.segments, 'rl')
-          : plainLabel
+          : label?.text
         return (
         <g style={{ pointerEvents: 'none' }}>
           <title>{plainLabel}</title>
@@ -592,21 +601,21 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
                 fontFamily="Inter, system-ui, sans-serif" fill={textColor}>{nodeInitial(node.title)}</text>
             )
           )}
-          {/* Depth 1 carries the map: its name and its subtree size sit under the circle */}
-          {node.depth === 1 && (
+          {/* Depth 1 carries the map: its name and its subtree size sit under the circle.
+              Depth 2 reads outward, away from the root. A dot carries no drawn label. */}
+          {label && (
             <>
-              <text x={cx} y={boxH + 16} textAnchor="middle" fontSize={13} fontWeight="600"
-                fontFamily="Inter, system-ui, sans-serif" fill="#1a1d2e">{titleBody}</text>
-              {descendantCount > 0 && (
-                <text x={cx} y={boxH + 31} textAnchor="middle" fontSize={11} fontWeight="600"
+              <text x={label.tx} y={label.ty} textAnchor={label.anchor}
+                fontSize={node.depth === 1 ? LABEL_FONT.title1 : LABEL_FONT.title2}
+                fontWeight={node.depth === 1 ? '600' : '400'}
+                fontFamily="Inter, system-ui, sans-serif"
+                fill={node.depth === 1 ? '#1a1d2e' : '#475569'}>{titleBody}</text>
+              {label.countY !== null && descendantCount > 0 && (
+                <text x={label.tx} y={label.countY} textAnchor={label.anchor}
+                  fontSize={LABEL_FONT.count1} fontWeight="600"
                   fontFamily="Inter, system-ui, sans-serif" fill={col}>{descendantCount}</text>
               )}
             </>
-          )}
-          {/* Depth 2 is labelled beside the circle; a dot only while it is selected */}
-          {(node.depth === 2 || (isRadialDot && isSelected)) && (
-            <text x={displayW + 8} y={cy + 4} textAnchor="start" fontSize={11}
-              fontFamily="Inter, system-ui, sans-serif" fill="#475569">{titleBody}</text>
           )}
         </g>
         )

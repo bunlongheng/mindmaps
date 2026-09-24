@@ -2,7 +2,7 @@
 import { describe, it, expect } from 'vitest'
 import { renderMindmapSvg } from '../_lib/render-svg.js'
 import { depthFill, L1_PALETTE } from '../../src/lib/color.js'
-import { computeMindmapLayout } from '../../src/lib/layout/mindmap.js'
+import { computeMindmapLayout, radialLabelSide } from '../../src/lib/layout/mindmap.js'
 
 const mkNodes = () => {
   const root = { id: 'r', title: 'Machine Learning', parentId: null, depth: 0, x: 0, y: 0, width: 180, height: 180, color: '#6366f1', sortOrder: 0, manuallyPositioned: false }
@@ -14,6 +14,8 @@ const mkNodes = () => {
   const b2 = { id: 'b2', title: 'K-Means', parentId: 'b1', depth: 3, x: 0, y: 0, width: 100, height: 40, color: '#ec4899', sortOrder: 0, manuallyPositioned: false }
   return [root, a, b, a1, a2, b1, b2]
 }
+
+const r2 = (v: number) => Math.round(v * 100) / 100
 
 describe('renderMindmapSvg smoke', () => {
   for (const type of ['logic-chart', 'mindmap', 'fishbone', 'timeline'] as const) {
@@ -72,6 +74,14 @@ describe('renderMindmapSvg smoke', () => {
     expect(connectors).toContain('2')
   })
 
+  it('falls back to curved for a missing or unrecognized line_style', () => {
+    const curvedSvg = renderMindmapSvg({ id: 'x', name: 'M', type: 'logic-chart', line_style: 'curved', theme_id: 'default', nodes: mkNodes() as never })
+    const missingSvg = renderMindmapSvg({ id: 'x', name: 'M', type: 'logic-chart', line_style: null, theme_id: 'default', nodes: mkNodes() as never })
+    const bogusSvg = renderMindmapSvg({ id: 'x', name: 'M', type: 'logic-chart', line_style: 'bogus', theme_id: 'default', nodes: mkNodes() as never })
+    expect(missingSvg).toBe(curvedSvg)
+    expect(bogusSvg).toBe(curvedSvg)
+  })
+
   // ── Mind map: the radial constellation ─────────────────────────────────────
   // The home cards and the share images are drawn by this renderer while the opened
   // map is drawn by the canvas, so the two must agree node for node.
@@ -111,10 +121,37 @@ describe('renderMindmapSvg smoke', () => {
     it('leaves the deepest nodes as bare dots with a hover title', () => {
       const svg = svgOf()
       expect(svg).toContain('<title>K-Means</title>')
-      // no 11px side label for the depth-3 dot
-      expect(svg).not.toMatch(/font-size="11" fill="#475569">K-Means</)
+      // no side label for the depth-3 dot
+      expect(svg).not.toMatch(/font-weight="400" fill="#475569">K-Means</)
       // ... while depth 2 does get one
-      expect(svg).toMatch(/font-size="11" fill="#475569">Regression</)
+      expect(svg).toMatch(/font-weight="400" fill="#475569">Regression</)
+    })
+
+    it('cuts a long depth-2 label but keeps the whole title on hover', () => {
+      const long = 'Hook reads the file on each prompt - flips on next message, no restart'
+      const nodes = mkNodes().map(n => (n.id === 'a1' ? { ...n, title: long } : n))
+      const svg = renderMindmapSvg({ id: 'x', name: 'M', type: 'mindmap', line_style: 'curved', theme_id: 'default', nodes: nodes as never })
+      expect(svg).toContain(`<title>${long}</title>`)
+      expect(svg).not.toContain(`fill="#475569">${long}<`)
+      const drawn = svg.match(/font-weight="400" fill="#475569">([^<]+)</)![1]
+      expect(drawn.length).toBeLessThanOrEqual(32)
+      expect(drawn.endsWith('\u2026')).toBe(true)
+    })
+
+    it('points every depth-2 label outward, away from the root', () => {
+      const svg = svgOf()
+      const laid = computeMindmapLayout(mkNodes().map(n => ({ ...n, width: 0, height: 0 })) as never)
+      const root = laid.find(n => n.depth === 0)!
+      const rcx = root.x + root.width / 2
+      const rcy = root.y + root.height / 2
+      let seen = 0
+      for (const n of laid.filter(d => d.depth === 2)) {
+        const side = radialLabelSide(n.x + n.width / 2 - rcx, n.y + n.height / 2 - rcy)
+        const block = svg.slice(svg.indexOf(`translate(${r2(n.x)},${r2(n.y)})`))
+        if (side === 'left') { expect(block).toContain('text-anchor="end"'); seen++ }
+        if (side === 'right') { expect(block).toContain('text-anchor="start"'); seen++ }
+      }
+      expect(seen).toBeGreaterThan(0)
     })
 
     it('reserves room for the labels that hang outside the circles', () => {

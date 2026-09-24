@@ -116,12 +116,12 @@ describe('l1PaletteColor', () => {
 
 describe('depth ladder (DEPTH_STRENGTH / depthStrength / depthFill)', () => {
   it('matches the documented table', () => {
-    expect(DEPTH_STRENGTH).toEqual({ 1: 1, 2: 0.8, 3: 0.6, 4: 0.5 })
-    expect(DEPTH_STRENGTH_FLOOR).toBe(0.4)
+    expect(DEPTH_STRENGTH).toEqual({ 1: 1, 2: 0.8, 3: 0.4, 4: 0.3 })
+    expect(DEPTH_STRENGTH_FLOOR).toBe(0.25)
     expect(depthStrength(1)).toBe(1)
     expect(depthStrength(2)).toBe(0.8)
-    expect(depthStrength(3)).toBe(0.6)
-    expect(depthStrength(4)).toBe(0.5)
+    expect(depthStrength(3)).toBe(0.4)
+    expect(depthStrength(4)).toBe(0.3)
   })
 
   it('floors at depth 5 and deeper', () => {
@@ -158,9 +158,76 @@ describe('depth ladder (DEPTH_STRENGTH / depthStrength / depthFill)', () => {
   })
 
   it('mixes exactly (1 - strength) toward white', () => {
-    // #000000 at 60% strength -> 40% of the way to white -> 102
-    expect(depthFill('#000000', 3)).toBe('#666666')
+    // #000000 at 40% strength -> 60% of the way to white -> 153
+    expect(depthFill('#000000', 3)).toBe('#999999')
     expect(depthFill('#ffffff', 5)).toBe('#ffffff')
+  })
+})
+
+describe('L1_PALETTE spacing and legibility', () => {
+  // Same conversion the rest of the app uses (hexToRgb above), turned into HSL just
+  // for this check.
+  function hexToHsl(hex: string): [number, number, number] {
+    const [r, g, b] = hexToRgb(hex).map(v => v / 255)
+    const max = Math.max(r, g, b)
+    const min = Math.min(r, g, b)
+    const l = (max + min) / 2
+    if (max === min) return [0, 0, l * 100]
+    const d = max - min
+    const s = l > 0.5 ? d / (2 - max - min) : d / (max + min)
+    let h: number
+    if (max === r) h = (g - b) / d + (g < b ? 6 : 0)
+    else if (max === g) h = (b - r) / d + 2
+    else h = (r - g) / d + 4
+    return [h * 60, s * 100, l * 100]
+  }
+
+  function hueDistance(a: number, b: number): number {
+    const diff = Math.abs(a - b) % 360
+    return diff > 180 ? 360 - diff : diff
+  }
+
+  // WCAG relative luminance / contrast ratio, gamma-corrected (not the app's fast
+  // perceived-luminance isLight() heuristic, which only picks text colour).
+  function relLuminance(hex: string): number {
+    const [r, g, b] = hexToRgb(hex).map(v => {
+      const c = v / 255
+      return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)
+    })
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
+  }
+
+  function contrastRatio(hexA: string, hexB: string): number {
+    const lA = relLuminance(hexA)
+    const lB = relLuminance(hexB)
+    const lighter = Math.max(lA, lB)
+    const darker = Math.min(lA, lB)
+    return (lighter + 0.05) / (darker + 0.05)
+  }
+
+  // Same threshold Node.tsx / render-svg.ts isLight() use to choose text colour.
+  function isLight(hex: string): boolean {
+    const [r, g, b] = hexToRgb(hex)
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b > 140
+  }
+
+  it('has exactly 12 colours', () => {
+    expect(L1_PALETTE).toHaveLength(12)
+  })
+
+  it('keeps every neighbouring pair at least 60 degrees apart in hue, wrapping around', () => {
+    for (let i = 0; i < L1_PALETTE.length; i++) {
+      const [hA] = hexToHsl(L1_PALETTE[i])
+      const [hB] = hexToHsl(L1_PALETTE[(i + 1) % L1_PALETTE.length])
+      expect(hueDistance(hA, hB)).toBeGreaterThanOrEqual(60)
+    }
+  })
+
+  it('is legible: each colour has >= 3:1 contrast against the text colour the app picks for it', () => {
+    for (const hex of L1_PALETTE) {
+      const textColor = isLight(hex) ? '#1a1d2e' : '#ffffff'
+      expect(contrastRatio(hex, textColor)).toBeGreaterThanOrEqual(3)
+    }
   })
 })
 

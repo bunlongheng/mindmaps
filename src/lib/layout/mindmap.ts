@@ -56,7 +56,140 @@ const CLEARANCE: Readonly<Record<number, number>> = { 0: 40, 1: 50, 2: 22 }
 const DEFAULT_CLEARANCE = 8
 
 /** Relaxation passes run after placement. Fixed count, so the result is deterministic. */
-export const RELAX_ITERATIONS = 60
+export const RELAX_ITERATIONS = 90
+
+// ── Labels ───────────────────────────────────────────────────────────────────
+// A radial node's label lives OUTSIDE its circle, so it is part of the node's
+// footprint: the relaxation, the viewport fit, the home cards and the share images
+// all have to reserve the same box for it. Everything about a label - how long it is
+// drawn, which way it points, where the box sits - is decided here once and read by
+// the canvas (Node.tsx) and the server renderer (render-svg.ts) alike.
+
+/** Text sizes, in px, for the drawn labels. */
+export const LABEL_FONT = { title1: 13, count1: 11, title2: 11 } as const
+
+/**
+ * Longest a label is DRAWN before it is cut with an ellipsis. The node keeps its
+ * whole title: the full text stays in the data, in the SVG <title> for hover, and
+ * is drawn in full while the node is selected.
+ */
+export const LABEL_MAX_CHARS: Readonly<Record<number, number>> = { 1: 40, 2: 32 }
+
+/** How many characters a depth's label is drawn at; 0 means it carries no label. */
+export function labelMaxChars(depth: number): number {
+  return LABEL_MAX_CHARS[depth] ?? 0
+}
+
+/** Cut `text` to `maxChars`, ellipsis included in the count. */
+export function truncateLabel(text: string, maxChars: number): string {
+  if (maxChars <= 0 || text.length <= maxChars) return text
+  return text.slice(0, Math.max(1, maxChars - 1)).trimEnd() + '\u2026'
+}
+
+/** Semibold runs a touch wider than the estimator's regular-weight ratio. */
+const BOLD_WIDTH = 1.06
+
+/** Drawn width of a label line. */
+export function labelTextWidth(text: string, fontSize: number, bold = false): number {
+  return estimateTextWidth(text, fontSize) * (bold ? BOLD_WIDTH : 1)
+}
+
+export type LabelSide = 'left' | 'right' | 'above' | 'below'
+
+/** Half-width of the top and bottom bands, where a side label would sit on the branch. */
+const VERTICAL_BAND = (20 * Math.PI) / 180
+
+/**
+ * Which way a depth-2 label points: always OUTWARD, away from the root. A label on
+ * the left half of the map reads right-to-left off its circle instead of pointing
+ * back across the branch and over the topic it hangs from. Straight up and straight
+ * down keep the label to the right but nudge it clear of the branch line.
+ */
+export function radialLabelSide(dx: number, dy: number): LabelSide {
+  const angle = Math.atan2(dy, dx)          // 0 = right, -PI/2 = straight up
+  if (Math.abs(angle + Math.PI / 2) < VERTICAL_BAND) return 'above'
+  if (Math.abs(angle - Math.PI / 2) < VERTICAL_BAND) return 'below'
+  return dx < 0 ? 'left' : 'right'
+}
+
+export interface RadialLabel {
+  /** The text actually drawn (already cut to the depth's limit). */
+  text: string
+  /** Title baseline, in the node's own coordinates (origin at node.x, node.y). */
+  tx: number
+  ty: number
+  anchor: 'start' | 'middle' | 'end'
+  /** Baseline of the subtree-count line under a depth-1 name, or null. */
+  countY: number | null
+  side: LabelSide
+  /** Box the label occupies, in the node's own coordinates. */
+  box: { x: number; y: number; w: number; h: number }
+}
+
+const LINE_H = 14        // one drawn text line, for box purposes
+const GAP = 8            // clear space between a circle and a side label
+
+/**
+ * The label for one radial node, or null when it carries none (the root, the dots,
+ * and any node with an explicit shape, which keeps its own box and inside label).
+ * `rcx`/`rcy` are the root's centre - the only thing "outward" can be measured from.
+ */
+export function radialLabelFor(
+  node: MindmapNode,
+  rcx: number,
+  rcy: number,
+  full = false,
+): RadialLabel | null {
+  if (node.shape) return null
+  const max = labelMaxChars(node.depth)
+  if (max <= 0) return null
+  const raw = displayTitle(node.title)
+  const text = full ? raw : truncateLabel(raw, max)
+  const d = node.width
+
+  if (node.depth === 1) {
+    // The map's own headings stay centred under their circle, name over count.
+    const w = labelTextWidth(text, LABEL_FONT.title1, true)
+    return {
+      text, tx: d / 2, ty: d + 16, anchor: 'middle', countY: d + 31, side: 'below',
+      box: { x: d / 2 - w / 2, y: d + 4, w, h: 2 * LINE_H },
+    }
+  }
+
+  const w = labelTextWidth(text, LABEL_FONT.title2)
+  const side = radialLabelSide(node.x + d / 2 - rcx, node.y + node.height / 2 - rcy)
+  const midY = node.height / 2
+  if (side === 'left') {
+    return { text, tx: -GAP, ty: midY + 4, anchor: 'end', countY: null, side,
+      box: { x: -GAP - w, y: midY - LINE_H / 2, w, h: LINE_H } }
+  }
+  if (side === 'above') {
+    return { text, tx: d / 2 + 6, ty: -6, anchor: 'start', countY: null, side,
+      box: { x: d / 2 + 6, y: -6 - LINE_H + 3, w, h: LINE_H } }
+  }
+  if (side === 'below') {
+    return { text, tx: d / 2 + 6, ty: node.height + 14, anchor: 'start', countY: null, side,
+      box: { x: d / 2 + 6, y: node.height + 3, w, h: LINE_H } }
+  }
+  return { text, tx: d + GAP, ty: midY + 4, anchor: 'start', countY: null, side: 'right',
+    box: { x: d + GAP, y: midY - LINE_H / 2, w, h: LINE_H } }
+}
+
+export interface Extent { left: number; top: number; right: number; bottom: number }
+
+/** A radial node's drawn extent in world coordinates, its label box included. */
+export function radialNodeExtent(node: MindmapNode, rcx: number, rcy: number): Extent {
+  const e: Extent = { left: node.x, top: node.y, right: node.x + node.width, bottom: node.y + node.height }
+  const label = radialLabelFor(node, rcx, rcy)
+  if (!label) return e
+  const { x, y, w, h } = label.box
+  return {
+    left: Math.min(e.left, node.x + x),
+    top: Math.min(e.top, node.y + y),
+    right: Math.max(e.right, node.x + x + w),
+    bottom: Math.max(e.bottom, node.y + y + h),
+  }
+}
 
 /** Diameter band for a depth (depth 3 and deeper are dots). */
 export function diameterBand(depth: number): readonly [number, number] {
@@ -173,40 +306,65 @@ export function radialNodeSize(
 }
 
 /**
- * Push overlapping circles apart along the line between their centres. Fixed
- * iteration count and a fixed visit order, so two runs on the same map agree.
- * The root and every manually-positioned node are pinned.
+ * Push overlapping nodes apart. A radial node's footprint is its circle PLUS its
+ * label box, so this separates the combined boxes, not just the circles - otherwise
+ * two clear circles still have their sentences lying across each other.
+ *
+ * Boxes are pulled apart along whichever axis they overlap least, which for wide,
+ * short label boxes means they stack vertically instead of fighting the ring. The
+ * side a label points is re-read from live positions at the top of every pass, so
+ * once the map stops moving the boxes and the drawn labels agree exactly.
+ *
+ * Fixed iteration count and fixed visit order: two runs on the same map agree. The
+ * root and every manually-positioned node are pinned.
  */
 export function relaxRadial(placed: MindmapNode[], iterations = RELAX_ITERATIONS): void {
+  const root = placed.find(n => n.depth === 0)
+  const rcx = root ? root.x + root.width / 2 : 0
+  const rcy = root ? root.y + root.height / 2 : 0
   const movable = placed.map(n => n.depth > 0 && !n.manuallyPositioned)
+  if (!movable.some(Boolean)) return
+
+  const boxes = placed.map(() => ({ x: 0, y: 0, w: 0, h: 0 }))
+  const remeasure = (i: number) => {
+    const n = placed[i]
+    const e = radialNodeExtent(n, rcx, rcy)
+    const p = clearance(n.depth) / 2
+    boxes[i].x = e.left - p
+    boxes[i].y = e.top - p
+    boxes[i].w = (e.right - e.left) + 2 * p
+    boxes[i].h = (e.bottom - e.top) + 2 * p
+  }
+
   for (let pass = 0; pass < iterations; pass++) {
+    for (let i = 0; i < placed.length; i++) remeasure(i)
     let moved = false
     for (let i = 0; i < placed.length; i++) {
-      const a = placed[i]
       for (let j = i + 1; j < placed.length; j++) {
-        const b = placed[j]
         if (!movable[i] && !movable[j]) continue
-        const acx = a.x + a.width / 2, acy = a.y + a.height / 2
-        const bcx = b.x + b.width / 2, bcy = b.y + b.height / 2
-        const need = a.width / 2 + b.width / 2 + Math.max(clearance(a.depth), clearance(b.depth))
-        let dx = bcx - acx, dy = bcy - acy
-        const dist = Math.hypot(dx, dy)
-        if (dist >= need) continue
-        if (dist === 0) {
-          // Coincident centres carry no direction: separate along a fixed axis so
-          // the result stays finite and reproducible.
-          dx = 1; dy = 0
-        } else {
-          dx /= dist; dy /= dist
+        const a = boxes[i], b = boxes[j]
+        const ox = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)
+        if (ox <= 0) continue
+        const oy = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y)
+        if (oy <= 0) continue
+        // Separate along the shallower axis; ties break on Y, so stacked labels
+        // slide apart vertically rather than drifting round the ring.
+        let px = 0, py = 0
+        if (ox < oy) px = (b.x + b.w / 2) >= (a.x + a.w / 2) ? ox : -ox
+        else py = (b.y + b.h / 2) >= (a.y + a.h / 2) ? oy : -oy
+        const share = movable[i] && movable[j] ? 0.5 : 1
+        if (movable[i]) {
+          placed[i].x -= px * share; placed[i].y -= py * share
+          a.x -= px * share; a.y -= py * share
         }
-        const overlap = need - dist
-        const share = movable[i] && movable[j] ? overlap / 2 : overlap
-        if (movable[i]) { a.x -= dx * share; a.y -= dy * share }
-        if (movable[j]) { b.x += dx * share; b.y += dy * share }
+        if (movable[j]) {
+          placed[j].x += px * share; placed[j].y += py * share
+          b.x += px * share; b.y += py * share
+        }
         moved = true
       }
     }
-    if (!moved) break
+    if (!moved) return
   }
 }
 

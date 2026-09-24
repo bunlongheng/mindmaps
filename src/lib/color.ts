@@ -37,10 +37,10 @@ export function applyDepthBackground(baseHex: string, depth: number): string {
  * Exported so the canvas (Node.tsx), the server renderer (render-svg.ts) and the
  * tests all read the same numbers.
  */
-export const DEPTH_STRENGTH: Readonly<Record<number, number>> = { 1: 1, 2: 0.8, 3: 0.6, 4: 0.5 }
+export const DEPTH_STRENGTH: Readonly<Record<number, number>> = { 1: 1, 2: 0.8, 3: 0.4, 4: 0.3 }
 
 /** Strength used at depth 5 and deeper. */
-export const DEPTH_STRENGTH_FLOOR = 0.4
+export const DEPTH_STRENGTH_FLOOR = 0.25
 
 /** Strength of the branch colour at a given depth (see DEPTH_STRENGTH). */
 export function depthStrength(depth: number): number {
@@ -105,21 +105,28 @@ export function darken(hex: string, amount = 0.3): string {
   return `rgb(${nr},${ng},${nb})`
 }
 
-// 12 distinct colours sampled from the artist's colour wheel, applied to the top-12
-// L1 categories in order (top -> bottom). Children inherit their L1's colour.
+// 12 distinct colours sampled from the colour wheel, applied to the top-12 L1
+// categories in order (top -> bottom). Children inherit their L1's colour.
+//
+// The old palette walked the wheel in hue order (red, red-orange, orange, ...), so
+// neighbouring branches landed within ~15-30 degrees of hue of each other and were
+// hard to tell apart at a glance. This one keeps the same 12 hue families - softened
+// a touch below pure saturation, Xmind-like - but visits them in an order where every
+// pair of neighbours (including branch 12 wrapping back to branch 1) is at least 60
+// degrees apart on the wheel, most well past 130. See color.test.ts for the check.
 export const L1_PALETTE = [
-  '#ED1C24', // red
-  '#F26522', // red-orange
-  '#F7941E', // orange
-  '#FAA61A', // amber
-  '#FFD500', // yellow
-  '#8DC63F', // yellow-green
-  '#39B54A', // green
-  '#0072BC', // blue
-  '#2E3192', // blue-violet
-  '#662D91', // violet
-  '#92278F', // purple
-  '#EC008C', // magenta
+  '#D94F3A', // coral red
+  '#3AD9BF', // teal
+  '#D93ABF', // magenta
+  '#8FD93A', // lime
+  '#473AD9', // indigo
+  '#D9843A', // orange
+  '#3AAAD9', // sky
+  '#D93A7C', // pink
+  '#3AD955', // green
+  '#7C3AD9', // violet
+  '#D9AA3A', // amber
+  '#3A74D9', // blue
 ]
 
 type MinNode = { id: string; parentId: string | null; depth: number; sortOrder?: number }

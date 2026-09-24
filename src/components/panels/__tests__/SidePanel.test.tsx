@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor, act, cleanup } from '@testing-library/react'
 import { SidePanel } from '../SidePanel'
 import { useMindmapStore } from '../../../store/mindmapStore'
+import { getTheme } from '../../../lib/themes'
 import type { Diagram, MindmapNode } from '../../../types'
 
 // Silence toast DOM noise
@@ -253,8 +254,7 @@ describe('SidePanel — Style tab', () => {
     expect(swatches.length).toBe(11)
     fireEvent.click(swatches[1])
     const node = useMindmapStore.getState().activeMindmap!.nodes.find(n => n.id === 'c1')!
-    // default theme color index 1 is #f97316
-    expect(node.color).toBe('#f97316')
+    expect(node.color).toBe(getTheme('default').colors[1])
   })
 
   it('ColorField custom color input changes color', () => {

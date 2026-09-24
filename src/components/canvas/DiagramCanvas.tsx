@@ -7,6 +7,7 @@ import { Node } from './Node'
 import { useKeyboard } from '../../hooks/useKeyboard'
 import { L1_PALETTE } from '../../lib/color'
 import { computeSubtreeCounts } from '../../lib/nodeCounts'
+import { radialNodeExtent } from '../../lib/layout/mindmap'
 
 interface DiagramCanvasProps {
   onNodeSelect: (nodeId: string | null) => void
@@ -49,6 +50,13 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract }: DiagramCan
     })),
   )
   const counts = useMemo(() => computeSubtreeCounts(activeMindmap?.nodes ?? []), [activeMindmap?.nodes])
+  // "Outward" in a radial mind map is measured from the root, so every Node needs the
+  // root's centre. Resolved once here rather than by an O(n) find inside each node.
+  const rootCenter = useMemo(() => {
+    const r = activeMindmap?.nodes.find(n => n.parentId === null)
+    return r ? { x: r.x + r.width / 2, y: r.y + r.height / 2 } : null
+  }, [activeMindmap?.nodes])
+
   const paletteColors = useMemo(() => computePaletteColors(activeMindmap?.nodes ?? []), [activeMindmap?.nodes])
   const canvasBg = getTheme(themeId).canvasBg
   const svgRef = useRef<SVGSVGElement>(null!)
@@ -99,10 +107,16 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract }: DiagramCan
     const { width: svgW, height: svgH } = svg.getBoundingClientRect()
     if (svgW === 0 || svgH === 0) return
     const nodes = activeMindmap.nodes
-    const minX = Math.min(...nodes.map(n => n.x))
-    const minY = Math.min(...nodes.map(n => n.y))
-    const maxX = Math.max(...nodes.map(n => n.x + n.width))
-    const maxY = Math.max(...nodes.map(n => n.y + n.height))
+    // A radial mind map hangs its names outside the circles, so the fit has to cover
+    // the label boxes too or the outermost titles are cropped off the viewport.
+    const root = nodes.find(n => n.parentId === null)
+    const ext = diagramType === 'mindmap' && root
+      ? nodes.map(n => radialNodeExtent(n, root.x + root.width / 2, root.y + root.height / 2))
+      : nodes.map(n => ({ left: n.x, top: n.y, right: n.x + n.width, bottom: n.y + n.height }))
+    const minX = Math.min(...ext.map(e => e.left))
+    const minY = Math.min(...ext.map(e => e.top))
+    const maxX = Math.max(...ext.map(e => e.right))
+    const maxY = Math.max(...ext.map(e => e.bottom))
     const pad = 80
     const newZoom = Math.max(0.05, Math.min((svgW - pad * 2) / Math.max(1, maxX - minX), (svgH - pad * 2) / Math.max(1, maxY - minY), 1))
     const cx = (minX + maxX) / 2
@@ -113,7 +127,7 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract }: DiagramCan
     panRef.current = p
     setPan(p)         // keep pan state in sync for selBox coords
     applyTransform(p, newZoom)
-  }, [activeMindmap, applyTransform])
+  }, [activeMindmap, diagramType, applyTransform])
 
   // Editor load: 100% so the text is readable, anchored on the root instead of shrinking
   // the whole map. Mind maps grow in every direction, so the root sits at the centre;
@@ -485,6 +499,7 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract }: DiagramCan
               noInteract={noInteract}
               l1Colors={node.depth === 0 ? activeMindmap.nodes.filter(n => n.depth === 1).map(n => n.color) : undefined}
               paletteColor={paletteColors.get(node.id) ?? null}
+              rootCenter={rootCenter}
               childCount={counts.childCounts.get(node.id) ?? 0}
               descendantCount={counts.descendantCounts.get(node.id) ?? 0}
               nodeCount={activeMindmap.nodes.length}

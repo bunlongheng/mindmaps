@@ -16,6 +16,7 @@ import { emberVanish, damageFlash } from './lib/emberVanish'
 import { ArrowLeft, SlidersHorizontal, Tag, FileDown, Network, Share2, Sparkles, GitBranch, Lightbulb, Workflow, ListTree, Waypoints, Image as ImageIcon } from 'lucide-react'
 import { Confetti } from './components/Confetti'
 import { MindmapsLogo } from './components/MindmapsLogo'
+import { ViewerPage } from './components/viewer/ViewerPage'
 
 // Faint feature icons that float behind the login card (mind maps, AI, sharing,
 // branching, tags, export, import, outlines) - purely decorative.
@@ -408,31 +409,7 @@ export default function App() {
   )
 
   if (view === 'viewer') return (
-    <div style={{
-      height: '100vh', width: '100vw', overflow: 'hidden',
-      background: '#eef0f5', fontFamily: 'Inter, system-ui, sans-serif',
-      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-      gap: 16, padding: 24, boxSizing: 'border-box',
-    }}>
-      {/* VIEW ONLY badge */}
-      <div style={{
-        background: '#1a1d2e', color: '#fff', fontSize: 11, fontWeight: 600,
-        padding: '5px 14px', borderRadius: 20, letterSpacing: '0.06em',
-        flexShrink: 0,
-      }}>
-        VIEW ONLY
-      </div>
-
-      {/* White paper */}
-      <div style={{
-        width: '100%', maxWidth: 1100, flex: 1,
-        background: '#fff', borderRadius: 20,
-        boxShadow: '0 8px 48px rgba(0,0,0,0.10), 0 1px 4px rgba(0,0,0,0.06)',
-        position: 'relative', overflow: 'hidden',
-      }}>
-        <DiagramCanvas onNodeSelect={() => {}} readOnly />
-      </div>
-    </div>
+    <ViewerPage diagram={activeMindmap} id={getShareParam()} />
   )
 
   return (

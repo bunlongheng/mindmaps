@@ -84,7 +84,7 @@ function useFakeTable(): Row[] {
 }
 
 // The insert parameter list of api/ai/mindmaps.ts, by position.
-const P_ID = 0, P_USER = 1, P_NAME = 2, P_TAGS = 8
+const P_ID = 0, P_USER = 1, P_NAME = 2, P_LINE_STYLE = 4, P_TAGS = 8
 
 beforeEach(() => {
   queryMock.mockReset()
@@ -123,6 +123,20 @@ describe('POST /api/ai/mindmaps owner resolution (issue 27)', () => {
     const sql = queryMock.mock.calls[0][0] as string
     expect(sql).toMatch(/created_at, updated_at/)
     expect(sql).toMatch(/now\(\),\s*now\(\)/)
+  })
+
+  it('defaults line_style to curved when the body omits it', async () => {
+    useFakeTable()
+    const res = mockRes()
+    await aiHandler(mockReq({
+      method: 'POST',
+      authorization: `Bearer ${KEY}`,
+      body: { title: 'No Line Style Sent' },
+    }), res)
+
+    expect(res.statusCode).toBe(201)
+    const params = queryMock.mock.calls[0][1] as unknown[]
+    expect(params[P_LINE_STYLE]).toBe('curved')
   })
 
   it('accepts a userId that matches the configured owner', async () => {

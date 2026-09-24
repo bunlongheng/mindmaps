@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import {
   computeMindmapLayout, wrapText, sectorSpans, radialDiameter, diameterBand,
-  relaxRadial, MIN_SECTOR, ROOT_MIN_DIAMETER,
+  relaxRadial, radialLabelFor, radialLabelSide, radialNodeExtent, truncateLabel,
+  labelMaxChars, MIN_SECTOR, ROOT_MIN_DIAMETER,
 } from '../mindmap'
 import type { MindmapNode } from '../../../types'
 
@@ -365,5 +366,171 @@ describe('relaxRadial', () => {
     expect(root.x).toBe(0)
     expect(root.y).toBe(0)
     expect(Math.hypot((kid.x + 22) - 90, (kid.y + 22) - 90)).toBeGreaterThan(90 + 22)
+  })
+})
+
+
+// ── Labels ───────────────────────────────────────────────────────────────────
+// A label hangs outside its circle, so it is part of the node's footprint: nothing
+// the layout does may leave one lying across another label or a foreign circle.
+
+interface Rect { id: string; x: number; y: number; w: number; h: number }
+
+function rootCentre(out: MindmapNode[]) {
+  const r = out.find(n => n.depth === 0)!
+  return { x: r.x + r.width / 2, y: r.y + r.height / 2 }
+}
+
+/** Every drawn label box in world coordinates. */
+function labelRects(out: MindmapNode[]): Rect[] {
+  const c = rootCentre(out)
+  const rects: Rect[] = []
+  for (const n of out) {
+    const l = radialLabelFor(n, c.x, c.y)
+    if (l) rects.push({ id: n.id, x: n.x + l.box.x, y: n.y + l.box.y, w: l.box.w, h: l.box.h })
+  }
+  return rects
+}
+
+function rectsOverlap(a: Rect, b: Rect) {
+  return Math.min(a.x + a.w, b.x + b.w) > Math.max(a.x, b.x)
+    && Math.min(a.y + a.h, b.y + b.h) > Math.max(a.y, b.y)
+}
+
+/** True when a circle's disc reaches into a rectangle. */
+function circleHitsRect(n: MindmapNode, r: Rect) {
+  const cx = n.x + n.width / 2, cy = n.y + n.height / 2, rad = n.width / 2
+  const nx = Math.max(r.x, Math.min(cx, r.x + r.w))
+  const ny = Math.max(r.y, Math.min(cy, r.y + r.h))
+  return Math.hypot(cx - nx, cy - ny) < rad
+}
+
+/** One crowded wedge: 12 depth-2 nodes carrying sentence-long titles. */
+function crowdedWedgeFixture(): MindmapNode[] {
+  const long = (i: number) => `Hook reads the file on each prompt - flips on next message ${i}`
+  const out: MindmapNode[] = [node({ id: 'root', depth: 0, title: 'Jev Router' })]
+  out.push(node({ id: 'dense', parentId: 'root', depth: 1, sortOrder: 0, title: 'Switch (current: ON, Jev decides)' }))
+  for (let k = 0; k < 12; k++) {
+    out.push(node({ id: `d${k}`, parentId: 'dense', depth: 2, sortOrder: k, title: long(k) }))
+  }
+  // Five more topics, each heavy with leaves, so 'dense' is squeezed into a narrow wedge
+  for (let t = 1; t <= 5; t++) {
+    out.push(node({ id: `t${t}`, parentId: 'root', depth: 1, sortOrder: t, title: `Topic ${t}` }))
+    for (let k = 0; k < 8; k++) out.push(node({ id: `t${t}c${k}`, parentId: `t${t}`, depth: 2, sortOrder: k, title: `Sub ${t}.${k}` }))
+  }
+  return out
+}
+
+describe('truncateLabel', () => {
+  it('leaves a short title alone', () => {
+    expect(truncateLabel('Supervised', 32)).toBe('Supervised')
+  })
+
+  it('cuts a long one to the limit, ellipsis included in the count', () => {
+    const long = 'Hook reads the file on each prompt - flips on next message, no restart'
+    const cut = truncateLabel(long, 32)
+    expect(cut.length).toBeLessThanOrEqual(32)
+    expect(cut.endsWith('\u2026')).toBe(true)
+    expect(long.startsWith(cut.slice(0, -1).trimEnd())).toBe(true)
+  })
+
+  it('never cuts at a depth that carries no label', () => {
+    expect(labelMaxChars(3)).toBe(0)
+    expect(truncateLabel('anything', labelMaxChars(3))).toBe('anything')
+  })
+
+  it('draws depth 1 longer than depth 2', () => {
+    expect(labelMaxChars(1)).toBe(40)
+    expect(labelMaxChars(2)).toBe(32)
+  })
+})
+
+describe('radialLabelSide', () => {
+  it('points outward: left half left, right half right', () => {
+    expect(radialLabelSide(-300, 10)).toBe('left')
+    expect(radialLabelSide(300, 10)).toBe('right')
+  })
+
+  it('clears the branch in the top and bottom bands', () => {
+    expect(radialLabelSide(0, -300)).toBe('above')
+    expect(radialLabelSide(0, 300)).toBe('below')
+    expect(radialLabelSide(-20, -300)).toBe('above')   // still inside the 20 degree band
+  })
+})
+
+describe('radial labels on a laid-out map', () => {
+  it('cuts what is drawn and leaves the whole title in the node data', () => {
+    const out = computeMindmapLayout(crowdedWedgeFixture())
+    const c = rootCentre(out)
+    const n = byId(out, 'd0')
+    expect(n.title).toBe('Hook reads the file on each prompt - flips on next message 0')  // untouched
+    const drawn = radialLabelFor(n, c.x, c.y)!
+    expect(drawn.text.length).toBeLessThanOrEqual(32)
+    expect(drawn.text.endsWith('\u2026')).toBe(true)
+    // selecting the node puts the whole thing back
+    expect(radialLabelFor(n, c.x, c.y, true)!.text).toBe(n.title)
+  })
+
+  it('leaves no two label boxes overlapping, even in the crowded wedge', () => {
+    const rects = labelRects(computeMindmapLayout(crowdedWedgeFixture()))
+    expect(rects.length).toBeGreaterThanOrEqual(18)
+    const clashes: string[] = []
+    for (let i = 0; i < rects.length; i++) {
+      for (let j = i + 1; j < rects.length; j++) {
+        if (rectsOverlap(rects[i], rects[j])) clashes.push(`${rects[i].id}/${rects[j].id}`)
+      }
+    }
+    expect(clashes).toEqual([])
+  })
+
+  it('never lets a label box reach a circle it does not belong to', () => {
+    const out = computeMindmapLayout(crowdedWedgeFixture())
+    const rects = labelRects(out)
+    const clashes: string[] = []
+    for (const r of rects) {
+      for (const n of out) {
+        if (n.id === r.id) continue
+        if (circleHitsRect(n, r)) clashes.push(`${r.id} label / ${n.id} circle`)
+      }
+    }
+    expect(clashes).toEqual([])
+  })
+
+  it('extends a left-half label left of its circle and a right-half one right', () => {
+    const out = computeMindmapLayout(crowdedWedgeFixture())
+    const c = rootCentre(out)
+    let sawLeft = false, sawRight = false
+    for (const n of out.filter(d => d.depth === 2)) {
+      const l = radialLabelFor(n, c.x, c.y)!
+      if (l.side === 'left') { sawLeft = true; expect(n.x + l.box.x + l.box.w).toBeLessThanOrEqual(n.x) }
+      if (l.side === 'right') { sawRight = true; expect(n.x + l.box.x).toBeGreaterThanOrEqual(n.x + n.width) }
+    }
+    expect(sawLeft).toBe(true)
+    expect(sawRight).toBe(true)
+  })
+
+  it('folds the label box into the extent the fit and the previews measure', () => {
+    const out = computeMindmapLayout(crowdedWedgeFixture())
+    const c = rootCentre(out)
+    const n = out.filter(d => d.depth === 2).find(d => radialLabelFor(d, c.x, c.y)!.side === 'left')!
+    const e = radialNodeExtent(n, c.x, c.y)
+    expect(e.left).toBeLessThan(n.x)                     // room kept for the label
+    expect(e.right).toBe(n.x + n.width)
+    const topic = out.find(d => d.depth === 1)!
+    expect(radialNodeExtent(topic, c.x, c.y).bottom).toBeGreaterThan(topic.y + topic.height)
+  })
+
+  it('carries no label for the root or the dots', () => {
+    const out = computeMindmapLayout(crowdedWedgeFixture())
+    const c = rootCentre(out)
+    expect(radialLabelFor(byId(out, 'root'), c.x, c.y)).toBeNull()
+    const dot = node({ id: 'x', parentId: 'd0', depth: 3, x: 10, y: 10, width: 6, height: 6 })
+    expect(radialLabelFor(dot, c.x, c.y)).toBeNull()
+  })
+
+  it('leaves an explicitly shaped node its own box and inside label', () => {
+    const shaped = node({ id: 's', parentId: 'root', depth: 2, shape: 'rect', x: 100, y: 0, width: 120, height: 40 })
+    expect(radialLabelFor(shaped, 0, 0)).toBeNull()
+    expect(radialNodeExtent(shaped, 0, 0)).toEqual({ left: 100, top: 0, right: 220, bottom: 40 })
   })
 })

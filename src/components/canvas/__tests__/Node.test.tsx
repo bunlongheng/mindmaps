@@ -389,13 +389,58 @@ describe('Node — mindmap type', () => {
     expect(container.querySelector('circle')).toBeTruthy()
   })
 
-  it('shows a selected dot its title', () => {
+  it('leaves a selected dot unlabelled - a dot never carries drawn text', () => {
     const root = makeRoot()
     const l1 = makeNode({ depth: 1 })
     const l3 = makeNode({ id: 'n3', depth: 3, parentId: 'n1', title: 'Deep leaf', width: 7, height: 7 })
     loadStore([root, l1, l3], 'mindmap')
     const { container } = renderNode(l3, { isSelected: true })
-    expect(Array.from(container.querySelectorAll('text')).map(t => t.textContent)).toContain('Deep leaf')
+    expect(container.querySelectorAll('text')).toHaveLength(0)
+    expect(container.querySelector('title')?.textContent).toBe('Deep leaf')
+  })
+
+  it('cuts a long depth-2 label but keeps the whole title in the data and on hover', () => {
+    const long = 'Hook reads the file on each prompt - flips on next message, no restart'
+    const root = makeRoot()
+    const l1 = makeNode({ depth: 1 })
+    const l2 = makeNode({ id: 'n2', depth: 2, parentId: 'n1', title: long, width: 30, height: 30 })
+    loadStore([root, l1, l2], 'mindmap')
+    const { container } = renderNode(l2, { rootCenter: { x: 0, y: 0 } })
+    const drawn = Array.from(container.querySelectorAll('text')).map(t => t.textContent ?? '')
+      .find(t => t.length > 5)!
+    expect(drawn.length).toBeLessThanOrEqual(32)
+    expect(drawn.endsWith('\u2026')).toBe(true)
+    expect(container.querySelector('title')?.textContent).toBe(long)   // full text on hover
+  })
+
+  it('shows a selected depth-2 node its whole title', () => {
+    const long = 'Hook reads the file on each prompt - flips on next message, no restart'
+    const root = makeRoot()
+    const l1 = makeNode({ depth: 1 })
+    const l2 = makeNode({ id: 'n2', depth: 2, parentId: 'n1', title: long, width: 30, height: 30 })
+    loadStore([root, l1, l2], 'mindmap')
+    const { container } = renderNode(l2, { isSelected: true, rootCenter: { x: 0, y: 0 } })
+    expect(Array.from(container.querySelectorAll('text')).map(t => t.textContent)).toContain(long)
+  })
+
+  it('points a depth-2 label outward: left of a left-half circle, right of a right-half one', () => {
+    const root = makeRoot()
+    const l1 = makeNode({ depth: 1 })
+    const mk = (x: number) => makeNode({ id: 'n2', depth: 2, parentId: 'n1', title: 'Side', x, y: 0, width: 30, height: 30 })
+    const labelAt = (x: number) => {
+      loadStore([root, l1, mk(x)], 'mindmap')
+      const { container } = renderNode(mk(x), { rootCenter: { x: 0, y: 0 } })
+      const t = Array.from(container.querySelectorAll('text')).find(el => el.textContent === 'Side')!
+      const out = { x: Number(t.getAttribute('x')), anchor: t.getAttribute('text-anchor') }
+      cleanup()
+      return out
+    }
+    const right = labelAt(400)
+    expect(right.x).toBeGreaterThan(30)        // past the circle's right edge
+    expect(right.anchor).toBe('start')
+    const left = labelAt(-400)
+    expect(left.x).toBeLessThan(0)             // past the circle's left edge
+    expect(left.anchor).toBe('end')
   })
 
   it('honours an explicit shape instead of the radial circle', () => {
