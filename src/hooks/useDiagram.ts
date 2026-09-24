@@ -3,6 +3,7 @@ import { useShallow } from 'zustand/react/shallow'
 import { showToast } from '../components/CuteToast'
 import { useMindmapStore } from '../store/mindmapStore'
 import { ROOT_COLORS } from '../lib/color'
+import { nodeHeight, nodeMinWidth } from '../lib/nodeMetrics'
 import { soundCreate, soundDelete, soundSave, soundPaste } from '../lib/sounds'
 import { endSession } from '../lib/session'
 import type { Diagram, DiagramMeta, MindmapNode } from '../types'
@@ -226,7 +227,7 @@ export function useDiagram(userId: string | null = null) {
       id: crypto.randomUUID(), title,
       color: ROOT_COLORS[i % ROOT_COLORS.length],
       parentId: rootId, depth: 1,
-      x: 0, y: 0, width: 160, height: 40, sortOrder: i,
+      x: 0, y: 0, width: nodeMinWidth(1), height: nodeHeight(1), sortOrder: i,
     }))
     const allNodes: MindmapNode[] = [
       { id: rootId, title: name, color: '#6366f1', parentId: null, depth: 0, x: 0, y: 0, width: 140, height: 140, sortOrder: 0 },

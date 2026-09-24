@@ -1,13 +1,17 @@
 import type { MindmapNode } from '../../types'
+import { nodeHeight, nodeMinWidth } from '../nodeMetrics'
 
 const ROOT_X = 120
 export const BRACE_GAP = 50  // horizontal space per level (includes the brace connector)
 const V_GAP = 14
 
-const WIDTHS  = [180, 160, 130, 110]
-const HEIGHTS = [52,  44,  36,  32]
-function nW(d: number) { return WIDTHS[Math.min(d, 3)] }
-function nH(d: number) { return HEIGHTS[Math.min(d, 3)] }
+// Fallback box for a node with no stored size. The root keeps its own compact bar
+// (the brace never draws the big pill or circle); every other depth reads the shared
+// table in src/lib/nodeMetrics.
+const ROOT_W = 180
+const ROOT_H = 52
+function nW(d: number) { return d === 0 ? ROOT_W : nodeMinWidth(d) }
+function nH(d: number) { return d === 0 ? ROOT_H : nodeHeight(d) }
 
 export function computeBraceLayout(nodes: MindmapNode[]): MindmapNode[] {
   const root = nodes.find(n => n.parentId === null)

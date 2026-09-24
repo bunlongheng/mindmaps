@@ -5,6 +5,8 @@ import { Node } from '../Node'
 import { useMindmapStore } from '../../../store/mindmapStore'
 import type { Diagram, DiagramType, MindmapNode } from '../../../types'
 import { depthFill, hexToRgb } from '../../../lib/color'
+import { renderMindmapSvg } from '../../../lib/render-svg'
+import { nodeFontSize } from '../../../lib/nodeMetrics'
 
 vi.mock('../../../components/CuteToast', () => ({ showToast: vi.fn() }))
 
@@ -963,5 +965,54 @@ describe('Node — links inside node text', () => {
     expect(anchors.length).toBeGreaterThan(0)
     Array.from(anchors).forEach(a => expect(a.getAttribute('href')).toBe('https://j.example/SHAR-1'))
     expect(container.innerHTML).not.toContain('](')
+  })
+
+  // The home-grid cards draw with the server renderer while the opened map draws with
+  // this component. Both read the same box table, so the same node must come out at the
+  // same font size - a card preview can never show a different text size than the map.
+  describe('canvas and server renderer agree on font size', () => {
+    const LABELS: Record<number, string> = { 0: 'Root', 1: 'Child', 2: 'Grandchild', 3: 'Leaf', 4: 'Deep leaf' }
+
+    function serverFontSizeFor(label: string): number {
+      const nodes = [
+        makeRoot({ title: LABELS[0] }),
+        makeNode({ id: 'd1', title: LABELS[1], depth: 1, parentId: 'root' }),
+        makeNode({ id: 'd2', title: LABELS[2], depth: 2, parentId: 'd1' }),
+        makeNode({ id: 'd3', title: LABELS[3], depth: 3, parentId: 'd2' }),
+        makeNode({ id: 'd4', title: LABELS[4], depth: 4, parentId: 'd3' }),
+      ]
+      const svg = renderMindmapSvg({
+        id: 'x', name: 'Test', type: 'logic-chart', line_style: 'orthogonal',
+        theme_id: 'default', nodes: nodes as never,
+      })
+      const m = svg.match(new RegExp(`<text[^>]*font-size="([\\d.]+)"[^>]*>${label}</text>`))
+      expect(m, `no server <text> for ${label}`).not.toBeNull()
+      return Number(m![1])
+    }
+
+    for (const depth of [1, 2, 3, 4]) {
+      it(`matches at depth ${depth}`, () => {
+        const n = makeNode({ id: `c${depth}`, title: LABELS[depth], depth })
+        loadStore([makeRoot(), n])
+        const { container } = renderNode(n)
+        const text = container.querySelector('text') as SVGTextElement
+        const canvasFs = Number(text.getAttribute('font-size'))
+        expect(canvasFs).toBe(nodeFontSize(depth))
+        expect(canvasFs).toBe(serverFontSizeFor(LABELS[depth]))
+      })
+    }
+
+    it('lets an explicit fontSize win in both renderers', () => {
+      const n = makeNode({ id: 'exp', title: 'Child', depth: 2, fontSize: 31 })
+      loadStore([makeRoot(), n])
+      const { container } = renderNode(n)
+      expect(Number((container.querySelector('text') as SVGTextElement).getAttribute('font-size'))).toBe(31)
+
+      const svg = renderMindmapSvg({
+        id: 'x', name: 'Test', type: 'logic-chart', line_style: 'orthogonal',
+        theme_id: 'default', nodes: [makeRoot(), makeNode({ id: 'd1', depth: 1, title: 'Parent' }), { ...n, parentId: 'd1' }] as never,
+      })
+      expect(svg).toMatch(/<text[^>]*font-size="31"[^>]*>Child<\/text>/)
+    })
   })
 })

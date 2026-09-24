@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { useMindmapStore, flushMindmapPersist } from '../mindmapStore'
 import type { Diagram, MindmapNode } from '../../types'
+import { ROOT_PILL_MAX } from '../../lib/rootPill'
 
 // Mock showToast (DOM-dependent)
 vi.mock('../../components/CuteToast', () => ({
@@ -83,12 +84,12 @@ describe('mindmapStore', () => {
 
     // Regression: a long root title overflowed the pill (render width was hard-
     // capped at 500). The layout must now reserve a bounded pill width that matches
-    // the canvas (≤720) so the title fits and children don't overlap it.
+    // the canvas (ROOT_PILL_MAX) so the title fits and children don't overlap it.
     it('reserves a bounded pill width for a long root title', () => {
       const longRoot = { ...makeRoot(), title: 'It’s Happening... Anthropic MYTHOS 1 Is Here!' }
       loadDiagram(makeDiagram([longRoot, makeChild('c1', 'Child 1', 'root', 1, 0)]))
       const root = useMindmapStore.getState().activeMindmap!.nodes.find(n => n.parentId === null)!
-      expect(root.width).toBeLessThanOrEqual(720)  // capped — never unbounded
+      expect(root.width).toBeLessThanOrEqual(ROOT_PILL_MAX)  // capped, never unbounded
       expect(root.width).toBeGreaterThan(400)      // grew well past the short-circle size
       expect(root.width).not.toBe(root.height)     // a pill, not a circle
     })

@@ -2,7 +2,9 @@ import { describe, it, expect } from 'vitest'
 import {
   parseIndentedOutline, normalizeOutlineRoots, assembleOutlineTree, flattenJsonOutline,
   computeNodeWidth, computeImportNodeWidth, computeGeneratedNodeWidth, OUTLINE_META_KEYS,
+  OUTLINE_ROOT_SIZE,
 } from '../outline'
+import { nodeMinWidth, nodeHeight, nodeWidth, estimateTextWidth, nodeFontSize, iconZoneWidth } from '../nodeMetrics'
 
 describe('parseIndentedOutline', () => {
   it('returns an empty array for empty text', () => {
@@ -133,24 +135,32 @@ describe('assembleOutlineTree', () => {
   })
 })
 
-describe('node width formulas (divergence is intentional, see outline.ts)', () => {
-  it('computeNodeWidth clamps to 140..400 and widens for icons', () => {
-    expect(computeNodeWidth('ab', 1, false)).toBe(140)
+describe('node width formulas (all 3 read the shared box table, see nodeMetrics.ts)', () => {
+  it('computeNodeWidth floors at the table minimum, caps at 400, and widens for icons', () => {
+    expect(computeNodeWidth('ab', 1, false)).toBe(nodeMinWidth(1))
     expect(computeNodeWidth('x'.repeat(80), 1, false)).toBe(400)
     const plain = computeNodeWidth('A medium title', 2, false)
-    expect(computeNodeWidth('A medium title', 2, true)).toBe(Math.ceil(plain / 0.8))
+    expect(computeNodeWidth('A medium title', 2, true)).toBe(plain + iconZoneWidth(2))
   })
 
-  it('computeImportNodeWidth matches the legacy import formula', () => {
-    expect(computeImportNodeWidth('anything', 0)).toBe(180)
-    expect(computeImportNodeWidth('Hello', 1)).toBe(Math.max(100, 5 * 7.5 + 32))
+  it('computeImportNodeWidth reads the table and caps at 260', () => {
+    expect(computeImportNodeWidth('anything', 0)).toBe(OUTLINE_ROOT_SIZE)
+    expect(computeImportNodeWidth('Hello', 1))
+      .toBe(nodeWidth(estimateTextWidth('Hello', nodeFontSize(1)), 1))
     expect(computeImportNodeWidth('x'.repeat(50), 2)).toBe(260)
   })
 
-  it('computeGeneratedNodeWidth matches the legacy generate formula', () => {
-    expect(computeGeneratedNodeWidth('anything', 0)).toBe(180)
-    expect(computeGeneratedNodeWidth('Hello', 1)).toBe(Math.max(120, Math.ceil(5 * 10.24) + 32))
+  it('computeGeneratedNodeWidth reads the table and caps at 300', () => {
+    expect(computeGeneratedNodeWidth('anything', 0)).toBe(OUTLINE_ROOT_SIZE)
+    expect(computeGeneratedNodeWidth('Hello', 1))
+      .toBe(nodeWidth(estimateTextWidth('Hello', nodeFontSize(1)), 1))
     expect(computeGeneratedNodeWidth('x'.repeat(60), 3)).toBe(300)
+  })
+
+  it('every formula agrees on the same title at the same depth, up to its own cap', () => {
+    const t = 'Supervised learning'
+    expect(computeImportNodeWidth(t, 2)).toBe(computeGeneratedNodeWidth(t, 2))
+    expect(computeNodeWidth(t, 2, false)).toBe(computeImportNodeWidth(t, 2))
   })
 })
 
@@ -175,8 +185,8 @@ describe('flattenJsonOutline', () => {
     expect(title).toBe('Root')
     expect(nodes.map(n => n.title)).toEqual(['Root', 'A', 'a1', 'a2', 'B'])
     expect(nodes.map(n => n.depth)).toEqual([0, 1, 2, 2, 1])
-    expect(nodes[0]).toMatchObject({ parentId: null, width: 180, height: 180, color: '#111111' })
-    expect(nodes[1]).toMatchObject({ color: '#aa0000', icon: 'zap', height: 40 })
+    expect(nodes[0]).toMatchObject({ parentId: null, width: OUTLINE_ROOT_SIZE, height: OUTLINE_ROOT_SIZE, color: '#111111' })
+    expect(nodes[1]).toMatchObject({ color: '#aa0000', icon: 'zap', height: nodeHeight(1) })
     expect(nodes[2].parentId).toBe(nodes[1].id)
     expect(nodes[2].color).toBe('#aa0000') // leaves inherit the branch color
     // string leaves directly under the root inherit the root color (legacy behavior)

@@ -1,59 +1,52 @@
 import type { MindmapNode } from '../../types/index.js'
-import { rootPillWidth, rootCircleDiameter, rootTitleNeedsPill } from '../rootPill.js'
-import { displayTitle } from '../links.js'
+import { rootPillWidth, rootCircleDiameter, rootTitleNeedsPill, ROOT_FONT } from '../rootPill.js'
 import { shapedNodeSize } from '../nodeShape.js'
+import { nodeFontSize, nodeHeight, nodeMinWidth, nodeWidth, estimateTextWidth } from '../nodeMetrics.js'
 
-const DEFAULT_H: Record<number, number> = { 1: 54, 2: 38, 3: 34 }
-const DEFAULT_HEIGHT = 30
 const H_GAPS: Record<number, number> = { 0: 120, 1: 60 }
 const DEFAULT_H_GAP = 50
 const V_GAP = 22
 
 function getHGap(depth: number) { return H_GAPS[depth] ?? DEFAULT_H_GAP }
 
-/** Font size the canvas draws at a given depth (Node.tsx defaultFontSize, scaled). */
-function fontSizeFor(depth: number): number {
-  return depth === 1 ? 22 : depth === 2 ? 16 : depth === 3 ? 13 : 11
-}
-
 /** Auto-compute width from title text so every node fits its content */
 function autoWidth(node: MindmapNode, depth: number): number {
-  const fontSize = fontSizeFor(depth)
   const hasVisual = !!(node.icon || node.emoji)
-  const h = DEFAULT_H[depth] ?? DEFAULT_HEIGHT
-  // For L1 with icon/emoji: white square takes full height, add that + gap to text width
-  const iconSquareW = hasVisual && depth === 1 ? h + 10 : 0
-  const textW = displayTitle(node.title).length * fontSize * 0.64 + 32 + iconSquareW
-  const min = depth === 1 ? 160 : depth === 2 ? 110 : 90
-  return Math.max(min, Math.ceil(textW))
+  // Only L1 draws the white icon badge, so only L1 reserves the zone for it.
+  return nodeWidth(estimateTextWidth(node.title, nodeFontSize(depth)), depth, {
+    hasIcon: hasVisual && depth === 1,
+    height: nodeHeight(depth),
+  })
 }
 
 /** Effective size: root pill always auto-sizes from title; circle uses stored or default */
 function nodeSize(node: MindmapNode, depth: number) {
   if (depth === 0) {
-    const fs = node.fontSize ?? 28
+    const fs = node.fontSize ?? ROOT_FONT
     const isPill = node.shape === 'pill' ||
       (node.shape !== 'circle' && rootTitleNeedsPill(node.title, fs))
     if (isPill) {
       // Same width the canvas draws (src/lib/rootPill) so the trunk meets the
       // pill's edge instead of starting inside it.
       const w = rootPillWidth(node.title, fs)
-      return { w, h: 64 }
+      // Height comes from the shared table's root row, the same one the store and the
+      // server renderer reserve, so the drawn pill matches what was reserved for it.
+      return { w, h: nodeHeight(0) }
     }
     // Circle: grow to fit the title (never smaller), so it never overflows.
     const sq = Math.max(rootCircleDiameter(node.title, fs), node.width > 0 ? node.width : 0)
     return { w: sq, h: sq }
   }
   const w = node.width > 0 ? node.width : autoWidth(node, depth)
-  const h = node.height > 0 ? node.height : (DEFAULT_H[depth] ?? DEFAULT_HEIGHT)
+  const h = node.height > 0 ? node.height : nodeHeight(depth)
   // A circle-shaped node reserves a square box, so siblings keep clear of it.
-  return shapedNodeSize(node, fontSizeFor(depth), w, h)
+  return shapedNodeSize(node, nodeFontSize(depth), w, h)
 }
 
 function subtreeH(nodeId: string, depth: number, nodes: MindmapNode[]): number {
   const node = nodes.find(n => n.id === nodeId)
   const children = nodes.filter(n => n.parentId === nodeId)
-  const fallbackH = DEFAULT_H[depth] ?? DEFAULT_HEIGHT
+  const fallbackH = nodeHeight(depth)
   const h = node ? nodeSize(node, depth).h : fallbackH
   if (children.length === 0) return h
   const childDepth = depth + 1
@@ -118,7 +111,7 @@ export function computeMindmapsLayout(nodes: MindmapNode[]): MindmapNode[] {
   // ── Uniform L1 width: all L1 nodes share the width of the widest one ─────
   const l1UniformW = l1s.length > 0
     ? Math.max(...l1s.map(n => autoWidth(n, 1)))
-    : 160
+    : nodeMinWidth(1)
   // Inject uniform width so nodeSize() picks it up via node.width > 0
   const nodesForLayout = nodes.map(n =>
     l1s.some(l => l.id === n.id) ? { ...n, width: l1UniformW } : n

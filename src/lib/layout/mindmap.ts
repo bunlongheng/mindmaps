@@ -1,32 +1,27 @@
 import type { MindmapNode } from '../../types/index.js'
 import { displayTitle } from '../links.js'
+import { ROOT_FONT } from '../rootPill.js'
+import { nodeFontSize, nodeHeight, nodeWidth, estimateTextWidth, nodePadX, CHAR_W_RATIO } from '../nodeMetrics.js'
 
 const ROOT_RADIUS = 260   // root center → L1 center
 const L1_EXTRA   = 140   // L1 center → L2 center
 const L2_EXTRA   = 110   // L2 center → L3 center
 const MIN_ARC    = 0.65  // minimum arc (radians) reserved per child node
 
-const FONT_SIZES: Record<number, number> = { 1: 18, 2: 13, 3: 11 }
-const DEFAULT_FONT_SIZE = 11
-
 function autoW(node: MindmapNode, depth: number): number {
-  const fontSize = FONT_SIZES[depth] ?? DEFAULT_FONT_SIZE
-  const hasVisual = !!(node.icon || node.emoji) && depth <= 1
-  // For L1 with icon/emoji: white square takes full node height, add that + gap
-  const iconSquareW = hasVisual && depth === 1 ? L1_H + 10 : 0
-  const padding = depth === 1 ? 32 : 24
-  const textW = displayTitle(node.title).length * fontSize * 0.64 + padding + iconSquareW
-  const min = depth === 1 ? 100 : depth === 2 ? 80 : depth === 3 ? 80 : 70
-  return Math.max(min, Math.ceil(textW))
+  const hasVisual = !!(node.icon || node.emoji) && depth === 1
+  return nodeWidth(estimateTextWidth(node.title, nodeFontSize(depth)), depth, {
+    hasIcon: hasVisual,
+    height: nodeHeight(depth),
+  })
 }
 
-const L1_H = 44
 const L2_CIRCLE_SIZE = 80
 
 /** Compute circle diameter that fits wrapped text */
 export function circleForText(rawTitle: string, fontSize: number, minSize: number): number {
   const title = displayTitle(rawTitle)
-  const charW = fontSize * 0.64
+  const charW = fontSize * CHAR_W_RATIO
   const lineH = fontSize * 1.3
   // Target ~8-10 chars per line for compact circles
   const maxLineChars = Math.max(8, Math.ceil(Math.sqrt(title.length * 1.8)))
@@ -69,16 +64,16 @@ function placeSubtree(
   const node = nodes.find(n => n.id === nodeId)
   if (!node) return
 
-  const fontSize = FONT_SIZES[depth] ?? DEFAULT_FONT_SIZE
+  const fontSize = nodeFontSize(depth)
   // An explicit shape: 'circle' wins over the depth default, so a mindmap L1 can be
   // a circle too. Every other shape keeps the depth's own box.
   const isCircle = depth >= 2 || node.shape === 'circle'
   const isL1Pill = depth === 1 && !isCircle
   // Auto-size circle: wrap text into lines, then size circle to fit
-  const minCircle = depth === 1 ? L1_H : depth === 2 ? L2_CIRCLE_SIZE : depth === 3 ? 66 : 52
+  const minCircle = depth === 1 ? nodeHeight(1) : depth === 2 ? L2_CIRCLE_SIZE : depth === 3 ? 66 : 52
   const circleSize = isCircle ? circleForText(node.title, fontSize, minCircle) : 0
   const w = isL1Pill ? autoW(node, depth) : isCircle ? circleSize : (node.width > 0 ? node.width : autoW(node, depth))
-  const h = isL1Pill ? L1_H : isCircle ? circleSize : 44
+  const h = isCircle ? circleSize : nodeHeight(depth)
 
   if (!node.manuallyPositioned) {
     result.push({ ...node, x: cx - w / 2, y: cy - h / 2, width: w, height: h, fontSize })
@@ -95,10 +90,9 @@ function placeSubtree(
   // Account for the largest child circle size so they don't overlap
   const maxChildSize = Math.max(...children.map(c => {
     const cDepth = depth + 1
-    const cFs = FONT_SIZES[cDepth] ?? DEFAULT_FONT_SIZE
-    const cTextW = displayTitle(c.title).length * cFs * 0.64
+    const cTextW = estimateTextWidth(c.title, nodeFontSize(cDepth))
     const cMin = cDepth === 2 ? L2_CIRCLE_SIZE : cDepth === 3 ? 66 : 52
-    return cDepth >= 2 ? Math.max(cMin, Math.ceil(cTextW + 24)) : 44
+    return cDepth >= 2 ? Math.max(cMin, Math.ceil(cTextW + 2 * nodePadX(cDepth))) : nodeHeight(cDepth)
   }))
   const childR = extra + Math.max(w, h) / 2 + maxChildSize / 2
 
@@ -121,7 +115,7 @@ export function computeMindmapLayout(nodes: MindmapNode[]): MindmapNode[] {
   if (!root) return nodes
 
   // Auto-size root circle to fit text
-  const rootFs = 24
+  const rootFs = ROOT_FONT
   const rootMinSize = 160
   const rw = Math.max(rootMinSize, circleForText(root.title, rootFs, rootMinSize))
   const cx = 0, cy = 0
