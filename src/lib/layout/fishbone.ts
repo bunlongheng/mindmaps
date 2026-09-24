@@ -83,6 +83,12 @@ export function autoW(title: string, depth: number, hasIcon: boolean, bold = fal
   const w = nodeWidth(measured, depth, { hasIcon, height, extra: slant })
   return Math.max(nodeMinWidth(depth), Math.min(MAX_AUTO_W, w))
 }
+
+/** A manual node keeps the width the user dragged; everyone else auto-sizes from title. */
+function boxW(node: MindmapNode, depth: number, hasIcon: boolean, bold: boolean): number {
+  if (node.widthMode === 'manual' && node.width > 0) return node.width
+  return autoW(node.title, depth, hasIcon, bold)
+}
 const SPINE_SEG = 340         // horizontal gap between L1 attachment points
 const BONE_HEIGHT_BASE = 260  // minimum vertical distance from spine to L1 tip
 const L2_MIN_SPACING = 56     // minimum vertical gap between L2 nodes on the diagonal
@@ -113,7 +119,7 @@ export function computeFishboneLayout(nodes: MindmapNode[]): MindmapNode[] {
 
     const l1CX = attachX + FISHBONE_SLANT
     const l1CY = above ? SPINE_Y - boneHeight : SPINE_Y + boneHeight
-    const { w: l1w, h: l1h } = shapedNodeSize(l1, nodeFontSize(1), autoW(l1.title, 1, !!(l1.icon || l1.emoji), !!l1.bold), boxH(1))
+    const { w: l1w, h: l1h } = shapedNodeSize(l1, nodeFontSize(1), boxW(l1, 1, !!(l1.icon || l1.emoji), !!l1.bold), boxH(1))
 
     result.push({
       ...l1,
@@ -131,7 +137,7 @@ export function computeFishboneLayout(nodes: MindmapNode[]): MindmapNode[] {
       const diagX = attachX + FISHBONE_SLANT * t
       const diagY = SPINE_Y + (above ? -1 : 1) * boneEdgeH * t
 
-      const { w: l2w, h: l2h } = shapedNodeSize(l2, nodeFontSize(2), autoW(l2.title, 2, !!(l2.icon || l2.emoji), !!l2.bold), boxH(2))
+      const { w: l2w, h: l2h } = shapedNodeSize(l2, nodeFontSize(2), boxW(l2, 2, !!(l2.icon || l2.emoji), !!l2.bold), boxH(2))
       const l2X = diagX + 28
       const l2Y = diagY - l2h / 2
 
@@ -142,7 +148,7 @@ export function computeFishboneLayout(nodes: MindmapNode[]): MindmapNode[] {
         .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
       const l3dir = above ? -1 : 1  // stack further from spine
       l3s.forEach((l3, k) => {
-        const { w: l3w, h: l3h } = shapedNodeSize(l3, nodeFontSize(3), autoW(l3.title, 3, !!(l3.icon || l3.emoji), !!l3.bold), boxH(3))
+        const { w: l3w, h: l3h } = shapedNodeSize(l3, nodeFontSize(3), boxW(l3, 3, !!(l3.icon || l3.emoji), !!l3.bold), boxH(3))
         result.push({
           ...l3,
           x: l2X + l2w + 16,

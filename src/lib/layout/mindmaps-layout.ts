@@ -108,13 +108,15 @@ export function computeMindmapsLayout(nodes: MindmapNode[]): MindmapNode[] {
   const l1s = nodes.filter(n => n.parentId === root.id)
     .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
 
-  // ── Uniform L1 width: all L1 nodes share the width of the widest one ─────
-  const l1UniformW = l1s.length > 0
-    ? Math.max(...l1s.map(n => autoWidth(n, 1)))
+  // ── Uniform L1 width: all AUTO L1 nodes share the width of the widest one;
+  // a manual L1 node keeps the width the user dragged ─────────────────────
+  const autoL1s = l1s.filter(n => n.widthMode !== 'manual')
+  const l1UniformW = autoL1s.length > 0
+    ? Math.max(...autoL1s.map(n => autoWidth(n, 1)))
     : nodeMinWidth(1)
   // Inject uniform width so nodeSize() picks it up via node.width > 0
   const nodesForLayout = nodes.map(n =>
-    l1s.some(l => l.id === n.id) ? { ...n, width: l1UniformW } : n
+    (l1s.some(l => l.id === n.id) && n.widthMode !== 'manual') ? { ...n, width: l1UniformW } : n
   )
 
   const ROOT_X = 60

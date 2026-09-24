@@ -536,6 +536,42 @@ describe('mindmapStore', () => {
     })
   })
 
+  describe('widthMode auto/manual (normalizeWidthsPerDepth)', () => {
+    it('equalises auto nodes at a depth to the longest label while a manual node keeps its own width', () => {
+      const shortChild = makeChild('c1', 'Hi', 'root', 1, 0)
+      const longChild = makeChild('c2', 'A much longer child title that needs a lot more room', 'root', 1, 1)
+      const manualChild = { ...makeChild('c3', 'Manual', 'root', 1, 2), width: 90, widthMode: 'manual' as const }
+      loadDiagram(makeDiagram([makeRoot(), shortChild, longChild, manualChild]))
+
+      const nodes = useMindmapStore.getState().activeMindmap!.nodes
+      const c1 = nodes.find(n => n.id === 'c1')!
+      const c2 = nodes.find(n => n.id === 'c2')!
+      const c3 = nodes.find(n => n.id === 'c3')!
+
+      // Both auto nodes share one width: the longest label's own width, not their own.
+      expect(c1.width).toBe(c2.width)
+      expect(c1.width).toBeGreaterThan(300)
+      // The manual node ignores the depth's shared width entirely.
+      expect(c3.width).toBe(90)
+      expect(c3.widthMode).toBe('manual')
+    })
+
+    it('a manual width survives setActiveMindmap (reload) while an auto width recomputes', () => {
+      const auto = makeChild('c1', 'Short', 'root', 1, 0)
+      const manual = { ...makeChild('c2', 'Also short', 'root', 1, 1), width: 275, widthMode: 'manual' as const }
+      loadDiagram(makeDiagram([makeRoot(), auto, manual]))
+
+      const before = useMindmapStore.getState().activeMindmap!.nodes.find(n => n.id === 'c2')!
+      expect(before.width).toBe(275)
+
+      // Reload the exact same stored diagram (simulates opening it again)
+      useMindmapStore.getState().setActiveMindmap(useMindmapStore.getState().activeMindmap)
+      const after = useMindmapStore.getState().activeMindmap!.nodes.find(n => n.id === 'c2')!
+      expect(after.width).toBe(275)
+      expect(after.widthMode).toBe('manual')
+    })
+  })
+
   describe('setShareEnabled', () => {
     it('toggles sharing flag and marks dirty', () => {
       loadDiagram()

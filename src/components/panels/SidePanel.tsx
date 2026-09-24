@@ -110,7 +110,6 @@ export function SidePanel({ nodeId, onClose, onDelete, onUpdateTags }: SidePanel
     activeMindmap, updateNode, batchUpdateNodes, selectedNodeIds, diagrams,
     lineStyle, setLineStyle, diagramType, setDiagramType, setShareEnabled, rerunLayout,
     themeId, setTheme, showOrderNumbers, setShowOrderNumbers, showChildCount, setShowChildCount, autoAssignIcons,
-    resizeNodeDepth,
   } = useMindmapStore(
     useShallow(s => ({
       activeMindmap: s.activeMindmap, updateNode: s.updateNode, batchUpdateNodes: s.batchUpdateNodes, selectedNodeIds: s.selectedNodeIds,
@@ -119,7 +118,6 @@ export function SidePanel({ nodeId, onClose, onDelete, onUpdateTags }: SidePanel
       setShareEnabled: s.setShareEnabled, rerunLayout: s.rerunLayout,
       themeId: s.themeId, setTheme: s.setTheme, showOrderNumbers: s.showOrderNumbers, setShowOrderNumbers: s.setShowOrderNumbers,
       showChildCount: s.showChildCount, setShowChildCount: s.setShowChildCount, autoAssignIcons: s.autoAssignIcons,
-      resizeNodeDepth: s.resizeNodeDepth,
     })),
   )
   const mapInfo = useMemo(() => levelCounts(activeMindmap?.nodes ?? []), [activeMindmap?.nodes])
@@ -376,11 +374,23 @@ export function SidePanel({ nodeId, onClose, onDelete, onUpdateTags }: SidePanel
                 {node.depth >= 1 && !(diagramType === 'mindmap' && node.depth <= 2) && (
                   <PRow label="Width">
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <input type="range" min={80} max={500} step={4}
-                        value={node.width}
-                        onChange={e => resizeNodeDepth(node.depth, parseInt(e.target.value))}
-                        style={{ flex: 1, accentColor: '#3b82f6' }}
-                      />
+                      {(() => {
+                        const isAuto = (node.widthMode ?? 'auto') === 'auto'
+                        return (
+                          <>
+                            <button onClick={() => { save({ widthMode: 'auto' }); setTimeout(() => rerunLayout(), 0) }}
+                              style={{ ...chip(isAuto), flexShrink: 0 }}>
+                              Auto
+                            </button>
+                            <input type="range" min={80} max={500} step={4}
+                              value={node.width}
+                              disabled={isAuto}
+                              onChange={e => { save({ width: parseInt(e.target.value), widthMode: 'manual' }); setTimeout(() => rerunLayout(), 0) }}
+                              style={{ flex: 1, accentColor: '#3b82f6', opacity: isAuto ? 0.5 : 1 }}
+                            />
+                          </>
+                        )
+                      })()}
                       <span style={{ fontSize: 11, color: '#6b7280', minWidth: 26, textAlign: 'right' }}>{node.width}</span>
                     </div>
                   </PRow>

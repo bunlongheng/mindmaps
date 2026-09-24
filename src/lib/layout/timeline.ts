@@ -17,6 +17,12 @@ function autoWidth(title: string, depth: number, hasIconOrEmoji: boolean): numbe
   })
 }
 
+/** A manual node keeps the width the user dragged; everyone else auto-sizes from title. */
+function boxWidth(node: MindmapNode, depth: number, hasIconOrEmoji: boolean): number {
+  if (node.widthMode === 'manual' && node.width > 0) return node.width
+  return autoWidth(node.title, depth, hasIconOrEmoji)
+}
+
 export function computeTimelineLayout(nodes: MindmapNode[]): MindmapNode[] {
   const root = nodes.find(n => n.parentId === null)
   if (!root) return nodes
@@ -33,8 +39,9 @@ export function computeTimelineLayout(nodes: MindmapNode[]): MindmapNode[] {
 
   l1s.forEach((l1, i) => {
     const above = i % 2 === 0
-    // Always auto-size L1 from title — stored widths from mindmap layout (320px) are too wide
-    const { w: l1w, h: l1h } = shapedNodeSize(l1, nodeFontSize(1), autoWidth(l1.title, 1, !!(l1.icon || l1.emoji)), nodeHeight(1))
+    // Auto-size L1 from title unless manual — a leftover stored width from mindmap
+    // layout (320px) is too wide and must not survive an unrelated type switch
+    const { w: l1w, h: l1h } = shapedNodeSize(l1, nodeFontSize(1), boxWidth(l1, 1, !!(l1.icon || l1.emoji)), nodeHeight(1))
     const l1X = curX
 
     result.push({ ...l1, x: l1X, y: SPINE_Y - l1h / 2, width: l1w, height: l1h, manuallyPositioned: false })
@@ -46,7 +53,7 @@ export function computeTimelineLayout(nodes: MindmapNode[]): MindmapNode[] {
     let maxW = l1w
 
     l2s.forEach((l2, j) => {
-      const { w: l2w, h: l2h } = shapedNodeSize(l2, nodeFontSize(2), autoWidth(l2.title, 2, !!(l2.icon || l2.emoji)), l2.height > 0 ? l2.height : nodeHeight(2))
+      const { w: l2w, h: l2h } = shapedNodeSize(l2, nodeFontSize(2), boxWidth(l2, 2, !!(l2.icon || l2.emoji)), l2.height > 0 ? l2.height : nodeHeight(2))
       // Offset L2 right from the branch line
       const l2X = l1X + BRANCH_INDENT
       // Stack: j=0 is closest to spine, j increases away
@@ -61,7 +68,7 @@ export function computeTimelineLayout(nodes: MindmapNode[]): MindmapNode[] {
         .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
 
       l3s.forEach((l3, k) => {
-        const { w: l3w, h: l3h } = shapedNodeSize(l3, nodeFontSize(3), autoWidth(l3.title, 3, !!(l3.icon || l3.emoji)), l3.height > 0 ? l3.height : nodeHeight(3))
+        const { w: l3w, h: l3h } = shapedNodeSize(l3, nodeFontSize(3), boxWidth(l3, 3, !!(l3.icon || l3.emoji)), l3.height > 0 ? l3.height : nodeHeight(3))
         const l3X = l1X + BRANCH_INDENT
         const l3Y = above
           ? l2Y - (k + 1) * (l3h + V_GAP)

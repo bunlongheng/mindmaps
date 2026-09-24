@@ -18,6 +18,7 @@ import { getTheme } from './themes.js'
 import { L1_PALETTE, hexToRgb, darken, depthFill, applyDepthTransparency, edgeWidthForDepth, radialEdgeWidth, RADIAL_EDGE_OPACITY } from './color.js'
 import { rootPillWidth, rootPillFontSize, rootTitleNeedsPill, ROOT_FONT } from './rootPill.js'
 import { nodeMetrics, ICON_GAP } from './nodeMetrics.js'
+import { normalizeWidthsPerDepth } from './widthNormalize.js'
 import { shapeRx } from './nodeShape.js'
 import { parseLinkedTitle, sliceSegments, lineRanges, type LinkSegment } from './links.js'
 import { nodeCenter, nodeCenterLeft, nodeCenterRight, buildStraightPath, buildCurvedPath, buildOrthogonalPath, buildRadialBranchPath } from './geometry.js'
@@ -48,24 +49,6 @@ function isLight(hex: string): boolean {
   if (!hex.startsWith('#')) return true
   const [r, g, b] = hexToRgb(hex)
   return 0.2126 * r + 0.7152 * g + 0.0722 * b > 140
-}
-
-/** Make all nodes at a depth share the widest width (mindmapStore normalizeWidthsPerDepth). */
-function normalizeWidthsPerDepth(nodes: MindmapNode[], type: DiagramType): MindmapNode[] {
-  // The mind map is a radial constellation: every circle's diameter is its own
-  // subtree's weight, so a shared per-depth width would erase the whole point.
-  if (type === 'mindmap') return nodes
-  const maxByDepth = new Map<number, number>()
-  for (const n of nodes) {
-    if (n.depth > 0 && n.shape !== 'circle') {
-      maxByDepth.set(n.depth, Math.max(maxByDepth.get(n.depth) ?? 0, n.width))
-    }
-  }
-  return nodes.map(n => {
-    if (n.depth <= 0) return n
-    if (n.shape === 'circle') return n   // circle-shaped nodes keep their own square
-    return { ...n, width: maxByDepth.get(n.depth) ?? n.width }
-  })
 }
 
 /** Layout dispatch (mindmapStore runLayout). */
@@ -101,7 +84,11 @@ function computePaletteColors(nodes: MindmapNode[]): Map<string, string | null> 
 /** Load pipeline (mindmapStore setActiveMindmap): reset sizes -> layout -> normalize -> layout. */
 function layoutForRender(raw: MindmapNode[], type: DiagramType): MindmapNode[] {
   const fresh = raw.map(n => {
-    if (n.depth !== 0) return { ...n, width: 0, height: 0, manuallyPositioned: false }
+    if (n.depth !== 0) {
+      return n.widthMode === 'manual'
+        ? { ...n, height: 0, manuallyPositioned: false }
+        : { ...n, width: 0, height: 0, manuallyPositioned: false }
+    }
     const isPill = parseLinkedTitle(n.title).text.length >= 15 || n.width !== n.height
     if (isPill) return { ...n, width: rootPillWidth(n.title, n.fontSize ?? ROOT_FONT), height: nodeMetrics(0).height, manuallyPositioned: false }
     return { ...n, manuallyPositioned: false }

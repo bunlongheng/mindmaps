@@ -18,27 +18,10 @@ import { computeTimelineLayout } from '../lib/layout/timeline'
 import { getTheme } from '../lib/themes'
 import { rootPillWidth, ROOT_FONT } from '../lib/rootPill'
 import { nodeHeight } from '../lib/nodeMetrics'
+import { normalizeWidthsPerDepth } from '../lib/widthNormalize'
 import { guessIcon } from '../lib/autoIcon'
 import { ICON_MAP } from '../lib/icons'
 import { showToast } from '../components/CuteToast'
-
-/** Make all nodes at the same depth share the width of the widest node at that depth */
-function normalizeWidthsPerDepth(nodes: MindmapNode[], type?: DiagramType): MindmapNode[] {
-  // The mind map is a radial constellation: every circle's diameter IS its subtree's
-  // weight, so sharing one width per depth would erase the thing it says.
-  if (type === 'mindmap') return nodes
-  const maxByDepth = new Map<number, number>()
-  for (const n of nodes) {
-    if (n.depth > 0 && n.shape !== 'circle') {
-      maxByDepth.set(n.depth, Math.max(maxByDepth.get(n.depth) ?? 0, n.width))
-    }
-  }
-  return nodes.map(n => {
-    if (n.depth <= 0) return n
-    if (n.shape === 'circle') return n              // circles keep individual sizes
-    return { ...n, width: maxByDepth.get(n.depth) ?? n.width }
-  })
-}
 
 /** Re-index sortOrder per parent group so numbers are always 0,1,2,... with no gaps */
 function reindexSortOrders(nodes: MindmapNode[]): MindmapNode[] {
@@ -203,9 +186,15 @@ export const useMindmapStore = create<MindmapStore>()(
       // Clearing the active map (e.g. after deleting the one being viewed): reset
       // cleanly instead of throwing on d.nodes of a null diagram.
       if (!d) { set({ activeMindmap: null, isDirty: false, past: [], future: [] }); return }
-      // Re-run layout on load: reset widths → compute auto-widths → normalize per depth → final layout
+      // Re-run layout on load: reset widths → compute auto-widths → normalize per depth → final layout.
+      // A manual width is the one thing worth keeping across the reset — it is the
+      // user's own choice, not something layout should recompute for them.
       const freshNodes = d.nodes.map(n => {
-        if (n.depth !== 0) return { ...n, width: 0, height: 0, manuallyPositioned: false }
+        if (n.depth !== 0) {
+          return n.widthMode === 'manual'
+            ? { ...n, height: 0, manuallyPositioned: false }
+            : { ...n, width: 0, height: 0, manuallyPositioned: false }
+        }
         // Root: a long title (or an already-pill root) renders as a pill that the
         // canvas auto-sizes from the title. Reserve the SAME width the canvas draws
         // (Node.tsx autoPillW: cap 720, +80 pad) so children never overlap the pill.
@@ -347,8 +336,8 @@ export const useMindmapStore = create<MindmapStore>()(
       const nodes = state.activeMindmap.nodes.map(n => {
         if (n.id !== id) return n
         const merged = { ...n, ...updates }
-        // Auto-resize width when title changes (non-root nodes only)
-        if (updates.title !== undefined && n.depth > 0) {
+        // Auto-resize width when title changes (non-root, non-manual nodes only)
+        if (updates.title !== undefined && n.depth > 0 && n.widthMode !== 'manual') {
           const hasIcon = !!merged.icon
           merged.width = computeNodeWidth(updates.title, n.depth, hasIcon)
         }
@@ -520,7 +509,7 @@ export const useMindmapStore = create<MindmapStore>()(
       if (!state.activeMindmap) return
       const clamped = Math.max(100, Math.min(500, width))
       const nodes = state.activeMindmap.nodes.map(n =>
-        n.depth === depth ? { ...n, width: clamped, manuallyPositioned: false } : n
+        n.depth === depth ? { ...n, width: clamped, widthMode: 'manual' as const, manuallyPositioned: false } : n
       )
       const laid = runLayout(nodes, state.diagramType)
       set({ activeMindmap: { ...state.activeMindmap, nodes: laid }, isDirty: true })
