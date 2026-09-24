@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { hexToRgb, applyDepthTransparency, applyDepthBackground, darken, l1PaletteColor, L1_PALETTE, depthFill, depthStrength, DEPTH_STRENGTH, DEPTH_STRENGTH_FLOOR } from '../color'
+import { hexToRgb, applyDepthTransparency, applyDepthBackground, darken, l1PaletteColor, L1_PALETTE, depthFill, depthStrength, DEPTH_STRENGTH, DEPTH_STRENGTH_FLOOR, edgeWidthForDepth, EDGE_WIDTH_BY_DEPTH } from '../color'
 
 describe('hexToRgb', () => {
   it('parses standard hex', () => {
@@ -161,5 +161,22 @@ describe('depth ladder (DEPTH_STRENGTH / depthStrength / depthFill)', () => {
     // #000000 at 60% strength -> 40% of the way to white -> 102
     expect(depthFill('#000000', 3)).toBe('#666666')
     expect(depthFill('#ffffff', 5)).toBe('#ffffff')
+  })
+})
+
+describe('edge width ladder (EDGE_WIDTH_BY_DEPTH / edgeWidthForDepth)', () => {
+  it('is strictly decreasing', () => {
+    for (let i = 1; i < EDGE_WIDTH_BY_DEPTH.length; i++) {
+      expect(EDGE_WIDTH_BY_DEPTH[i]).toBeLessThan(EDGE_WIDTH_BY_DEPTH[i - 1])
+    }
+  })
+
+  it('returns 5, 3, 2, 1, 1, 1 for depths 1 through 6', () => {
+    expect([1, 2, 3, 4, 5, 6].map(edgeWidthForDepth)).toEqual([5, 3, 2, 1, 1, 1])
+  })
+
+  it('defends against depth 0 or negative by returning the L1 width', () => {
+    expect(edgeWidthForDepth(0)).toBe(5)
+    expect(edgeWidthForDepth(-1)).toBe(5)
   })
 })

@@ -28,7 +28,8 @@ describe('Edge', () => {
     expect(path).toBeTruthy()
     // curved path uses cubic bezier "C"
     expect(path?.getAttribute('d')).toContain('C')
-    expect(path?.getAttribute('stroke-width')).toBe('1.5')
+    // child is depth 1, so the connector uses the L1 width (edgeWidthForDepth)
+    expect(path?.getAttribute('stroke-width')).toBe('5')
     expect(path?.getAttribute('fill')).toBe('none')
     expect(path?.getAttribute('stroke-linecap')).toBe('round')
   })

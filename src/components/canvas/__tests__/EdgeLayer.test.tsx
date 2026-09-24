@@ -111,6 +111,18 @@ describe('EdgeLayer — logic-chart', () => {
     expect(container.querySelector('text')?.textContent).toBe('1')
   })
 
+  it('connector thickness steps down by child depth (5, 3, 1 for depth 1, 2, 4)', () => {
+    const a = n({ id: 'a', depth: 1, parentId: 'root', x: 300, y: 200, color: '#111111' })
+    const b = n({ id: 'b', depth: 2, parentId: 'a', x: 600, y: 200, color: '#222222' })
+    const c = n({ id: 'c', depth: 3, parentId: 'b', x: 900, y: 200, color: '#333333' })
+    const d = n({ id: 'd', depth: 4, parentId: 'c', x: 1200, y: 200, color: '#444444' })
+    const { container } = renderLayer([root, a, b, c, d], 'curved', 'logic-chart')
+    const byStroke = (stroke: string) => container.querySelector(`path[stroke="${stroke}"]`)
+    expect(byStroke('#111111')?.getAttribute('stroke-width')).toBe('5')
+    expect(byStroke('#222222')?.getAttribute('stroke-width')).toBe('3')
+    expect(byStroke('#444444')?.getAttribute('stroke-width')).toBe('1')
+  })
+
   it('logic-chart sorts L1 with sortOrder ?? 0 fallback when both lack sortOrder', () => {
     const a4 = n({ id: 'a', depth: 1, parentId: 'root', x: 400, y: 100, color: '#3b82f6' })
     const b4 = n({ id: 'b', depth: 1, parentId: 'root', x: 400, y: 300, color: '#22c55e' })

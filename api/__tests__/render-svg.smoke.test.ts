@@ -62,6 +62,15 @@ describe('renderMindmapSvg smoke', () => {
     expect(radii(circleSvg)).not.toContain(3)
   })
 
+  it('steps connector thickness down by depth (root->L1 5px, L1->L2 3px, L2->L3 2px)', () => {
+    // mkNodes() is a 3-level tree: root -> a/b (depth 1) -> a1/a2/b1 (depth 2) -> b2 (depth 3)
+    const svg = renderMindmapSvg({ id: 'x', name: 'M', type: 'logic-chart', line_style: 'orthogonal', theme_id: 'default', nodes: mkNodes() as never })
+    const connectors = [...svg.matchAll(/<(?:path|line)\b[^>]*stroke-width="([\d.]+)"[^>]*\/>/g)].map(m => m[1])
+    expect(connectors).toContain('5')
+    expect(connectors).toContain('3')
+    expect(connectors).toContain('2')
+  })
+
   it('renders curved logic-chart + JSON-string nodes + empty map', () => {
     const svg = renderMindmapSvg({ id: 'x', name: 'T', type: 'logic-chart', line_style: 'curved', theme_id: 'retro', nodes: JSON.stringify(mkNodes()) })
     expect(svg).toContain('<path')

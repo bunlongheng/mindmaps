@@ -4,6 +4,7 @@ import { Edge } from './Edge'
 import { FISHBONE_SLANT } from '../../lib/layout/fishbone'
 import { useMindmapStore } from '../../store/mindmapStore'
 import { rootDrawnWidth } from '../../lib/rootPill'
+import { edgeWidthForDepth } from '../../lib/color'
 
 
 interface EdgeLayerProps {
@@ -26,7 +27,7 @@ function CurvedEdge({ parent, child, goRight = true, color }: { parent: MindmapN
     <path
       d={`M ${x1} ${y1} C ${cx} ${y1} ${cx} ${y2} ${x2} ${y2}`}
       stroke={color ?? child.color}
-      strokeWidth={2}
+      strokeWidth={edgeWidthForDepth(child.depth)}
       fill="none"
       strokeLinecap="round"
     />
@@ -62,7 +63,7 @@ function BracketConnector({ parent, children, goRight = true, showOrderNumbers =
         const numX = goRight ? cx2 - 18 : cx2 + 18
         return (
           <g key={child.id}>
-            <path d={d} stroke={colour(child)} strokeWidth={2} fill="none" strokeLinecap="round" />
+            <path d={d} stroke={colour(child)} strokeWidth={edgeWidthForDepth(child.depth)} fill="none" strokeLinecap="round" />
             {showOrderNumbers && parent.depth === 0 && (
               <>
                 <circle cx={numX} cy={cy} r={10} fill="#ffffff" stroke={colour(child)} strokeWidth={2} />
@@ -108,7 +109,7 @@ export function EdgeLayer({ nodes, lineStyle, diagramType, paletteColors }: Edge
     const trunk = l1Nodes.length > 0 && (
       <>
         <line x1={rootRightX} y1={l1MidY} x2={barX} y2={l1MidY}
-          stroke="#1a1d2e" strokeWidth={4} strokeLinecap="round" />
+          stroke="#1a1d2e" strokeWidth={edgeWidthForDepth(1)} strokeLinecap="round" />
         {l1Nodes.length > 1 && l1Nodes.map((l1, i) => {
           if (i === l1Nodes.length - 1) return null
           const nextL1 = l1Nodes[i + 1]
@@ -125,7 +126,7 @@ export function EdgeLayer({ nodes, lineStyle, diagramType, paletteColors }: Edge
           return (
             <g key={l1.id}>
               <line x1={barX} y1={stubY} x2={l1.x} y2={stubY}
-                stroke={pc(l1)} strokeWidth={4} strokeLinecap="round" />
+                stroke={pc(l1)} strokeWidth={edgeWidthForDepth(1)} strokeLinecap="round" />
               {showOrderNumbers && (
                 <>
                   <circle cx={midX} cy={stubY} r={10} fill="#ffffff" stroke={pc(l1)} strokeWidth={2} />
@@ -180,7 +181,6 @@ export function EdgeLayer({ nodes, lineStyle, diagramType, paletteColors }: Edge
           const y2 = n.y + n.height / 2
 
           const isL1 = n.depth === 1
-          const isL2 = n.depth === 2
           const dx = x2 - x1, dy = y2 - y1
           const len = Math.hypot(dx, dy) || 1
           const ux = dx / len, uy = dy / len
@@ -214,7 +214,7 @@ export function EdgeLayer({ nodes, lineStyle, diagramType, paletteColors }: Edge
             <g key={n.id}>
               <path
                 d={edgePath}
-                stroke={pc(n)} strokeWidth={isL1 ? 3 : isL2 ? 2.5 : 2}
+                stroke={pc(n)} strokeWidth={edgeWidthForDepth(n.depth)}
                 fill="none" strokeLinecap="round"
               />
               {isL1 && showOrderNumbers && (
@@ -262,7 +262,7 @@ export function EdgeLayer({ nodes, lineStyle, diagramType, paletteColors }: Edge
             <line key={l1.id}
               x1={attachX} y1={spineY}
               x2={l1CX} y2={l1EdgeY}
-              stroke={pc(l1)} strokeWidth={2.5} strokeLinecap="round" />
+              stroke={pc(l1)} strokeWidth={edgeWidthForDepth(1)} strokeLinecap="round" />
           )
         })}
 
@@ -288,7 +288,7 @@ export function EdgeLayer({ nodes, lineStyle, diagramType, paletteColors }: Edge
             <line key={l2.id}
               x1={diagX} y1={l2CY}
               x2={nodeEdgeX} y2={l2CY}
-              stroke={pc(l2)} strokeWidth={1.5} strokeLinecap="round" />
+              stroke={pc(l2)} strokeWidth={edgeWidthForDepth(2)} strokeLinecap="round" />
           )
         })}
 
@@ -300,7 +300,7 @@ export function EdgeLayer({ nodes, lineStyle, diagramType, paletteColors }: Edge
             <line key={n.id}
               x1={parent.x + parent.width} y1={parent.y + parent.height / 2}
               x2={n.x} y2={n.y + n.height / 2}
-              stroke={pc(n)} strokeWidth={1.5} strokeLinecap="round" />
+              stroke={pc(n)} strokeWidth={edgeWidthForDepth(n.depth)} strokeLinecap="round" />
           )
         })}
       </g>
@@ -351,7 +351,7 @@ export function EdgeLayer({ nodes, lineStyle, diagramType, paletteColors }: Edge
               {/* Vertical branch from L1 edge through all descendants */}
               {descendants.length > 0 && (
                 <line x1={branchX} y1={l1SpineEdge} x2={branchX} y2={farY}
-                  stroke={pc(l1)} strokeWidth={1.8} strokeLinecap="round" />
+                  stroke={pc(l1)} strokeWidth={edgeWidthForDepth(2)} strokeLinecap="round" />
               )}
               {/* Orthogonal horizontal connector from branch line to each node's left-center */}
               {descendants.map(n => {
@@ -359,7 +359,7 @@ export function EdgeLayer({ nodes, lineStyle, diagramType, paletteColors }: Edge
                 return (
                   <line key={`h-${n.id}`}
                     x1={branchX} y1={nodeCY} x2={n.x} y2={nodeCY}
-                    stroke={pc(l1)} strokeWidth={1.5} strokeLinecap="round" />
+                    stroke={pc(l1)} strokeWidth={edgeWidthForDepth(n.depth)} strokeLinecap="round" />
                 )
               })}
             </g>

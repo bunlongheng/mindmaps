@@ -48,6 +48,27 @@ export function depthStrength(depth: number): number {
 }
 
 /**
+ * Connector line thickness by layer, so the hierarchy reads at a glance instead of
+ * flat. Root to L1 connectors are thickest, stepping down each layer down to a 1px
+ * floor at L4 and deeper.
+ *
+ *   depth 1 -> 5px   depth 2 -> 3px   depth 3 -> 2px   depth 4+ -> 1px
+ *
+ * The key is the CHILD node's depth - the connector drawn INTO a node belongs to
+ * that node's own layer (e.g. the line from the root into an L1 node is the L1
+ * connector, width 5). Exported so the canvas (EdgeLayer.tsx, Edge.tsx), the server
+ * renderer (render-svg.ts) and the tests all read the same numbers.
+ */
+export const EDGE_WIDTH_BY_DEPTH = [5, 3, 2, 1]
+
+/** Connector width for a child at the given depth (see EDGE_WIDTH_BY_DEPTH). */
+export function edgeWidthForDepth(childDepth: number): number {
+  if (childDepth <= 1) return EDGE_WIDTH_BY_DEPTH[0]
+  const idx = Math.min(childDepth - 1, EDGE_WIDTH_BY_DEPTH.length - 1)
+  return EDGE_WIDTH_BY_DEPTH[idx]
+}
+
+/**
  * Node fill for a branch colour at a given depth: the colour mixed toward white by
  * (1 - strength). Depth 0 (the root) is returned untouched. Returns hex so callers
  * can run the same isLight() readability check on the result.

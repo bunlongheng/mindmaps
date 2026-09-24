@@ -91,28 +91,29 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract }: DiagramCan
     if (gRef.current) gRef.current.setAttribute('transform', `translate(${p.x},${p.y}) scale(${z})`)
   }, [])
 
+  // Load at 50% so the text stays readable, anchored on the root instead of shrinking the
+  // whole map to fit. Mind maps grow in every direction, so the root sits at the centre;
+  // logic charts, fishbones and timelines read left to right, so the root sits near the
+  // left edge and the branches get the width.
   const fitView = useCallback(() => {
     const svg = svgRef.current
     if (!svg || !activeMindmap?.nodes.length) return
     const { width: svgW, height: svgH } = svg.getBoundingClientRect()
     if (svgW === 0 || svgH === 0) return
     const nodes = activeMindmap.nodes
-    const minX = Math.min(...nodes.map(n => n.x))
-    const minY = Math.min(...nodes.map(n => n.y))
-    const maxX = Math.max(...nodes.map(n => n.x + n.width))
-    const maxY = Math.max(...nodes.map(n => n.y + n.height))
-    const pad = 80
-    const newZoom = Math.min((svgW - pad * 2) / (maxX - minX), (svgH - pad * 2) / (maxY - minY), 1)
-    const cx = (minX + maxX) / 2
-    const cy = (minY + maxY) / 2
+    const root = nodes.find(n => n.parentId === null) ?? nodes[0]
+    const newZoom = 0.5
+    const cx = root.x + root.width / 2
+    const cy = root.y + root.height / 2
+    const anchorX = diagramType === 'mindmap' ? svgW / 2 : Math.min(svgW / 2, Math.max(root.width / 2 + 40, svgW * 0.18))
     zoomCurrentRef.current = newZoom
     setZoom(newZoom)  // badge only
 
-    const p = { x: svgW / 2 - cx * newZoom, y: svgH / 2 - cy * newZoom }
+    const p = { x: anchorX - cx * newZoom, y: svgH / 2 - cy * newZoom }
     panRef.current = p
     setPan(p)         // keep pan state in sync for selBox coords
     applyTransform(p, newZoom)
-  }, [activeMindmap, applyTransform])
+  }, [activeMindmap, diagramType, applyTransform])
 
 
   // Auto-fit on initial diagram load or diagram type switch
