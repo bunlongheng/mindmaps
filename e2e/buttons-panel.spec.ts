@@ -458,7 +458,7 @@ test.describe('SidePanel — Style tab', () => {
     await page.waitForTimeout(600)
     const active = await page.getByRole('button', { name: 'Pill', exact: true })
       .evaluate(el => getComputedStyle(el).borderColor)
-    expect(active).toBe('rgb(26, 29, 46)') // #1a1d2e active border
+    expect(active).toBe('rgb(59, 130, 246)') // the standard blue selected ring, same as the Type tiles
     expect(await textCount(page)).toBeGreaterThanOrEqual(1)
   })
 })

@@ -425,7 +425,7 @@ export function SidePanel({ nodeId, onClose, onDelete, onUpdateTags }: SidePanel
                             </button>
                             <input type="range" min={80} max={500} step={4}
                               value={node.width}
-                              disabled={isAuto}
+                              aria-label="Width"
                               onChange={e => { save({ width: parseInt(e.target.value), widthMode: 'manual' }); setTimeout(() => rerunLayout(), 0) }}
                               style={{ flex: 1, accentColor: '#3b82f6', opacity: isAuto ? 0.5 : 1 }}
                             />
