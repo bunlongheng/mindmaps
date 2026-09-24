@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { computeTimelineLayout } from '../timeline'
+import { nodeHeight, nodeMinWidth } from '../../nodeMetrics'
 import type { MindmapNode } from '../../../types'
 
 function node(overrides: Partial<MindmapNode> & { id: string }): MindmapNode {
@@ -142,9 +143,9 @@ describe('computeTimelineLayout', () => {
       node({ id: 'l3-default', parentId: 'l2-default', depth: 3, sortOrder: 0 }),
       node({ id: 'l3-stored', parentId: 'l2-default', depth: 3, sortOrder: 1, height: 48 }),
     ])
-    expect(byId(out, 'l2-default').height).toBe(36)
+    expect(byId(out, 'l2-default').height).toBe(nodeHeight(2))
     expect(byId(out, 'l2-stored').height).toBe(50)
-    expect(byId(out, 'l3-default').height).toBe(30)
+    expect(byId(out, 'l3-default').height).toBe(nodeHeight(3))
     expect(byId(out, 'l3-stored').height).toBe(48)
   })
 
@@ -167,8 +168,8 @@ describe('computeTimelineLayout', () => {
     const short = byId(out, 'short')
     const long = byId(out, 'long')
     expect(long.width).toBeGreaterThan(short.width)
-    // short hits the min width floor (120 for L1)
-    expect(short.width).toBe(120)
+    // short hits the table's L1 min width floor
+    expect(short.width).toBe(nodeMinWidth(1))
     // icon zone makes a same-title node wider than the plain equivalent
     expect(byId(out, 'icon').width).toBeGreaterThan(byId(out, 'plainmed').width)
     // emoji L2 and icon L3 placed without error

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { computeMindmapsLayout } from '../mindmaps-layout'
+import { nodeHeight, nodeMinWidth } from '../../nodeMetrics'
 import type { MindmapNode } from '../../../types'
 
 function node(overrides: Partial<MindmapNode> & { id: string }): MindmapNode {
@@ -50,12 +51,12 @@ describe('computeMindmapsLayout', () => {
     expect(root.height).toBe(260) // square
   })
 
-  it('renders a long-title root as a pill (clamped width, height 64)', () => {
+  it('renders a long-title root as a pill at the table root height', () => {
     const out = computeMindmapsLayout([
       node({ id: 'root', depth: 0, title: 'This title is definitely longer than fifteen chars' }),
     ])
     const root = byId(out, 'root')
-    expect(root.height).toBe(64) // pill
+    expect(root.height).toBe(nodeHeight(0)) // pill
     expect(root.width).toBeGreaterThanOrEqual(180)
     expect(root.width).toBeLessThanOrEqual(720)
   })
@@ -65,7 +66,7 @@ describe('computeMindmapsLayout', () => {
       node({ id: 'root', depth: 0, title: 'Hi', shape: 'pill' }),
     ])
     const root = byId(out, 'root')
-    expect(root.height).toBe(64)
+    expect(root.height).toBe(nodeHeight(0))
     expect(root.width).toBe(180) // min clamp
   })
 
@@ -123,8 +124,8 @@ describe('computeMindmapsLayout', () => {
     expect(l2.x).toBeGreaterThan(l1.x)
     expect(l3.x).toBeGreaterThan(l2.x)
     expect(l4.x).toBeGreaterThan(l3.x)
-    // depth 4 falls back to DEFAULT_HEIGHT (30)
-    expect(l4.height).toBe(30)
+    // depth 4 reads the table's deepest row
+    expect(l4.height).toBe(nodeHeight(4))
   })
 
   it('uses stored width/height for non-root nodes when greater than zero', () => {
@@ -180,7 +181,7 @@ describe('computeMindmapsLayout', () => {
     const plain = byId(out, 'plain')
     const icon = byId(out, 'icon')
     expect(plain.width).toBe(icon.width)
-    expect(plain.width).toBeGreaterThanOrEqual(160)
+    expect(plain.width).toBeGreaterThanOrEqual(nodeMinWidth(1))
   })
 
   it('appends nodes unreachable from the root (orphans) at the end', () => {

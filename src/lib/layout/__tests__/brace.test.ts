@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { computeBraceLayout, BRACE_GAP } from '../brace'
+import { nodeHeight, nodeMinWidth, MAX_METRIC_DEPTH } from '../../nodeMetrics'
 import type { MindmapNode } from '../../../types'
 
 function node(overrides: Partial<MindmapNode> & { id: string }): MindmapNode {
@@ -66,9 +67,9 @@ describe('computeBraceLayout', () => {
     expect(c2.x).toBe(expectedChildX)
     // c1 sorts above c2
     expect(c1.y).toBeLessThan(c2.y)
-    // default depth-1 sizes
-    expect(c1.width).toBe(160)
-    expect(c1.height).toBe(44)
+    // default depth-1 sizes come from the shared box table
+    expect(c1.width).toBe(nodeMinWidth(1))
+    expect(c1.height).toBe(nodeHeight(1))
   })
 
   it('sorts children by sortOrder (out-of-order input still ordered)', () => {
@@ -109,26 +110,26 @@ describe('computeBraceLayout', () => {
     expect(c1.x).toBeGreaterThan(root.x)
     expect(gc1.x).toBeGreaterThan(c1.x)
     expect(ggc1.x).toBeGreaterThan(gc1.x)
-    // depth-3 default sizes
-    expect(ggc1.width).toBe(110)
-    expect(ggc1.height).toBe(32)
+    // depth-3 default sizes come from the shared box table
+    expect(ggc1.width).toBe(nodeMinWidth(3))
+    expect(ggc1.height).toBe(nodeHeight(3))
     // gc1 (with a child) and gc2 ordered
     expect(byId(out, 'gc1').y).toBeLessThan(byId(out, 'gc2').y)
   })
 
-  it('caps depth-based sizing at depth 3 (deeper nodes reuse index 3)', () => {
+  it('caps depth-based sizing at the table\'s deepest row', () => {
     const out = computeBraceLayout([
       node({ id: 'root', depth: 0 }),
       node({ id: 'd1', parentId: 'root', depth: 1, sortOrder: 0 }),
       node({ id: 'd2', parentId: 'd1', depth: 2, sortOrder: 0 }),
       node({ id: 'd3', parentId: 'd2', depth: 3, sortOrder: 0 }),
       node({ id: 'd4', parentId: 'd3', depth: 4, sortOrder: 0 }),
+      node({ id: 'd5', parentId: 'd4', depth: 5, sortOrder: 0 }),
     ])
-    const d3 = byId(out, 'd3')
-    const d4 = byId(out, 'd4')
-    // depth 4 uses same default width/height as depth 3 (Math.min(d,3))
-    expect(d4.width).toBe(d3.width)
-    expect(d4.height).toBe(d3.height)
+    const deepest = byId(out, `d${MAX_METRIC_DEPTH}`)
+    const past = byId(out, `d${MAX_METRIC_DEPTH + 1}`)
+    expect(past.width).toBe(deepest.width)
+    expect(past.height).toBe(deepest.height)
   })
 
   it('produces finite numeric positions for every node', () => {
@@ -169,7 +170,7 @@ describe('computeBraceLayout', () => {
     ])
     const noh = byId(out, 'noh')
     // default depth-2 height applied
-    expect(noh.height).toBe(36)
+    expect(noh.height).toBe(nodeHeight(2))
   })
 
   it('subtree height grows with many children (vertical spread)', () => {

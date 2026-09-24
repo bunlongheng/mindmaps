@@ -3,9 +3,10 @@ import type { MindmapNode } from '../../types'
 import { useMindmapStore } from '../../store/mindmapStore'
 import { NodeIcon, getLucideIcon } from './NodeIcon'
 import { wrapText } from '../../lib/layout/mindmap'
-import { rootPillWidth, rootPillFontSize, rootTitleNeedsPill, rootCircleDiameter, rootDrawnWidth } from '../../lib/rootPill'
+import { rootPillWidth, rootPillFontSize, rootTitleNeedsPill, rootCircleDiameter, rootDrawnWidth, ROOT_FONT } from '../../lib/rootPill'
 import { hexToRgb, darken, depthFill } from '../../lib/color'
 import { shapeRx } from '../../lib/nodeShape'
+import { nodeMetrics, ICON_GAP } from '../../lib/nodeMetrics'
 import { parseLinkedTitle, sliceSegments, lineRanges, type LinkSegment } from '../../lib/links'
 
 interface NodeProps {
@@ -120,7 +121,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   const isRootPill = isRoot && diagramType !== 'mindmap' && (
     node.shape === 'pill' ? true :
     node.shape === 'circle' ? false :
-    rootTitleNeedsPill(node.title, node.fontSize ?? 28)
+    rootTitleNeedsPill(node.title, node.fontSize ?? ROOT_FONT)
   )
   const isMindmapCircle = diagramType === 'mindmap' && node.depth === 1
   const isMindmapL2Plus = diagramType === 'mindmap' && node.depth >= 2
@@ -170,9 +171,11 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   // Node-level overrides from panel
   if (node.borderColor) { strokeColor = node.borderColor; strokeW = Math.max(strokeW, node.borderWidth ?? 1.5) }
 
-  // Depth-based font sizes
-  const defaultFontSize = node.depth === 0 ? 34 : node.depth === 1 ? 26 : node.depth === 2 ? 19 : node.depth === 3 ? 16 : 13
-  const baseFontSize = node.fontSize ?? defaultFontSize
+  // Depth-based font size + padding from the one shared box table (src/lib/nodeMetrics),
+  // so the canvas, the server renderer and every layout agree on what a node holds.
+  const metric = nodeMetrics(node.depth)
+  const baseFontSize = node.fontSize ?? metric.fontSize
+  const padX = metric.padX
   // Root pill grows to fit the title up to a max width; past that the font shrinks
   // so long titles never overflow. Shared with the layout (src/lib/rootPill) so
   // the trunk meets the pill's edge instead of starting inside it.
@@ -215,7 +218,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
       if (node.shape !== 'circle' && (node.shape === 'pill' || rootTitleNeedsPill(val, baseFontSize))) {
         // pill: auto width, fixed height
         updates.width = rootPillWidth(val, baseFontSize)
-        updates.height = 90
+        updates.height = nodeMetrics(0).height
       } else {
         // circle: equal width and height, grown to fit the title
         const diameter = rootCircleDiameter(val, baseFontSize)
@@ -553,7 +556,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
             // For fishbone: shift icon center to account for parallelogram skew
             const skOff = isFishboneNode ? node.height * 0.35 / 2 : 0
             const emojiCX = sq / 2 + skOff
-            const textX = sq + 14 + skOff
+            const textX = sq + ICON_GAP + skOff
             const h = node.height
             return (
               <>
@@ -581,7 +584,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
             const skOff = isFishboneNode ? node.height * 0.35 / 2 : 0
             const iconX = (sq - iconSize) / 2 + skOff
             const iconY = (sq - iconSize) / 2
-            const textX = sq + 14 + skOff
+            const textX = sq + ICON_GAP + skOff
             return (
               <>
                 <NodeIcon icon={resolvedIcon} x={iconX} y={iconY} size={iconSize} color={col} strokeWidth={node.depth === 1 ? 2.5 : 1.8} />
@@ -667,7 +670,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
             }
             return (
               <text
-                x={isRoot ? cx : align === 'left' ? 12 : align === 'right' ? displayW - 12 : displayW / 2}
+                x={isRoot ? cx : align === 'left' ? padX : align === 'right' ? displayW - padX : displayW / 2}
                 y={isRoot ? cy + fontSize * 0.38 : node.height / 2 + fontSize * 0.38}
                 textAnchor={isRoot ? 'middle' : textAnchor}
                 fontSize={fontSize} fontWeight={fontWeight} fontStyle={fontStyle}

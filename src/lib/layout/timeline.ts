@@ -1,6 +1,6 @@
 import type { MindmapNode } from '../../types/index.js'
-import { displayTitle } from '../links.js'
 import { shapedNodeSize } from '../nodeShape.js'
+import { nodeFontSize, nodeHeight, nodeWidth, estimateTextWidth } from '../nodeMetrics.js'
 
 const SPINE_Y = 400
 const ROOT_X = 80
@@ -9,11 +9,12 @@ const BRANCH_GAP = 20 // vertical gap between L1 edge and nearest L2
 const L1_SEG = 64     // horizontal gap between L1 nodes
 const BRANCH_INDENT = 48 // horizontal offset from branch line to node left edge
 
-/** Estimate rendered width from title text and font size */
-function autoWidth(title: string, fontSize: number, hasIconOrEmoji: boolean, minW: number): number {
-  const textW = displayTitle(title).length * fontSize * 0.62
-  const iconZone = hasIconOrEmoji ? fontSize * 2.2 : 0
-  return Math.max(minW, Math.ceil(textW + iconZone + 28))
+/** Estimate rendered width from title text and the shared box table (src/lib/nodeMetrics) */
+function autoWidth(title: string, depth: number, hasIconOrEmoji: boolean): number {
+  return nodeWidth(estimateTextWidth(title, nodeFontSize(depth)), depth, {
+    hasIcon: hasIconOrEmoji,
+    height: nodeHeight(depth),
+  })
 }
 
 export function computeTimelineLayout(nodes: MindmapNode[]): MindmapNode[] {
@@ -33,7 +34,7 @@ export function computeTimelineLayout(nodes: MindmapNode[]): MindmapNode[] {
   l1s.forEach((l1, i) => {
     const above = i % 2 === 0
     // Always auto-size L1 from title — stored widths from mindmap layout (320px) are too wide
-    const { w: l1w, h: l1h } = shapedNodeSize(l1, 22, autoWidth(l1.title, 22, !!(l1.icon || l1.emoji), 120), 44)
+    const { w: l1w, h: l1h } = shapedNodeSize(l1, nodeFontSize(1), autoWidth(l1.title, 1, !!(l1.icon || l1.emoji)), nodeHeight(1))
     const l1X = curX
 
     result.push({ ...l1, x: l1X, y: SPINE_Y - l1h / 2, width: l1w, height: l1h, manuallyPositioned: false })
@@ -45,7 +46,7 @@ export function computeTimelineLayout(nodes: MindmapNode[]): MindmapNode[] {
     let maxW = l1w
 
     l2s.forEach((l2, j) => {
-      const { w: l2w, h: l2h } = shapedNodeSize(l2, 16, autoWidth(l2.title, 16, !!(l2.icon || l2.emoji), 90), l2.height > 0 ? l2.height : 36)
+      const { w: l2w, h: l2h } = shapedNodeSize(l2, nodeFontSize(2), autoWidth(l2.title, 2, !!(l2.icon || l2.emoji)), l2.height > 0 ? l2.height : nodeHeight(2))
       // Offset L2 right from the branch line
       const l2X = l1X + BRANCH_INDENT
       // Stack: j=0 is closest to spine, j increases away
@@ -60,7 +61,7 @@ export function computeTimelineLayout(nodes: MindmapNode[]): MindmapNode[] {
         .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
 
       l3s.forEach((l3, k) => {
-        const { w: l3w, h: l3h } = shapedNodeSize(l3, 13, autoWidth(l3.title, 13, !!(l3.icon || l3.emoji), 80), l3.height > 0 ? l3.height : 30)
+        const { w: l3w, h: l3h } = shapedNodeSize(l3, nodeFontSize(3), autoWidth(l3.title, 3, !!(l3.icon || l3.emoji)), l3.height > 0 ? l3.height : nodeHeight(3))
         const l3X = l1X + BRANCH_INDENT
         const l3Y = above
           ? l2Y - (k + 1) * (l3h + V_GAP)

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { computeMindmapLayout, wrapText } from '../mindmap'
+import { nodeFontSize, nodeHeight } from '../../nodeMetrics'
 import type { MindmapNode } from '../../../types'
 
 function node(overrides: Partial<MindmapNode> & { id: string }): MindmapNode {
@@ -103,7 +104,7 @@ describe('computeMindmapLayout', () => {
     // L1 nodes are pills of uniform width
     const widths = new Set(l1s.map(n => n.width))
     expect(widths.size).toBe(1)
-    expect(l1s[0].height).toBe(44) // L1_H
+    expect(l1s[0].height).toBe(nodeHeight(1))
   })
 
   it('renders L2 and L3 children as circles (width === height)', () => {
@@ -129,11 +130,11 @@ describe('computeMindmapLayout', () => {
       node({ id: 'l3', parentId: 'l2', depth: 3, sortOrder: 0 }),
       node({ id: 'l4', parentId: 'l3', depth: 4, sortOrder: 0 }),
     ])
-    expect(byId(out, 'l1').fontSize).toBe(18)
-    expect(byId(out, 'l2').fontSize).toBe(13)
-    expect(byId(out, 'l3').fontSize).toBe(11)
-    // depth 4 falls back to DEFAULT_FONT_SIZE
-    expect(byId(out, 'l4').fontSize).toBe(11)
+    expect(byId(out, 'l1').fontSize).toBe(nodeFontSize(1))
+    expect(byId(out, 'l2').fontSize).toBe(nodeFontSize(2))
+    expect(byId(out, 'l3').fontSize).toBe(nodeFontSize(3))
+    // depth 4 reads the table's deepest row
+    expect(byId(out, 'l4').fontSize).toBe(nodeFontSize(4))
   })
 
   it('keeps manually-positioned non-root nodes in place', () => {

@@ -16,7 +16,8 @@ import { computeFishboneLayout } from '../lib/layout/fishbone'
 import { parseIndentedOutline, normalizeOutlineRoots, assembleOutlineTree, computeNodeWidth, OUTLINE_META_KEYS } from '../lib/outline'
 import { computeTimelineLayout } from '../lib/layout/timeline'
 import { getTheme } from '../lib/themes'
-import { rootPillWidth } from '../lib/rootPill'
+import { rootPillWidth, ROOT_FONT } from '../lib/rootPill'
+import { nodeHeight } from '../lib/nodeMetrics'
 import { guessIcon } from '../lib/autoIcon'
 import { ICON_MAP } from '../lib/icons'
 import { showToast } from '../components/CuteToast'
@@ -209,7 +210,7 @@ export const useMindmapStore = create<MindmapStore>()(
         // (Node.tsx autoPillW: cap 720, +80 pad) so children never overlap the pill.
         const isPill = n.title.length >= 15 || n.width !== n.height
         if (isPill) {
-          return { ...n, width: rootPillWidth(n.title, n.fontSize ?? 28), height: 90 }
+          return { ...n, width: rootPillWidth(n.title, n.fontSize ?? ROOT_FONT), height: nodeHeight(0) }
         }
         return n
       })
@@ -325,7 +326,7 @@ export const useMindmapStore = create<MindmapStore>()(
         x: (parent?.x ?? 400) + 220,
         y: (parent?.y ?? 300) + siblings.length * 60,
         width: depth === 0 ? 180 : computeNodeWidth(title, depth, false),
-        height: depth === 0 ? 180 : 40,
+        height: depth === 0 ? 180 : nodeHeight(depth),
         sortOrder: siblings.length,
       }
       // Strip manuallyPositioned so the layout is always clean when adding nodes
@@ -723,7 +724,8 @@ export const useMindmapStore = create<MindmapStore>()(
           color: p.color ?? palette[0],
           x: 0, y: 0,
           width: depth === 0 ? 180 : computeNodeWidth(p.title, depth, hasVisualZone),
-          height: depth === 0 ? 180 : (emoji ? 48 : 40),
+          // An emoji badge needs a little more box than the depth's plain text row.
+          height: depth === 0 ? 180 : (emoji ? Math.max(nodeHeight(depth), 48) : nodeHeight(depth)),
           manuallyPositioned: false,
           icon,
           emoji,

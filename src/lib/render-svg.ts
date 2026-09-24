@@ -16,7 +16,8 @@ import { computeFishboneLayout, FISHBONE_SLANT } from './layout/fishbone.js'
 import { computeTimelineLayout } from './layout/timeline.js'
 import { getTheme } from './themes.js'
 import { L1_PALETTE, hexToRgb, darken, depthFill, applyDepthTransparency, edgeWidthForDepth } from './color.js'
-import { rootPillWidth, rootPillFontSize, rootTitleNeedsPill } from './rootPill.js'
+import { rootPillWidth, rootPillFontSize, rootTitleNeedsPill, ROOT_FONT } from './rootPill.js'
+import { nodeMetrics, ICON_GAP } from './nodeMetrics.js'
 import { shapeRx } from './nodeShape.js'
 import { parseLinkedTitle, sliceSegments, lineRanges, type LinkSegment } from './links.js'
 import { nodeCenter, nodeCenterLeft, nodeCenterRight, buildStraightPath, buildCurvedPath, buildOrthogonalPath } from './geometry.js'
@@ -99,7 +100,7 @@ function layoutForRender(raw: MindmapNode[], type: DiagramType): MindmapNode[] {
   const fresh = raw.map(n => {
     if (n.depth !== 0) return { ...n, width: 0, height: 0, manuallyPositioned: false }
     const isPill = parseLinkedTitle(n.title).text.length >= 15 || n.width !== n.height
-    if (isPill) return { ...n, width: rootPillWidth(n.title, n.fontSize ?? 28), height: 90, manuallyPositioned: false }
+    if (isPill) return { ...n, width: rootPillWidth(n.title, n.fontSize ?? ROOT_FONT), height: nodeMetrics(0).height, manuallyPositioned: false }
     return { ...n, manuallyPositioned: false }
   })
   const withWidths = runLayout(fresh, type)
@@ -343,7 +344,7 @@ function renderNode(node: MindmapNode, type: DiagramType, paletteColor: string |
   const isRootPill = isRoot && type !== 'mindmap' && (
     node.shape === 'pill' ? true :
     node.shape === 'circle' ? false :
-    rootTitleNeedsPill(node.title, node.fontSize ?? 28)
+    rootTitleNeedsPill(node.title, node.fontSize ?? ROOT_FONT)
   )
 
   // Styling per depth (Node.tsx)
@@ -364,10 +365,12 @@ function renderNode(node: MindmapNode, type: DiagramType, paletteColor: string |
   }
   if (node.borderColor) { strokeColor = node.borderColor; strokeW = Math.max(strokeW, node.borderWidth ?? 1.5) }
 
-  const defaultFontSize = node.depth === 0 ? 34 : node.depth === 1 ? 26 : node.depth === 2 ? 19 : node.depth === 3 ? 16 : 13
+  // Same shared box table the canvas reads (src/lib/nodeMetrics), so a card preview
+  // and the opened map can never draw a label at a different size.
+  const metric = nodeMetrics(node.depth)
   // Coerced: fontSize is typed number but arrives as unvalidated stored JSON, and it
   // lands in an SVG attribute that the home grid injects with dangerouslySetInnerHTML.
-  const baseFontSize = Number(node.fontSize) || defaultFontSize
+  const baseFontSize = Number(node.fontSize) || metric.fontSize
   const fontSize = isRootPill ? rootPillFontSize(node.title, baseFontSize) : baseFontSize
   const fontWeight = node.bold ? '700' : (isRoot ? '500' : node.depth === 1 ? '500' : '400')
 
@@ -429,7 +432,7 @@ function renderNode(node: MindmapNode, type: DiagramType, paletteColor: string |
   } else if (hasEmoji) {
     const emojiSize = Math.round(h * 0.52)
     parts.push(`<text x="${r2(h / 2 + skOff)}" y="${r2(h / 2 + emojiSize * 0.36)}" text-anchor="middle" font-size="${emojiSize}">${esc(node.emoji)}</text>`)
-    parts.push(`<text x="${r2(h + 14 + skOff)}" y="${r2(h / 2 + fontSize * 0.38)}" text-anchor="start" font-size="${fontSize}" font-weight="${fontWeight}" fill="${esc(textColor)}">${labelBody}</text>`)
+    parts.push(`<text x="${r2(h + ICON_GAP + skOff)}" y="${r2(h / 2 + fontSize * 0.38)}" text-anchor="start" font-size="${fontSize}" font-weight="${fontWeight}" fill="${esc(textColor)}">${labelBody}</text>`)
   } else if (hasIcon) {
     // Neutral placeholder for the lucide icon (no icon dep server-side)
     const iconSize = Math.round(h * 0.48)
@@ -437,9 +440,9 @@ function renderNode(node: MindmapNode, type: DiagramType, paletteColor: string |
     const iy = (h - iconSize) / 2
     parts.push(`<rect x="${r2(ix)}" y="${r2(iy)}" width="${iconSize}" height="${iconSize}" rx="${Math.round(iconSize / 4)}" fill="none" stroke="${esc(col)}" stroke-width="2"/>`)
     parts.push(`<circle cx="${r2(ix + iconSize / 2)}" cy="${r2(iy + iconSize / 2)}" r="${r2(iconSize / 6)}" fill="${esc(col)}"/>`)
-    parts.push(`<text x="${r2(h + 14 + skOff)}" y="${r2(h / 2 + fontSize * 0.38)}" text-anchor="start" font-size="${fontSize}" font-weight="${fontWeight}" fill="${esc(textColor)}">${labelBody}</text>`)
+    parts.push(`<text x="${r2(h + ICON_GAP + skOff)}" y="${r2(h / 2 + fontSize * 0.38)}" text-anchor="start" font-size="${fontSize}" font-weight="${fontWeight}" fill="${esc(textColor)}">${labelBody}</text>`)
   } else {
-    const tx = isRoot ? cx : align === 'left' ? 12 + skOff : align === 'right' ? displayW - 12 : displayW / 2
+    const tx = isRoot ? cx : align === 'left' ? metric.padX + skOff : align === 'right' ? displayW - metric.padX : displayW / 2
     const anchor = isRoot || align === 'center' ? 'middle' : align === 'right' ? 'end' : 'start'
     parts.push(`<text x="${r2(tx)}" y="${r2(isRoot ? cy + fontSize * 0.38 : h / 2 + fontSize * 0.38)}" text-anchor="${anchor}" font-size="${fontSize}" font-weight="${fontWeight}" fill="${esc(textColor)}">${labelBody}</text>`)
   }
