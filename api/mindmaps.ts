@@ -33,7 +33,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method === 'GET') {
       if (id) {
         const r = await pool.query(
-          'SELECT id, user_id, name, type, line_style, sharing_enabled, theme_id, nodes, tags, updated_at FROM mindmaps WHERE id=$1',
+          'SELECT id, user_id, name, type, line_style, sharing_enabled, theme_id, nodes, tags, locked, updated_at FROM mindmaps WHERE id=$1',
           [id],
         )
         if (!r.rows.length) return res.status(404).json({ error: 'Not found' })
@@ -61,7 +61,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // Listing a user's maps requires being that user.
       if (!auth) return res.status(401).json({ error: 'Unauthorized' })
       const r = await pool.query(
-        'SELECT id, name, type, sharing_enabled, tags, updated_at FROM mindmaps WHERE user_id=$1 ORDER BY updated_at DESC',
+        'SELECT id, name, type, sharing_enabled, tags, locked, updated_at FROM mindmaps WHERE user_id=$1 ORDER BY updated_at DESC',
         [auth.sub],
       )
       return res.json(r.rows)
@@ -100,6 +100,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (b.tags !== undefined)            { fields.push(`tags=$${i++}`);            vals.push(b.tags) }
       if (b.sharing_enabled !== undefined) { fields.push(`sharing_enabled=$${i++}`); vals.push(b.sharing_enabled) }
       if (b.theme_id !== undefined)        { fields.push(`theme_id=$${i++}`);        vals.push(b.theme_id) }
+      if (b.locked !== undefined)          { fields.push(`locked=$${i++}`);          vals.push(!!b.locked) }
       if (!fields.length) return res.status(400).json({ error: 'Nothing to update' })
       fields.push(`updated_at=now()`)
       vals.push(targetId, uid)
@@ -111,6 +112,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (req.method === 'DELETE') {
       if (!id) return res.status(400).json({ error: 'id required' })
+      // Lock check server-side, not just in the UI: a locked map cannot be deleted by a
+      // direct API call either. It is an accident guard, not a security boundary - the
+      // owner can unlock it at any time and then delete.
+      const guard = await pool.query('SELECT locked FROM mindmaps WHERE id=$1 AND user_id=$2', [id, uid])
+      if (guard.rows.length && guard.rows[0].locked) {
+        return res.status(423).json({ error: 'This map is locked. Unlock it before deleting.' })
+      }
       await pool.query('DELETE FROM mindmaps WHERE id=$1 AND user_id=$2', [id, uid])
       return res.json({ ok: true })
     }

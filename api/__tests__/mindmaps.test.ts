@@ -138,3 +138,70 @@ describe('writes matching 0 rows return 404', () => {
     expect(res.jsonBody).toEqual({ ok: true })
   })
 })
+
+describe('DELETE /api/mindmaps - lock guard', () => {
+  it('returns 423 for a locked map and never runs the delete query', async () => {
+    queryMock.mockResolvedValue({ rows: [{ locked: true }], rowCount: 1 })
+    const res = mockRes()
+    await handler(mockReq({
+      method: 'DELETE',
+      query: { id: 'map-1' },
+      authorization: `Bearer ${KEY}`,
+    }), res)
+    expect(res.statusCode).toBe(423)
+    expect(res.jsonBody).toEqual({ error: 'This map is locked. Unlock it before deleting.' })
+    // Only the lock lookup ran - nothing was deleted.
+    expect(queryMock).toHaveBeenCalledTimes(1)
+    expect(queryMock.mock.calls.some(c => String(c[0]).startsWith('DELETE'))).toBe(false)
+  })
+
+  it('deletes an unlocked map', async () => {
+    queryMock
+      .mockResolvedValueOnce({ rows: [{ locked: false }], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [], rowCount: 1 })
+    const res = mockRes()
+    await handler(mockReq({
+      method: 'DELETE',
+      query: { id: 'map-1' },
+      authorization: `Bearer ${KEY}`,
+    }), res)
+    expect(res.statusCode).toBe(200)
+    expect(res.jsonBody).toEqual({ ok: true })
+    expect(queryMock.mock.calls[1][0]).toBe('DELETE FROM mindmaps WHERE id=$1 AND user_id=$2')
+  })
+
+  it('deletes when the map row does not exist (nothing to guard)', async () => {
+    queryMock.mockResolvedValue({ rows: [], rowCount: 0 })
+    const res = mockRes()
+    await handler(mockReq({
+      method: 'DELETE',
+      query: { id: 'ghost' },
+      authorization: `Bearer ${KEY}`,
+    }), res)
+    expect(res.statusCode).toBe(200)
+    expect(queryMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('DELETE without an id returns 400', async () => {
+    const res = mockRes()
+    await handler(mockReq({ method: 'DELETE', authorization: `Bearer ${KEY}` }), res)
+    expect(res.statusCode).toBe(400)
+    expect(queryMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('PUT /api/mindmaps - locked field', () => {
+  it('writes the locked column', async () => {
+    queryMock.mockResolvedValue({ rows: [], rowCount: 1 })
+    const res = mockRes()
+    await handler(mockReq({
+      method: 'PUT',
+      query: { id: 'map-1' },
+      body: { locked: true },
+      authorization: `Bearer ${KEY}`,
+    }), res)
+    expect(res.statusCode).toBe(200)
+    expect(String(queryMock.mock.calls[0][0])).toContain('locked=$1')
+    expect(queryMock.mock.calls[0][1]).toEqual([true, 'map-1', OWNER_ID])
+  })
+})
