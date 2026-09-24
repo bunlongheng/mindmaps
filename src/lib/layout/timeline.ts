@@ -17,6 +17,21 @@ function autoWidth(title: string, depth: number, hasIconOrEmoji: boolean): numbe
   })
 }
 
+/**
+ * An L2 and its L3 children run as one continuous block away from the spine (L2 box,
+ * then its L3s stacked past it). Reserving the whole block's height, not just the L2's
+ * own height, is what keeps the next L2 on the branch from landing on top of these L3s.
+ */
+function l2Block(l2: MindmapNode, nodes: MindmapNode[]) {
+  const { w: l2w, h: l2h } = shapedNodeSize(l2, nodeFontSize(2), autoWidth(l2.title, 2, !!(l2.icon || l2.emoji)), l2.height > 0 ? l2.height : nodeHeight(2))
+  const l3s = nodes.filter(n => n.parentId === l2.id)
+    .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+  const l3Sizes = l3s.map(l3 => shapedNodeSize(l3, nodeFontSize(3), autoWidth(l3.title, 3, !!(l3.icon || l3.emoji)), l3.height > 0 ? l3.height : nodeHeight(3)))
+  const l3Total = l3Sizes.reduce((sum, sz) => sum + sz.h, 0) + Math.max(0, l3s.length - 1) * V_GAP
+  const blockH = l2h + (l3s.length > 0 ? V_GAP + l3Total : 0)
+  return { l2w, l2h, l3s, l3Sizes, blockH }
+}
+
 export function computeTimelineLayout(nodes: MindmapNode[]): MindmapNode[] {
   const root = nodes.find(n => n.parentId === null)
   if (!root) return nodes
@@ -41,34 +56,36 @@ export function computeTimelineLayout(nodes: MindmapNode[]): MindmapNode[] {
 
     const l2s = nodes.filter(n => n.parentId === l1.id)
       .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+    const blocks = l2s.map(l2 => l2Block(l2, nodes))
 
     // Track widest node in this column for spacing
     let maxW = l1w
 
+    // Stack each L2's block (its own box, then its L3 run) one after another away from
+    // the spine, so an L2 with several L3 children never collides with the next L2.
+    let offset = 0
     l2s.forEach((l2, j) => {
-      const { w: l2w, h: l2h } = shapedNodeSize(l2, nodeFontSize(2), autoWidth(l2.title, 2, !!(l2.icon || l2.emoji)), l2.height > 0 ? l2.height : nodeHeight(2))
+      const { l2w, l2h, l3s, l3Sizes, blockH } = blocks[j]
       // Offset L2 right from the branch line
       const l2X = l1X + BRANCH_INDENT
-      // Stack: j=0 is closest to spine, j increases away
       const l2Y = above
-        ? SPINE_Y - l1h / 2 - BRANCH_GAP - l2h - j * (l2h + V_GAP)
-        : SPINE_Y + l1h / 2 + BRANCH_GAP + j * (l2h + V_GAP)
+        ? SPINE_Y - l1h / 2 - BRANCH_GAP - offset - l2h
+        : SPINE_Y + l1h / 2 + BRANCH_GAP + offset
 
       maxW = Math.max(maxW, l2w)
       result.push({ ...l2, x: l2X, y: l2Y, width: l2w, height: l2h, manuallyPositioned: false })
 
-      const l3s = nodes.filter(n => n.parentId === l2.id)
-        .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
-
+      let l3Cursor = above ? l2Y - V_GAP : l2Y + l2h + V_GAP
       l3s.forEach((l3, k) => {
-        const { w: l3w, h: l3h } = shapedNodeSize(l3, nodeFontSize(3), autoWidth(l3.title, 3, !!(l3.icon || l3.emoji)), l3.height > 0 ? l3.height : nodeHeight(3))
+        const { w: l3w, h: l3h } = l3Sizes[k]
         const l3X = l1X + BRANCH_INDENT
-        const l3Y = above
-          ? l2Y - (k + 1) * (l3h + V_GAP)
-          : l2Y + l2h + V_GAP + k * (l3h + V_GAP)
+        const l3Y = above ? l3Cursor - l3h : l3Cursor
         maxW = Math.max(maxW, l3w)
         result.push({ ...l3, x: l3X, y: l3Y, width: l3w, height: l3h, manuallyPositioned: false })
+        l3Cursor = above ? l3Y - V_GAP : l3Cursor + l3h + V_GAP
       })
+
+      offset += blockH + V_GAP
     })
 
     curX += maxW + L1_SEG

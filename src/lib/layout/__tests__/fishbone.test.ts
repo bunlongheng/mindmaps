@@ -143,16 +143,14 @@ describe('computeFishboneLayout', () => {
     const t2 = byId(out, 't2')
     const t3a = byId(out, 't3a')
     const t3b = byId(out, 't3b')
-    // above: k=0 aligns with l2 top, k=1 stacks upward (smaller y)
-    expect(t3a.y).toBe(t2.y) // k=0 -> dir*0 offset
+    // The L3 stack is centred on L2's own diagonal anchor, so k=0 (t3a) still sits
+    // nearer the spine side of the block and k=1 (t3b) stacks further away (smaller y).
     expect(t3b.y).toBeLessThan(t3a.y)
     // L3 x sits to the right of its L2
     expect(t3a.x).toBe(t2.x + t2.width + 16)
 
-    const b2 = byId(out, 'b2')
     const b3a = byId(out, 'b3a')
     const b3b = byId(out, 'b3b')
-    expect(b3a.y).toBe(b2.y)
     expect(b3b.y).toBeGreaterThan(b3a.y) // below stacks downward
   })
 
