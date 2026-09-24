@@ -81,6 +81,16 @@ describe('HomePage — rendering & list', () => {
     expect(screen.getByText('All Maps')).toBeInTheDocument()
   })
 
+  it('the List/Grid toggle switches viewMode and persists it', () => {
+    seedDiagrams(SAMPLE)
+    render(<HomePage onOpen={vi.fn()} user={USER} onSignOut={vi.fn()} />)
+    expect(localStorage.getItem('mindmaps:viewMode')).toBe('list')
+    fireEvent.click(screen.getByTitle('Grid view'))
+    expect(localStorage.getItem('mindmaps:viewMode')).toBe('grid')
+    fireEvent.click(screen.getByTitle('List view'))
+    expect(localStorage.getItem('mindmaps:viewMode')).toBe('list')
+  })
+
   it('shows the empty state when there are no maps', () => {
     render(<HomePage onOpen={vi.fn()} user={USER} onSignOut={vi.fn()} />)
     expect(screen.getByText('No maps yet')).toBeInTheDocument()
@@ -356,6 +366,36 @@ describe('HomePage — delete & tag editing', () => {
     )!
     fireEvent.click(delBtn)
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByText('Delete map?')).not.toBeInTheDocument()
+    expect(useMindmapStore.getState().diagrams.find(d => d.id === 'm1')).toBeDefined()
+  })
+
+  it('closes the delete confirm on Escape', () => {
+    seedDiagrams(SAMPLE)
+    render(<HomePage onOpen={vi.fn()} user={USER} onSignOut={vi.fn()} />)
+    const card = screen.getByText('Project Plan').closest('div[style*="cursor: pointer"]')!
+    fireEvent.mouseEnter(card)
+    const delBtn = (Array.from(card.querySelectorAll('button')) as HTMLElement[]).find(
+      b => b.style.border === '1px solid rgb(254, 202, 202)'
+    )!
+    fireEvent.click(delBtn)
+    expect(screen.getByText('Delete map?')).toBeInTheDocument()
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(screen.queryByText('Delete map?')).not.toBeInTheDocument()
+    expect(useMindmapStore.getState().diagrams.find(d => d.id === 'm1')).toBeDefined()
+  })
+
+  it('closes the delete confirm on backdrop click, without touching the dialog card', () => {
+    seedDiagrams(SAMPLE)
+    render(<HomePage onOpen={vi.fn()} user={USER} onSignOut={vi.fn()} />)
+    const card = screen.getByText('Project Plan').closest('div[style*="cursor: pointer"]')!
+    fireEvent.mouseEnter(card)
+    const delBtn = (Array.from(card.querySelectorAll('button')) as HTMLElement[]).find(
+      b => b.style.border === '1px solid rgb(254, 202, 202)'
+    )!
+    fireEvent.click(delBtn)
+    const dialog = screen.getByRole('dialog', { name: 'Delete map?' })
+    fireEvent.click(dialog.parentElement!) // the fixed backdrop, not the dialog itself
     expect(screen.queryByText('Delete map?')).not.toBeInTheDocument()
     expect(useMindmapStore.getState().diagrams.find(d => d.id === 'm1')).toBeDefined()
   })
@@ -957,6 +997,52 @@ describe('HomePage — DiagramCard interactions (coverage)', () => {
     render(<HomePage onOpen={onOpen} user={USER} onSignOut={vi.fn()} />)
     await act(async () => { fireEvent.click(screen.getByText('New')) })
     await waitFor(() => expect(onOpen).toHaveBeenCalled())
+  })
+
+  it('grid card: hover/focus/blur styling, Enter opens it, and the tag/delete buttons work', () => {
+    localStorage.setItem('mindmaps:viewMode', 'grid')
+    seedDiagrams(SAMPLE)
+    const onOpen = vi.fn()
+    render(<HomePage onOpen={onOpen} user={USER} onSignOut={vi.fn()} />)
+    const card = screen.getByText('Project Plan').closest('div[style*="cursor: pointer"]')!
+
+    fireEvent.mouseEnter(card)
+    expect((card as HTMLElement).style.transform).toBe('translateY(-2px)')
+    fireEvent.focus(card)
+    fireEvent.blur(card)
+    expect((card as HTMLElement).style.transform).toBe('translateY(0)')
+
+    // hover the buttons back into view, then use them
+    fireEvent.mouseEnter(card)
+    fireEvent.keyDown(card, { key: 'Enter' })
+    expect(onOpen).toHaveBeenCalledWith('m1')
+
+    const editBtn = screen.getByLabelText('Edit tags for Project Plan')
+    fireEvent.click(editBtn)
+    const modal = screen.getByText('Edit tags').closest('div[style*="position: fixed"]')! as HTMLElement
+    const xBtn = (Array.from(modal.querySelectorAll('button')) as HTMLElement[]).find(b => b.style.width === '30px')!
+    fireEvent.click(xBtn)
+    expect(screen.queryByText('Edit tags')).toBeNull()
+
+    fireEvent.mouseEnter(card)
+    const delBtn = screen.getByLabelText('Delete Project Plan')
+    fireEvent.click(delBtn)
+    expect(screen.getByText('Delete map?')).toBeInTheDocument()
+  })
+
+  it('list row: hover/focus/blur styling and Enter opens it', () => {
+    localStorage.setItem('mindmaps:viewMode', 'list')
+    seedDiagrams(SAMPLE)
+    const onOpen = vi.fn()
+    render(<HomePage onOpen={onOpen} user={USER} onSignOut={vi.fn()} />)
+    const row = screen.getByText('Project Plan').closest('div[style*="cursor: pointer"]')!
+
+    fireEvent.mouseEnter(row)
+    fireEvent.mouseLeave(row)
+    fireEvent.focus(row)
+    fireEvent.blur(row)
+    fireEvent.keyDown(row, { key: 'Enter' })
+    expect(onOpen).toHaveBeenCalledWith('m1')
   })
 })
 

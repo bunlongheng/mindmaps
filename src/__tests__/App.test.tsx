@@ -55,12 +55,14 @@ vi.mock('../lib/export/share', () => ({
 const google = vi.hoisted(() => ({
   lastCredentialCb: null as null | ((idToken: string) => void),
   renderGoogleButton: vi.fn(),
+  rejectNextRender: false,
 }))
 vi.mock('../lib/googleAuth', () => ({
   hasGoogleAuth: true,
   renderGoogleButton: (el: HTMLElement, cb: (idToken: string) => void) => {
     google.lastCredentialCb = cb
     google.renderGoogleButton(el, cb)
+    if (google.rejectNextRender) { google.rejectNextRender = false; return Promise.reject(new Error('Google script failed')) }
     return Promise.resolve()
   },
 }))
@@ -216,6 +218,12 @@ describe('App — login screen (non-local, no user)', () => {
     await waitFor(() => expect(google.lastCredentialCb).toBeTruthy())
     await act(async () => { google.lastCredentialCb!('id-token') })
     await waitFor(() => expect(screen.getByText('Network error')).toBeInTheDocument())
+  })
+
+  it('shows a login error when the Google button itself fails to render', async () => {
+    google.rejectNextRender = true
+    render(<App />)
+    await waitFor(() => expect(screen.getByText('Could not load Google sign-in')).toBeInTheDocument())
   })
 })
 
@@ -405,6 +413,17 @@ describe('App — viewer / share view', () => {
     decodeShareURL.mockReturnValue(makeDiagram({ name: 'Decoded' }))
     render(<App />)
     await waitFor(() => expect(screen.getByText('VIEW ONLY')).toBeInTheDocument())
+  })
+
+  it('a node select in the read-only viewer is a no-op (no panel, no crash)', async () => {
+    setHostname('app.example.com')
+    decodeShareURL.mockReturnValue(makeDiagram({ name: 'Decoded' }))
+    render(<App />)
+    await waitFor(() => expect(screen.getByText('VIEW ONLY')).toBeInTheDocument())
+    expect(() => fireEvent.click(screen.getByTestId('select-node'))).not.toThrow()
+    // The viewer never mounts a side panel - selecting a node there has nowhere to go.
+    expect(screen.queryByTestId('side-panel')).toBeNull()
+    expect(screen.getByText('VIEW ONLY')).toBeInTheDocument()
   })
 })
 

@@ -44,6 +44,12 @@ describe('getLucideIcon', () => {
   it('returns undefined for a completely unknown name', () => {
     expect(getLucideIcon('totally-not-a-real-icon-xyz')).toBeUndefined()
   })
+
+  it('normalizes a PascalCase name to kebab-case before retrying ICON_MAP', () => {
+    // 'GitBranch' isn't itself an ICON_MAP/fallback key (those are kebab-case),
+    // so this only resolves by falling through to the toKebab('GitBranch') -> 'git-branch' retry.
+    expect(getLucideIcon('GitBranch')).toBe(getLucideIcon('git-branch'))
+  })
 })
 
 describe('NodeIcon', () => {

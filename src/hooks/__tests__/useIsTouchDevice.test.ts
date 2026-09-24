@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest'
-import { renderHook } from '@testing-library/react'
+import { renderHook, act } from '@testing-library/react'
 import { useIsTouchDevice } from '../useIsTouchDevice'
 
 type Listener = () => void
@@ -79,5 +79,31 @@ describe('useIsTouchDevice', () => {
     mockNavigator({ userAgent: 'Mozilla/5.0 (Linux; Android 10)' })
     const { unmount } = renderHook(() => useIsTouchDevice())
     expect(() => unmount()).not.toThrow()
+  })
+
+  it('re-detects and flips the result when the media query changes at runtime', () => {
+    // A mutable matchMedia mock: `state` can be flipped after mount, and firing a
+    // captured listener re-reads it live (mirrors a real MediaQueryList).
+    const state = { coarse: false, hoverNone: false }
+    const changeListeners: Listener[] = []
+    window.matchMedia = ((query: string) => ({
+      get matches() { return query.includes('coarse') ? state.coarse : state.hoverNone },
+      media: query,
+      addEventListener: (_: string, cb: Listener) => { changeListeners.push(cb) },
+      removeEventListener: (_: string, cb: Listener) => {
+        const i = changeListeners.indexOf(cb)
+        if (i >= 0) changeListeners.splice(i, 1)
+      },
+    })) as unknown as typeof window.matchMedia
+    mockNavigator({ userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15) AppleWebKit' })
+
+    const { result } = renderHook(() => useIsTouchDevice())
+    expect(result.current).toBe(false) // mouse/trackpad at mount
+
+    // A mouse gets detached: the device now matches coarse pointer + no hover.
+    state.coarse = true
+    state.hoverNone = true
+    act(() => { changeListeners.forEach(cb => cb()) })
+    expect(result.current).toBe(true)
   })
 })

@@ -162,6 +162,40 @@ describe('SidePanel — Style tab', () => {
     expect(useMindmapStore.getState().isDirty).toBe(false)
   })
 
+  it('edits node url via the Link input on Enter', () => {
+    loadDiagram()
+    render(<SidePanel nodeId="c1" onClose={vi.fn()} />)
+    const input = screen.getByPlaceholderText('https://…') as HTMLInputElement
+    fireEvent.change(input, { target: { value: 'https://example.com' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    const node = useMindmapStore.getState().activeMindmap!.nodes.find(n => n.id === 'c1')!
+    expect(node.url).toBe('https://example.com')
+  })
+
+  it('saves url on blur when changed, and clears it when blanked', () => {
+    loadDiagram()
+    render(<SidePanel nodeId="c1" onClose={vi.fn()} />)
+    const input = screen.getByPlaceholderText('https://…') as HTMLInputElement
+    fireEvent.focus(input) // exercise onFocus border handler
+    fireEvent.change(input, { target: { value: 'https://blur.example' } })
+    fireEvent.blur(input)
+    let node = useMindmapStore.getState().activeMindmap!.nodes.find(n => n.id === 'c1')!
+    expect(node.url).toBe('https://blur.example')
+    // blanking it out and blurring clears the url (trimmed empty -> undefined)
+    fireEvent.change(input, { target: { value: '  ' } })
+    fireEvent.blur(input)
+    node = useMindmapStore.getState().activeMindmap!.nodes.find(n => n.id === 'c1')!
+    expect(node.url).toBeUndefined()
+  })
+
+  it('does not save url on blur when unchanged', () => {
+    loadDiagram()
+    render(<SidePanel nodeId="c1" onClose={vi.fn()} />)
+    const input = screen.getByPlaceholderText('https://…') as HTMLInputElement
+    fireEvent.blur(input)
+    expect(useMindmapStore.getState().isDirty).toBe(false)
+  })
+
   it('toggles bold and italic', () => {
     loadDiagram()
     render(<SidePanel nodeId="c1" onClose={vi.fn()} />)
@@ -443,6 +477,26 @@ describe('SidePanel — Map tab', () => {
     expect(useMindmapStore.getState().themeId).toBe('monokai')
   })
 
+  it('ThemeCard lifts on hover and rings on keyboard focus', () => {
+    loadDiagram()
+    render(<SidePanel nodeId={null} onClose={vi.fn()} />)
+    const card = screen.getByText('Monokai').closest('button')!
+    expect(card.style.boxShadow).toBe('none')
+
+    fireEvent.mouseEnter(card)
+    expect(card.style.transform).toBe('translateY(-1px)')
+    expect(card.style.boxShadow).toContain('rgba(0,0,0,0.12)')
+
+    fireEvent.mouseLeave(card)
+    expect(card.style.transform).toBe('none')
+
+    fireEvent.focus(card)
+    expect(card.style.boxShadow).toContain('0 0 0 2px')
+
+    fireEvent.blur(card)
+    expect(card.style.boxShadow).toBe('none')
+  })
+
   it('Tags block adds and removes a tag', () => {
     loadDiagram(makeDiagram({ tags: [] }))
     const onUpdateTags = (id: string, tags: string[]) => {
@@ -457,6 +511,39 @@ describe('SidePanel — Map tab', () => {
     // remove it by clicking the tag chip
     fireEvent.click(screen.getByText('Work'))
     expect(useMindmapStore.getState().activeMindmap!.tags).not.toContain('Work')
+  })
+
+  it('Tags block: custom tag input adds via Enter and via the Add button, and tag colors draw from other diagrams', () => {
+    loadDiagram(makeDiagram({ tags: [] }))
+    // Non-empty diagrams (with their own tags) exercises the tagColorMap/available
+    // memos' flatMap over diagrams, not just the empty-array default.
+    act(() => {
+      useMindmapStore.setState({ diagrams: [
+        { id: 'other', name: 'Other', type: 'logic-chart', updatedAt: '2024-01-01T00:00:00Z', tags: ['Personal'] },
+      ] })
+    })
+    const tags: string[] = []
+    const onUpdateTags = (_id: string, next: string[]) => {
+      tags.length = 0; tags.push(...next)
+      const current = useMindmapStore.getState().activeMindmap!
+      useMindmapStore.getState().setActiveMindmap({ ...current, tags: next })
+    }
+    render(<SidePanel nodeId={null} onClose={vi.fn()} onUpdateTags={onUpdateTags} />)
+    fireEvent.click(screen.getByText('+ Tag'))
+
+    // Type a custom tag and press Enter
+    const input = screen.getByPlaceholderText('Custom tag…') as HTMLInputElement
+    fireEvent.change(input, { target: { value: 'Urgent' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(tags).toContain('Urgent')
+
+    // Reopen the picker, type another tag, and click Add
+    fireEvent.click(screen.getByText('+ Tag'))
+    const input2 = screen.getByPlaceholderText('Custom tag…') as HTMLInputElement
+    fireEvent.change(input2, { target: { value: 'Later' } })
+    fireEvent.click(screen.getByText('Add'))
+    expect(tags).toContain('Later')
+    expect(tags).toContain('Urgent')
   })
 
   it('Details block shows the right per-level counts', () => {
@@ -586,6 +673,21 @@ describe('SidePanel — Share tab', () => {
     fireEvent.click(toggle)
     expect(useMindmapStore.getState().activeMindmap!.sharingEnabled).toBe(true)
     await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalled())
+  })
+
+  it('enabling the public link toggle also flips Copy Link to "Copied!" and back after the timeout', async () => {
+    vi.useFakeTimers()
+    loadDiagram()
+    const { container } = render(<SidePanel nodeId={null} onClose={vi.fn()} />)
+    fireEvent.click(screen.getByText('Share'))
+    const toggle = Array.from(container.querySelectorAll('button')).find(
+      b => (b as HTMLElement).style.width === '40px'
+    )!
+    await act(async () => { fireEvent.click(toggle) })
+    expect(screen.getByText('Copied!')).toBeInTheDocument()
+    await act(async () => { vi.advanceTimersByTime(2100) })
+    expect(screen.getByText('Copy Link')).toBeInTheDocument()
+    vi.useRealTimers()
   })
 
   it('disabling the public link toggle does not copy', () => {
