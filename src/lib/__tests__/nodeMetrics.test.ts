@@ -46,6 +46,11 @@ describe('the box table', () => {
     expect(nodeMetrics(1)).toEqual({ fontSize: 20, height: 44, padX: 14 })
   })
 
+  it('gives the root a title that dominates a top-level topic', () => {
+    expect(nodeFontSize(0)).toBeGreaterThan(nodeFontSize(1) * 2)
+    expect(nodeHeight(0)).toBeGreaterThan(nodeHeight(1) * 2)
+  })
+
   it('clamps every depth past the table to the deepest row', () => {
     expect(nodeMetrics(9)).toEqual(nodeMetrics(MAX_METRIC_DEPTH))
     expect(nodeMetrics(200)).toEqual(nodeMetrics(MAX_METRIC_DEPTH))

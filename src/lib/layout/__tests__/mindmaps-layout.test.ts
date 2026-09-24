@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { computeMindmapsLayout } from '../mindmaps-layout'
 import { nodeHeight, nodeMinWidth } from '../../nodeMetrics'
+import { ROOT_PILL_MAX, ROOT_CIRCLE_MAX } from '../../rootPill'
 import type { MindmapNode } from '../../../types'
 
 function node(overrides: Partial<MindmapNode> & { id: string }): MindmapNode {
@@ -41,7 +42,7 @@ describe('computeMindmapsLayout', () => {
     const root = byId(out, 'root')
     expect(root.width).toBe(root.height) // square
     expect(root.width).toBeGreaterThan(180) // grew past the minimum
-    expect(root.width).toBeLessThanOrEqual(340)
+    expect(root.width).toBeLessThanOrEqual(ROOT_CIRCLE_MAX)
   })
 
   it('uses a stored square size for circle roots when width > 0', () => {
@@ -58,7 +59,7 @@ describe('computeMindmapsLayout', () => {
     const root = byId(out, 'root')
     expect(root.height).toBe(nodeHeight(0)) // pill
     expect(root.width).toBeGreaterThanOrEqual(180)
-    expect(root.width).toBeLessThanOrEqual(720)
+    expect(root.width).toBeLessThanOrEqual(ROOT_PILL_MAX)
   })
 
   it('clamps pill width to the 180px minimum for short-but-pill-shaped roots', () => {
@@ -70,11 +71,11 @@ describe('computeMindmapsLayout', () => {
     expect(root.width).toBe(180) // min clamp
   })
 
-  it('clamps very long pill titles to the 720px maximum', () => {
+  it('clamps very long pill titles to ROOT_PILL_MAX', () => {
     const out = computeMindmapsLayout([
       node({ id: 'root', depth: 0, title: 'x'.repeat(200), shape: 'pill' }),
     ])
-    expect(byId(out, 'root').width).toBe(720)
+    expect(byId(out, 'root').width).toBe(ROOT_PILL_MAX)
   })
 
   it('places L1 children to the right of the root', () => {

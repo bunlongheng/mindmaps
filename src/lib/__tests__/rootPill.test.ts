@@ -7,8 +7,8 @@ describe('rootPillFontSize', () => {
   })
 
   it('shrinks the font for titles too long for the max width', () => {
-    const fs = rootPillFontSize('It’s Happening... Anthropic MYTHOS 1 Is Here!', 28)
-    expect(fs).toBeLessThan(28)
+    const fs = rootPillFontSize('It’s Happening... Anthropic MYTHOS 1 Is Here, And Then Some More')
+    expect(fs).toBeLessThan(ROOT_FONT)
     expect(fs).toBeGreaterThanOrEqual(15)
   })
 
@@ -92,7 +92,7 @@ describe('rootDrawnWidth', () => {
   })
 
   it('respects a node font size override', () => {
-    expect(rootDrawnWidth({ ...pillRoot, fontSize: 30 }, 'logic-chart')).toBe(rootPillWidth(pillRoot.title, 30))
+    expect(rootDrawnWidth({ ...pillRoot, fontSize: 50 }, 'logic-chart')).toBe(rootPillWidth(pillRoot.title, 50))
     // A small enough font lets the title fit a circle, so it stops being a pill.
     expect(rootDrawnWidth({ ...pillRoot, fontSize: 20 }, 'logic-chart')).toBe(STALE_W)
   })
@@ -115,6 +115,13 @@ describe('ROOT_FONT is the one default for every root helper', () => {
 
   it('rootTitleNeedsPill defaults to ROOT_FONT', () => {
     expect(rootTitleNeedsPill(title)).toBe(rootTitleNeedsPill(title, ROOT_FONT))
+  })
+
+  it('scales the pill and circle geometry with ROOT_FONT', () => {
+    // A root title at ROOT_FONT must still fit the boxes that hold it.
+    expect(ROOT_PILL_MAX).toBeGreaterThan(rootPillWidth('A ten word root title for a real diagram'))
+    expect(ROOT_CIRCLE_MAX).toBeGreaterThan(rootCircleDiameter('Deploy Captain'))
+    expect(rootTitleNeedsPill('Deploy Captain')).toBe(false)
   })
 
   it('rootDrawnWidth with no explicit fontSize measures at ROOT_FONT', () => {

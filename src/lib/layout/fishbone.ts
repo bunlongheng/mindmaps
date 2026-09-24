@@ -9,7 +9,7 @@ const SPINE_Y = 400
 const ROOT_X = 120
 // The root keeps its own bone-anchor height; every other depth comes from the shared
 // box table (src/lib/nodeMetrics).
-const ROOT_H = 54
+const ROOT_H = 80
 
 // Fishbone L1/L2/L3 boxes render as slanted parallelograms (Node.tsx: sk = height * 0.35).
 // Raised from the old 500px clamp so a long title grows the box instead of getting clipped.

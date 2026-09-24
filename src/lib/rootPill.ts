@@ -10,19 +10,21 @@ import { displayTitle } from './links.js'
 // Base font size of the root title. Single source for every renderer, layout and
 // store that needs the root's default size - and the depth-0 row of the shared box
 // table (src/lib/nodeMetrics) is built from it.
-export const ROOT_FONT = 28
+export const ROOT_FONT = 42
 // Height of the root pill, shared by the store's load-time reserve and the server
 // renderer so a card preview and the opened map draw the same pill.
-export const ROOT_PILL_H = 90
+export const ROOT_PILL_H = 130
 
-export const ROOT_PILL_MAX = 720
-export const ROOT_PILL_PAD = 80
+// Pill and circle geometry scale with ROOT_FONT: every number below is the old
+// 28px-era value times 1.5, so a 50 percent larger title keeps the same proportions.
+export const ROOT_PILL_MAX = 1080
+export const ROOT_PILL_PAD = 120
 const CHAR_RATIO = 0.62
 
 // A circle root grows to fit its title; once a fitting circle would exceed this
 // diameter the title is too long for a circle and a pill is used instead.
-export const ROOT_CIRCLE_MAX = 340
-const ROOT_CIRCLE_PAD = 70
+export const ROOT_CIRCLE_MAX = 510
+const ROOT_CIRCLE_PAD = 105
 
 /** Diameter that fits the title inside a circle root, clamped to [180, ROOT_CIRCLE_MAX]. */
 export function rootCircleDiameter(title: string, baseFontSize = ROOT_FONT): number {
