@@ -12,9 +12,10 @@ import { showToast, dismissToast } from '../CuteToast'
 import { soundChaChing } from '../../lib/sounds'
 import { authHeaders } from '../../hooks/useDiagram'
 import { levelCounts } from '../../lib/nodeCounts'
-import type { LineStyle, DiagramType, Diagram, DiagramMeta } from '../../types'
+import type { DiagramType, Diagram, DiagramMeta } from '../../types'
 import type { NodeShape } from '../../lib/nodeShape'
 import { QRCodeSVG } from 'qrcode.react'
+import { LinePicker } from './LinePicker'
 
 interface SidePanelProps {
   nodeId: string | null
@@ -422,19 +423,20 @@ export function SidePanel({ nodeId, onClose, onDelete, onUpdateTags }: SidePanel
                 {diagramType !== 'mindmap' && <PRow label="Shape">
                   <div style={{ display: 'flex', gap: 6 }}>
                     {([
-                      { value: 'circle' as const, label: 'Circle', icon: (active: boolean) => (
-                        <svg width="32" height="22" viewBox="0 0 32 22" fill="none">
-                          <circle cx="16" cy="11" r="8" fill={active ? '#1a1d2e' : 'none'} stroke={active ? '#1a1d2e' : '#94a3b8'} strokeWidth="2"/>
+                      { value: 'circle' as const, label: 'Circle', icon: (c: string) => (
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                          <circle cx="12" cy="12" r="8" stroke={c} strokeWidth="1.8"/>
                         </svg>
                       )},
-                      { value: 'pill' as const, label: 'Pill', icon: (active: boolean) => (
-                        <svg width="32" height="22" viewBox="0 0 32 22" fill="none">
-                          <rect x="3" y="6" width="26" height="10" rx="5" fill={active ? '#1a1d2e' : 'none'} stroke={active ? '#1a1d2e' : '#94a3b8'} strokeWidth="2"/>
+                      { value: 'pill' as const, label: 'Pill', icon: (c: string) => (
+                        <svg width="30" height="18" viewBox="0 0 30 18" fill="none">
+                          <rect x="2" y="3" width="26" height="12" rx="6" stroke={c} strokeWidth="1.8"/>
                         </svg>
                       )},
                     ]).map(({ value, label, icon }) => {
                       const currentShape = node.shape ?? (node.title.length >= 15 || node.width !== node.height ? 'pill' : 'circle')
                       const active = currentShape === value
+                      const c = active ? '#3b82f6' : '#64748b'
                       return (
                         <button key={value} onClick={() => {
                           if (!node) return
@@ -446,93 +448,18 @@ export function SidePanel({ nodeId, onClose, onDelete, onUpdateTags }: SidePanel
                           style={{
                             flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
                             gap: 5, padding: '8px 4px', borderRadius: 8, cursor: 'pointer',
-                            border: `1.5px solid ${active ? '#1a1d2e' : '#e0e2e7'}`,
-                            background: active ? '#f1f5f9' : '#fff', fontFamily: 'inherit',
+                            border: `1.5px solid ${active ? '#3b82f6' : '#e0e2e7'}`,
+                            background: active ? '#eff6ff' : '#fff', fontFamily: 'inherit',
                           }}>
-                          {icon(active)}
-                          <span style={{ fontSize: 9, fontWeight: active ? 600 : 500, color: active ? '#1a1d2e' : '#64748b' }}>{label}</span>
+                          {icon(c)}
+                          <span style={{ fontSize: 9, fontWeight: active ? 600 : 500, color: c }}>{label}</span>
                         </button>
                       )
                     })}
                   </div>
                 </PRow>}
                 {diagramType !== 'mindmap' && <PRow label="Line">
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    {([
-                      {
-                        value: 'curved' as LineStyle, label: 'Brace',
-                        icon: (c: string) => (
-                          <svg width="32" height="22" viewBox="0 0 32 22" fill="none">
-                            {/* vertical bar */}
-                            <line x1="10" y1="4" x2="10" y2="18" stroke={c} strokeWidth="1.8" strokeLinecap="round"/>
-                            {/* stubs to nodes */}
-                            <line x1="10" y1="7" x2="20" y2="7" stroke={c} strokeWidth="1.8" strokeLinecap="round"/>
-                            <line x1="10" y1="11" x2="20" y2="11" stroke={c} strokeWidth="1.8" strokeLinecap="round"/>
-                            <line x1="10" y1="15" x2="20" y2="15" stroke={c} strokeWidth="1.8" strokeLinecap="round"/>
-                            {/* mini node rects */}
-                            <rect x="20" y="4.5" width="10" height="5" rx="1.5" fill={c} opacity="0.18"/>
-                            <rect x="20" y="8.5" width="10" height="5" rx="1.5" fill={c} opacity="0.18"/>
-                            <rect x="20" y="12.5" width="10" height="5" rx="1.5" fill={c} opacity="0.18"/>
-                            {/* connector from left */}
-                            <line x1="2" y1="11" x2="10" y2="11" stroke={c} strokeWidth="1.8" strokeLinecap="round"/>
-                          </svg>
-                        ),
-                      },
-                      {
-                        value: 'straight' as LineStyle, label: 'Straight',
-                        icon: (c: string) => (
-                          <svg width="32" height="22" viewBox="0 0 32 22" fill="none">
-                            {/* root dot */}
-                            <circle cx="5" cy="11" r="2.5" fill={c}/>
-                            {/* straight lines to nodes */}
-                            <line x1="5" y1="11" x2="20" y2="5" stroke={c} strokeWidth="1.8" strokeLinecap="round"/>
-                            <line x1="5" y1="11" x2="20" y2="11" stroke={c} strokeWidth="1.8" strokeLinecap="round"/>
-                            <line x1="5" y1="11" x2="20" y2="17" stroke={c} strokeWidth="1.8" strokeLinecap="round"/>
-                            {/* mini node rects */}
-                            <rect x="20" y="2" width="10" height="5" rx="1.5" fill={c} opacity="0.18"/>
-                            <rect x="20" y="8.5" width="10" height="5" rx="1.5" fill={c} opacity="0.18"/>
-                            <rect x="20" y="14.5" width="10" height="5" rx="1.5" fill={c} opacity="0.18"/>
-                          </svg>
-                        ),
-                      },
-                      {
-                        value: 'orthogonal' as LineStyle, label: 'Square',
-                        icon: (c: string) => (
-                          <svg width="32" height="22" viewBox="0 0 32 22" fill="none">
-                            {/* root dot */}
-                            <circle cx="5" cy="11" r="2.5" fill={c}/>
-                            {/* horizontal from root */}
-                            <line x1="5" y1="11" x2="13" y2="11" stroke={c} strokeWidth="1.8" strokeLinecap="round"/>
-                            {/* vertical bar */}
-                            <line x1="13" y1="5" x2="13" y2="17" stroke={c} strokeWidth="1.8" strokeLinecap="square"/>
-                            {/* right-angle stubs */}
-                            <line x1="13" y1="5" x2="20" y2="5" stroke={c} strokeWidth="1.8" strokeLinecap="round"/>
-                            <line x1="13" y1="11" x2="20" y2="11" stroke={c} strokeWidth="1.8" strokeLinecap="round"/>
-                            <line x1="13" y1="17" x2="20" y2="17" stroke={c} strokeWidth="1.8" strokeLinecap="round"/>
-                            {/* mini node rects */}
-                            <rect x="20" y="2" width="10" height="5" rx="1.5" fill={c} opacity="0.18"/>
-                            <rect x="20" y="8.5" width="10" height="5" rx="1.5" fill={c} opacity="0.18"/>
-                            <rect x="20" y="14.5" width="10" height="5" rx="1.5" fill={c} opacity="0.18"/>
-                          </svg>
-                        ),
-                      },
-                    ]).map(({ value, label, icon }) => {
-                      const active = lineStyle === value
-                      const c = active ? '#3b82f6' : '#64748b'
-                      return (
-                        <button key={value} onClick={() => setLineStyle(value)}
-                          style={{
-                            flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
-                            gap: 5, padding: '8px 4px', borderRadius: 8, cursor: 'pointer',
-                            border: `1.5px solid ${active ? '#3b82f6' : '#e0e2e7'}`,
-                            background: active ? '#eff6ff' : '#fff', fontFamily: 'inherit',
-                          }}>
-                          {icon(c)}
-                          <span style={{ fontSize: 9, fontWeight: active ? 600 : 500, color: active ? '#3b82f6' : '#64748b' }}>{label}</span>
-                        </button>
-                      )
-                    })}
-                  </div>
+                  <LinePicker value={lineStyle} onChange={setLineStyle} />
                 </PRow>}
 
               </SBlock>}
@@ -575,40 +502,7 @@ export function SidePanel({ nodeId, onClose, onDelete, onUpdateTags }: SidePanel
             <>
               <HR />
               <SBlock title="Line">
-                <div style={{ display: 'flex', gap: 6 }}>
-                  {([
-                    { value: 'curved' as LineStyle,     label: 'Brace',    d: '' },
-                    { value: 'straight' as LineStyle,   label: 'Straight', d: 'M1,8 L15,2' },
-                    { value: 'orthogonal' as LineStyle, label: 'Square',   d: 'M1,8 L8,8 L8,2 L15,2' },
-                  ]).map(({ value, label, d }) => {
-                    const active = lineStyle === value
-                    const c = active ? '#3b82f6' : '#64748b'
-                    return (
-                      <button key={value} onClick={() => setLineStyle(value)}
-                        style={{
-                          flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
-                          gap: 5, padding: '8px 4px', borderRadius: 8, cursor: 'pointer',
-                          border: `1.5px solid ${active ? '#3b82f6' : '#e0e2e7'}`,
-                          background: active ? '#eff6ff' : '#fff', fontFamily: 'inherit',
-                        }}>
-                        {label === 'Brace' ? (
-                          <svg width="20" height="18" viewBox="0 0 22 20" fill="none" style={{ color: c }}>
-                            {/* a right-facing brace: the trunk enters at the cusp, 3 leaders fan out to the right */}
-                            <path d="M9 1.5 C6.5 1.5 6 3 6 5 L6 7.5 C6 9 5 10 3.5 10 C5 10 6 11 6 12.5 L6 15 C6 17 6.5 18.5 9 18.5" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
-                            <line x1="12" y1="3.5" x2="19" y2="3.5" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
-                            <line x1="12" y1="10" x2="19" y2="10" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
-                            <line x1="12" y1="16.5" x2="19" y2="16.5" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
-                          </svg>
-                        ) : (
-                          <svg width="16" height="10" viewBox="0 0 16 10" fill="none">
-                            <path d={d} stroke={c} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                          </svg>
-                        )}
-                        <span style={{ fontSize: 9, fontWeight: active ? 600 : 500, color: c }}>{label}</span>
-                      </button>
-                    )
-                  })}
-                </div>
+                <LinePicker value={lineStyle} onChange={setLineStyle} />
               </SBlock>
             </>
           )}
