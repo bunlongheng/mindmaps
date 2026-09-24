@@ -5,6 +5,7 @@ import { NodeIcon, getLucideIcon } from './NodeIcon'
 import { wrapText } from '../../lib/layout/mindmap'
 import { rootPillWidth, rootPillFontSize, rootTitleNeedsPill, rootCircleDiameter, rootDrawnWidth } from '../../lib/rootPill'
 import { hexToRgb, darken, depthFill } from '../../lib/color'
+import { shapeRx } from '../../lib/nodeShape'
 import { parseLinkedTitle, sliceSegments, lineRanges, type LinkSegment } from '../../lib/links'
 
 interface NodeProps {
@@ -120,10 +121,16 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   const isMindmapCircle = diagramType === 'mindmap' && node.depth === 1
   const isMindmapL2Plus = diagramType === 'mindmap' && node.depth >= 2
   const isFishbone = diagramType === 'fishbone'
+  // An explicit per-node shape overrides the diagram's own default geometry
+  // (fishbone parallelogram, mindmap L2 box). Absence keeps today's look.
+  const nodeShape = isRoot ? undefined : node.shape
+  const drawCircle = nodeShape === 'circle'
   const isFishboneNode = isFishbone && node.depth >= 1
   // Fishbone: detect if node is above or below the spine (Y=400) for parallelogram direction
   const fishboneAbove = isFishboneNode ? (node.y + node.height / 2) < 400 : false
-  const effectiveRx = isFishboneNode ? 0 : rx
+  const effectiveRx = isRoot ? rx
+    : nodeShape ? shapeRx(nodeShape, node.height, rx)
+    : isFishboneNode ? 0 : rx
   const previewW = (!isRoot && resizePreview?.depth === node.depth) ? resizePreview.width : null
 
   // Styling per depth
@@ -276,7 +283,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   // Root pill: always auto-size from title so it never relies on stale stored width.
   const autoPillW = isRootPill ? rootDrawnWidth(node, diagramType) : null
   // Mindmap L2+ circles: force width = height so it's always a circle
-  const circleW = isMindmapL2Plus ? Math.max(node.width, node.height) : null
+  const circleW = (isMindmapL2Plus || drawCircle) ? Math.max(node.width, node.height) : null
   const displayW = previewW ?? (autoPillW ?? circleW ?? node.width)
   // The title is stored raw (markdown and all); everything drawn and measured uses
   // the display text, so a box never sizes to characters nobody sees.
@@ -288,8 +295,11 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
     : parsedTitle.segments
   const hasLinks = labelSegments.some(s => !!s.url)
   // All coordinates are relative to (node.x, node.y)
+  // Circle-shaped nodes draw in a square box; the layout already sizes them square,
+  // this Math.max is only a guard so a stale stored box can never clip the circle.
+  const boxH = drawCircle ? Math.max(displayW, node.height) : node.height
   const cx = displayW / 2
-  const cy = node.height / 2
+  const cy = boxH / 2
   const r = displayW / 2
 
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
@@ -331,7 +341,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   }
 
   const clipId = `clip-${node.id}`
-  const hasBadge = (hasEmoji || hasIcon) && !isRoot && !isMindmapL2Plus
+  const hasBadge = (hasEmoji || hasIcon) && !isRoot && !isMindmapL2Plus && !drawCircle
   const editX = isRoot ? cx - r * 0.75 : hasBadge ? node.height : (align === 'left' ? 8 : 2)
   const editW = isRoot ? r * 1.5 : hasBadge ? displayW - node.height - 4 : displayW - editX - 2
 
@@ -344,7 +354,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
     {!isRoot && (
       <defs>
         <clipPath id={clipId}>
-          <rect x={0} y={0} width={displayW} height={node.height} rx={effectiveRx} ry={effectiveRx} />
+          <rect x={0} y={0} width={displayW} height={boxH} rx={effectiveRx} ry={effectiveRx} />
         </clipPath>
       </defs>
     )}
@@ -427,7 +437,16 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
               colors={l1Colors} count={Math.min(20, Math.max(10, l1Colors.length))} color={l1Colors[0]} />
           )}
         </>
-      ) : isMindmapL2Plus ? (
+      ) : drawCircle ? (
+        <>
+        <circle cx={cx} cy={cy} r={r} fill="transparent" />
+        <g style={{ pointerEvents: 'none' }}
+          filter="drop-shadow(0 1px 4px rgba(0,0,0,0.1))">
+          <circle cx={cx} cy={cy} r={r} fill={nodeFill} fillOpacity={bgOpacity} />
+          <circle cx={cx} cy={cy} r={r} fill="none" stroke={strokeColor} strokeWidth={strokeW} />
+        </g>
+        </>
+      ) : isMindmapL2Plus && !nodeShape ? (
         <>
         <rect x={0} y={0} width={displayW} height={node.height} fill="transparent" />
         <g style={{ pointerEvents: 'none' }}
@@ -440,7 +459,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
             fill="none" stroke={strokeColor} strokeWidth={strokeW * 2} />
         </g>
         </>
-      ) : isFishboneNode ? (() => {
+      ) : isFishboneNode && !nodeShape ? (() => {
         // Parallelogram: skew matches the bone direction
         const sk = node.height * 0.35  // skew amount
         const w = displayW, h = node.height
@@ -481,7 +500,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
           )}
           {/* Border ring — doubled stroke so clip cuts outer half, stays inset */}
           {(strokeW > 0 || previewW !== null) && (
-            <rect x={0} y={0} width={displayW} height={node.height} rx={rx} ry={rx}
+            <rect x={0} y={0} width={displayW} height={node.height} rx={effectiveRx} ry={effectiveRx}
               fill="none"
               stroke={previewW !== null ? '#3b82f6' : strokeColor}
               strokeWidth={(previewW !== null ? 3.5 : strokeW) * 2}
@@ -520,7 +539,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
         </foreignObject>
       ) : (
         <g clipPath={isRoot ? undefined : `url(#${clipId})`}>
-          {hasEmoji && resolvedEmoji && !isMindmapL2Plus && (() => {
+          {hasEmoji && resolvedEmoji && !isMindmapL2Plus && !drawCircle && (() => {
             const sq = node.height
             const emojiSize = Math.round(sq * 0.52)
             // For fishbone: shift icon center to account for parallelogram skew
@@ -547,7 +566,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
               </>
             )
           })()}
-          {hasIcon && resolvedIcon && !isMindmapL2Plus && (() => {
+          {hasIcon && resolvedIcon && !isMindmapL2Plus && !drawCircle && (() => {
             const sq = node.height  // white square = full node height
             const iconSize = Math.round(sq * 0.48)
             // For fishbone: center icon within the skewed badge area
@@ -570,8 +589,8 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
               </>
             )
           })()}
-          {((!hasIcon && !hasEmoji) || isRoot || isMindmapL2Plus) && (() => {
-            if (isMindmapL2Plus) {
+          {((!hasIcon && !hasEmoji) || isRoot || isMindmapL2Plus || drawCircle) && (() => {
+            if (isMindmapL2Plus || drawCircle) {
               const maxChars = Math.max(8, Math.ceil(Math.sqrt(label.length * 1.8)))
               const lines = wrapText(label, maxChars)
               const ranges = lineRanges(label, lines)
@@ -581,7 +600,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
               const iconGap = 4
               const textBlockH = lines.length * lineH
               const totalH = hasVisual ? iconSize + iconGap + textBlockH : textBlockH
-              const groupCY = node.height / 2
+              const groupCY = boxH / 2
               // Icon sits above text, both centered as a group
               const iconY = groupCY - totalH / 2
               const firstLineY = hasVisual
@@ -697,7 +716,17 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
               style={{ pointerEvents: 'none' }} />
           </>
         )
-      ) : isFishboneNode ? (() => {
+      ) : drawCircle ? (
+        <>
+          <circle cx={cx} cy={cy} r={r + 5}
+            fill="none" stroke="rgba(59,130,246,0.18)" strokeWidth={6}
+            style={{ pointerEvents: 'none' }} />
+          <circle cx={cx} cy={cy} r={r + 3}
+            fill="none" stroke="#3b82f6" strokeWidth={3.5}
+            filter="drop-shadow(0 0 8px rgba(59,130,246,0.7))"
+            style={{ pointerEvents: 'none' }} />
+        </>
+      ) : isFishboneNode && !nodeShape ? (() => {
         const sk = node.height * 0.35
         const w = displayW, h = node.height
         const pad1 = 5, pad2 = 2
@@ -722,13 +751,13 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
           <rect
             x={-5} y={-5}
             width={displayW + 10} height={node.height + 10}
-            rx={rx + 4} ry={rx + 4}
+            rx={effectiveRx + 4} ry={effectiveRx + 4}
             fill="none" stroke="rgba(59,130,246,0.18)" strokeWidth={6}
             style={{ pointerEvents: 'none' }} />
           <rect
             x={-2} y={-2}
             width={displayW + 4} height={node.height + 4}
-            rx={rx + 2} ry={rx + 2}
+            rx={effectiveRx + 2} ry={effectiveRx + 2}
             fill="none" stroke="#3b82f6" strokeWidth={3.5}
             filter="drop-shadow(0 0 8px rgba(59,130,246,0.7))"
             style={{ pointerEvents: 'none' }} />

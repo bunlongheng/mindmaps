@@ -17,6 +17,7 @@ import { computeTimelineLayout } from './layout/timeline.js'
 import { getTheme } from './themes.js'
 import { L1_PALETTE, hexToRgb, darken, depthFill, applyDepthTransparency } from './color.js'
 import { rootPillWidth, rootPillFontSize, rootTitleNeedsPill } from './rootPill.js'
+import { shapeRx } from './nodeShape.js'
 import { parseLinkedTitle, sliceSegments, lineRanges, type LinkSegment } from './links.js'
 import { nodeCenter, nodeCenterLeft, nodeCenterRight, buildStraightPath, buildCurvedPath, buildOrthogonalPath } from './geometry.js'
 
@@ -51,12 +52,13 @@ function isLight(hex: string): boolean {
 function normalizeWidthsPerDepth(nodes: MindmapNode[], type: DiagramType): MindmapNode[] {
   const maxByDepth = new Map<number, number>()
   for (const n of nodes) {
-    if (n.depth > 0 && !(type === 'mindmap' && n.depth >= 2)) {
+    if (n.depth > 0 && n.shape !== 'circle' && !(type === 'mindmap' && n.depth >= 2)) {
       maxByDepth.set(n.depth, Math.max(maxByDepth.get(n.depth) ?? 0, n.width))
     }
   }
   return nodes.map(n => {
     if (n.depth <= 0) return n
+    if (n.shape === 'circle') return n   // circle-shaped nodes keep their own square
     if (type === 'mindmap' && n.depth >= 2) return n
     return { ...n, width: maxByDepth.get(n.depth) ?? n.width }
   })
@@ -330,7 +332,13 @@ function renderNode(node: MindmapNode, type: DiagramType, paletteColor: string |
   const isFishboneNode = type === 'fishbone' && node.depth >= 1
   const col = (isRoot ? null : paletteColor) ?? node.color
   const rx = isRoot ? 4 : 3
-  const effectiveRx = isFishboneNode ? 0 : rx
+  // An explicit per-node shape overrides the diagram's own default geometry, exactly
+  // as it does on the canvas (Node.tsx), so a card preview matches the opened map.
+  const nodeShape = isRoot ? undefined : node.shape
+  const drawCircle = nodeShape === 'circle'
+  const effectiveRx = isRoot ? rx
+    : nodeShape ? shapeRx(nodeShape, node.height, rx)
+    : isFishboneNode ? 0 : rx
 
   const isRootPill = isRoot && type !== 'mindmap' && (
     node.shape === 'pill' ? true :
@@ -366,9 +374,10 @@ function renderNode(node: MindmapNode, type: DiagramType, paletteColor: string |
   const hasEmoji = !isRoot && !!node.emoji
   const hasIcon = !isRoot && !hasEmoji && !!node.icon
   const displayW = isRootPill ? rootPillWidth(node.title, baseFontSize)
-    : isMindmapL2Plus ? Math.max(node.width, node.height)
+    : (isMindmapL2Plus || drawCircle) ? Math.max(node.width, node.height)
     : node.width
-  const h = node.height
+  // Circle-shaped nodes draw in a square box; the layout already sizes them square.
+  const h = drawCircle ? Math.max(displayW, node.height) : node.height
   const cx = displayW / 2
   const cy = h / 2
   const parsedTitle = parseLinkedTitle(node.title)
@@ -385,7 +394,11 @@ function renderNode(node: MindmapNode, type: DiagramType, paletteColor: string |
     } else {
       parts.push(`<circle cx="${r2(cx)}" cy="${r2(cy)}" r="${r2(displayW / 2)}" fill="${esc(bg)}" fill-opacity="0.8" stroke="${esc(strokeColor)}" stroke-width="${strokeW}"/>`)
     }
-  } else if (isFishboneNode) {
+  } else if (drawCircle) {
+    const cr = displayW / 2
+    parts.push(`<circle cx="${r2(cx)}" cy="${r2(cy)}" r="${r2(cr)}" fill="${esc(bg)}"/>`)
+    parts.push(`<circle cx="${r2(cx)}" cy="${r2(cy)}" r="${r2(cr)}" fill="none" stroke="${esc(strokeColor)}" stroke-width="${strokeW}"/>`)
+  } else if (isFishboneNode && !nodeShape) {
     // Parallelogram skewed toward the spine (SPINE_Y = 400 in the fishbone layout)
     const sk = h * 0.35
     const above = node.y + h / 2 < 400
@@ -411,7 +424,7 @@ function renderNode(node: MindmapNode, type: DiagramType, paletteColor: string |
 
   // ── Label + badge ──
   const skOff = isFishboneNode ? (h * 0.35) / 2 : 0
-  if (isMindmapL2Plus || (isRoot && type === 'mindmap')) {
+  if (isMindmapL2Plus || drawCircle || (isRoot && type === 'mindmap')) {
     parts.push(centeredWrappedText(label, parsedTitle.segments, cx, cy, fontSize, fontWeight, textColor))
   } else if (hasEmoji) {
     const emojiSize = Math.round(h * 0.52)

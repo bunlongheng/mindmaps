@@ -39,6 +39,29 @@ describe('renderMindmapSvg smoke', () => {
     expect(d2).not.toBe(depthFill(L1_PALETTE[0], 3))
   })
 
+  it('emits the matching primitive for every box shape', () => {
+    // Shape every non-root node so the default radius can't mask the result.
+    const shaped = (shape: 'rect' | 'rounded' | 'pill' | 'circle') => {
+      const nodes = mkNodes().map(n => (n.depth > 0 ? { ...n, shape } : n))
+      return renderMindmapSvg({ id: 'x', name: 'M', type: 'logic-chart', line_style: 'orthogonal', theme_id: 'default', nodes: nodes as never })
+    }
+    const radii = (svg: string) => [...svg.matchAll(/rx="([\d.]+)"/g)].map(m => Number(m[1]))
+
+    // rect squares every non-root corner; the default radius 3 is gone
+    expect(radii(shaped('rect'))).not.toContain(3)
+    // rounded is today's look, radius 3
+    expect(radii(shaped('rounded'))).toContain(3)
+    // pill fully rounds the ends: radius is half the box height, never 3
+    const pillRadii = radii(shaped('pill'))
+    expect(pillRadii).not.toContain(3)
+    expect(pillRadii.some(v => v >= 15)).toBe(true)
+    // circle draws real <circle> elements, wide enough for the label
+    const circleSvg = shaped('circle')
+    const circleR = [...circleSvg.matchAll(/<circle [^>]*r="([\d.]+)"/g)].map(m => Number(m[1]))
+    expect(circleR.filter(v => v > 40).length).toBeGreaterThanOrEqual(3)
+    expect(radii(circleSvg)).not.toContain(3)
+  })
+
   it('renders curved logic-chart + JSON-string nodes + empty map', () => {
     const svg = renderMindmapSvg({ id: 'x', name: 'T', type: 'logic-chart', line_style: 'curved', theme_id: 'retro', nodes: JSON.stringify(mkNodes()) })
     expect(svg).toContain('<path')

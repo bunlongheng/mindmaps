@@ -172,6 +172,38 @@ describe('Node — rendering by depth / type', () => {
     expect(container.querySelector('[data-node-id="n4"]')).toBeTruthy()
   })
 
+  it('draws the right primitive for each box shape', () => {
+    // rect squares the corners, rounded keeps today's radius, pill fully rounds the
+    // ends, circle becomes a real <circle> sized to fit the label.
+    // The clip box carries the node's corner radius (the fill rect is clipped by it)
+    const boxRx = (c: HTMLElement) => c.querySelector('clipPath rect')!.getAttribute('rx')
+
+    const rect = makeNode({ id: 'sr', shape: 'rect' })
+    loadStore([makeRoot(), rect])
+    expect(boxRx(renderNode(rect).container)).toBe('0')
+    cleanup()
+
+    const rounded = makeNode({ id: 'sd', shape: 'rounded' })
+    loadStore([makeRoot(), rounded])
+    expect(boxRx(renderNode(rounded).container)).toBe('3')
+    cleanup()
+
+    const pill = makeNode({ id: 'sp', shape: 'pill', height: 40 })
+    loadStore([makeRoot(), pill])
+    expect(boxRx(renderNode(pill).container)).toBe('20')
+    cleanup()
+
+    const circle = makeNode({ id: 'sc', shape: 'circle' })
+    loadStore([makeRoot(), circle])
+    const { container } = renderNode(circle)
+    const circles = Array.from(container.querySelectorAll('circle'))
+    expect(circles.length).toBeGreaterThan(0)
+    // The drawn circle must be wide enough for the label it holds
+    const drawn = useMindmapStore.getState().activeMindmap!.nodes.find(n => n.id === 'sc')!
+    expect(drawn.width).toBe(drawn.height)
+    expect(Number(circles[0].getAttribute('r'))).toBeGreaterThanOrEqual(drawn.width / 2)
+  })
+
   it('handles a non-hex color (falls back to default fill)', () => {
     const l2 = makeNode({ id: 'n2', depth: 2, parentId: 'n1', color: 'red' })
     loadStore([makeRoot(), makeNode(), l2])

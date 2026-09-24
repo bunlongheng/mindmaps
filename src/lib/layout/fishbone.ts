@@ -1,5 +1,6 @@
 import type { MindmapNode } from '../../types/index.js'
 import { displayTitle } from '../links.js'
+import { shapedNodeSize } from '../nodeShape.js'
 
 export const FISHBONE_SLANT = 90
 
@@ -113,12 +114,12 @@ export function computeFishboneLayout(nodes: MindmapNode[]): MindmapNode[] {
 
     const l1CX = attachX + FISHBONE_SLANT
     const l1CY = above ? SPINE_Y - boneHeight : SPINE_Y + boneHeight
-    const l1w = autoW(l1.title, 1, !!(l1.icon || l1.emoji), !!l1.bold)
+    const { w: l1w, h: l1h } = shapedNodeSize(l1, 22, autoW(l1.title, 1, !!(l1.icon || l1.emoji), !!l1.bold), L1_H)
 
     result.push({
       ...l1,
-      x: l1CX - l1w / 2, y: l1CY - L1_H / 2,
-      width: l1w, height: L1_H, manuallyPositioned: false,
+      x: l1CX - l1w / 2, y: l1CY - l1h / 2,
+      width: l1w, height: l1h, manuallyPositioned: false,
     })
 
     // Effective bone length is from spine to the NEAR EDGE of L1 box
@@ -131,8 +132,7 @@ export function computeFishboneLayout(nodes: MindmapNode[]): MindmapNode[] {
       const diagX = attachX + FISHBONE_SLANT * t
       const diagY = SPINE_Y + (above ? -1 : 1) * boneEdgeH * t
 
-      const l2w = autoW(l2.title, 2, !!(l2.icon || l2.emoji), !!l2.bold)
-      const l2h = L2_H
+      const { w: l2w, h: l2h } = shapedNodeSize(l2, 16, autoW(l2.title, 2, !!(l2.icon || l2.emoji), !!l2.bold), L2_H)
       const l2X = diagX + 28
       const l2Y = diagY - l2h / 2
 
@@ -143,8 +143,7 @@ export function computeFishboneLayout(nodes: MindmapNode[]): MindmapNode[] {
         .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
       const l3dir = above ? -1 : 1  // stack further from spine
       l3s.forEach((l3, k) => {
-        const l3w = autoW(l3.title, 3, !!(l3.icon || l3.emoji), !!l3.bold)
-        const l3h = L3_H
+        const { w: l3w, h: l3h } = shapedNodeSize(l3, 13, autoW(l3.title, 3, !!(l3.icon || l3.emoji), !!l3.bold), L3_H)
         result.push({
           ...l3,
           x: l2X + l2w + 16,
