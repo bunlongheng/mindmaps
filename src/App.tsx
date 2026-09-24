@@ -663,7 +663,7 @@ export default function App() {
                   color: copiedSvg ? '#16a34a' : '#64748b', fontFamily: 'inherit',
                   display: 'flex', alignItems: 'center', gap: 4,
                 }}>
-                {copiedSvg ? <Check size={11} /> : <Copy size={11} />} {copiedSvg ? 'Copied' : 'SVG'}
+                {copiedSvg ? <Check size={11} /> : <Copy size={11} />} {copiedSvg ? 'Copied' : 'Copy SVG'}
               </button>
 <button onClick={() => setShowDeleteConfirm(true)} title="Delete map" style={{
                 height: 22, padding: '0 8px', border: '1px solid #fecaca', borderRadius: 6,
