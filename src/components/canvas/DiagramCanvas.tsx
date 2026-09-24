@@ -7,40 +7,13 @@ import { Node } from './Node'
 import { useKeyboard } from '../../hooks/useKeyboard'
 import { soundClick } from '../../lib/sounds'
 import { L1_PALETTE } from '../../lib/color'
+import { computeSubtreeCounts } from '../../lib/nodeCounts'
 
 interface DiagramCanvasProps {
   onNodeSelect: (nodeId: string | null) => void
   readOnly?: boolean
   noInteract?: boolean
   onDelete?: () => void
-}
-
-// Direct-child and total-descendant counts for every node in one O(n) pass, so Node no
-// longer runs an O(n)/O(n^2) store selector each (which re-ran for every node on every change).
-function computeSubtreeCounts(nodes: { id: string; parentId: string | null }[]) {
-  const children = new Map<string, string[]>()
-  for (const n of nodes) {
-    if (n.parentId) {
-      const arr = children.get(n.parentId)
-      if (arr) arr.push(n.id); else children.set(n.parentId, [n.id])
-    }
-  }
-  const childCounts = new Map<string, number>()
-  const descendantCounts = new Map<string, number>()
-  const descOf = (id: string): number => {
-    const cached = descendantCounts.get(id)
-    if (cached !== undefined) return cached
-    const kids = children.get(id) ?? []
-    let total = kids.length
-    for (const k of kids) total += descOf(k)
-    descendantCounts.set(id, total)
-    return total
-  }
-  for (const n of nodes) {
-    childCounts.set(n.id, (children.get(n.id) ?? []).length)
-    descOf(n.id)
-  }
-  return { childCounts, descendantCounts }
 }
 
 // Resolve every node's 12-colour-wheel palette colour in one O(n) pass, so Node and

@@ -13,7 +13,8 @@ import { decodeShareURL } from './lib/export/share'
 import { hasGoogleAuth, renderGoogleButton } from './lib/googleAuth'
 import { readSession, saveSession, clearSession, SESSION_EXPIRED } from './lib/session'
 import { emberVanish, damageFlash } from './lib/emberVanish'
-import { ArrowLeft, SlidersHorizontal, Tag, X, FileDown, Trash2, Copy, Check, Network, Share2, Sparkles, GitBranch, Lightbulb, Workflow, ListTree, Waypoints, Image as ImageIcon } from 'lucide-react'
+import { levelCounts } from './lib/nodeCounts'
+import { ArrowLeft, SlidersHorizontal, Tag, X, FileDown, Trash2, Copy, Check, Info, Network, Share2, Sparkles, GitBranch, Lightbulb, Workflow, ListTree, Waypoints, Image as ImageIcon } from 'lucide-react'
 import { Confetti } from './components/Confetti'
 import { MindmapsLogo } from './components/MindmapsLogo'
 
@@ -167,6 +168,8 @@ export default function App() {
   const [showTagFooter, setShowTagFooter] = useState(false)
   const [tagInput, setTagInput] = useState('')
   const tagFooterRef = useRef<HTMLDivElement>(null)
+  const [showMapInfo, setShowMapInfo] = useState(false)
+  const mapInfoRef = useRef<HTMLDivElement>(null)
 
   const tagColorMap = useMemo(() => {
     const all = [...new Set([...PRESET_TAGS, ...diagrams.flatMap(d => d.tags ?? [])])]
@@ -182,6 +185,25 @@ export default function App() {
     document.addEventListener('mousedown', onDown, true)
     return () => document.removeEventListener('mousedown', onDown, true)
   }, [showTagFooter])
+
+  // Close map-info popover on outside click or Escape
+  useEffect(() => {
+    if (!showMapInfo) return
+    function onDown(e: MouseEvent) {
+      if (mapInfoRef.current && !mapInfoRef.current.contains(e.target as Node)) setShowMapInfo(false)
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setShowMapInfo(false)
+    }
+    document.addEventListener('mousedown', onDown, true)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDown, true)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [showMapInfo])
+
+  const mapInfo = useMemo(() => levelCounts(activeMindmap?.nodes ?? []), [activeMindmap?.nodes])
   const [diagramLoading, setDiagramLoading] = useState(() => !!(getMapParam() || getShareParam()))
   const [view, setView] = useState<View>(() => {
     if (decodeShareURL()) return 'viewer'
@@ -661,6 +683,47 @@ export default function App() {
                 }}>
                 {copiedSvg ? <Check size={11} /> : <Copy size={11} />} {copiedSvg ? 'Copied' : 'Copy SVG'}
               </button>
+              <div ref={mapInfoRef} style={{ position: 'relative' }}>
+                <button onClick={() => setShowMapInfo(p => !p)} title="Map info" style={{
+                  height: 22, padding: '0 8px', borderRadius: 6,
+                  border: `1px solid ${showMapInfo ? '#c7d2fe' : '#e2e8f0'}`,
+                  background: 'transparent', cursor: 'pointer', fontSize: 11, fontWeight: 500,
+                  color: showMapInfo ? '#4f46e5' : '#64748b', fontFamily: 'inherit',
+                  display: 'flex', alignItems: 'center', gap: 4,
+                }}>
+                  <Info size={11} />
+                </button>
+                {showMapInfo && (
+                  <div style={{
+                    position: 'absolute', bottom: '100%', left: '50%', transform: 'translateX(-50%)', marginBottom: 6,
+                    background: '#fff', borderRadius: 12, padding: 12,
+                    boxShadow: '0 -4px 24px rgba(0,0,0,0.12), 0 0 0 1px #e2e8f0',
+                    fontFamily: 'inherit', minWidth: 170, whiteSpace: 'nowrap',
+                  }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                      <tbody>
+                        {mapInfo.byDepth.map((count, depth) => (
+                          <tr key={depth}>
+                            <td style={{ padding: '2px 10px 2px 0', color: '#64748b', fontWeight: 500 }}>
+                              {depth === 0 ? 'Root' : `L${depth}`}
+                            </td>
+                            <td style={{ padding: '2px 0', color: '#1e293b', fontWeight: 600, textAlign: 'right' }}>{count}</td>
+                          </tr>
+                        ))}
+                        <tr>
+                          <td style={{ padding: '4px 10px 0 0', borderTop: '1px solid #e2e8f0', color: '#64748b', fontWeight: 600 }}>Total</td>
+                          <td style={{ padding: '4px 0 0', borderTop: '1px solid #e2e8f0', color: '#1e293b', fontWeight: 700, textAlign: 'right' }}>{mapInfo.total}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                    {mapInfo.largestBranch && (
+                      <div style={{ marginTop: 8, fontSize: 10, color: '#94a3b8' }}>
+                        Deepest: L{mapInfo.deepest}. Largest branch: {mapInfo.largestBranch.title}, {mapInfo.largestBranch.count} nodes.
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
 <button onClick={() => setShowDeleteConfirm(true)} title="Delete map" style={{
                 height: 22, padding: '0 8px', border: '1px solid #fecaca', borderRadius: 6,
                 background: 'transparent', cursor: 'pointer', fontSize: 11, fontWeight: 500,

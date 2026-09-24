@@ -409,6 +409,31 @@ describe('App — editor view, panel, footer', () => {
     fireEvent.mouseDown(document.body)
     await waitFor(() => expect(screen.queryByPlaceholderText(/Custom tag/)).toBeNull())
   })
+
+  it('renders the map info button and shows per-level counts on click', async () => {
+    renderEditor()
+    render(<App />)
+    await waitFor(() => expect(screen.getByTestId('canvas')).toBeInTheDocument())
+    const infoButton = screen.getByTitle('Map info')
+    expect(infoButton).toBeInTheDocument()
+    fireEvent.click(infoButton)
+    // makeDiagram(): root (depth 0) + 1 L1 node => Root 1, L1 1, Total 2
+    expect(screen.getByText('Root')).toBeInTheDocument()
+    expect(screen.getByText('L1')).toBeInTheDocument()
+    expect(screen.getByText('Total')).toBeInTheDocument()
+    const rows = screen.getByText('Total').closest('tr')
+    expect(rows?.textContent).toContain('2')
+  })
+
+  it('closes the map info popover on Escape', async () => {
+    renderEditor()
+    render(<App />)
+    await waitFor(() => expect(screen.getByTestId('canvas')).toBeInTheDocument())
+    fireEvent.click(screen.getByTitle('Map info'))
+    expect(screen.getByText('Total')).toBeInTheDocument()
+    fireEvent.keyDown(document, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByText('Total')).toBeNull())
+  })
 })
 
 describe('App — delete confirm modal', () => {

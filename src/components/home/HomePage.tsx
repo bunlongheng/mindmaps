@@ -852,6 +852,25 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
   )
 }
 
+// ── CachedNodeCount ───────────────────────────────────────────────────────
+// Small standalone "N nodes" badge for the home grid card. Reads only the cached
+// localStorage snapshot (no network call), so it renders nothing when uncached.
+function CachedNodeCount({ id }: { id: string }) {
+  const [count, setCount] = useState<number | null>(null)
+  useEffect(() => {
+    try {
+      const data = JSON.parse(
+        localStorage.getItem(`mindmaps:diagram:${id}`) ?? localStorage.getItem(`mindmaps:thumb:${id}`) ?? 'null',
+      )
+      setCount(data?.nodes?.length ?? null)
+    } catch {
+      setCount(null)
+    }
+  }, [id])
+  if (count === null) return null
+  return <div style={{ fontSize: 10, color: '#94a3b8', flexShrink: 0 }}>{count} nodes</div>
+}
+
 // ── DiagramMinimap ─────────────────────────────────────────────────────────
 
 /** Extract a YouTube video id from a watch/share/embed/shorts URL, else null */
@@ -1159,6 +1178,7 @@ function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isPublic, tags, tagCo
             {diagram.name}
           </div>
           {isPublic && <Globe size={11} color="#6366f1" style={{ flexShrink: 0 }} />}
+          <CachedNodeCount id={diagram.id} />
           <div style={{ fontSize: 10, color: '#94a3b8', flexShrink: 0 }}>{timeAgo}</div>
         </div>
         {currentTags.length > 0 && (
