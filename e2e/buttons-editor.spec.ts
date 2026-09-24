@@ -105,7 +105,7 @@ test.describe('Editor chrome — App.tsx', () => {
     await page.click('[title="Settings"]')
     await page.getByRole('button', { name: 'Share', exact: true }).click()
     await page.getByRole('button', { name: 'Copy SVG', exact: true }).click()
-    await expect(page.getByText('SVG copied!', { exact: true })).toBeVisible({ timeout: 20_000 })
+    await expect(page.getByRole('button', { name: 'SVG copied!' })).toBeVisible({ timeout: 20_000 })
     const svg = await page.evaluate(() => navigator.clipboard.readText())
     expect(svg).toContain('<svg')
     expect(svg).toContain('xmlns="http://www.w3.org/2000/svg"')
@@ -158,4 +158,25 @@ test.describe('Editor chrome — App.tsx', () => {
     await expect(page.getByRole('heading', { name: 'Delete map?' })).toHaveCount(0)
     await expect(page.locator('.diagram-canvas-root')).toBeVisible()
   })
+  test('screen takes a red hit then the canvas comes apart, from the Settings panel delete', async ({ page }) => {
+    await createMap(page)
+    await page.locator('[title="Settings"]').click()
+    await page.getByRole('button', { name: 'Share' }).click()
+    await page.locator('[title="Delete map"]').first().click()
+    await expect(page.getByText('Delete map?')).toBeVisible({ timeout: 5000 })
+    await page.locator('button').filter({ hasText: /^Delete$/ }).last().click()
+    await page.waitForTimeout(120)
+    const hit = await page.evaluate(() => {
+      const skins = Array.from(document.querySelectorAll('div[aria-hidden="true"]')) as HTMLElement[]
+      const skin = skins.find(s => s.style.background.includes('radial-gradient'))
+      if (!skin) return null
+      return { opacity: getComputedStyle(skin).opacity, red: skin.style.background.includes('239,68,68') }
+    })
+    expect(hit).not.toBeNull()
+    expect(Number(hit!.opacity)).toBeGreaterThan(0)
+    await page.waitForTimeout(500)
+    const specks = await page.evaluate(() => document.querySelectorAll('div[aria-hidden="true"] i').length)
+    expect(specks).toBeGreaterThan(50)
+  })
+
 })

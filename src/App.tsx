@@ -138,6 +138,17 @@ export default function App() {
   // Triple-locked: only when (1) isLocal, (2) no real session, (3) env var is set.
   const effectiveUserId = user?.userId ?? null
   const { loadDiagramList, loadDiagram, saveDiagram, createDiagramFromNodes, deleteDiagram, updateTags } = useDiagram(effectiveUserId)
+  // You took the hit: the screen flashes red, then the map on screen comes apart
+  // before we drop back to the library. Every delete path goes through here so the
+  // Settings panel and the confirm modal behave the same.
+  const animatedDelete = (id: string, name: string) => {
+    const wait = damageFlash()
+    const go = () => {
+      emberVanish(document.querySelector('.diagram-canvas-root'))
+      deleteDiagram(id, name).finally(() => handleBack())
+    }
+    if (wait) setTimeout(go, wait); else go()
+  }
 
   // Realtime removed — data now on Linode PostgreSQL
   // Shallow-selected slice so App only re-renders when one of these actually changes,
@@ -495,13 +506,7 @@ export default function App() {
         <SidePanel
           nodeId={selectedPanelNodeId}
           onClose={() => { setSelectedPanelNodeId(null); setSelectedNodeIds([]); setShowPanel(false) }}
-          onDelete={activeMindmap ? () => {
-            const name = activeMindmap.name
-            deleteDiagram(activeMindmap.id, name).then(() => {
-              handleBack()
-              setTimeout(() => showToast(`"${name}" deleted`, { color: '#ef4444' }), 50)
-            })
-          } : undefined}
+          onDelete={activeMindmap ? () => animatedDelete(activeMindmap.id, activeMindmap.name) : undefined}
           onUpdateTags={updateTags}
         />
       )}
@@ -529,18 +534,7 @@ export default function App() {
               }}>Cancel</button>
               <button onClick={() => {
                 setShowDeleteConfirm(false)
-                if (activeMindmap) {
-                  const id = activeMindmap.id
-                  const name = activeMindmap.name
-                  // You took the hit: the screen flashes red, then the map on
-                  // screen comes apart before we drop back to the library.
-                  const wait = damageFlash()
-                  const go = () => {
-                    emberVanish(document.querySelector('.diagram-canvas-root'))
-                    deleteDiagram(id, name).finally(() => handleBack())
-                  }
-                  if (wait) setTimeout(go, wait); else go()
-                }
+                if (activeMindmap) animatedDelete(activeMindmap.id, activeMindmap.name)
               }} style={{
                 padding: '8px 18px', background: '#ef4444', color: '#fff',
                 border: 'none', borderRadius: 9, cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',

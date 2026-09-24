@@ -59,7 +59,7 @@ test.describe('Canvas Pan', () => {
     expect(after.ty).not.toBe(before.ty)
   })
 
-  test('space + drag pans canvas', async ({ page }) => {
+  test('middle-button drag pans canvas', async ({ page }) => {
     const g = page.locator('.diagram-canvas-root svg > g')
     const before = parseTransform(await g.getAttribute('transform'))
     const svg = page.locator('.diagram-canvas-root svg')
@@ -67,13 +67,10 @@ test.describe('Canvas Pan', () => {
     if (!box) return
     const cx = box.x + box.width / 2
     const cy = box.y + box.height / 2
-    // Hold space and drag
-    await page.keyboard.down('Space')
     await page.mouse.move(cx, cy)
-    await page.mouse.down()
+    await page.mouse.down({ button: 'middle' })
     await page.mouse.move(cx + 150, cy + 100, { steps: 5 })
-    await page.mouse.up()
-    await page.keyboard.up('Space')
+    await page.mouse.up({ button: 'middle' })
     await page.waitForTimeout(300)
     const after = parseTransform(await g.getAttribute('transform'))
     expect(after.tx).toBeGreaterThan(before.tx)
