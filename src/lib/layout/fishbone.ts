@@ -83,6 +83,12 @@ export function autoW(title: string, depth: number, hasIcon: boolean, bold = fal
   const w = nodeWidth(measured, depth, { hasIcon, height, extra: slant })
   return Math.max(nodeMinWidth(depth), Math.min(MAX_AUTO_W, w))
 }
+
+/** A manual node keeps the width the user dragged; everyone else auto-sizes from title. */
+function boxW(node: MindmapNode, depth: number, hasIcon: boolean, bold: boolean): number {
+  if (node.widthMode === 'manual' && node.width > 0) return node.width
+  return autoW(node.title, depth, hasIcon, bold)
+}
 const SPINE_SEG = 340         // horizontal gap between L1 attachment points
 const BONE_HEIGHT_BASE = 260  // minimum vertical distance from spine to L1 tip
 const L2_GAP = 24             // minimum vertical gap between reserved L2 slots on the diagonal
@@ -95,10 +101,10 @@ const L3_GAP = 12             // vertical gap between stacked L3 boxes
  * hung off each one).
  */
 function l2Slot(l2: MindmapNode, nodes: MindmapNode[]) {
-  const { w: l2w, h: l2h } = shapedNodeSize(l2, nodeFontSize(2), autoW(l2.title, 2, !!(l2.icon || l2.emoji), !!l2.bold), boxH(2))
+  const { w: l2w, h: l2h } = shapedNodeSize(l2, nodeFontSize(2), boxW(l2, 2, !!(l2.icon || l2.emoji), !!l2.bold), boxH(2))
   const l3s = nodes.filter(n => n.parentId === l2.id)
     .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
-  const l3Sizes = l3s.map(l3 => shapedNodeSize(l3, nodeFontSize(3), autoW(l3.title, 3, !!(l3.icon || l3.emoji), !!l3.bold), boxH(3)))
+  const l3Sizes = l3s.map(l3 => shapedNodeSize(l3, nodeFontSize(3), boxW(l3, 3, !!(l3.icon || l3.emoji), !!l3.bold), boxH(3)))
   const l3Total = l3Sizes.reduce((sum, sz) => sum + sz.h, 0) + Math.max(0, l3s.length - 1) * L3_GAP
   return { l2w, l2h, l3s, l3Sizes, l3Total, slotH: Math.max(l2h, l3Total) }
 }
@@ -137,7 +143,7 @@ export function computeFishboneLayout(nodes: MindmapNode[]): MindmapNode[] {
     const boneHeight = boneEdgeH + boxH(1) / 2
     const l1CX = attachX + FISHBONE_SLANT
     const l1CY = above ? SPINE_Y - boneHeight : SPINE_Y + boneHeight
-    const { w: l1w, h: l1h } = shapedNodeSize(l1, nodeFontSize(1), autoW(l1.title, 1, !!(l1.icon || l1.emoji), !!l1.bold), boxH(1))
+    const { w: l1w, h: l1h } = shapedNodeSize(l1, nodeFontSize(1), boxW(l1, 1, !!(l1.icon || l1.emoji), !!l1.bold), boxH(1))
 
     result.push({
       ...l1,

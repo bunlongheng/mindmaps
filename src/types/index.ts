@@ -12,6 +12,8 @@ export interface MindmapNode {
   y: number
   width: number
   height: number
+  widthMode?: 'auto' | 'manual'  // absent/'auto' = width fits the longest label at this depth;
+                                  // 'manual' = width was dragged by hand and keeps its own value
   manuallyPositioned?: boolean
   sortOrder?: number
   fontSize?: number

@@ -17,16 +17,22 @@ function autoWidth(title: string, depth: number, hasIconOrEmoji: boolean): numbe
   })
 }
 
+/** A manual node keeps the width the user dragged; everyone else auto-sizes from title. */
+function boxWidth(node: MindmapNode, depth: number, hasIconOrEmoji: boolean): number {
+  if (node.widthMode === 'manual' && node.width > 0) return node.width
+  return autoWidth(node.title, depth, hasIconOrEmoji)
+}
+
 /**
  * An L2 and its L3 children run as one continuous block away from the spine (L2 box,
  * then its L3s stacked past it). Reserving the whole block's height, not just the L2's
  * own height, is what keeps the next L2 on the branch from landing on top of these L3s.
  */
 function l2Block(l2: MindmapNode, nodes: MindmapNode[]) {
-  const { w: l2w, h: l2h } = shapedNodeSize(l2, nodeFontSize(2), autoWidth(l2.title, 2, !!(l2.icon || l2.emoji)), l2.height > 0 ? l2.height : nodeHeight(2))
+  const { w: l2w, h: l2h } = shapedNodeSize(l2, nodeFontSize(2), boxWidth(l2, 2, !!(l2.icon || l2.emoji)), l2.height > 0 ? l2.height : nodeHeight(2))
   const l3s = nodes.filter(n => n.parentId === l2.id)
     .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
-  const l3Sizes = l3s.map(l3 => shapedNodeSize(l3, nodeFontSize(3), autoWidth(l3.title, 3, !!(l3.icon || l3.emoji)), l3.height > 0 ? l3.height : nodeHeight(3)))
+  const l3Sizes = l3s.map(l3 => shapedNodeSize(l3, nodeFontSize(3), boxWidth(l3, 3, !!(l3.icon || l3.emoji)), l3.height > 0 ? l3.height : nodeHeight(3)))
   const l3Total = l3Sizes.reduce((sum, sz) => sum + sz.h, 0) + Math.max(0, l3s.length - 1) * V_GAP
   const blockH = l2h + (l3s.length > 0 ? V_GAP + l3Total : 0)
   return { l2w, l2h, l3s, l3Sizes, blockH }
@@ -48,8 +54,9 @@ export function computeTimelineLayout(nodes: MindmapNode[]): MindmapNode[] {
 
   l1s.forEach((l1, i) => {
     const above = i % 2 === 0
-    // Always auto-size L1 from title — stored widths from mindmap layout (320px) are too wide
-    const { w: l1w, h: l1h } = shapedNodeSize(l1, nodeFontSize(1), autoWidth(l1.title, 1, !!(l1.icon || l1.emoji)), nodeHeight(1))
+    // Auto-size L1 from title unless manual — a leftover stored width from mindmap
+    // layout (320px) is too wide and must not survive an unrelated type switch
+    const { w: l1w, h: l1h } = shapedNodeSize(l1, nodeFontSize(1), boxWidth(l1, 1, !!(l1.icon || l1.emoji)), nodeHeight(1))
     const l1X = curX
 
     result.push({ ...l1, x: l1X, y: SPINE_Y - l1h / 2, width: l1w, height: l1h, manuallyPositioned: false })

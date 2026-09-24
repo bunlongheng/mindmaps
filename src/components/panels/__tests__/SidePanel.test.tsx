@@ -286,15 +286,32 @@ describe('SidePanel — Style tab', () => {
     expect(node.colorMode).toBeUndefined()
   })
 
-  it('width slider invokes resizeNodeDepth', () => {
+  it('Auto chip is selected by default for a node with no widthMode', () => {
     loadDiagram()
-    const spy = vi.spyOn(useMindmapStore.getState(), 'resizeNodeDepth')
+    render(<SidePanel nodeId="c1" onClose={vi.fn()} />)
+    const autoChip = screen.getByRole('button', { name: 'Auto' })
+    expect(autoChip).toHaveStyle({ color: '#3b82f6' })
+  })
+
+  it('dragging the width slider switches the node to manual and sets the width', () => {
+    loadDiagram()
     const { container } = render(<SidePanel nodeId="c1" onClose={vi.fn()} />)
     const slider = container.querySelector('input[type="range"]') as HTMLInputElement
     expect(slider).toBeTruthy()
     fireEvent.change(slider, { target: { value: '300' } })
-    expect(spy).toHaveBeenCalledWith(1, 300)
-    spy.mockRestore()
+    const node = useMindmapStore.getState().activeMindmap!.nodes.find(n => n.id === 'c1')!
+    expect(node.widthMode).toBe('manual')
+    expect(node.width).toBe(300)
+  })
+
+  it('clicking Auto clears a manual width', () => {
+    loadDiagram()
+    const { container } = render(<SidePanel nodeId="c1" onClose={vi.fn()} />)
+    const slider = container.querySelector('input[type="range"]') as HTMLInputElement
+    fireEvent.change(slider, { target: { value: '300' } })
+    expect(useMindmapStore.getState().activeMindmap!.nodes.find(n => n.id === 'c1')!.widthMode).toBe('manual')
+    fireEvent.click(screen.getByRole('button', { name: 'Auto' }))
+    expect(useMindmapStore.getState().activeMindmap!.nodes.find(n => n.id === 'c1')!.widthMode).toBe('auto')
   })
 
   it('hides width slider for mindmap shallow nodes', () => {
