@@ -9,6 +9,7 @@ import { Plus, Search, Trash2, LayoutGrid, List, Globe, Sparkles, Loader2, Tag, 
 import { ImportModal } from '../modals/ImportModal'
 import { MindmapsLogo } from '../MindmapsLogo'
 import { getTheme } from '../../lib/themes'
+import { renderMindmapSvg } from '../../lib/render-svg'
 import { emberVanish, blinkDoomed } from '../../lib/emberVanish'
 import { hexToRgb, l1PaletteColor, applyDepthBackground } from '../../lib/color'
 import { AIThinkingOverlay } from '../AIThinkingOverlay'
@@ -519,7 +520,7 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
             </div>
             {viewMode === 'grid' ? (
               <div className="home-grid">
-                {filtered.map(d => (
+                {filtered.map((d, i) => (
                   <DiagramCard
                     key={d.id} diagram={d} timeAgo={timeAgo(d.updatedAt)}
                     onOpen={() => onOpen(d.id)} onDelete={() => setDeleteTarget(d)}
@@ -527,12 +528,13 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
                     onTagEdit={() => { setTagModalId(d.id) }}
                     flash={flashId === d.id}
                     hideTag={activeTag}
+                    eager={i < EAGER_PREVIEWS}
                   />
                 ))}
               </div>
             ) : (
               <div className="home-list">
-                {filtered.map(d => (
+                {filtered.map((d, i) => (
                   <DiagramRow
                     key={d.id} diagram={d} timeAgo={timeAgo(d.updatedAt)}
                     onOpen={() => onOpen(d.id)} onDelete={() => setDeleteTarget(d)}
@@ -540,6 +542,7 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
                     onTagEdit={() => { setTagModalId(d.id) }}
                     flash={flashId === d.id}
                     hideTag={activeTag}
+                    eager={i < EAGER_PREVIEWS}
                   />
                 ))}
               </div>
@@ -581,16 +584,17 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
           50%      { opacity: 1;    transform: scale(1.04); }
         }
         input::placeholder { color: #94a3b8 !important; }
+        /* 4 across, the way Sequences lays its library out. At 7 across a card was
+           ~200px wide and a 114-node map collapsed into a stripe; 4 across gives the
+           2:1 preview enough room to read as the diagram it is. */
         .home-grid {
           display: grid;
-          gap: 12px;
-          grid-template-columns: repeat(2, 1fr);
+          gap: 14px;
+          grid-template-columns: repeat(4, 1fr);
         }
-        @media (min-width: 480px)  { .home-grid { grid-template-columns: repeat(3, 1fr); } }
-        @media (min-width: 768px)  { .home-grid { grid-template-columns: repeat(4, 1fr); } }
-        @media (min-width: 1024px) { .home-grid { grid-template-columns: repeat(5, 1fr); } }
-        @media (min-width: 1280px) { .home-grid { grid-template-columns: repeat(6, 1fr); } }
-        @media (min-width: 1600px) { .home-grid { grid-template-columns: repeat(7, 1fr); } }
+        @media (max-width: 1100px) { .home-grid { grid-template-columns: repeat(3, 1fr); } }
+        @media (max-width: 820px)  { .home-grid { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 640px)  { .home-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; } }
         .home-list { display: flex; flex-direction: column; gap: 8px; }
         .home-header { padding: 0 16px !important; }
         @media (min-width: 640px) { .home-header { padding: 0 24px !important; } }
@@ -894,11 +898,16 @@ function textColorFor(fill: string): string {
   return lum > 150 ? '#1a1d2e' : '#fff'
 }
 
-function DiagramMinimap({ id }: { id: string; type: string }) {
+/** How many previews draw on first paint. The rest wait until they scroll into
+ *  view - the real renderer re-runs the whole layout per map, and a library of 76
+ *  doing that at once on mount is a visible stall. */
+const EAGER_PREVIEWS = 12
+
+function DiagramMinimap({ id, name, type, eager }: { id: string; name: string; type: string; eager: boolean }) {
   const storeThemeId = useMindmapStore(s => s.themeId)
   const [nodes, setNodes] = useState<MindmapNode[]>([])
   const [diagramThemeId, setDiagramThemeId] = useState<string>('default')
-  const [, setLineStyle] = useState<string>('orthogonal')
+  const [lineStyle, setLineStyle] = useState<string>('orthogonal')
   const wrapRef = useRef<HTMLDivElement>(null)
   const [inView, setInView] = useState(false)
 
@@ -963,6 +972,25 @@ function DiagramMinimap({ id }: { id: string; type: string }) {
   })()
   const rootFill = isDarkCanvas ? theme.colors[0] : '#1e293b'
 
+  // ── The preview: the real diagram ─────────────────────────────────────────
+  // Same renderer the editor's export and the /svg endpoint use, so the card shows
+  // the map itself instead of a sketch of it. It recomputes the layout from the
+  // real layout functions rather than trusting the stored x/y, which is what made
+  // the old miniature draw a dot and a stray bar for maps that had never been
+  // re-laid-out. Root width/height are swapped for 100% so the viewBox scales the
+  // drawing to whatever box the card gives it.
+  // 3-state: 'pending' (deferred, not drawn yet), null (nothing to draw or the
+  // render threw - the hand-rolled minimap below takes over), or the markup.
+  const ready = eager || inView
+  const preview = useMemo((): string | null | 'pending' => {
+    if (!nodes.length) return null
+    if (!ready) return 'pending'
+    try {
+      return renderMindmapSvg({ id, name, type, line_style: lineStyle, theme_id: diagramThemeId, nodes })
+        .replace(/(<svg\b[^>]*?)\swidth="\d+"\sheight="\d+"/, '$1 width="100%" height="100%" preserveAspectRatio="xMidYMid meet"')
+    } catch { return null }
+  }, [ready, id, name, type, lineStyle, diagramThemeId, nodes])
+
   // Real-render geometry: bbox + resolved colours over the actual cached layout, memoized
   // per node-list identity so scrolling the 76-card grid stays smooth. Beyond 120 nodes only
   // depth<=2 is kept so the tile stays legible and fast.
@@ -1015,6 +1043,22 @@ function DiagramMinimap({ id }: { id: string; type: string }) {
     )
   }
 
+  // A deferred preview holds its space quietly on the theme's own background rather
+  // than drawing the sketch and swapping it out - that swap reads as a flicker.
+  if (preview === 'pending') {
+    return <div ref={wrapRef} aria-hidden style={{ width: '100%', height: '100%', background: canvasBg, borderRadius: 'inherit' }} />
+  }
+  if (preview) {
+    return (
+      <div ref={wrapRef} aria-hidden
+        style={{ width: '100%', height: '100%', overflow: 'hidden', borderRadius: 'inherit', background: canvasBg }}
+        dangerouslySetInnerHTML={{ __html: preview }} />
+    )
+  }
+
+  // ── Fallback ────────────────────────────────────────────────────────────────
+  // Only reached when the real render throws. Hand-rolled miniature off the stored
+  // coordinates - less faithful, but it never takes the whole grid down with it.
   // Thumbnail root: show actual shape but fixed size for consistency, positioned at its real centre
   const isRootPill = root?.shape === 'pill' || (!root?.shape && (root?.title?.length ?? 0) >= 15)
   const THUMB_ROOT_R = 10
@@ -1069,11 +1113,11 @@ function DiagramMinimap({ id }: { id: string; type: string }) {
 
 // ── DiagramCard ────────────────────────────────────────────────────────────
 
-function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isPublic, tags, tagColorMap, onTagEdit, flash, hideTag }: {
+function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isPublic, tags, tagColorMap, onTagEdit, flash, hideTag, eager }: {
   diagram: DiagramMeta; timeAgo: string; onOpen: () => void; onDelete: () => void
   isPublic?: boolean; tags?: string[]
   tagColorMap: Map<string, string>; onTagEdit: () => void; flash?: boolean
-  hideTag?: string | null
+  hideTag?: string | null; eager: boolean
 }) {
   const [hovered, setHovered] = useState(false)
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -1130,8 +1174,8 @@ function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isPublic, tags, tagCo
       </div>
 
       {/* Thumbnail */}
-      <div style={{ height: 110, background: 'transparent', position: 'relative' }}>
-        <DiagramMinimap id={diagram.id} type={diagram.type} />
+      <div style={{ width: '100%', aspectRatio: '2 / 1', background: 'transparent', position: 'relative' }}>
+        <DiagramMinimap id={diagram.id} name={diagram.name} type={diagram.type} eager={eager} />
         {hovered && (
           <>
             <button onClick={e => { e.stopPropagation(); onTagEdit() }} title="Edit tags" aria-label={`Edit tags for ${diagram.name}`}
@@ -1151,11 +1195,11 @@ function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isPublic, tags, tagCo
 
 // ── DiagramRow (list view) ───────────────────────────────────────────────────
 
-function DiagramRow({ diagram, timeAgo, onOpen, onDelete, isPublic, tags, tagColorMap, onTagEdit, flash, hideTag }: {
+function DiagramRow({ diagram, timeAgo, onOpen, onDelete, isPublic, tags, tagColorMap, onTagEdit, flash, hideTag, eager }: {
   diagram: DiagramMeta; timeAgo: string; onOpen: () => void; onDelete: () => void
   isPublic?: boolean; tags?: string[]
   tagColorMap: Map<string, string>; onTagEdit: () => void; flash?: boolean
-  hideTag?: string | null
+  hideTag?: string | null; eager: boolean
 }) {
   const [hovered, setHovered] = useState(false)
   // Every card in a filtered view carries the tag that filtered it - showing it
@@ -1186,7 +1230,7 @@ function DiagramRow({ diagram, timeAgo, onOpen, onDelete, isPublic, tags, tagCol
     >
       {/* Thumbnail */}
       <div style={{ width: 72, height: 44, borderRadius: 8, overflow: 'hidden', flexShrink: 0, border: '1px solid #eef0f5' }}>
-        <DiagramMinimap id={diagram.id} type={diagram.type} />
+        <DiagramMinimap id={diagram.id} name={diagram.name} type={diagram.type} eager={eager} />
       </div>
 
       {/* Name + tags */}

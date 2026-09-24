@@ -1,5 +1,5 @@
 import { test, expect } from './fixtures'
-import { waitForApp, expectLoginScreen, createMap } from './helpers'
+import { waitForApp, expectLoginScreen } from './helpers'
 import type { Page } from '@playwright/test'
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -345,7 +345,7 @@ test.describe('Home — diagram card hover actions', () => {
     await mountSingleCard(page, 'Hover Reveal')
     const card = cardByName(page, 'Hover Reveal').first()
     const editBtn = card.locator('[title="Edit tags"]')
-    // Hover state can be lost under CPU load — retry until the on-hover button shows.
+    // Hover state can be lost under CPU load - retry until the on-hover button shows.
     await expect(async () => {
       await card.hover()
       await expect(editBtn).toBeVisible({ timeout: 1000 })
@@ -516,12 +516,20 @@ test.describe('Home — paste import flow', () => {
 // ── Delete: the card comes apart into embers (ported from the drops board) ──
 
 test('index: card blinks red twice then scatters', async ({ page }) => {
-  await createMap(page)
-  await page.goto('/')
-  await page.waitForSelector('[data-map-id]')
-  const card = page.locator('[data-map-id]').first()
-  await card.hover()
-  await card.locator('[title="Delete map"]').first().click()
+  // Deterministic single-card grid, the same remedy the tag-modal flows use above.
+  // On the shared grid, parallel specs insert their own new maps at the top while
+  // this test is hovering, which walks the card down a row mid-click and can leave
+  // us sampling a card that was never the one we deleted (red 0, anims []).
+  const name = 'Ember Scatter'
+  await mountSingleCard(page, name)
+  const card = cardByName(page, name).first()
+  const deleteBtn = card.locator('[title="Delete map"]').first()
+  // Hover state can be lost under CPU load - retry until the on-hover button shows.
+  await expect(async () => {
+    await card.hover()
+    await expect(deleteBtn).toBeVisible({ timeout: 1000 })
+  }).toPass({ timeout: 10_000 })
+  await deleteBtn.click()
   await page.getByRole('button', { name: 'Delete', exact: true }).click()
 
   // sample the card's border colour across the blink window
