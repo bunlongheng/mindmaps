@@ -13,6 +13,20 @@ vi.mock('../../CuteToast', () => ({
 // AIThinkingOverlay renders an animated canvas — stub it
 vi.mock('../../AIThinkingOverlay', () => ({ AIThinkingOverlay: () => <div data-testid="ai-overlay" /> }))
 
+// The card preview calls the real renderer. This wrapper leaves it untouched by
+// default and lets a test flip `throws` on to exercise the minimap fallback.
+const renderCtl = vi.hoisted(() => ({ throws: false }))
+vi.mock('../../../lib/render-svg', async importOriginal => {
+  const actual = await importOriginal<typeof import('../../../lib/render-svg')>()
+  return {
+    ...actual,
+    renderMindmapSvg: (row: Parameters<typeof actual.renderMindmapSvg>[0]) => {
+      if (renderCtl.throws) throw new Error('render blew up')
+      return actual.renderMindmapSvg(row)
+    },
+  }
+})
+
 import { showToast } from '../../CuteToast'
 
 const USER = { email: 'a@b.com', name: 'Alice', userId: 'u1' }
@@ -28,6 +42,7 @@ const SAMPLE: DiagramMeta[] = [
 ]
 
 beforeEach(() => {
+  renderCtl.throws = false
   localStorage.clear()
   act(() => { useMindmapStore.getState().setDiagrams([]) })
   vi.clearAllMocks()
@@ -613,7 +628,8 @@ describe('HomePage — DiagramMinimap', () => {
     expect(screen.getByText('Open to preview')).toBeInTheDocument()
   })
 
-  it('renders an svg whose viewBox matches the real node bbox plus padding', () => {
+  it('falls back to the minimap - bbox viewBox and all - when the real render throws', () => {
+    renderCtl.throws = true
     const nodes = [
       { id: 'r', title: 'Root', parentId: null, depth: 0, color: '#000', x: 0, y: 0, width: 40, height: 40, sortOrder: 0 },
       { id: 'a', title: 'A', parentId: 'r', depth: 1, color: '#111', x: 100, y: 0, width: 80, height: 30, sortOrder: 0 },
@@ -638,7 +654,8 @@ describe('HomePage — DiagramMinimap', () => {
     expect(svg!.getAttribute('preserveAspectRatio')).toBe('xMidYMid meet')
   })
 
-  it('fills each node with its real resolved colour, never a fixed THUMB_COLORS value', () => {
+  it('the fallback minimap fills each node with its real resolved colour, never a fixed THUMB_COLORS value', () => {
+    renderCtl.throws = true
     const THUMB_COLORS = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#8b5cf6']
     const nodes = [
       { id: 'r', title: 'Root', parentId: null, depth: 0, color: '#000', x: 0, y: 0, width: 40, height: 40, sortOrder: 0 },
@@ -663,6 +680,118 @@ describe('HomePage — DiagramMinimap', () => {
     seedDiagrams([{ id: 'empty1', name: 'Empty', type: 'logic-chart', updatedAt: new Date().toISOString(), tags: [] }])
     render(<HomePage onOpen={vi.fn()} user={USER} onSignOut={vi.fn()} />)
     expect(screen.getByText('Open to preview')).toBeInTheDocument()
+  })
+})
+
+describe('HomePage — card previews use the real renderer', () => {
+  const NODES = [
+    { id: 'r', title: 'Root', parentId: null, depth: 0, color: '#000', x: 0, y: 0, width: 140, height: 140, sortOrder: 0 },
+    { id: 'a', title: 'L1 A', parentId: 'r', depth: 1, color: '#f00', x: 0, y: 0, width: 100, height: 40, sortOrder: 0 },
+    { id: 'b', title: 'L1 B', parentId: 'r', depth: 1, color: '#0f0', x: 0, y: 0, width: 100, height: 40, sortOrder: 1 },
+  ]
+  function seedCached(id: string, nodes: unknown[], name = 'Real Render') {
+    localStorage.setItem(`mindmaps:diagram:${id}`, JSON.stringify({ id, themeId: 'default', lineStyle: 'orthogonal', nodes }))
+    seedDiagrams([{ id, name, type: 'logic-chart', updatedAt: new Date().toISOString(), tags: [] }])
+  }
+  // Only renderMindmapSvg emits an <svg> carrying font-family + a <title> of the map
+  // name; the hand-rolled minimap emits neither.
+  const realSvg = (container: HTMLElement) => container.querySelector('svg[font-family] > title')?.closest('svg') ?? null
+
+  it('draws the card preview with renderMindmapSvg, not the fallback minimap', () => {
+    seedCached('rr1', NODES)
+    const { container } = render(<HomePage onOpen={vi.fn()} user={USER} onSignOut={vi.fn()} />)
+    const svg = realSvg(container)
+    expect(svg).toBeTruthy()
+    expect(svg!.querySelector('title')!.textContent).toBe('Real Render')
+    // scaled to the card box rather than its intrinsic pixel size
+    expect(svg!.getAttribute('width')).toBe('100%')
+    expect(svg!.getAttribute('height')).toBe('100%')
+    expect(svg!.getAttribute('preserveAspectRatio')).toBe('xMidYMid meet')
+    // the real render replays node titles; the old miniature dropped them past 6 nodes
+    expect(svg!.textContent).toContain('L1 A')
+  })
+
+  it('uses the same render for the list-view row thumbnail', () => {
+    localStorage.setItem('mindmaps:viewMode', 'list')
+    seedCached('rr2', NODES, 'Row Render')
+    const { container } = render(<HomePage onOpen={vi.fn()} user={USER} onSignOut={vi.fn()} />)
+    const svg = realSvg(container)
+    expect(svg).toBeTruthy()
+    expect(svg!.querySelector('title')!.textContent).toBe('Row Render')
+  })
+
+  it('falls back to the minimap instead of crashing the grid when the render throws', () => {
+    renderCtl.throws = true
+    seedCached('rr3', NODES, 'Broken Map')
+    const { container } = render(<HomePage onOpen={vi.fn()} user={USER} onSignOut={vi.fn()} />)
+    expect(realSvg(container)).toBeNull()
+    // the card is still on the grid, drawn by the fallback
+    expect(screen.getByText('Broken Map')).toBeInTheDocument()
+    expect(container.querySelectorAll('svg rect').length).toBeGreaterThan(0)
+  })
+
+  it('escapes user text before injecting the markup', () => {
+    seedCached('rr4', [
+      ...NODES,
+      { id: 'x', title: '<script>alert(1)</script>', parentId: 'r', depth: 1, color: '#00f', x: 0, y: 0, width: 100, height: 40, sortOrder: 2 },
+      { id: 'y', title: 'He said "hi" & left', parentId: 'r', depth: 1, color: '#0ff', x: 0, y: 0, width: 100, height: 40, sortOrder: 3 },
+    ], '<img src=x onerror="alert(1)">')
+    const { container } = render(<HomePage onOpen={vi.fn()} user={USER} onSignOut={vi.fn()} />)
+    const svg = realSvg(container)!
+    expect(svg).toBeTruthy()
+    // no live element or handler came out of the user text
+    expect(container.querySelector('script')).toBeNull()
+    expect(container.querySelector('img[onerror]')).toBeNull()
+    expect(svg.innerHTML).toContain('&lt;script&gt;')
+    expect(svg.innerHTML).not.toContain('<script>')
+    // the quote and ampersand survive as text, escaped in the markup
+    expect(svg.textContent).toContain('He said "hi" & left')
+    expect(svg.innerHTML).toContain('&amp;')
+    expect(svg.querySelector('title')!.textContent).toBe('<img src=x onerror="alert(1)">')
+  })
+
+  it('escapes a node border colour before it reaches a stroke attribute', () => {
+    seedCached('rr5', [
+      { id: 'r', title: 'Root', parentId: null, depth: 0, color: '#000', borderColor: '#f00" onload="alert(1)', x: 0, y: 0, width: 140, height: 140, sortOrder: 0 },
+      { id: 'a', title: 'A', parentId: 'r', depth: 1, color: '#f00', x: 0, y: 0, width: 100, height: 40, sortOrder: 0 },
+    ])
+    const { container } = render(<HomePage onOpen={vi.fn()} user={USER} onSignOut={vi.fn()} />)
+    const svg = realSvg(container)!
+    expect(svg).toBeTruthy()
+    expect(svg.querySelector('[onload]')).toBeNull()
+    expect(svg.innerHTML).toContain('&quot;')
+  })
+
+  it('renders the first 12 previews eagerly and holds the rest as quiet placeholders', () => {
+    const many = Array.from({ length: 15 }, (_, i) => {
+      const id = `many${i}`
+      localStorage.setItem(`mindmaps:diagram:${id}`, JSON.stringify({ id, themeId: 'default', lineStyle: 'orthogonal', nodes: NODES }))
+      return { id, name: `Map ${String(i).padStart(2, '0')}`, type: 'logic-chart' as const, updatedAt: new Date(Date.now() - i * 1000).toISOString(), tags: [] }
+    })
+    seedDiagrams(many)
+    const { container } = render(<HomePage onOpen={vi.fn()} user={USER} onSignOut={vi.fn()} />)
+    // IntersectionObserver is a no-op in the test setup, so only the eager ones draw
+    expect(container.querySelectorAll('svg[font-family] > title').length).toBe(12)
+    // and every card is still on the grid, the deferred ones holding their space
+    expect(container.querySelectorAll('[data-map-id]').length).toBe(15)
+  })
+
+  it('still shows YouTube thumbnails instead of a render when nodes link to videos', () => {
+    seedCached('yt1', [
+      { id: 'r', title: 'Root', parentId: null, depth: 0, color: '#000', x: 0, y: 0, width: 140, height: 140, sortOrder: 0 },
+      { id: 'a', title: 'Clip', parentId: 'r', depth: 1, color: '#f00', url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', x: 0, y: 0, width: 100, height: 40, sortOrder: 0 },
+    ], 'Videos')
+    const { container } = render(<HomePage onOpen={vi.fn()} user={USER} onSignOut={vi.fn()} />)
+    expect(container.querySelector('img[src*="img.youtube.com/vi/dQw4w9WgXcQ"]')).toBeTruthy()
+    expect(realSvg(container)).toBeNull()
+  })
+
+  it('still shows the empty state for a map with no nodes', () => {
+    localStorage.setItem('mindmaps:diagram:mt1', JSON.stringify({ id: 'mt1', themeId: 'default', lineStyle: 'orthogonal', nodes: [] }))
+    seedDiagrams([{ id: 'mt1', name: 'Nothing', type: 'logic-chart', updatedAt: new Date().toISOString(), tags: [] }])
+    const { container } = render(<HomePage onOpen={vi.fn()} user={USER} onSignOut={vi.fn()} />)
+    expect(screen.getByText('Open to preview')).toBeInTheDocument()
+    expect(realSvg(container)).toBeNull()
   })
 })
 
