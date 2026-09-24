@@ -3,7 +3,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 
 import { pool } from '../_lib/db.js'
 import { corsHeaders } from '../_lib/cors.js'
-import { authorizeOwner } from '../_lib/authorizeOwner.js'
+import { authorizeOwner, ownerId } from '../_lib/authorizeOwner.js'
 import { renderMindmapSvg } from '../_lib/render-svg.js'
 import {
   parseIndentedOutline, normalizeOutlineRoots, assembleOutlineTree,
@@ -93,7 +93,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         type: 'logic-chart | mindmap | fishbone | timeline (default logic-chart)',
         themeId: 'optional (default "default")',
         lineStyle: 'optional (default "orthogonal")',
-        userId: 'optional; must equal the configured owner id, otherwise the map is created unowned',
+        userId: 'optional; omit it - the map is always filed under the configured owner. If sent, it must equal that owner id or the call is rejected with 403.',
         sharing: 'optional bool, default false; set true to make the map readable by id without auth',
         colors: 'optional hex array to override the branch palette',
       },
@@ -106,10 +106,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const VALID_TYPES = new Set(['logic-chart', 'mindmap', 'fishbone', 'timeline'])
   const type = VALID_TYPES.has(rawType) ? rawType : 'logic-chart'
 
-  // The static key is shared by any external agent, so it must not be able to attribute a
-  // map to an arbitrary owner - only accept a userId that matches the configured owner.
-  const ownerId = (process.env.MINDMAP_USER_ID ?? '').trim()
-  const ownedUserId = userId && userId === ownerId ? userId : null
+  // Every API map belongs to the configured owner. The static key already proves the caller
+  // is the owner's agent, so an omitted userId defaults to that owner instead of writing a
+  // NULL owner - a NULL-owner row is invisible to the library forever (issue 27). The key is
+  // shared by any external agent, so it still must not attribute a map to somebody else:
+  // a userId that does not match the configured owner is rejected rather than orphaned.
+  const ownedUserId = ownerId()
+  if (!ownedUserId) {
+    return res.status(500).json({ error: 'Owner not configured: MINDMAP_USER_ID is unset on the server' })
+  }
+  if (userId && userId !== ownedUserId) {
+    return res.status(403).json({ error: 'userId does not match the configured owner - omit it to file the map under the owner' })
+  }
 
   // Per-request palette (no cross-request mutation of the shared default).
   const palette = [...DEFAULT_BRANCH_COLORS]
@@ -131,8 +139,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     await pool.query(
-      `INSERT INTO mindmaps (id, user_id, name, type, line_style, sharing_enabled, theme_id, nodes, tags)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+      // created_at/updated_at are set explicitly (not left to the column defaults) so a fresh
+      // API map always sorts to the top of the library, which orders by updated_at DESC.
+      `INSERT INTO mindmaps (id, user_id, name, type, line_style, sharing_enabled, theme_id, nodes, tags, created_at, updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,now(),now())
        ON CONFLICT (id) DO UPDATE SET name=$3, nodes=$8, updated_at=now()`,
       [id, ownedUserId, title, type, lineStyle, sharing === true, themeId, JSON.stringify(nodes), ['API']]
     )

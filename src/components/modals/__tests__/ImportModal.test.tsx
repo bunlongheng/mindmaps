@@ -28,20 +28,11 @@ describe('ImportModal', () => {
     expect(screen.getByText('AI agents - how to discover this API')).toBeTruthy()
   })
 
-  it('uses the placeholder when no userId is supplied', () => {
-    render(<ImportModal onClose={() => {}} />)
-    // The curl example embeds the placeholder uid
-    expect(screen.getByText(/<your-user-id>/)).toBeTruthy()
-  })
-
-  it('uses the provided userId in the curl example', () => {
-    render(<ImportModal onClose={() => {}} userId="abc-123" />)
-    expect(screen.getByText(/abc-123/)).toBeTruthy()
-  })
-
-  it('uses null userId fallback', () => {
-    render(<ImportModal onClose={() => {}} userId={null} />)
-    expect(screen.getByText(/<your-user-id>/)).toBeTruthy()
+  it('never asks for a userId in the curl example (issue 27)', () => {
+    const { container } = render(<ImportModal onClose={() => {}} />)
+    // The API files every map under the owner, so the example must not imply a userId.
+    expect(container.textContent).not.toMatch(/userId/)
+    expect(container.textContent).not.toMatch(/<your-user-id>/)
   })
 
   it('calls onClose when the backdrop is clicked', () => {
@@ -79,6 +70,8 @@ describe('ImportModal', () => {
       await Promise.resolve()
     })
     expect(writeText).toHaveBeenCalledWith(expect.stringContaining('Import Guide for AI Agents'))
+    // The AI-facing instructions say the owner is implicit, never a userId to fill in.
+    expect(writeText).toHaveBeenCalledWith(expect.stringContaining('no userId needed'))
     // "Copied!" label appears
     expect(screen.getByText('Copied!')).toBeTruthy()
     // After 1800ms it resets
