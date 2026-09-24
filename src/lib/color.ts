@@ -69,6 +69,22 @@ export function edgeWidthForDepth(childDepth: number): number {
 }
 
 /**
+ * The radial mind map draws hair-thin branches, not the trunk-and-limb connectors the
+ * other diagram types use, so it scales the SAME table down instead of carrying a
+ * second one: 1.5px from the root into a depth-1 topic, tapering to a 1px floor for
+ * the dots at depth 3 and deeper.
+ */
+export const RADIAL_EDGE_SCALE = 0.3
+
+/** Branch opacity in the radial mind map, so a dense fan stays readable on white. */
+export const RADIAL_EDGE_OPACITY = 0.55
+
+/** Branch width for a child at the given depth in the radial mind map. */
+export function radialEdgeWidth(childDepth: number): number {
+  return Math.max(1, edgeWidthForDepth(childDepth) * RADIAL_EDGE_SCALE)
+}
+
+/**
  * Node fill for a branch colour at a given depth: the colour mixed toward white by
  * (1 - strength). Depth 0 (the root) is returned untouched. Returns hex so callers
  * can run the same isLight() readability check on the result.

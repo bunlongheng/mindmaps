@@ -351,15 +351,60 @@ describe('Node — mindmap type', () => {
     expect(container.querySelector('[data-node-id="n1"]')).toBeTruthy()
   })
 
-  it('renders a mindmap L2+ circle node (transparent rect + wrapped text)', () => {
+  it('renders a mindmap L1 as a circle labelled with its title and subtree size', () => {
+    const root = makeRoot({ title: 'Center' })
+    const n = makeNode({ depth: 1, title: 'Supervised', width: 72, height: 72 })
+    loadStore([root, n], 'mindmap')
+    const { container } = renderNode(n, { descendantCount: 29 })
+    expect(container.querySelector('circle')).toBeTruthy()
+    expect(container.querySelector('rect')).toBeNull()      // a circle, never a box
+    const texts = Array.from(container.querySelectorAll('text')).map(t => t.textContent)
+    expect(texts).toContain('Supervised')                    // the name, on one line
+    expect(texts).toContain('29')                            // the subtree size under it
+    expect(texts).toContain('S')                             // the initial inside the circle
+    expect(container.querySelector('tspan')).toBeNull()      // never wrapped into a column
+  })
+
+  it('renders a mindmap L2 as a smaller circle with the title beside it', () => {
     const root = makeRoot()
     const l1 = makeNode({ depth: 1 })
-    const l2 = makeNode({ id: 'n2', depth: 2, parentId: 'n1', title: 'A long mindmap leaf node label', width: 120, height: 120 })
+    const l2 = makeNode({ id: 'n2', depth: 2, parentId: 'n1', title: 'A long mindmap leaf node label', width: 30, height: 30 })
     loadStore([root, l1, l2], 'mindmap')
     const { container } = renderNode(l2, { isSelected: true })
     expect(container.querySelector('[data-node-id="n2"]')).toBeTruthy()
-    // tspan-wrapped text
-    expect(container.querySelector('tspan')).toBeTruthy()
+    const texts = Array.from(container.querySelectorAll('text'))
+    expect(texts.map(t => t.textContent)).toContain('A long mindmap leaf node label')
+    expect(container.querySelector('tspan')).toBeNull()
+  })
+
+  it('renders a mindmap L3 as a bare dot carrying its title for hover', () => {
+    const root = makeRoot()
+    const l1 = makeNode({ depth: 1 })
+    const l2 = makeNode({ id: 'n2', depth: 2, parentId: 'n1', width: 30, height: 30 })
+    const l3 = makeNode({ id: 'n3', depth: 3, parentId: 'n2', title: 'Deep leaf', width: 7, height: 7 })
+    loadStore([root, l1, l2, l3], 'mindmap')
+    const { container } = renderNode(l3)
+    expect(container.querySelector('title')?.textContent).toBe('Deep leaf')
+    expect(container.querySelectorAll('text')).toHaveLength(0)  // no label until selected
+    expect(container.querySelector('circle')).toBeTruthy()
+  })
+
+  it('shows a selected dot its title', () => {
+    const root = makeRoot()
+    const l1 = makeNode({ depth: 1 })
+    const l3 = makeNode({ id: 'n3', depth: 3, parentId: 'n1', title: 'Deep leaf', width: 7, height: 7 })
+    loadStore([root, l1, l3], 'mindmap')
+    const { container } = renderNode(l3, { isSelected: true })
+    expect(Array.from(container.querySelectorAll('text')).map(t => t.textContent)).toContain('Deep leaf')
+  })
+
+  it('honours an explicit shape instead of the radial circle', () => {
+    const root = makeRoot()
+    const l1 = makeNode({ depth: 1 })
+    const box = makeNode({ id: 'n2', depth: 2, parentId: 'n1', title: 'Boxed', shape: 'rect', width: 120, height: 40 })
+    loadStore([root, l1, box], 'mindmap')
+    const { container } = renderNode(box)
+    expect(container.querySelector('rect')).toBeTruthy()
   })
 
   it('renders mindmap L2+ with emoji centered', () => {
@@ -957,7 +1002,7 @@ describe('Node — links inside node text', () => {
     expect(input.value).toBe(raw)
   })
 
-  it('wraps a mindmap circle label into per-line anchors', () => {
+  it('keeps a markdown link in a mindmap label clickable', () => {
     const n = makeNode({ title: 'ticket [SHAR-1](https://j.example/SHAR-1) fix', depth: 2, width: 120, height: 120 })
     loadStore([makeRoot(), makeNode({ depth: 1 }), n], 'mindmap')
     const { container } = renderNode(n)

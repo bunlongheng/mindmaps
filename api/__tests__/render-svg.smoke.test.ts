@@ -2,6 +2,7 @@
 import { describe, it, expect } from 'vitest'
 import { renderMindmapSvg } from '../_lib/render-svg.js'
 import { depthFill, L1_PALETTE } from '../../src/lib/color.js'
+import { computeMindmapLayout } from '../../src/lib/layout/mindmap.js'
 
 const mkNodes = () => {
   const root = { id: 'r', title: 'Machine Learning', parentId: null, depth: 0, x: 0, y: 0, width: 180, height: 180, color: '#6366f1', sortOrder: 0, manuallyPositioned: false }
@@ -69,6 +70,70 @@ describe('renderMindmapSvg smoke', () => {
     expect(connectors).toContain('5')
     expect(connectors).toContain('3')
     expect(connectors).toContain('2')
+  })
+
+  // ── Mind map: the radial constellation ─────────────────────────────────────
+  // The home cards and the share images are drawn by this renderer while the opened
+  // map is drawn by the canvas, so the two must agree node for node.
+  describe('mindmap radial graph', () => {
+    const svgOf = () => renderMindmapSvg({ id: 'x', name: 'Machine Learning', type: 'mindmap', line_style: 'curved', theme_id: 'default', nodes: mkNodes() as never })
+
+    it('puts every node exactly where the shared layout puts it', () => {
+      const laid = computeMindmapLayout(mkNodes().map(n => ({ ...n, width: 0, height: 0 })) as never)
+      const drawn = new Map<string, string>()
+      const svg = svgOf()
+      for (const m of svg.matchAll(/<g transform="translate\(([-\d.]+),([-\d.]+)\)">/g)) {
+        drawn.set(`${m[1]},${m[2]}`, m[0])
+      }
+      expect(drawn.size).toBe(laid.length)
+      const r2 = (v: number) => Math.round(v * 100) / 100
+      for (const n of laid) {
+        expect(drawn.has(`${r2(n.x)},${r2(n.y)}`)).toBe(true)
+      }
+    })
+
+    it('draws circles, not boxes, and one shared glow filter', () => {
+      const svg = svgOf()
+      expect(svg).toContain('<filter id="mm-glow"')
+      expect((svg.match(/<filter /g) ?? []).length).toBe(1)
+      // The only <rect> is the canvas background; every node is a <circle>.
+      expect((svg.match(/<rect /g) ?? []).length).toBe(1)
+      expect((svg.match(/<circle /g) ?? []).length).toBeGreaterThan(5)
+    })
+
+    it('labels a depth-1 topic with its name and its subtree size', () => {
+      const svg = svgOf()
+      // 'a' (Supervised) carries 2 children, 'b' (Unsupervised) carries 2 descendants
+      expect(svg).toMatch(/font-size="13" font-weight="600" fill="#1a1d2e">Supervised</)
+      expect(svg).toMatch(/font-size="11" font-weight="600" fill="#[0-9A-Fa-f]{6}">2</)
+    })
+
+    it('leaves the deepest nodes as bare dots with a hover title', () => {
+      const svg = svgOf()
+      expect(svg).toContain('<title>K-Means</title>')
+      // no 11px side label for the depth-3 dot
+      expect(svg).not.toMatch(/font-size="11" fill="#475569">K-Means</)
+      // ... while depth 2 does get one
+      expect(svg).toMatch(/font-size="11" fill="#475569">Regression</)
+    })
+
+    it('reserves room for the labels that hang outside the circles', () => {
+      const svg = svgOf()
+      const vb = svg.match(/viewBox="([-\d.]+) ([-\d.]+) (\d+) (\d+)"/)!
+      const minY = Number(vb[2]), h = Number(vb[4])
+      const laid = computeMindmapLayout(mkNodes().map(n => ({ ...n, width: 0, height: 0 })) as never)
+      const lowestL1 = Math.max(...laid.filter(n => n.depth === 1).map(n => n.y + n.height))
+      // the name + count under the lowest topic still fit inside the viewBox
+      expect(minY + h).toBeGreaterThan(lowestL1 + 31)
+    })
+
+    it('draws hair-thin branch curves, never a straight spoke', () => {
+      const svg = svgOf()
+      const branches = [...svg.matchAll(/<path d="M [^"]*" stroke="[^"]*" stroke-opacity="0.55" stroke-width="([\d.]+)"/g)]
+      expect(branches.length).toBe(mkNodes().length - 1)
+      for (const b of branches) expect(Number(b[1])).toBeLessThanOrEqual(1.5)
+      expect(svg).not.toContain(' L ')   // every branch is a quadratic curve
+    })
   })
 
   it('renders curved logic-chart + JSON-string nodes + empty map', () => {

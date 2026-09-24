@@ -24,17 +24,18 @@ import { showToast } from '../components/CuteToast'
 
 /** Make all nodes at the same depth share the width of the widest node at that depth */
 function normalizeWidthsPerDepth(nodes: MindmapNode[], type?: DiagramType): MindmapNode[] {
-  // For mindmap type, only normalize L1 widths — L2+ are circles sized individually
+  // The mind map is a radial constellation: every circle's diameter IS its subtree's
+  // weight, so sharing one width per depth would erase the thing it says.
+  if (type === 'mindmap') return nodes
   const maxByDepth = new Map<number, number>()
   for (const n of nodes) {
-    if (n.depth > 0 && n.shape !== 'circle' && !(type === 'mindmap' && n.depth >= 2)) {
+    if (n.depth > 0 && n.shape !== 'circle') {
       maxByDepth.set(n.depth, Math.max(maxByDepth.get(n.depth) ?? 0, n.width))
     }
   }
   return nodes.map(n => {
     if (n.depth <= 0) return n
     if (n.shape === 'circle') return n              // circles keep individual sizes
-    if (type === 'mindmap' && n.depth >= 2) return n // circles keep individual sizes
     return { ...n, width: maxByDepth.get(n.depth) ?? n.width }
   })
 }
