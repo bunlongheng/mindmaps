@@ -350,7 +350,7 @@ describe('App — editor view, panel, footer', () => {
     renderEditor()
     render(<App />)
     await waitFor(() => expect(screen.getByTestId('canvas')).toBeInTheDocument())
-    await act(async () => { fireEvent.click(screen.getByText('SVG')) })
+    await act(async () => { fireEvent.click(screen.getByText('Copy SVG')) })
     expect(copyDiagramSvg).toHaveBeenCalled()
     expect(screen.getByText('Copied')).toBeInTheDocument()
   })
@@ -360,8 +360,8 @@ describe('App — editor view, panel, footer', () => {
     renderEditor()
     render(<App />)
     await waitFor(() => expect(screen.getByTestId('canvas')).toBeInTheDocument())
-    await act(async () => { fireEvent.click(screen.getByText('SVG')) })
-    expect(screen.getByText('SVG')).toBeInTheDocument()
+    await act(async () => { fireEvent.click(screen.getByText('Copy SVG')) })
+    expect(screen.getByText('Copy SVG')).toBeInTheDocument()
   })
 
   it('adds and removes tags in the footer', async () => {
