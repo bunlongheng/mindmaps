@@ -1,4 +1,5 @@
 import type { MindmapNode } from '../../types/index.js'
+import { displayTitle } from '../links.js'
 
 export const FISHBONE_SLANT = 90
 
@@ -70,7 +71,9 @@ export function autoW(title: string, depth: number, hasIcon: boolean, bold = fal
   const fontSize = depth === 0 ? 28 : depth === 1 ? 22 : depth === 2 ? 16 : 13
   const height = depth === 0 ? ROOT_H : depth === 1 ? L1_H : depth === 2 ? L2_H : L3_H
   const fontWeight = fontWeightFor(depth, bold)
-  const measured = measureTitleWidth(title, fontSize, fontWeight)
+  // Measure what the user sees: a title carrying a markdown link renders as the label
+  // alone, so measuring the raw text would size the box to invisible characters.
+  const measured = measureTitleWidth(displayTitle(title), fontSize, fontWeight)
   // Root isn't slanted (Node.tsx: isFishboneNode = depth >= 1); L1/L2/L3 are, so reserve
   // the same skew amount as extra width to keep the last glyph clear of the diagonal edge.
   const slant = depth === 0 ? 0 : height * 0.35

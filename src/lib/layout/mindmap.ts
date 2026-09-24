@@ -1,4 +1,5 @@
 import type { MindmapNode } from '../../types/index.js'
+import { displayTitle } from '../links.js'
 
 const ROOT_RADIUS = 260   // root center → L1 center
 const L1_EXTRA   = 140   // L1 center → L2 center
@@ -14,7 +15,7 @@ function autoW(node: MindmapNode, depth: number): number {
   // For L1 with icon/emoji: white square takes full node height, add that + gap
   const iconSquareW = hasVisual && depth === 1 ? L1_H + 10 : 0
   const padding = depth === 1 ? 32 : 24
-  const textW = node.title.length * fontSize * 0.64 + padding + iconSquareW
+  const textW = displayTitle(node.title).length * fontSize * 0.64 + padding + iconSquareW
   const min = depth === 1 ? 100 : depth === 2 ? 80 : depth === 3 ? 80 : 70
   return Math.max(min, Math.ceil(textW))
 }
@@ -23,7 +24,8 @@ const L1_H = 44
 const L2_CIRCLE_SIZE = 80
 
 /** Compute circle diameter that fits wrapped text */
-function circleForText(title: string, fontSize: number, minSize: number): number {
+function circleForText(rawTitle: string, fontSize: number, minSize: number): number {
+  const title = displayTitle(rawTitle)
   const charW = fontSize * 0.64
   const lineH = fontSize * 1.3
   // Target ~8-10 chars per line for compact circles
@@ -92,7 +94,7 @@ function placeSubtree(
   const maxChildSize = Math.max(...children.map(c => {
     const cDepth = depth + 1
     const cFs = FONT_SIZES[cDepth] ?? DEFAULT_FONT_SIZE
-    const cTextW = c.title.length * cFs * 0.64
+    const cTextW = displayTitle(c.title).length * cFs * 0.64
     const cMin = cDepth === 2 ? L2_CIRCLE_SIZE : cDepth === 3 ? 66 : 52
     return cDepth >= 2 ? Math.max(cMin, Math.ceil(cTextW + 24)) : 44
   }))

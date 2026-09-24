@@ -1,4 +1,5 @@
 import type { MindmapNode } from '../../types/index.js'
+import { displayTitle } from '../links.js'
 
 const SPINE_Y = 400
 const ROOT_X = 80
@@ -9,7 +10,7 @@ const BRANCH_INDENT = 48 // horizontal offset from branch line to node left edge
 
 /** Estimate rendered width from title text and font size */
 function autoWidth(title: string, fontSize: number, hasIconOrEmoji: boolean, minW: number): number {
-  const textW = title.length * fontSize * 0.62
+  const textW = displayTitle(title).length * fontSize * 0.62
   const iconZone = hasIconOrEmoji ? fontSize * 2.2 : 0
   return Math.max(minW, Math.ceil(textW + iconZone + 28))
 }
