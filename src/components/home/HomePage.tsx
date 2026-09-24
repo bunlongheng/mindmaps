@@ -276,7 +276,7 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
 
   return (
     <div style={{ minHeight: '100vh', background: BG, fontFamily: 'Inter, system-ui, sans-serif' }}>
-      {showImport && <ImportModal onClose={() => setShowImport(false)} userId={user?.userId} />}
+      {showImport && <ImportModal onClose={() => setShowImport(false)} />}
 
       {/* AI thinking canvas overlay */}
       {aiLoading && <AIThinkingOverlay />}
