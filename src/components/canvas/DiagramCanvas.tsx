@@ -11,6 +11,7 @@ import { L1_PALETTE } from '../../lib/color'
 interface DiagramCanvasProps {
   onNodeSelect: (nodeId: string | null) => void
   readOnly?: boolean
+  noInteract?: boolean
   onDelete?: () => void
 }
 
@@ -65,7 +66,7 @@ function computePaletteColors(nodes: { id: string; parentId: string | null; dept
   return colors
 }
 
-export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
+export function DiagramCanvas({ onNodeSelect, readOnly, noInteract }: DiagramCanvasProps) {
   // Shallow-selected slice so the canvas only re-renders when one of these actually changes,
   // not on unrelated store writes (resizePreview, HUD flags, showChildCount, etc.).
   const { activeMindmap, selectedNodeIds, setSelectedNodeIds, diagramType, lineStyle, themeId, addNode, reorderNode, isImporting, hideDetails } = useMindmapStore(
@@ -254,6 +255,9 @@ export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
       // Node taps: don't preventDefault, don't capture — let node handle it
       return
     }
+    // Look-only mode (touch devices): no marquee/selection-box, no node hit-testing —
+    // pinch zoom and 1/2-finger pan above are unaffected since they return before this point.
+    if (noInteract) return
     // Mouse on background: capture for pan/select
     e.preventDefault()
     ;(e.currentTarget as Element).setPointerCapture(e.pointerId)
@@ -267,7 +271,7 @@ export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
     const { x, y } = screenToCanvas(e.clientX, e.clientY)
     selStart.current = { cx: x, cy: y }
     setSelBox({ x, y, w: 0, h: 0 })
-  }, [])
+  }, [noInteract])
 
   const handleBgPointerMove = useCallback((e: React.PointerEvent) => {
     activePointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
@@ -480,6 +484,7 @@ export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
               onDoubleClick={n => { setSelectedNodeIds([n.id]); onNodeSelect(n.id) }}
               svgRef={svgRef}
               readOnly={readOnly}
+              noInteract={noInteract}
               l1Colors={node.depth === 0 ? activeMindmap.nodes.filter(n => n.depth === 1).map(n => n.color) : undefined}
               paletteColor={paletteColors.get(node.id) ?? null}
               childCount={counts.childCounts.get(node.id) ?? 0}

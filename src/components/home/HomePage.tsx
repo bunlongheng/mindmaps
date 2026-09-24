@@ -10,7 +10,7 @@ import { ImportModal } from '../modals/ImportModal'
 import { MindmapsLogo } from '../MindmapsLogo'
 import { getTheme } from '../../lib/themes'
 import { emberVanish, blinkDoomed } from '../../lib/emberVanish'
-import { hexToRgb } from '../../lib/color'
+import { hexToRgb, l1PaletteColor, applyDepthBackground } from '../../lib/color'
 import { AIThinkingOverlay } from '../AIThinkingOverlay'
 import { soundHover, soundClick, soundPaste } from '../../lib/sounds'
 
@@ -276,7 +276,7 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
 
   return (
     <div style={{ minHeight: '100vh', background: BG, fontFamily: 'Inter, system-ui, sans-serif' }}>
-      {showImport && <ImportModal onClose={() => setShowImport(false)} userId={user?.userId} />}
+      {showImport && <ImportModal onClose={() => setShowImport(false)} />}
 
       {/* AI thinking canvas overlay */}
       {aiLoading && <AIThinkingOverlay />}
@@ -881,11 +881,24 @@ function YoutubeThumbs({ ids, bg }: { ids: string[]; bg: string }) {
   )
 }
 
-function DiagramMinimap({ id, type }: { id: string; type: string }) {
+/** Readable text colour (near-black or white) for a thumbnail node fill — accepts hex or rgb(...) */
+function textColorFor(fill: string): string {
+  let r = 0, g = 0, b = 0
+  if (fill.startsWith('#')) {
+    [r, g, b] = hexToRgb(fill)
+  } else {
+    const m = fill.match(/[\d.]+/g)
+    if (m) { r = +m[0]; g = +m[1]; b = +m[2] }
+  }
+  const lum = (r * 299 + g * 587 + b * 114) / 1000
+  return lum > 150 ? '#1a1d2e' : '#fff'
+}
+
+function DiagramMinimap({ id }: { id: string; type: string }) {
   const storeThemeId = useMindmapStore(s => s.themeId)
   const [nodes, setNodes] = useState<MindmapNode[]>([])
   const [diagramThemeId, setDiagramThemeId] = useState<string>('default')
-  const [lineStyle, setLineStyle] = useState<string>('orthogonal')
+  const [, setLineStyle] = useState<string>('orthogonal')
   const wrapRef = useRef<HTMLDivElement>(null)
   const [inView, setInView] = useState(false)
 
@@ -949,7 +962,33 @@ function DiagramMinimap({ id, type }: { id: string; type: string }) {
     return (r * 299 + g * 587 + b * 114) / 1000 < 128
   })()
   const rootFill = isDarkCanvas ? theme.colors[0] : '#1e293b'
-  const spineFill = isDarkCanvas ? 'rgba(255,255,255,0.3)' : '#94a3b8'
+
+  // Real-render geometry: bbox + resolved colours over the actual cached layout, memoized
+  // per node-list identity so scrolling the 76-card grid stays smooth. Beyond 120 nodes only
+  // depth<=2 is kept so the tile stays legible and fast.
+  const thumbGeo = useMemo(() => {
+    const source = nodes.length > 120 ? nodes.filter(n => n.depth <= 2) : nodes
+    const byId = new Map(source.map(n => [n.id, n]))
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+    for (const n of source) {
+      minX = Math.min(minX, n.x); minY = Math.min(minY, n.y)
+      maxX = Math.max(maxX, n.x + n.width); maxY = Math.max(maxY, n.y + n.height)
+    }
+    if (!source.length) { minX = 0; minY = 0; maxX = 0; maxY = 0 }
+    const bboxW = Math.max(1, maxX - minX)
+    const bboxH = Math.max(1, maxY - minY)
+    const pad = Math.max(8, Math.max(bboxW, bboxH) * 0.06)
+    const vbX = minX - pad, vbY = minY - pad, vbW = bboxW + pad * 2, vbH = bboxH + pad * 2
+    const nodeColor = new Map<string, string>()
+    for (const n of source) {
+      if (n.depth === 0) { nodeColor.set(n.id, rootFill); continue }
+      const base = l1PaletteColor(n, source) ?? n.color
+      nodeColor.set(n.id, n.depth >= 2 ? applyDepthBackground(base, n.depth) : base)
+    }
+    // ~1/120 of the bbox width so the stroke reads at tile size regardless of map scale
+    const strokeW = Math.min(3, Math.max(0.6, bboxW / 120))
+    return { nodes: source, byId, vb: `${vbX} ${vbY} ${vbW} ${vbH}`, vbRect: { x: vbX, y: vbY, w: vbW, h: vbH }, nodeColor, strokeW, showLabels: nodes.length <= 6 }
+  }, [nodes, rootFill])
 
   const root = nodes.find(n => n.parentId === null)
   const l1s = root
@@ -976,7 +1015,7 @@ function DiagramMinimap({ id, type }: { id: string; type: string }) {
     )
   }
 
-  // Thumbnail root: show actual shape but fixed size for consistency
+  // Thumbnail root: show actual shape but fixed size for consistency, positioned at its real centre
   const isRootPill = root?.shape === 'pill' || (!root?.shape && (root?.title?.length ?? 0) >= 15)
   const THUMB_ROOT_R = 10
   const THUMB_PILL_W = 28, THUMB_PILL_H = 14
@@ -984,192 +1023,46 @@ function DiagramMinimap({ id, type }: { id: string; type: string }) {
     ? <rect x={cx2 - THUMB_PILL_W / 2} y={cy2 - THUMB_PILL_H / 2} width={THUMB_PILL_W} height={THUMB_PILL_H} rx={THUMB_PILL_H / 2} fill={rootFill} />
     : <circle cx={cx2} cy={cy2} r={THUMB_ROOT_R} fill={rootFill} />
 
-  // Diagram content area — padding is baked into the viewBox so canvasBg fills edge-to-edge
-  const P = 14  // internal padding
-  const W = 200, H = 110
-  const VB = `${-P} ${-P} ${W + P * 2} ${H + P * 2}`  // expanded viewBox
+  // ── Real-render: the actual layout, real colours, scaled to fit the tile ──────────
+  // One render path for every diagram type — mindmap/fishbone/timeline/logic-chart all
+  // already store their own real x/y layout, so replaying real positions naturally
+  // reproduces the right shape per type without separate wireframe geometry.
+  const { nodes: gNodes, byId: gById, vb, vbRect, nodeColor, strokeW, showLabels } = thumbGeo
+  const fontSize = Math.max(4, Math.min(11, vbRect.h / 22))
 
-  // Fixed 6 vibrant colors for thumbnail L1 nodes — quick visual identification
-  const THUMB_COLORS = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#8b5cf6']
-  const thumbL1s = l1s.slice(0, 6).map((l1, i) => ({ ...l1, color: THUMB_COLORS[i % THUMB_COLORS.length] }))
-
-  // ── Logic Chart ──────────────────────────────────────────────────
-  if (type === 'logic-chart' || !type) {
-    const n = thumbL1s.length
-    const rowH = (H - 14) / n
-    const l1H = Math.max(7, Math.min(18, Math.round(rowH * 0.65)))
-    const totalH = n * l1H + (n - 1) * (rowH - l1H)
-    const startY = (H - totalH) / 2
-    const rootCY = H / 2
-    const rootRight = 22 + THUMB_ROOT_R
-    const barX = rootRight + 10, l1X = barX + 8, l1W = 100
-
-    return (
-      <svg viewBox={VB} style={{ width: '100%', height: '100%' }} overflow="hidden">
-        <rect x={-P} y={-P} width={W + P * 2} height={H + P * 2} fill={canvasBg} />
-        <g transform={`translate(${W / 2} ${H / 2}) scale(0.8) translate(${-W / 2} ${-H / 2})`}>
-          {rootShape(22, rootCY)}
-          {lineStyle === 'straight' ? (
-            /* Straight: diagonal lines from root to each L1 */
-            thumbL1s.map((l1, i) => {
-              const cy = startY + i * rowH + l1H / 2
-              return (
-                <g key={l1.id}>
-                  <line x1={rootRight} y1={rootCY} x2={l1X} y2={cy} stroke={l1.color} strokeWidth={1.8} strokeLinecap="round" />
-                  <rect x={l1X} y={cy - l1H / 2} width={l1W} height={l1H} rx={l1H / 2} fill={l1.color} />
-                </g>
-              )
-            })
-          ) : lineStyle === 'curved' ? (
-            /* Brace/curved: curly bracket from root to each L1 */
-            <>
-              <line x1={rootRight} y1={rootCY} x2={rootRight + 6} y2={rootCY} stroke={rootFill} strokeWidth={2.5} strokeLinecap="round" />
-              {thumbL1s.map((l1, i) => {
-                const cy = startY + i * rowH + l1H / 2
-                const midX = rootRight + 8
-                const curveR = Math.min(8, Math.abs(cy - rootCY) / 2)
-                const dir = cy > rootCY ? 1 : cy < rootCY ? -1 : 0
-                return (
-                  <g key={l1.id}>
-                    <path
-                      d={dir === 0
-                        ? `M${midX},${rootCY} L${l1X},${cy}`
-                        : `M${midX},${rootCY} L${midX},${cy - dir * curveR} Q${midX},${cy} ${midX + curveR},${cy} L${l1X},${cy}`
-                      }
-                      fill="none" stroke={l1.color} strokeWidth={1.8} strokeLinecap="round" />
-                    <rect x={l1X} y={cy - l1H / 2} width={l1W} height={l1H} rx={l1H / 2} fill={l1.color} />
-                  </g>
-                )
-              })}
-            </>
-          ) : (
-            /* Orthogonal (default): vertical bar + horizontal stubs */
-            <>
-              <line x1={rootRight} y1={rootCY} x2={barX} y2={rootCY} stroke={rootFill} strokeWidth={2.5} strokeLinecap="round" />
-              {n > 1 && <line x1={barX} y1={startY + l1H / 2} x2={barX} y2={startY + totalH - l1H / 2} stroke={thumbL1s[Math.floor(n / 2)].color} strokeWidth={2.5} />}
-              {thumbL1s.map((l1, i) => {
-                const cy = startY + i * rowH + l1H / 2
-                return (
-                  <g key={l1.id}>
-                    <line x1={barX} y1={cy} x2={l1X} y2={cy} stroke={l1.color} strokeWidth={1.8} strokeLinecap="round" />
-                    <rect x={l1X} y={cy - l1H / 2} width={l1W} height={l1H} rx={l1H / 2} fill={l1.color} />
-                  </g>
-                )
-              })}
-            </>
-          )}
-        </g>
-      </svg>
-    )
-  }
-
-  // ── Mindmap (radial) ─────────────────────────────────────────────
-  if (type === 'mindmap') {
-    const cx = W / 2, cy = H / 2
-    const visible = thumbL1s
-    const vn = visible.length
-    const angleStep = (2 * Math.PI) / Math.max(vn, 1)
-    const startAngle = -Math.PI / 2
-    const armLen = 42, dotR = 6
-
-    return (
-      <svg viewBox={VB} style={{ width: '100%', height: '100%' }} overflow="hidden">
-        <rect x={-P} y={-P} width={W + P * 2} height={H + P * 2} fill={canvasBg} />
-        {visible.map((l1, i) => {
-          const angle = startAngle + i * angleStep
-          const x2 = cx + armLen * Math.cos(angle)
-          const y2 = cy + armLen * Math.sin(angle)
-          return (
-            <g key={l1.id}>
-              <line x1={cx} y1={cy} x2={x2} y2={y2} stroke={l1.color} strokeWidth={1.8} strokeLinecap="round" />
-              <circle cx={x2} cy={y2} r={dotR} fill={l1.color} />
-            </g>
-          )
-        })}
-        {/* Root shape on top */}
-        {rootShape(cx, cy)}
-      </svg>
-    )
-  }
-
-  // ── Fishbone ─────────────────────────────────────────────────────
-  if (type === 'fishbone') {
-    const spineY = H / 2
-    const rootEndX = 30
-
-    return (
-      <svg viewBox={VB} style={{ width: '100%', height: '100%' }} overflow="hidden">
-        <rect x={-P} y={-P} width={W + P * 2} height={H + P * 2} fill={canvasBg} />
-        {/* Root on the LEFT */}
-        {rootShape(17, spineY)}
-        {/* Spine from root rightward */}
-        <line x1={rootEndX} y1={spineY} x2={W - 14} y2={spineY} stroke={spineFill} strokeWidth={2.5} strokeLinecap="round" />
-        {thumbL1s.map((l1, i) => {
-          const above = i % 2 === 0
-          const nPairs = Math.ceil(thumbL1s.length / 2)
-          const pairGap = (W - rootEndX - 40) / Math.max(nPairs, 1)
-          const x = rootEndX + 16 + Math.floor(i / 2) * pairGap
-          const tipX = x + 18, tipY = above ? spineY - 26 : spineY + 26
-          return (
-            <g key={l1.id}>
-              <line x1={x} y1={spineY} x2={tipX} y2={tipY} stroke={l1.color} strokeWidth={1.8} strokeLinecap="round" />
-              <rect x={tipX - 12} y={tipY - 6} width={24} height={12} rx={2} fill={l1.color} />
-            </g>
-          )
-        })}
-      </svg>
-    )
-  }
-
-  // ── Timeline ─────────────────────────────────────────────────────
-  if (type === 'timeline') {
-    const spineY = H / 2, n = thumbL1s.length
-    const rootEndX = 8 + THUMB_ROOT_R * 2 + 4
-    const step = (W - rootEndX - 14) / Math.max(n, 1)
-
-    return (
-      <svg viewBox={VB} style={{ width: '100%', height: '100%' }} overflow="hidden">
-        <rect x={-P} y={-P} width={W + P * 2} height={H + P * 2} fill={canvasBg} />
-        {rootShape(8 + THUMB_ROOT_R, spineY)}
-        <line x1={rootEndX} y1={spineY} x2={W - 14} y2={spineY} stroke={spineFill} strokeWidth={2} strokeLinecap="round" />
-        {thumbL1s.map((l1, i) => {
-          const x = rootEndX + i * step + step / 2
-          const above = i % 2 === 0
-          const boxY = above ? spineY - 34 : spineY + 12
-          return (
-            <g key={l1.id}>
-              <circle cx={x} cy={spineY} r={4} fill={l1.color} />
-              <line x1={x} y1={above ? spineY - 4 : spineY + 4} x2={x} y2={above ? boxY + 14 : boxY} stroke={l1.color} strokeWidth={1.5} />
-              <rect x={x - 16} y={boxY} width={32} height={14} rx={3} fill={l1.color} opacity={0.9} />
-            </g>
-          )
-        })}
-      </svg>
-    )
-  }
-
-  // ── Default fallback (render as logic chart) ──────────────────────
-  const n2 = thumbL1s.length, rowH2 = (H - 14) / Math.max(n2, 1)
-  const l1H2 = Math.max(7, Math.min(18, Math.round(rowH2 * 0.65)))
-  const totalH2 = n2 * l1H2 + (n2 - 1) * (rowH2 - l1H2)
-  const startY2 = (H - totalH2) / 2
   return (
-    <svg viewBox={VB} style={{ width: '100%', height: '100%' }} overflow="hidden">
-      <rect x={-P} y={-P} width={W + P * 2} height={H + P * 2} fill={canvasBg} />
-      <g transform={`translate(${W / 2} ${H / 2}) scale(0.8) translate(${-W / 2} ${-H / 2})`}>
-      {rootShape(22, H / 2)}
-      <line x1={32} y1={H / 2} x2={42} y2={H / 2} stroke={rootFill} strokeWidth={2.5} strokeLinecap="round" />
-      {n2 > 1 && <line x1={42} y1={startY2 + l1H2 / 2} x2={42} y2={startY2 + totalH2 - l1H2 / 2} stroke={thumbL1s[Math.floor(n2 / 2)]?.color ?? '#94a3b8'} strokeWidth={2.5} />}
-      {thumbL1s.map((l1, i) => {
-        const cy2 = startY2 + i * rowH2 + l1H2 / 2
+    <svg viewBox={vb} preserveAspectRatio="xMidYMid meet" style={{ width: '100%', height: '100%' }} overflow="hidden">
+      <rect x={vbRect.x} y={vbRect.y} width={vbRect.w} height={vbRect.h} fill={canvasBg} />
+      {gNodes.map(n => {
+        if (n.parentId == null) return null
+        const parent = gById.get(n.parentId)
+        if (!parent) return null
+        const x1 = parent.x + parent.width, y1 = parent.y + parent.height / 2
+        const x2 = n.x, y2 = n.y + n.height / 2
+        return <line key={`e-${n.id}`} x1={x1} y1={y1} x2={x2} y2={y2} stroke={nodeColor.get(n.id)} strokeWidth={strokeW} strokeLinecap="round" />
+      })}
+      {gNodes.map(n => {
+        const fill = nodeColor.get(n.id) ?? n.color
+        const cx2 = n.x + n.width / 2, cy2 = n.y + n.height / 2
         return (
-          <g key={l1.id}>
-            <line x1={42} y1={cy2} x2={50} y2={cy2} stroke={l1.color} strokeWidth={1.8} strokeLinecap="round" />
-            <rect x={50} y={cy2 - l1H2 / 2} width={100} height={l1H2} rx={l1H2 / 2} fill={l1.color} />
+          <g key={n.id}>
+            {n.depth === 0 ? rootShape(cx2, cy2) : (
+              <rect x={n.x} y={n.y} width={n.width} height={n.height} rx={Math.max(1, n.height * 0.3)} fill={fill} />
+            )}
+            {showLabels && (
+              <>
+                <clipPath id={`thumb-clip-${id}-${n.id}`}>
+                  <rect x={n.x} y={n.y} width={n.width} height={n.height} />
+                </clipPath>
+                <text x={cx2} y={cy2} textAnchor="middle" dominantBaseline="middle" fontSize={fontSize}
+                  fill={textColorFor(fill)} clipPath={`url(#thumb-clip-${id}-${n.id})`} style={{ pointerEvents: 'none' }}>
+                  {n.title}
+                </text>
+              </>
+            )}
           </g>
         )
       })}
-      </g>
     </svg>
   )
 }

@@ -7,6 +7,7 @@ import { ImportModal } from './components/modals/ImportModal'
 import { HomePage } from './components/home/HomePage'
 import { useDiagram } from './hooks/useDiagram'
 import { useIsMobile } from './hooks/useIsMobile'
+import { useIsTouchDevice } from './hooks/useIsTouchDevice'
 import { useMindmapStore } from './store/mindmapStore'
 import { decodeShareURL } from './lib/export/share'
 import { hasGoogleAuth, renderGoogleButton } from './lib/googleAuth'
@@ -191,6 +192,7 @@ export default function App() {
   const [selectedPanelNodeId, setSelectedPanelNodeId] = useState<string | null>(null)
   const [showPanel, setShowPanel] = useState(false)
   const isMobile = useIsMobile()
+  const isTouch = useIsTouchDevice()
   const [showImport, setShowImport] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [copiedSvg, setCopiedSvg] = useState(false)
@@ -478,6 +480,8 @@ export default function App() {
         <DiagramCanvas
           onNodeSelect={handleNodeSelect}
           onDelete={activeMindmap ? () => setShowDeleteConfirm(true) : undefined}
+          readOnly={isTouch}
+          noInteract={isTouch}
         />
 
         {/* Back button — top left */}

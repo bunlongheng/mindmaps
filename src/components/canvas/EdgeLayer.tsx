@@ -16,7 +16,7 @@ interface EdgeLayerProps {
 }
 
 /** Curved bezier connecting parent center-edge to child center-edge (auto-detects direction) */
-function CurvedEdge({ parent, child, goRight = true }: { parent: MindmapNode; child: MindmapNode; goRight?: boolean }) {
+function CurvedEdge({ parent, child, goRight = true, color }: { parent: MindmapNode; child: MindmapNode; goRight?: boolean; color?: string }) {
   const x1 = goRight ? parent.x + parent.width : parent.x
   const y1 = parent.y + parent.height / 2
   const x2 = goRight ? child.x : child.x + child.width
@@ -25,7 +25,7 @@ function CurvedEdge({ parent, child, goRight = true }: { parent: MindmapNode; ch
   return (
     <path
       d={`M ${x1} ${y1} C ${cx} ${y1} ${cx} ${y2} ${x2} ${y2}`}
-      stroke={child.color}
+      stroke={color ?? child.color}
       strokeWidth={2}
       fill="none"
       strokeLinecap="round"
@@ -35,14 +35,15 @@ function CurvedEdge({ parent, child, goRight = true }: { parent: MindmapNode; ch
 
 /** Fan connector — smooth bezier curves all originating from the parent's center edge,
  *  fanning out to each child's center edge (the "braces" style) */
-function BracketConnector({ parent, children, goRight = true, showOrderNumbers = false }: { parent: MindmapNode; children: MindmapNode[]; goRight?: boolean; showOrderNumbers?: boolean }) {
+function BracketConnector({ parent, children, goRight = true, showOrderNumbers = false, colorOf }: { parent: MindmapNode; children: MindmapNode[]; goRight?: boolean; showOrderNumbers?: boolean; colorOf?: (n: MindmapNode) => string }) {
+  const colour = (n: MindmapNode) => colorOf?.(n) ?? n.color
   if (children.length === 0) return null
 
   const sorted = [...children].sort((a, b) => a.y - b.y)
 
   // Single child: simple bezier
   if (children.length === 1) {
-    return <CurvedEdge parent={parent} child={sorted[0]} goRight={goRight} />
+    return <CurvedEdge parent={parent} child={sorted[0]} goRight={goRight} color={colour(sorted[0])} />
   }
 
   const px = goRight ? parent.x + parent.width : parent.x
@@ -61,13 +62,13 @@ function BracketConnector({ parent, children, goRight = true, showOrderNumbers =
         const numX = goRight ? cx2 - 18 : cx2 + 18
         return (
           <g key={child.id}>
-            <path d={d} stroke={child.color} strokeWidth={2} fill="none" strokeLinecap="round" />
+            <path d={d} stroke={colour(child)} strokeWidth={2} fill="none" strokeLinecap="round" />
             {showOrderNumbers && parent.depth === 0 && (
               <>
-                <circle cx={numX} cy={cy} r={10} fill="#ffffff" stroke={child.color} strokeWidth={2} />
+                <circle cx={numX} cy={cy} r={10} fill="#ffffff" stroke={colour(child)} strokeWidth={2} />
                 <text x={numX} y={cy + 4}
                   textAnchor="middle" fontSize={11} fontWeight="700"
-                  fontFamily="Inter, system-ui, sans-serif" fill={child.color}
+                  fontFamily="Inter, system-ui, sans-serif" fill={colour(child)}
                   style={{ pointerEvents: 'none' }}>
                   {(child.sortOrder ?? 0) + 1}
                 </text>
@@ -149,7 +150,7 @@ export function EdgeLayer({ nodes, lineStyle, diagramType, paletteColors }: Edge
         <g>
           {allParents.map(parent => {
             const children = nodes.filter(n => n.parentId === parent.id)
-            return <BracketConnector key={parent.id} parent={parent} children={children} showOrderNumbers={showOrderNumbers} />
+            return <BracketConnector key={parent.id} parent={parent} children={children} showOrderNumbers={showOrderNumbers} colorOf={pc} />
           })}
         </g>
       )
@@ -160,7 +161,7 @@ export function EdgeLayer({ nodes, lineStyle, diagramType, paletteColors }: Edge
       <g>
         {trunk}
         {deeperEdges.map(n => (
-          <Edge key={n.id} parent={nodeMap.get(n.parentId!)!} child={n} lineStyle={lineStyle} diagramType={diagramType} />
+          <Edge key={n.id} parent={nodeMap.get(n.parentId!)!} child={n} lineStyle={lineStyle} diagramType={diagramType} color={pc(n)} />
         ))}
       </g>
     )

@@ -8,9 +8,11 @@ interface EdgeProps {
   child: MindmapNode
   lineStyle: LineStyle
   diagramType: string
+  // Palette colour for the child, so connectors match the node fill (not a stale stored colour)
+  color?: string
 }
 
-export function Edge({ parent, child, lineStyle, diagramType }: EdgeProps) {
+export function Edge({ parent, child, lineStyle, diagramType, color }: EdgeProps) {
   let src, tgt
   if (diagramType === 'fishbone') {
     src = nodeCenter(parent)
@@ -36,7 +38,7 @@ export function Edge({ parent, child, lineStyle, diagramType }: EdgeProps) {
     default: d = buildCurvedPath(src, tgt)
   }
 
-  const stroke = applyDepthTransparency(child.color, child.depth)
+  const stroke = applyDepthTransparency(color ?? child.color, child.depth)
 
   return (
     <path

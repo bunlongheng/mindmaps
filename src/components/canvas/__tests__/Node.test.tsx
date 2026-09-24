@@ -57,6 +57,7 @@ function renderNode(node: MindmapNode, props: Partial<React.ComponentProps<typeo
         onRootDragOffset={props.onRootDragOffset}
         svgRef={svgRef as unknown as React.RefObject<SVGSVGElement>}
         readOnly={props.readOnly}
+        noInteract={props.noInteract}
         l1Colors={props.l1Colors}
         paletteColor={props.paletteColor}
         childCount={props.childCount}
@@ -371,6 +372,41 @@ describe('Node — editing', () => {
     const g = container.querySelector('[data-node-id="n1"] > g') as Element
     act(() => { fireEvent.doubleClick(g) })
     expect(container.querySelector('input')).toBeFalsy()
+  })
+
+  it('renders no blue selection ring when selected + noInteract (iOS look-only)', () => {
+    const n = makeNode()
+    loadStore([makeRoot(), n])
+    const { container } = renderNode(n, { isSelected: true, readOnly: true, noInteract: true })
+    expect(container.querySelector('[stroke="#3b82f6"]')).toBeFalsy()
+  })
+
+  it('still renders the blue selection ring when selected + readOnly but not noInteract (e.g. a locked map on desktop)', () => {
+    const n = makeNode()
+    loadStore([makeRoot(), n])
+    const { container } = renderNode(n, { isSelected: true, readOnly: true })
+    expect(container.querySelector('[stroke="#3b82f6"]')).toBeTruthy()
+  })
+
+  it('renders the blue selection ring when selected + not readOnly + not noInteract', () => {
+    const n = makeNode()
+    loadStore([makeRoot(), n])
+    const { container } = renderNode(n, { isSelected: true })
+    expect(container.querySelector('[stroke="#3b82f6"]')).toBeTruthy()
+  })
+
+  it('noInteract disables pointer events and click on the outer node group', () => {
+    const n = makeNode({ url: 'example.com' })
+    loadStore([makeRoot(), n])
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null)
+    const { container, onSelect } = renderNode(n, { readOnly: true, noInteract: true })
+    const outerG = container.querySelector('[data-node-id="n1"]') as SVGGElement
+    expect(outerG.style.pointerEvents).toBe('none')
+    const innerG = container.querySelector('[data-node-id="n1"] > g') as Element
+    act(() => { fireEvent.click(innerG) })
+    expect(openSpy).not.toHaveBeenCalled()
+    expect(onSelect).not.toHaveBeenCalled()
+    openSpy.mockRestore()
   })
 
   it('commits an edit on Enter and updates the store', () => {

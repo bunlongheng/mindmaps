@@ -14,6 +14,9 @@
 //
 // Env: MINDMAP_AI_API_KEY (Bearer, required). Optional: MINDMAP_USER_ID (owner id
 // so maps show in the home list; defaults to the known owner) and MINDMAP_APP_URL.
+// The server now defaults the owner itself, so sending userId is optional - but if this
+// OWNER_ID disagrees with the server's MINDMAP_USER_ID the create fails loudly with a
+// 403 (surfaced as a tool error) instead of silently saving an unowned map (issue 27).
 //
 // NOTE: separate from the diagrams and system-design MCP servers — different app,
 // API, and store. Mind maps ONLY.
@@ -55,7 +58,7 @@ server.registerTool(
   {
     title: 'Create mindmap',
     description:
-      'Create a mind map in the Mindmaps app from an outline YOU write (no server-side AI, no Anthropic spend). `outline` is a JSON string like {"Root":[{"icon":"brain","Category A":["item 1","item 2"]}]} OR indented text (2 spaces per level). Returns the id, shareable url, svg_url, and node count; pass format:"svg" to also get the inline SVG string.',
+      'Create a mind map in the Mindmaps app from an outline YOU write (no server-side AI, no Anthropic spend). `outline` is a JSON string like {"Root":[{"icon":"brain","Category A":["item 1","item 2"]}]} OR indented text (2 spaces per level). Returns the id, shareable url, svg_url, and node count; pass format:"svg" to also get the inline SVG string. Maps are always filed under the owner\'s library - you never pass an owner, and a mismatched one is rejected with 403 rather than silently orphaned.',
     inputSchema: {
       title: z.string().describe('The map title / root label, e.g. "Machine Learning"'),
       outline: z.string().describe('JSON-string outline (categories with items, optional per-category "icon") OR indented text. Omit for an empty root.').optional(),

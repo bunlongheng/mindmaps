@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { X, Copy, Check } from 'lucide-react'
 
-interface ImportModalProps { onClose: () => void; userId?: string | null }
+interface ImportModalProps { onClose: () => void }
 
 function Badge({ label, color }: { label: string; color?: string }) {
   const c = color ?? '#6366f1'
@@ -99,14 +99,14 @@ Export MINDMAP_AI_API_KEY in your shell, then:
 curl -X POST https://mindmaps-bheng.vercel.app/api/ai/mindmaps \\
   -H "Authorization: Bearer $MINDMAP_AI_API_KEY" \\
   -H "Content-Type: application/json" \\
-  -d '{ "title": "My Map", "outline": "Root\\n  Branch 1\\n    Item A", "type": "logic-chart", "userId": "<user-id>" }'
+  -d '{ "title": "My Map", "outline": "Root\\n  Branch 1\\n    Item A", "type": "logic-chart" }'
 
-Required: title. Optional: outline, type, userId, colors, lineStyle, themeId.
+Required: title. Optional: outline, type, colors, lineStyle, themeId.
+The map is always filed under your library - no userId needed.
 Calling with no body returns a JSON sample with the full field reference.
 `
 
-export function ImportModal({ onClose, userId }: ImportModalProps) {
-  const uid = userId ?? '<your-user-id>'
+export function ImportModal({ onClose }: ImportModalProps) {
   const [copiedAll, setCopiedAll] = useState(false)
 
   function copyAll() {
@@ -207,8 +207,7 @@ Example prompt: "top 10 productivity habits for software engineers"`} />
   -d '{
     "title": "My Map",
     "outline": "Root\\n  Branch 1\\n    Item A\\n  Branch 2\\n    Item B",
-    "type": "logic-chart",
-    "userId": "${uid}"
+    "type": "logic-chart"
   }'`} />
           </Row>
 
