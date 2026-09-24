@@ -306,9 +306,10 @@ export function useDiagram(userId: string | null = null) {
   }, [setDiagrams, userId])
 
   const updateTags = useCallback(async (id: string, tags: string[]) => {
-    const { diagrams, activeMindmap, setActiveMindmap } = useMindmapStore.getState()
+    const { diagrams, activeMindmap, setMapTags } = useMindmapStore.getState()
     setDiagrams(diagrams.map(d => d.id === id ? { ...d, tags } : d))
-    if (activeMindmap?.id === id) setActiveMindmap({ ...activeMindmap, tags })
+    // setMapTags, not setActiveMindmap: re-seating the map would wipe the undo stack.
+    if (activeMindmap?.id === id) setMapTags(tags)
     lsSaveList(lsGetList().map(m => m.id === id ? { ...m, tags } : m))
     const cached = lsGetDiagram(id)
     if (cached) lsSaveDiagram({ ...cached, tags })

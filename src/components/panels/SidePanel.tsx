@@ -6,7 +6,7 @@ import { useIsMobile } from '../../hooks/useIsMobile'
 import { getTheme, THEMES, isDarkBg } from '../../lib/themes'
 import { L1_PALETTE } from '../../lib/color'
 import type { Theme } from '../../lib/themes'
-import { X, AlignLeft, AlignCenter, AlignRight, Copy, Check, FileDown, Trash2, Sparkles, Code2, Square, Squircle, Circle, Tag } from 'lucide-react'
+import { X, AlignLeft, AlignCenter, AlignRight, Copy, Check, FileDown, Trash2, Sparkles, Code2, Square, Squircle, Circle, Tag, Undo2, Redo2 } from 'lucide-react'
 import { getLucideIcon } from '../canvas/NodeIcon'
 import { showToast, dismissToast } from '../CuteToast'
 import { soundChaChing } from '../../lib/sounds'
@@ -244,6 +244,21 @@ export function SidePanel({ nodeId, onClose, onDelete, onUpdateTags }: SidePanel
     })
   }
 
+  // History lives in its own slice: the header row re-renders on every push and pop,
+  // the rest of the panel does not.
+  const { undo, redo, canUndo, canRedo } = useMindmapStore(
+    useShallow(s => ({
+      undo: s.undo, redo: s.redo,
+      canUndo: s.past.length > 0, canRedo: s.future.length > 0,
+    })),
+  )
+  const historyBtn = (enabled: boolean) => ({
+    width: 30, height: 42, border: 'none', background: 'transparent',
+    cursor: enabled ? 'pointer' : 'default', color: '#9ca3af',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    flexShrink: 0, opacity: enabled ? 1 : 0.4, padding: 0,
+  } as const)
+
   return (
     <div style={{
       position: 'fixed', top: 0, right: 0, bottom: 0, width: isMobile ? 256 : Math.round(256 * 1.2),
@@ -259,6 +274,24 @@ export function SidePanel({ nodeId, onClose, onDelete, onUpdateTags }: SidePanel
         background: '#fff', flexShrink: 0,
         padding: '0 4px',
       }}>
+        <button
+          onClick={undo}
+          disabled={!canUndo}
+          title="Undo (Cmd+Z)"
+          aria-label="Undo"
+          style={historyBtn(canUndo)}
+        >
+          <Undo2 size={14} />
+        </button>
+        <button
+          onClick={redo}
+          disabled={!canRedo}
+          title="Redo (Cmd+Shift+Z)"
+          aria-label="Redo"
+          style={historyBtn(canRedo)}
+        >
+          <Redo2 size={14} />
+        </button>
         {(['map', 'style', 'share'] as Tab[]).map(t => (
           <button key={t} onClick={() => setTab(t)} style={{
             flex: 1, height: 42, border: 'none', background: 'transparent',
@@ -270,7 +303,7 @@ export function SidePanel({ nodeId, onClose, onDelete, onUpdateTags }: SidePanel
             {t === 'style' ? 'Style' : t === 'map' ? 'Map' : 'Share'}
           </button>
         ))}
-        <button onClick={onClose} style={{
+        <button onClick={onClose} aria-label="Close panel" style={{
           width: 30, height: 42, border: 'none', background: 'transparent',
           cursor: 'pointer', color: '#9ca3af', display: 'flex', alignItems: 'center', justifyContent: 'center',
           flexShrink: 0,

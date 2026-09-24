@@ -613,10 +613,202 @@ describe('mindmapStore', () => {
       expect(useMindmapStore.getState().past.length).toBeGreaterThan(0)
     })
 
-    it('caps history at 31 entries (slice -30 + new)', () => {
+    it('caps history at 100 entries, dropping the oldest', () => {
       loadDiagram()
-      for (let i = 0; i < 40; i++) useMindmapStore.getState().snapshotHistory()
-      expect(useMindmapStore.getState().past.length).toBeLessThanOrEqual(31)
+      for (let i = 0; i < 140; i++) useMindmapStore.getState().snapshotHistory()
+      expect(useMindmapStore.getState().past).toHaveLength(100)
+    })
+  })
+
+  // Every panel edit used to be lost to Cmd+Z because only 5 actions snapshotted.
+  describe('history - every edit is undoable', () => {
+    function pastLen() { return useMindmapStore.getState().past.length }
+    function node(id: string) {
+      return useMindmapStore.getState().activeMindmap!.nodes.find(n => n.id === id)!
+    }
+
+    it('fill: 1 entry, undo restores the colour', () => {
+      loadDiagram()
+      const before = node('c1').color
+      useMindmapStore.getState().batchUpdateNodes(['c1'], { color: '#123456' })
+      expect(pastLen()).toBe(1)
+      expect(node('c1').color).toBe('#123456')
+      useMindmapStore.getState().undo()
+      expect(node('c1').color).toBe(before)
+    })
+
+    it('shape: 1 entry, undo restores the shape', () => {
+      loadDiagram()
+      useMindmapStore.getState().batchUpdateNodes(['c1'], { shape: 'circle' })
+      expect(pastLen()).toBe(1)
+      useMindmapStore.getState().undo()
+      expect(node('c1').shape).toBeUndefined()
+    })
+
+    it('width: 1 entry, undo restores the width', () => {
+      loadDiagram()
+      const before = node('c1').width
+      useMindmapStore.getState().batchUpdateNodes(['c1'], { width: 321 })
+      expect(pastLen()).toBe(1)
+      useMindmapStore.getState().undo()
+      expect(node('c1').width).toBe(before)
+    })
+
+    it('bold, italic, align and font size each land in history', () => {
+      loadDiagram()
+      useMindmapStore.getState().batchUpdateNodes(['c1'], { bold: true })
+      useMindmapStore.getState().batchUpdateNodes(['c1'], { italic: true })
+      useMindmapStore.getState().batchUpdateNodes(['c1'], { textAlign: 'right' })
+      useMindmapStore.getState().batchUpdateNodes(['c1'], { fontSize: 22 })
+      expect(pastLen()).toBe(4)
+      useMindmapStore.getState().undo()
+      expect(node('c1').fontSize).toBeUndefined()
+      expect(node('c1').textAlign).toBe('right')
+    })
+
+    it('tags: 1 entry, undo restores the map tags and the library row', () => {
+      loadDiagram()
+      useMindmapStore.getState().setDiagrams([
+        { id: 'test-diagram', name: 'Test', type: 'logic-chart', updatedAt: '2024-01-01', tags: [] },
+      ])
+      useMindmapStore.getState().setMapTags(['AI', 'Work'])
+      expect(pastLen()).toBe(1)
+      expect(useMindmapStore.getState().activeMindmap!.tags).toEqual(['AI', 'Work'])
+      useMindmapStore.getState().undo()
+      expect(useMindmapStore.getState().activeMindmap!.tags).toEqual([])
+      expect(useMindmapStore.getState().diagrams[0].tags).toEqual([])
+    })
+
+    it('link: 1 entry, undo restores the url', () => {
+      loadDiagram()
+      useMindmapStore.getState().updateNode('c1', { url: 'https://example.com' })
+      expect(pastLen()).toBe(1)
+      useMindmapStore.getState().undo()
+      expect(node('c1').url).toBeUndefined()
+    })
+
+    it('theme: 1 entry, undo restores the previous theme', () => {
+      localStorage.setItem('mindmaps:themeId', 'default')
+      loadDiagram()
+      const beforeColor = node('c1').color
+      useMindmapStore.getState().setTheme('cyberpunk')
+      expect(pastLen()).toBe(1)
+      expect(useMindmapStore.getState().themeId).toBe('cyberpunk')
+      useMindmapStore.getState().undo()
+      expect(useMindmapStore.getState().themeId).toBe('default')
+      expect(useMindmapStore.getState().activeMindmap!.themeId).toBe('default')
+      expect(node('c1').color).toBe(beforeColor)
+    })
+
+    it('line style: 1 entry, undo restores the previous style', () => {
+      loadDiagram()
+      useMindmapStore.getState().setLineStyle('curved')
+      expect(pastLen()).toBe(1)
+      expect(useMindmapStore.getState().lineStyle).toBe('curved')
+      useMindmapStore.getState().undo()
+      expect(useMindmapStore.getState().lineStyle).toBe('orthogonal')
+      expect(useMindmapStore.getState().activeMindmap!.lineStyle).toBe('orthogonal')
+    })
+
+    it('diagram type: 1 entry, undo restores the previous type', () => {
+      loadDiagram()
+      useMindmapStore.getState().setDiagramType('mindmap')
+      expect(pastLen()).toBe(1)
+      expect(useMindmapStore.getState().diagramType).toBe('mindmap')
+      useMindmapStore.getState().undo()
+      expect(useMindmapStore.getState().diagramType).toBe('logic-chart')
+      expect(useMindmapStore.getState().activeMindmap!.type).toBe('logic-chart')
+    })
+
+    it('reorder, depth resize, share, order numbers and auto icons all snapshot', () => {
+      loadDiagram()
+      useMindmapStore.getState().reorderNode('c2', 'c1')
+      useMindmapStore.getState().resizeNodeDepth(1, 260)
+      useMindmapStore.getState().setShareEnabled(true)
+      useMindmapStore.getState().setShowOrderNumbers(false)
+      useMindmapStore.getState().autoAssignIcons()
+      expect(pastLen()).toBe(5)
+      useMindmapStore.getState().undo()
+      expect(useMindmapStore.getState().showOrderNumbers).toBe(false)
+      useMindmapStore.getState().undo()
+      expect(useMindmapStore.getState().showOrderNumbers).toBe(true)
+      expect(useMindmapStore.getState().activeMindmap!.sharingEnabled).toBe(true)
+    })
+
+    it('a re-layout that trails an edit joins that edit instead of adding an entry', () => {
+      loadDiagram()
+      useMindmapStore.getState().batchUpdateNodes(['c1'], { shape: 'circle' })
+      useMindmapStore.getState().rerunLayout()
+      expect(pastLen()).toBe(1)
+      useMindmapStore.getState().undo()
+      expect(node('c1').shape).toBeUndefined()
+    })
+
+    it('a standalone re-layout is its own entry', () => {
+      vi.useFakeTimers()
+      try {
+        loadDiagram()
+        useMindmapStore.getState().batchUpdateNodes(['c1'], { shape: 'circle' })
+        vi.advanceTimersByTime(401)
+        useMindmapStore.getState().rerunLayout()
+        expect(pastLen()).toBe(2)
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('never records pure view state', () => {
+      loadDiagram()
+      useMindmapStore.getState().setSelectedNodeIds(['c1'])
+      useMindmapStore.getState().setShowChildCount(true)
+      useMindmapStore.getState().setHideDetails(true)
+      useMindmapStore.getState().setResizePreview({ depth: 1, width: 200 })
+      useMindmapStore.getState().setIsImporting(true)
+      expect(pastLen()).toBe(0)
+    })
+
+    it('coalesces a burst of same-key edits into 1 entry', () => {
+      loadDiagram()
+      const before = node('c1').width
+      for (let i = 0; i < 10; i++) {
+        useMindmapStore.getState().batchUpdateNodes(['c1'], { width: 200 + i })
+      }
+      expect(pastLen()).toBe(1)
+      expect(node('c1').width).toBe(209)
+      useMindmapStore.getState().undo()
+      expect(node('c1').width).toBe(before)
+    })
+
+    it('does not coalesce edits to a different field', () => {
+      loadDiagram()
+      useMindmapStore.getState().batchUpdateNodes(['c1'], { width: 200 })
+      useMindmapStore.getState().batchUpdateNodes(['c1'], { color: '#abcdef' })
+      expect(pastLen()).toBe(2)
+    })
+
+    it('reopens the coalescing window once the burst has gone quiet', () => {
+      vi.useFakeTimers()
+      try {
+        loadDiagram()
+        useMindmapStore.getState().batchUpdateNodes(['c1'], { width: 200 })
+        vi.advanceTimersByTime(401)
+        useMindmapStore.getState().batchUpdateNodes(['c1'], { width: 240 })
+        expect(pastLen()).toBe(2)
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('a node drag is 1 entry, not 1 per pointermove', () => {
+      loadDiagram()
+      const before = { x: node('c1').x, y: node('c1').y }
+      for (let i = 0; i < 20; i++) {
+        useMindmapStore.getState().updateNode('c1', { x: 100 + i, y: 50 + i, manuallyPositioned: true })
+      }
+      expect(pastLen()).toBe(1)
+      useMindmapStore.getState().undo()
+      expect(node('c1').x).toBe(before.x)
+      expect(node('c1').y).toBe(before.y)
     })
   })
 
