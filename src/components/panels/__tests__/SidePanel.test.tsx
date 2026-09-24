@@ -346,6 +346,55 @@ describe('SidePanel — Style tab', () => {
     // In mindmap, shape/line rows hidden — Branch block has no Circle/Pill
     expect(screen.queryByText('Circle')).toBeNull()
   })
+
+  it('Branch selected tile carries the same selected style as a selected Type tile', () => {
+    loadDiagram() // default diagramType 'logic-chart', root shape defaults to circle
+    render(<SidePanel nodeId="root" onClose={vi.fn()} />)
+    const selectedShapeTile = screen.getByText('Circle').closest('button')!
+    expect(selectedShapeTile).toHaveStyle({ borderColor: '#3b82f6', background: '#eff6ff' })
+
+    // Map tab hosts the Type block — its selected tile uses the same treatment
+    fireEvent.click(screen.getByText('Map'))
+    const selectedTypeTile = screen.getByText('Logic Chart').closest('button')!
+    expect(selectedTypeTile).toHaveStyle({ borderColor: '#3b82f6', background: '#eff6ff' })
+  })
+
+  it('no tile in the Branch block uses a black border', () => {
+    loadDiagram()
+    render(<SidePanel nodeId="root" onClose={vi.fn()} />)
+    const branchBlock = screen.getByText('Branch').closest('div')!
+    const tiles = branchBlock.querySelectorAll('button')
+    tiles.forEach(tile => {
+      expect(tile).not.toHaveStyle({ borderColor: '#1a1d2e' })
+    })
+  })
+
+  it('the Branch Line picker and the Map tab Line picker render the same 3 labels in the same order', () => {
+    loadDiagram()
+    render(<SidePanel nodeId="root" onClose={vi.fn()} />)
+    const branchBlock = screen.getByText('Branch').closest('div')!
+    const branchLabels = Array.from(branchBlock.querySelectorAll('button span')).map(s => s.textContent)
+    expect(branchLabels).toEqual(expect.arrayContaining(['Brace', 'Straight', 'Square']))
+
+    fireEvent.click(screen.getByText('Map'))
+    const lineBlock = screen.getByText('Line').closest('div')!
+    const mapLabels = Array.from(lineBlock.querySelectorAll('button span'))
+      .map(s => s.textContent)
+      .filter(t => t !== '▼' && t !== 'Line')
+    expect(mapLabels).toEqual(['Brace', 'Straight', 'Square'])
+  })
+
+  it('both Line pickers switch the store line style the same way', () => {
+    loadDiagram()
+    render(<SidePanel nodeId="root" onClose={vi.fn()} />)
+    fireEvent.click(screen.getByText('Map'))
+    fireEvent.click(screen.getByText('Square'))
+    expect(useMindmapStore.getState().lineStyle).toBe('orthogonal')
+
+    fireEvent.click(screen.getByText('Style'))
+    fireEvent.click(screen.getByText('Brace'))
+    expect(useMindmapStore.getState().lineStyle).toBe('curved')
+  })
 })
 
 describe('SidePanel — VisualPickerBlock', () => {
