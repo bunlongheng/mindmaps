@@ -575,11 +575,12 @@ export function SidePanel({ nodeId, onClose, onDelete, onUpdateTags }: SidePanel
                           background: active ? '#eff6ff' : '#fff', fontFamily: 'inherit',
                         }}>
                         {label === 'Brace' ? (
-                          <svg width="16" height="16" viewBox="0 0 20 20" fill="none" style={{ color: c }}>
-                            <path d="M7,2 C4,2 5,5 5,7 C5,9 3,10 3,10 C3,10 5,11 5,13 C5,15 4,18 7,18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                            <line x1="10" y1="4" x2="15" y2="4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                            <line x1="10" y1="10" x2="15" y2="10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                            <line x1="10" y1="16" x2="15" y2="16" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                          <svg width="20" height="18" viewBox="0 0 22 20" fill="none" style={{ color: c }}>
+                            {/* a right-facing brace: the trunk enters at the cusp, 3 leaders fan out to the right */}
+                            <path d="M9 1.5 C6.5 1.5 6 3 6 5 L6 7.5 C6 9 5 10 3.5 10 C5 10 6 11 6 12.5 L6 15 C6 17 6.5 18.5 9 18.5" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
+                            <line x1="12" y1="3.5" x2="19" y2="3.5" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
+                            <line x1="12" y1="10" x2="19" y2="10" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
+                            <line x1="12" y1="16.5" x2="19" y2="16.5" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
                           </svg>
                         ) : (
                           <svg width="16" height="10" viewBox="0 0 16 10" fill="none">

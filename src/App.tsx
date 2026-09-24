@@ -138,17 +138,6 @@ export default function App() {
   // Triple-locked: only when (1) isLocal, (2) no real session, (3) env var is set.
   const effectiveUserId = user?.userId ?? null
   const { loadDiagramList, loadDiagram, saveDiagram, createDiagramFromNodes, deleteDiagram, updateTags } = useDiagram(effectiveUserId)
-  // You took the hit: the screen flashes red, then the map on screen comes apart
-  // before we drop back to the library. Every delete path goes through here so the
-  // Settings panel and the confirm modal behave the same.
-  const animatedDelete = (id: string, name: string) => {
-    const wait = damageFlash()
-    const go = () => {
-      emberVanish(document.querySelector('.diagram-canvas-root'))
-      deleteDiagram(id, name).finally(() => handleBack())
-    }
-    if (wait) setTimeout(go, wait); else go()
-  }
 
   // Realtime removed — data now on Linode PostgreSQL
   // Shallow-selected slice so App only re-renders when one of these actually changes,
@@ -337,6 +326,18 @@ export default function App() {
     const tag = current?.tags?.[0] ?? lastTagRef.current
     window.history.replaceState({}, '', tag ? `?tag=${tag}` : window.location.pathname)
   }, [setSelectedNodeIds, loadDiagramList, saveDiagram])
+
+  // You took the hit: the screen flashes red, then the map on screen comes apart
+  // before we drop back to the library. Every delete path goes through here so the
+  // Settings panel and the confirm modal behave the same.
+  const animatedDelete = useCallback((id: string, name: string) => {
+    const wait = damageFlash()
+    const go = () => {
+      emberVanish(document.querySelector('.diagram-canvas-root'))
+      deleteDiagram(id, name).finally(() => handleBack())
+    }
+    if (wait) setTimeout(go, wait); else go()
+  }, [deleteDiagram, handleBack])
 
   const handleNodeSelect = useCallback((nodeId: string | null) => {
     if (nodeId) setSelectedPanelNodeId(nodeId)
