@@ -2,13 +2,16 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { NODE_ICONS } from '../../lib/icons'
 import { useMindmapStore } from '../../store/mindmapStore'
+import { useIsMobile } from '../../hooks/useIsMobile'
 import { getTheme, THEMES, isDarkBg } from '../../lib/themes'
-import { X, AlignLeft, AlignCenter, AlignRight, Copy, Check, FileDown, Trash2, Sparkles, Code2, Square, Squircle, Pill, Circle } from 'lucide-react'
+import type { Theme } from '../../lib/themes'
+import { X, AlignLeft, AlignCenter, AlignRight, Copy, Check, FileDown, Trash2, Sparkles, Code2, Square, Squircle, Pill, Circle, Tag } from 'lucide-react'
 import { getLucideIcon } from '../canvas/NodeIcon'
 import { showToast, dismissToast } from '../CuteToast'
 import { soundChaChing } from '../../lib/sounds'
 import { authHeaders } from '../../hooks/useDiagram'
-import type { LineStyle, DiagramType } from '../../types'
+import { levelCounts } from '../../lib/nodeCounts'
+import type { LineStyle, DiagramType, Diagram, DiagramMeta } from '../../types'
 import type { NodeShape } from '../../lib/nodeShape'
 import { QRCodeSVG } from 'qrcode.react'
 
@@ -16,6 +19,22 @@ interface SidePanelProps {
   nodeId: string | null
   onClose: () => void
   onDelete?: () => void
+  onUpdateTags?: (id: string, tags: string[]) => void
+}
+
+// 8 cohesive colors — all Tailwind-500 level, same saturation family
+const TAG_PALETTE = [
+  '#6366f1', '#14b8a6', '#ec4899', '#f59e0b',
+  '#22c55e', '#3b82f6', '#f97316', '#8b5cf6',
+]
+const PRESET_TAGS = ['AI', 'Work', 'Personal', 'Research']
+
+function buildTagColorMap(allTags: string[]): Map<string, string> {
+  const sorted = [...new Set(allTags)].sort()
+  return new Map(sorted.map((tag, i) => [tag, TAG_PALETTE[i % TAG_PALETTE.length]]))
+}
+function tagBg(tag: string, colorMap: Map<string, string>): string {
+  return colorMap.get(tag) ?? '#64748b'
 }
 
 const DIAGRAM_TYPES: { value: DiagramType; label: string }[] = [
@@ -84,17 +103,18 @@ function DiagramTypeIcon({ value, color }: { value: string; color: string }) {
 type Tab = 'style' | 'map' | 'share'
 
 
-export function SidePanel({ nodeId, onClose, onDelete }: SidePanelProps) {
+export function SidePanel({ nodeId, onClose, onDelete, onUpdateTags }: SidePanelProps) {
   // Shallow-selected slice so the panel only re-renders when one of these actually
   // changes, not on every store write (resizePreview during drags, HUD flags, etc.).
   const {
-    activeMindmap, updateNode, batchUpdateNodes, selectedNodeIds,
+    activeMindmap, updateNode, batchUpdateNodes, selectedNodeIds, diagrams,
     lineStyle, setLineStyle, diagramType, setDiagramType, setShareEnabled, rerunLayout,
     themeId, setTheme, showOrderNumbers, setShowOrderNumbers, showChildCount, setShowChildCount, autoAssignIcons,
     resizeNodeDepth,
   } = useMindmapStore(
     useShallow(s => ({
       activeMindmap: s.activeMindmap, updateNode: s.updateNode, batchUpdateNodes: s.batchUpdateNodes, selectedNodeIds: s.selectedNodeIds,
+      diagrams: s.diagrams,
       lineStyle: s.lineStyle, setLineStyle: s.setLineStyle, diagramType: s.diagramType, setDiagramType: s.setDiagramType,
       setShareEnabled: s.setShareEnabled, rerunLayout: s.rerunLayout,
       themeId: s.themeId, setTheme: s.setTheme, showOrderNumbers: s.showOrderNumbers, setShowOrderNumbers: s.setShowOrderNumbers,
@@ -102,7 +122,9 @@ export function SidePanel({ nodeId, onClose, onDelete }: SidePanelProps) {
       resizeNodeDepth: s.resizeNodeDepth,
     })),
   )
+  const mapInfo = useMemo(() => levelCounts(activeMindmap?.nodes ?? []), [activeMindmap?.nodes])
   const themeColors = getTheme(themeId).colors
+  const isMobile = useIsMobile()
 
   const [tab, setTab] = useState<Tab>('map')
   const [iconLoading, setIconLoading] = useState(false)
@@ -223,7 +245,7 @@ export function SidePanel({ nodeId, onClose, onDelete }: SidePanelProps) {
 
   return (
     <div style={{
-      position: 'fixed', top: 0, right: 0, bottom: 0, width: 256,
+      position: 'fixed', top: 0, right: 0, bottom: 0, width: isMobile ? 256 : Math.round(256 * 1.2),
       background: '#f8f9fb', borderLeft: '1px solid #e8eaed',
       display: 'flex', flexDirection: 'column',
       boxShadow: '-2px 0 16px rgba(0,0,0,0.07)', zIndex: 30,
@@ -508,6 +530,8 @@ export function SidePanel({ nodeId, onClose, onDelete }: SidePanelProps) {
       {/* ── Map tab ── */}
       {tab === 'map' && (
         <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', minHeight: 0}}>
+          <TagsBlock activeMindmap={activeMindmap} diagrams={diagrams} onUpdateTags={onUpdateTags} />
+          <HR />
           <SBlock title="Type">
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
               {DIAGRAM_TYPES.map(({ value, label }) => {
@@ -536,11 +560,12 @@ export function SidePanel({ nodeId, onClose, onDelete }: SidePanelProps) {
               <SBlock title="Line">
                 <div style={{ display: 'flex', gap: 6 }}>
                   {([
-                    { value: 'curved' as LineStyle,     label: 'Brace',    d: 'M1,2 L5,2 M1,5 L5,5 M1,8 L5,8 M5,2 L5,8 L9,5' },
+                    { value: 'curved' as LineStyle,     label: 'Brace',    d: '' },
                     { value: 'straight' as LineStyle,   label: 'Straight', d: 'M1,8 L15,2' },
                     { value: 'orthogonal' as LineStyle, label: 'Square',   d: 'M1,8 L8,8 L8,2 L15,2' },
                   ]).map(({ value, label, d }) => {
                     const active = lineStyle === value
+                    const c = active ? '#3b82f6' : '#64748b'
                     return (
                       <button key={value} onClick={() => setLineStyle(value)}
                         style={{
@@ -549,10 +574,20 @@ export function SidePanel({ nodeId, onClose, onDelete }: SidePanelProps) {
                           border: `1.5px solid ${active ? '#3b82f6' : '#e0e2e7'}`,
                           background: active ? '#eff6ff' : '#fff', fontFamily: 'inherit',
                         }}>
-                        <svg width="16" height="10" viewBox="0 0 16 10" fill="none">
-                          <path d={d} stroke={active ? '#3b82f6' : '#64748b'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                        <span style={{ fontSize: 9, fontWeight: active ? 600 : 500, color: active ? '#3b82f6' : '#64748b' }}>{label}</span>
+                        {label === 'Brace' ? (
+                          <svg width="20" height="18" viewBox="0 0 22 20" fill="none" style={{ color: c }}>
+                            {/* a right-facing brace: the trunk enters at the cusp, 3 leaders fan out to the right */}
+                            <path d="M9 1.5 C6.5 1.5 6 3 6 5 L6 7.5 C6 9 5 10 3.5 10 C5 10 6 11 6 12.5 L6 15 C6 17 6.5 18.5 9 18.5" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
+                            <line x1="12" y1="3.5" x2="19" y2="3.5" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
+                            <line x1="12" y1="10" x2="19" y2="10" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
+                            <line x1="12" y1="16.5" x2="19" y2="16.5" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
+                          </svg>
+                        ) : (
+                          <svg width="16" height="10" viewBox="0 0 16 10" fill="none">
+                            <path d={d} stroke={c} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        )}
+                        <span style={{ fontSize: 9, fontWeight: active ? 600 : 500, color: c }}>{label}</span>
                       </button>
                     )
                   })}
@@ -615,39 +650,27 @@ export function SidePanel({ nodeId, onClose, onDelete }: SidePanelProps) {
           </SBlock>
           <HR />
           <SBlock title="Theme">
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-              {THEMES.map(theme => {
-                const active = themeId === theme.id
-                const dark = isDarkBg(theme.canvasBg)
-                const labelColor = active
-                  ? (dark ? '#93c5fd' : '#3b82f6')
-                  : (dark ? '#f1f5f9' : '#374151')
-                return (
-                  <button key={theme.id} onClick={() => setTheme(theme.id)}
-                    style={{
-                      width: '100%', padding: '8px 10px', borderRadius: 8, textAlign: 'left',
-                      border: `1.5px solid ${active ? '#3b82f6' : '#e0e2e7'}`,
-                      background: theme.canvasBg, cursor: 'pointer',
-                      fontFamily: 'inherit',
-                      display: 'flex', alignItems: 'center', gap: 10,
-                      boxShadow: active ? `0 0 0 2px #3b82f6` : 'none',
-                    }}>
-                    {/* mini palette preview */}
-                    <div style={{ display: 'flex', gap: 2, flexShrink: 0 }}>
-                      {theme.colors.slice(0, 6).map((c, i) => (
-                        <div key={i} style={{
-                          width: 10, height: 10, borderRadius: 3, background: c,
-                          border: '1px solid rgba(0,0,0,0.12)',
-                        }} />
-                      ))}
-                    </div>
-                    <span style={{ fontSize: 12, fontWeight: active ? 700 : 400, color: labelColor }}>
-                      {theme.label}
-                    </span>
-                  </button>
-                )
-              })}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+              {THEMES.map(theme => (
+                <ThemeCard key={theme.id} theme={theme} active={themeId === theme.id} onSelect={() => setTheme(theme.id)} />
+              ))}
             </div>
+          </SBlock>
+          <HR />
+          <SBlock title="Details" defaultOpen={false}>
+            {mapInfo.byDepth.map((count, depth) => (
+              <PRow key={depth} label={depth === 0 ? 'Root' : `L${depth}`}>
+                <div style={{ fontSize: 12, color: '#111827', fontWeight: 600, textAlign: 'right' }}>{count}</div>
+              </PRow>
+            ))}
+            <PRow label="Total">
+              <div style={{ fontSize: 12, color: '#111827', fontWeight: 700, textAlign: 'right', paddingTop: 4, borderTop: '1px solid #e8eaed' }}>{mapInfo.total}</div>
+            </PRow>
+            {mapInfo.largestBranch && (
+              <p style={{ fontSize: 10, color: '#9ca3af', margin: 0, lineHeight: 1.5 }}>
+                Deepest: L{mapInfo.deepest}. Largest branch: {mapInfo.largestBranch.title}, {mapInfo.largestBranch.count} nodes.
+              </p>
+            )}
           </SBlock>
         </div>
       )}
@@ -741,7 +764,7 @@ export function SidePanel({ nodeId, onClose, onDelete }: SidePanelProps) {
                 onMouseLeave={e => (e.currentTarget.style.background = '#fff')}>
                 <FileDown size={13} /> Export PDF
               </button>
-              <button onClick={() => setShowDeleteConfirm(true)} style={{
+              <button onClick={() => setShowDeleteConfirm(true)} title="Delete map" style={{
                 padding: '9px 12px', borderRadius: 8,
                 border: '1px solid #fecaca', background: '#fff',
                 cursor: 'pointer', fontSize: 12, fontWeight: 500,
@@ -790,14 +813,22 @@ export function SidePanel({ nodeId, onClose, onDelete }: SidePanelProps) {
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
 
-function SBlock({ title, children }: { title: string; children: React.ReactNode }) {
+function SBlock({ title, children, defaultOpen = true }: { title: string; children: React.ReactNode; defaultOpen?: boolean }) {
+  const [open, setOpen] = useState(defaultOpen)
   return (
     <div style={{ padding: '12px 14px 8px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 10 }}>
-        <span style={{ fontSize: 9, color: '#6b7280' }}>▼</span>
+      <button onClick={() => setOpen(o => !o)} style={{
+        display: 'flex', alignItems: 'center', gap: 5, marginBottom: open ? 10 : 0,
+        background: 'none', border: 'none', padding: 0, width: '100%', textAlign: 'left',
+        cursor: 'pointer', fontFamily: 'inherit',
+      }}>
+        <span style={{
+          fontSize: 9, color: '#6b7280', display: 'inline-block',
+          transform: open ? 'rotate(0deg)' : 'rotate(-90deg)', transition: 'transform 120ms ease',
+        }}>▼</span>
         <span style={{ fontSize: 11, fontWeight: 700, color: '#374151', letterSpacing: '0.04em', textTransform: 'uppercase' }}>{title}</span>
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>{children}</div>
+      </button>
+      {open && <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>{children}</div>}
     </div>
   )
 }
@@ -808,6 +839,92 @@ function PRow({ label, children }: { label: string; children: React.ReactNode })
       <span style={{ fontSize: 11, color: '#9ca3af', width: 38, paddingTop: 7, flexShrink: 0 }}>{label}</span>
       <div style={{ flex: 1 }}>{children}</div>
     </div>
+  )
+}
+
+function TagsBlock({ activeMindmap, diagrams, onUpdateTags }: {
+  activeMindmap: Diagram | null
+  diagrams: DiagramMeta[]
+  onUpdateTags?: (id: string, tags: string[]) => void
+}) {
+  const [showPicker, setShowPicker] = useState(false)
+  const [tagInput, setTagInput] = useState('')
+
+  const currentTags = useMemo(() => activeMindmap?.tags ?? [], [activeMindmap?.tags])
+  const tagColorMap = useMemo(() => {
+    const all = [...new Set([...PRESET_TAGS, ...diagrams.flatMap(d => d.tags ?? [])])]
+    return buildTagColorMap(all)
+  }, [diagrams])
+  const available = useMemo(() => {
+    const allTagsList = [...new Set([...PRESET_TAGS, ...diagrams.flatMap(d => d.tags ?? [])])]
+    return allTagsList.filter(t => !currentTags.includes(t))
+  }, [diagrams, currentTags])
+
+  function addTag(tag: string) {
+    const t = tag.trim()
+    if (!t || !activeMindmap || currentTags.includes(t)) return
+    onUpdateTags?.(activeMindmap.id, [...currentTags, t])
+    setTagInput('')
+  }
+  function removeTag(tag: string) {
+    if (!activeMindmap) return
+    onUpdateTags?.(activeMindmap.id, currentTags.filter(t => t !== tag))
+  }
+
+  return (
+    <SBlock title="Tags">
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+        <Tag size={13} color="#94a3b8" style={{ flexShrink: 0 }} />
+        {currentTags.map(t => (
+          <span key={t} onClick={() => removeTag(t)} title="Remove tag" style={{
+            display: 'inline-flex', alignItems: 'center', gap: 4,
+            fontSize: 11, fontWeight: 700, padding: '4px 9px', borderRadius: 10,
+            background: tagBg(t, tagColorMap), color: '#fff',
+            cursor: 'pointer', fontFamily: 'inherit',
+          }}>
+            {t} <X size={8} strokeWidth={3} />
+          </span>
+        ))}
+        <button onClick={() => setShowPicker(p => !p)} style={{
+          fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 10,
+          background: showPicker ? '#1a1d2e' : '#f1f5f9',
+          color: showPicker ? '#fff' : '#64748b',
+          border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+          display: 'flex', alignItems: 'center', gap: 4,
+        }}>
+          + Tag
+        </button>
+      </div>
+      {showPicker && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 2 }}>
+          {available.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+              {available.map(t => (
+                <button key={t} onClick={() => { addTag(t); setShowPicker(false) }}
+                  style={{
+                    fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 10,
+                    background: `${tagBg(t, tagColorMap)}22`, color: tagBg(t, tagColorMap),
+                    border: `1px solid ${tagBg(t, tagColorMap)}55`,
+                    cursor: 'pointer', fontFamily: 'inherit',
+                  }}>{t}</button>
+              ))}
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 6 }}>
+            <input value={tagInput} onChange={e => setTagInput(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') { addTag(tagInput); setShowPicker(false); e.preventDefault() } }}
+              placeholder="Custom tag…"
+              style={{ flex: 1, fontSize: 12, padding: '6px 10px', border: '1px solid #e0e2e7', borderRadius: 8, outline: 'none', fontFamily: 'inherit', color: '#111827' }}
+              autoFocus
+            />
+            <button onClick={() => { addTag(tagInput); setShowPicker(false) }}
+              style={{ padding: '6px 12px', background: '#6366f1', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontFamily: 'inherit', fontWeight: 600 }}>
+              Add
+            </button>
+          </div>
+        </div>
+      )}
+    </SBlock>
   )
 }
 
@@ -1015,4 +1132,54 @@ function chip(active: boolean): React.CSSProperties {
     cursor: 'pointer', fontSize: 11, fontWeight: active ? 600 : 500,
     color: active ? '#3b82f6' : '#4b5563', fontFamily: 'inherit',
   }
+}
+
+// A 2-column tile that mirrors the Type tiles: same gap/radius/border/tinted-surface
+// selected state, but the card itself always keeps the light tile surface - even for
+// a dark theme - so the panel stays cohesive. Only the preview strip carries the
+// theme's own canvas background.
+function ThemeCard({ theme, active, onSelect }: { theme: Theme; active: boolean; onSelect: () => void }) {
+  const [hover, setHover] = useState(false)
+  const [focused, setFocused] = useState(false)
+  const ring = (active || focused) ? '0 0 0 2px #3b82f6' : ''
+  const lift = hover ? '0 4px 10px rgba(0,0,0,0.12)' : ''
+  // Connector tone reads against the theme's own canvas - lighter for a dark canvas.
+  const edgeColor = isDarkBg(theme.canvasBg) ? 'rgba(255,255,255,0.35)' : 'rgba(15,23,42,0.28)'
+  const root = theme.colors[0]
+  const branches = [theme.colors[1], theme.colors[2], theme.colors[3]]
+  return (
+    <button
+      onClick={onSelect}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
+      style={{
+        display: 'flex', flexDirection: 'column', gap: 5, padding: 6,
+        borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit',
+        border: `1.5px solid ${active ? '#3b82f6' : '#e0e2e7'}`,
+        background: active ? '#eff6ff' : '#fff',
+        boxShadow: [ring, lift].filter(Boolean).join(', ') || 'none',
+        transform: hover ? 'translateY(-1px)' : 'none',
+        transition: 'transform 120ms ease, box-shadow 120ms ease',
+      }}>
+      <div style={{ width: '100%', aspectRatio: '3 / 1', borderRadius: 6, overflow: 'hidden', background: theme.canvasBg }}>
+        <svg width="100%" height="100%" viewBox="0 0 120 40" preserveAspectRatio="none">
+          <rect x="6" y="17" width="22" height="6" rx="3" fill={root} />
+          <path d="M28,20 C40,20 40,8 52,8" stroke={edgeColor} strokeWidth="1.4" fill="none" strokeLinecap="round" />
+          <rect x="52" y="5" width="30" height="6" rx="3" fill={branches[0]} />
+          <line x1="28" y1="20" x2="52" y2="20" stroke={edgeColor} strokeWidth="1.4" />
+          <rect x="52" y="17" width="30" height="6" rx="3" fill={branches[1]} />
+          <path d="M28,20 C40,20 40,32 52,32" stroke={edgeColor} strokeWidth="1.4" fill="none" strokeLinecap="round" />
+          <rect x="52" y="29" width="30" height="6" rx="3" fill={branches[2]} />
+        </svg>
+      </div>
+      <span style={{
+        fontSize: 12, fontWeight: 600, color: active ? '#3b82f6' : '#374151',
+        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+      }}>
+        {theme.label}
+      </span>
+    </button>
+  )
 }

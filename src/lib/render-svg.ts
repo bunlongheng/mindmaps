@@ -15,8 +15,9 @@ import { computeMindmapLayout, wrapText } from './layout/mindmap.js'
 import { computeFishboneLayout, FISHBONE_SLANT } from './layout/fishbone.js'
 import { computeTimelineLayout } from './layout/timeline.js'
 import { getTheme } from './themes.js'
-import { L1_PALETTE, hexToRgb, darken, depthFill, applyDepthTransparency } from './color.js'
-import { rootPillWidth, rootPillFontSize, rootTitleNeedsPill } from './rootPill.js'
+import { L1_PALETTE, hexToRgb, darken, depthFill, applyDepthTransparency, edgeWidthForDepth } from './color.js'
+import { rootPillWidth, rootPillFontSize, rootTitleNeedsPill, ROOT_FONT } from './rootPill.js'
+import { nodeMetrics, ICON_GAP } from './nodeMetrics.js'
 import { shapeRx } from './nodeShape.js'
 import { parseLinkedTitle, sliceSegments, lineRanges, type LinkSegment } from './links.js'
 import { nodeCenter, nodeCenterLeft, nodeCenterRight, buildStraightPath, buildCurvedPath, buildOrthogonalPath } from './geometry.js'
@@ -99,7 +100,7 @@ function layoutForRender(raw: MindmapNode[], type: DiagramType): MindmapNode[] {
   const fresh = raw.map(n => {
     if (n.depth !== 0) return { ...n, width: 0, height: 0, manuallyPositioned: false }
     const isPill = parseLinkedTitle(n.title).text.length >= 15 || n.width !== n.height
-    if (isPill) return { ...n, width: rootPillWidth(n.title, n.fontSize ?? 28), height: 90, manuallyPositioned: false }
+    if (isPill) return { ...n, width: rootPillWidth(n.title, n.fontSize ?? ROOT_FONT), height: nodeMetrics(0).height, manuallyPositioned: false }
     return { ...n, manuallyPositioned: false }
   })
   const withWidths = runLayout(fresh, type)
@@ -120,7 +121,7 @@ function curvedEdge(parent: MindmapNode, child: MindmapNode): string {
   const x2 = child.x
   const y2 = child.y + child.height / 2
   const cx = (x1 + x2) / 2
-  return `<path d="M ${r2(x1)} ${r2(y1)} C ${r2(cx)} ${r2(y1)} ${r2(cx)} ${r2(y2)} ${r2(x2)} ${r2(y2)}" stroke="${esc(child.color)}" stroke-width="2" fill="none" stroke-linecap="round"/>`
+  return `<path d="M ${r2(x1)} ${r2(y1)} C ${r2(cx)} ${r2(y1)} ${r2(cx)} ${r2(y2)} ${r2(x2)} ${r2(y2)}" stroke="${esc(child.color)}" stroke-width="${edgeWidthForDepth(child.depth)}" fill="none" stroke-linecap="round"/>`
 }
 
 /** Fan of beziers from a parent to its children (EdgeLayer BracketConnector). */
@@ -135,7 +136,7 @@ function bracketConnector(parent: MindmapNode, children: MindmapNode[]): string 
     const cx2 = child.x
     const gap = Math.abs(cx2 - px)
     const c1x = px + gap * 0.5
-    return `<path d="M ${r2(px)} ${r2(py)} C ${r2(c1x)} ${r2(py)}, ${r2(c1x)} ${r2(cy)}, ${r2(cx2)} ${r2(cy)}" stroke="${esc(child.color)}" stroke-width="2" fill="none" stroke-linecap="round"/>`
+    return `<path d="M ${r2(px)} ${r2(py)} C ${r2(c1x)} ${r2(py)}, ${r2(c1x)} ${r2(cy)}, ${r2(cx2)} ${r2(cy)}" stroke="${esc(child.color)}" stroke-width="${edgeWidthForDepth(child.depth)}" fill="none" stroke-linecap="round"/>`
   }).join('')
 }
 
@@ -148,7 +149,7 @@ function deepEdge(parent: MindmapNode, child: MindmapNode, lineStyle: LineStyle)
   const d = lineStyle === 'straight' ? buildStraightPath(src, tgt)
     : lineStyle === 'orthogonal' ? buildOrthogonalPath(src, tgt)
     : buildCurvedPath(src, tgt)
-  return `<path d="${d}" stroke="${esc(edgeStroke(child.color, child.depth))}" stroke-width="1.5" fill="none" stroke-linecap="round"/>`
+  return `<path d="${d}" stroke="${esc(edgeStroke(child.color, child.depth))}" stroke-width="${edgeWidthForDepth(child.depth)}" fill="none" stroke-linecap="round"/>`
 }
 
 function renderEdges(nodes: MindmapNode[], type: DiagramType, lineStyle: LineStyle, pc: (n: MindmapNode) => string): string {
@@ -178,7 +179,7 @@ function renderEdges(nodes: MindmapNode[], type: DiagramType, lineStyle: LineSty
       const d = lineStyle === 'straight'
         ? `M ${r2(sx)} ${r2(sy)} L ${r2(ex)} ${r2(ey)}`
         : `M ${r2(sx)} ${r2(sy)} Q ${r2(mx)} ${r2(my)} ${r2(ex)} ${r2(ey)}`
-      const width = n.depth === 1 ? 3 : n.depth === 2 ? 2.5 : 2
+      const width = edgeWidthForDepth(n.depth)
       return `<path d="${d}" stroke="${esc(pc(n))}" stroke-width="${width}" fill="none" stroke-linecap="round"/>`
     }).join('')
   }
@@ -199,7 +200,7 @@ function renderEdges(nodes: MindmapNode[], type: DiagramType, lineStyle: LineSty
       const attachX = l1CX - FISHBONE_SLANT
       const above = l1CY < spineY
       const l1EdgeY = above ? l1.y + l1.height : l1.y
-      parts.push(`<line x1="${r2(attachX)}" y1="${r2(spineY)}" x2="${r2(l1CX)}" y2="${r2(l1EdgeY)}" stroke="${esc(pc(l1))}" stroke-width="2.5" stroke-linecap="round"/>`)
+      parts.push(`<line x1="${r2(attachX)}" y1="${r2(spineY)}" x2="${r2(l1CX)}" y2="${r2(l1EdgeY)}" stroke="${esc(pc(l1))}" stroke-width="${edgeWidthForDepth(1)}" stroke-linecap="round"/>`)
     }
     for (const l2 of nodes.filter(n => n.depth === 2)) {
       const l1 = nodeMap.get(l2.parentId ?? '')
@@ -214,12 +215,12 @@ function renderEdges(nodes: MindmapNode[], type: DiagramType, lineStyle: LineSty
       const t = above ? (spineY - l2CY) / boneEdgeH : (l2CY - spineY) / boneEdgeH
       const diagX = attachX + FISHBONE_SLANT * t
       const nodeEdgeX = l2.x + (l2.height * 0.35) / 2
-      parts.push(`<line x1="${r2(diagX)}" y1="${r2(l2CY)}" x2="${r2(nodeEdgeX)}" y2="${r2(l2CY)}" stroke="${esc(pc(l2))}" stroke-width="1.5" stroke-linecap="round"/>`)
+      parts.push(`<line x1="${r2(diagX)}" y1="${r2(l2CY)}" x2="${r2(nodeEdgeX)}" y2="${r2(l2CY)}" stroke="${esc(pc(l2))}" stroke-width="${edgeWidthForDepth(2)}" stroke-linecap="round"/>`)
     }
     for (const n of nodes.filter(n => n.depth >= 3)) {
       const parent = nodeMap.get(n.parentId ?? '')
       if (!parent) continue
-      parts.push(`<line x1="${r2(parent.x + parent.width)}" y1="${r2(parent.y + parent.height / 2)}" x2="${r2(n.x)}" y2="${r2(n.y + n.height / 2)}" stroke="${esc(pc(n))}" stroke-width="1.5" stroke-linecap="round"/>`)
+      parts.push(`<line x1="${r2(parent.x + parent.width)}" y1="${r2(parent.y + parent.height / 2)}" x2="${r2(n.x)}" y2="${r2(n.y + n.height / 2)}" stroke="${esc(pc(n))}" stroke-width="${edgeWidthForDepth(n.depth)}" stroke-linecap="round"/>`)
     }
     return parts.join('')
   }
@@ -252,11 +253,11 @@ function renderEdges(nodes: MindmapNode[], type: DiagramType, lineStyle: LineSty
           : Math.max(...descendants.map(n => n.y + n.height / 2))
         : l1SpineEdge
       if (descendants.length > 0) {
-        parts.push(`<line x1="${r2(branchX)}" y1="${r2(l1SpineEdge)}" x2="${r2(branchX)}" y2="${r2(farY)}" stroke="${esc(pc(l1))}" stroke-width="1.8" stroke-linecap="round"/>`)
+        parts.push(`<line x1="${r2(branchX)}" y1="${r2(l1SpineEdge)}" x2="${r2(branchX)}" y2="${r2(farY)}" stroke="${esc(pc(l1))}" stroke-width="${edgeWidthForDepth(2)}" stroke-linecap="round"/>`)
       }
       for (const n of descendants) {
         const nodeCY = n.y + n.height / 2
-        parts.push(`<line x1="${r2(branchX)}" y1="${r2(nodeCY)}" x2="${r2(n.x)}" y2="${r2(nodeCY)}" stroke="${esc(pc(l1))}" stroke-width="1.5" stroke-linecap="round"/>`)
+        parts.push(`<line x1="${r2(branchX)}" y1="${r2(nodeCY)}" x2="${r2(n.x)}" y2="${r2(nodeCY)}" stroke="${esc(pc(l1))}" stroke-width="${edgeWidthForDepth(n.depth)}" stroke-linecap="round"/>`)
       }
     }
     return parts.join('')
@@ -283,7 +284,7 @@ function renderEdges(nodes: MindmapNode[], type: DiagramType, lineStyle: LineSty
     const barX = l1LeftX - 60
     const sortedL1 = [...l1Nodes].sort((a, b) => a.y - b.y)
     const l1MidY = ((sortedL1[0].y + sortedL1[0].height / 2) + (sortedL1[sortedL1.length - 1].y + sortedL1[sortedL1.length - 1].height / 2)) / 2
-    parts.push(`<line x1="${r2(rootRightX)}" y1="${r2(l1MidY)}" x2="${r2(barX)}" y2="${r2(l1MidY)}" stroke="#1a1d2e" stroke-width="4" stroke-linecap="round"/>`)
+    parts.push(`<line x1="${r2(rootRightX)}" y1="${r2(l1MidY)}" x2="${r2(barX)}" y2="${r2(l1MidY)}" stroke="#1a1d2e" stroke-width="${edgeWidthForDepth(1)}" stroke-linecap="round"/>`)
     l1Nodes.forEach((l1, i) => {
       if (i === l1Nodes.length - 1) return
       const nextL1 = l1Nodes[i + 1]
@@ -291,7 +292,7 @@ function renderEdges(nodes: MindmapNode[], type: DiagramType, lineStyle: LineSty
     })
     for (const l1 of l1Nodes) {
       const stubY = l1.y + l1.height / 2
-      parts.push(`<line x1="${r2(barX)}" y1="${r2(stubY)}" x2="${r2(l1.x)}" y2="${r2(stubY)}" stroke="${esc(pc(l1))}" stroke-width="4" stroke-linecap="round"/>`)
+      parts.push(`<line x1="${r2(barX)}" y1="${r2(stubY)}" x2="${r2(l1.x)}" y2="${r2(stubY)}" stroke="${esc(pc(l1))}" stroke-width="${edgeWidthForDepth(1)}" stroke-linecap="round"/>`)
     }
   }
   for (const n of nodes) {
@@ -343,7 +344,7 @@ function renderNode(node: MindmapNode, type: DiagramType, paletteColor: string |
   const isRootPill = isRoot && type !== 'mindmap' && (
     node.shape === 'pill' ? true :
     node.shape === 'circle' ? false :
-    rootTitleNeedsPill(node.title, node.fontSize ?? 28)
+    rootTitleNeedsPill(node.title, node.fontSize ?? ROOT_FONT)
   )
 
   // Styling per depth (Node.tsx)
@@ -364,10 +365,12 @@ function renderNode(node: MindmapNode, type: DiagramType, paletteColor: string |
   }
   if (node.borderColor) { strokeColor = node.borderColor; strokeW = Math.max(strokeW, node.borderWidth ?? 1.5) }
 
-  const defaultFontSize = node.depth === 0 ? 34 : node.depth === 1 ? 26 : node.depth === 2 ? 19 : node.depth === 3 ? 16 : 13
+  // Same shared box table the canvas reads (src/lib/nodeMetrics), so a card preview
+  // and the opened map can never draw a label at a different size.
+  const metric = nodeMetrics(node.depth)
   // Coerced: fontSize is typed number but arrives as unvalidated stored JSON, and it
   // lands in an SVG attribute that the home grid injects with dangerouslySetInnerHTML.
-  const baseFontSize = Number(node.fontSize) || defaultFontSize
+  const baseFontSize = Number(node.fontSize) || metric.fontSize
   const fontSize = isRootPill ? rootPillFontSize(node.title, baseFontSize) : baseFontSize
   const fontWeight = node.bold ? '700' : (isRoot ? '500' : node.depth === 1 ? '500' : '400')
 
@@ -390,9 +393,9 @@ function renderNode(node: MindmapNode, type: DiagramType, paletteColor: string |
   // ── Shape ──
   if (isRoot) {
     if (isRootPill) {
-      parts.push(`<rect x="0" y="0" width="${r2(displayW)}" height="${r2(h)}" rx="${r2(h / 2)}" ry="${r2(h / 2)}" fill="${esc(bg)}" fill-opacity="0.8" stroke="${esc(strokeColor)}" stroke-width="${strokeW}"/>`)
+      parts.push(`<rect x="0" y="0" width="${r2(displayW)}" height="${r2(h)}" rx="${r2(h / 2)}" ry="${r2(h / 2)}" fill="${esc(bg)}" stroke="${esc(strokeColor)}" stroke-width="${strokeW}"/>`)
     } else {
-      parts.push(`<circle cx="${r2(cx)}" cy="${r2(cy)}" r="${r2(displayW / 2)}" fill="${esc(bg)}" fill-opacity="0.8" stroke="${esc(strokeColor)}" stroke-width="${strokeW}"/>`)
+      parts.push(`<circle cx="${r2(cx)}" cy="${r2(cy)}" r="${r2(displayW / 2)}" fill="${esc(bg)}" stroke="${esc(strokeColor)}" stroke-width="${strokeW}"/>`)
     }
   } else if (drawCircle) {
     const cr = displayW / 2
@@ -429,7 +432,7 @@ function renderNode(node: MindmapNode, type: DiagramType, paletteColor: string |
   } else if (hasEmoji) {
     const emojiSize = Math.round(h * 0.52)
     parts.push(`<text x="${r2(h / 2 + skOff)}" y="${r2(h / 2 + emojiSize * 0.36)}" text-anchor="middle" font-size="${emojiSize}">${esc(node.emoji)}</text>`)
-    parts.push(`<text x="${r2(h + 14 + skOff)}" y="${r2(h / 2 + fontSize * 0.38)}" text-anchor="start" font-size="${fontSize}" font-weight="${fontWeight}" fill="${esc(textColor)}">${labelBody}</text>`)
+    parts.push(`<text x="${r2(h + ICON_GAP + skOff)}" y="${r2(h / 2 + fontSize * 0.38)}" text-anchor="start" font-size="${fontSize}" font-weight="${fontWeight}" fill="${esc(textColor)}">${labelBody}</text>`)
   } else if (hasIcon) {
     // Neutral placeholder for the lucide icon (no icon dep server-side)
     const iconSize = Math.round(h * 0.48)
@@ -437,9 +440,9 @@ function renderNode(node: MindmapNode, type: DiagramType, paletteColor: string |
     const iy = (h - iconSize) / 2
     parts.push(`<rect x="${r2(ix)}" y="${r2(iy)}" width="${iconSize}" height="${iconSize}" rx="${Math.round(iconSize / 4)}" fill="none" stroke="${esc(col)}" stroke-width="2"/>`)
     parts.push(`<circle cx="${r2(ix + iconSize / 2)}" cy="${r2(iy + iconSize / 2)}" r="${r2(iconSize / 6)}" fill="${esc(col)}"/>`)
-    parts.push(`<text x="${r2(h + 14 + skOff)}" y="${r2(h / 2 + fontSize * 0.38)}" text-anchor="start" font-size="${fontSize}" font-weight="${fontWeight}" fill="${esc(textColor)}">${labelBody}</text>`)
+    parts.push(`<text x="${r2(h + ICON_GAP + skOff)}" y="${r2(h / 2 + fontSize * 0.38)}" text-anchor="start" font-size="${fontSize}" font-weight="${fontWeight}" fill="${esc(textColor)}">${labelBody}</text>`)
   } else {
-    const tx = isRoot ? cx : align === 'left' ? 12 + skOff : align === 'right' ? displayW - 12 : displayW / 2
+    const tx = isRoot ? cx : align === 'left' ? metric.padX + skOff : align === 'right' ? displayW - metric.padX : displayW / 2
     const anchor = isRoot || align === 'center' ? 'middle' : align === 'right' ? 'end' : 'start'
     parts.push(`<text x="${r2(tx)}" y="${r2(isRoot ? cy + fontSize * 0.38 : h / 2 + fontSize * 0.38)}" text-anchor="${anchor}" font-size="${fontSize}" font-weight="${fontWeight}" fill="${esc(textColor)}">${labelBody}</text>`)
   }

@@ -1,7 +1,7 @@
 import type { MindmapNode } from '../../types'
 import type { LineStyle } from '../../types'
 import { nodeCenterRight, nodeCenterLeft, nodeCenter, buildStraightPath, buildCurvedPath, buildOrthogonalPath } from '../../lib/geometry'
-import { applyDepthTransparency } from '../../lib/color'
+import { applyDepthTransparency, edgeWidthForDepth } from '../../lib/color'
 
 interface EdgeProps {
   parent: MindmapNode
@@ -44,7 +44,7 @@ export function Edge({ parent, child, lineStyle, diagramType, color }: EdgeProps
     <path
       d={d}
       stroke={stroke}
-      strokeWidth={1.5}
+      strokeWidth={edgeWidthForDepth(child.depth)}
       fill="none"
       strokeLinecap="round"
     />

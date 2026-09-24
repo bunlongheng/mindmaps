@@ -7,31 +7,41 @@
 
 import { displayTitle } from './links.js'
 
-export const ROOT_PILL_MAX = 720
-export const ROOT_PILL_PAD = 80
+// Base font size of the root title. Single source for every renderer, layout and
+// store that needs the root's default size - and the depth-0 row of the shared box
+// table (src/lib/nodeMetrics) is built from it.
+export const ROOT_FONT = 42
+// Height of the root pill, shared by the store's load-time reserve and the server
+// renderer so a card preview and the opened map draw the same pill.
+export const ROOT_PILL_H = 130
+
+// Pill and circle geometry scale with ROOT_FONT: every number below is the old
+// 28px-era value times 1.5, so a 50 percent larger title keeps the same proportions.
+export const ROOT_PILL_MAX = 1080
+export const ROOT_PILL_PAD = 120
 const CHAR_RATIO = 0.62
 
 // A circle root grows to fit its title; once a fitting circle would exceed this
 // diameter the title is too long for a circle and a pill is used instead.
-export const ROOT_CIRCLE_MAX = 340
-const ROOT_CIRCLE_PAD = 70
+export const ROOT_CIRCLE_MAX = 510
+const ROOT_CIRCLE_PAD = 105
 
 /** Diameter that fits the title inside a circle root, clamped to [180, ROOT_CIRCLE_MAX]. */
-export function rootCircleDiameter(title: string, baseFontSize = 28): number {
+export function rootCircleDiameter(title: string, baseFontSize = ROOT_FONT): number {
   const len = Math.max(1, displayTitle(title).length)
   const natural = Math.ceil(len * baseFontSize * CHAR_RATIO + ROOT_CIRCLE_PAD)
   return Math.max(180, Math.min(ROOT_CIRCLE_MAX, natural))
 }
 
 /** True when a fitting circle would exceed ROOT_CIRCLE_MAX, so a pill is used instead. */
-export function rootTitleNeedsPill(title: string, baseFontSize = 28): boolean {
+export function rootTitleNeedsPill(title: string, baseFontSize = ROOT_FONT): boolean {
   const len = Math.max(1, displayTitle(title).length)
   return Math.ceil(len * baseFontSize * CHAR_RATIO + ROOT_CIRCLE_PAD) > ROOT_CIRCLE_MAX
 }
 
 /** Font size for the root pill: full size until the title would exceed the max
  *  width, then shrink (floor 15px) so the title always fits inside the pill. */
-export function rootPillFontSize(title: string, baseFontSize = 28): number {
+export function rootPillFontSize(title: string, baseFontSize = ROOT_FONT): number {
   const len = Math.max(1, displayTitle(title).length)
   const naturalW = Math.ceil(len * baseFontSize * CHAR_RATIO + ROOT_PILL_PAD)
   return naturalW > ROOT_PILL_MAX
@@ -41,7 +51,7 @@ export function rootPillFontSize(title: string, baseFontSize = 28): number {
 
 /** Pill width that exactly fits the title at its (possibly shrunk) font, clamped
  *  to [180, ROOT_PILL_MAX]. */
-export function rootPillWidth(title: string, baseFontSize = 28): number {
+export function rootPillWidth(title: string, baseFontSize = ROOT_FONT): number {
   const len = Math.max(1, displayTitle(title).length)
   const fs = rootPillFontSize(title, baseFontSize)
   return Math.max(180, Math.min(ROOT_PILL_MAX, Math.ceil(len * fs * CHAR_RATIO + ROOT_PILL_PAD)))
@@ -61,8 +71,7 @@ export function rootDrawnWidth(
   const isPill = diagramType !== 'mindmap' && (
     node.shape === 'pill' ? true :
     node.shape === 'circle' ? false :
-    rootTitleNeedsPill(node.title, node.fontSize ?? 28)
+    rootTitleNeedsPill(node.title, node.fontSize ?? ROOT_FONT)
   )
-  // 34 is the depth-0 default font size on the canvas.
-  return isPill ? rootPillWidth(node.title, node.fontSize ?? 34) : node.width
+  return isPill ? rootPillWidth(node.title, node.fontSize ?? ROOT_FONT) : node.width
 }

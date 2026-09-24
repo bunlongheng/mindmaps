@@ -37,32 +37,34 @@ test.describe('Editor chrome — App.tsx', () => {
     await expect(page.locator('.diagram-canvas-root')).toHaveCount(0)
   })
 
-  test('Format toggle button opens and closes the side panel', async ({ page }) => {
+  test('Settings toggle button opens and closes the side panel', async ({ page }) => {
     await createMap(page)
     // Panel not present initially
     await expect(page.getByText('Theme', { exact: true })).toHaveCount(0)
     // Open
-    await page.click('[title="Format"]')
+    await page.click('[title="Settings"]')
     await expect(page.getByText('Theme', { exact: true })).toBeVisible({ timeout: 3_000 })
     // Toggle button turns dark when active
-    const toggleBg = await page.locator('[title="Format"]').evaluate(el => getComputedStyle(el).backgroundColor)
+    const toggleBg = await page.locator('[title="Settings"]').evaluate(el => getComputedStyle(el).backgroundColor)
     expect(toggleBg).toBe('rgb(26, 29, 46)')
-    // Close again with the same button. The 256px-wide panel overlaps the
-    // top-right toggle, so force the click through to the button underneath.
-    await page.click('[title="Format"]', { force: true })
+    // Close again with the same button. The panel overlaps the top-right
+    // toggle, so force the click through to the button underneath.
+    await page.click('[title="Settings"]', { force: true })
     await expect(page.getByText('Theme', { exact: true })).toHaveCount(0)
   })
 
-  test('+ Tag picker adds a preset tag chip, and chip click removes it', async ({ page }) => {
+  test('+ Tag picker in the settings panel adds a preset tag chip, and chip click removes it', async ({ page }) => {
     await createMap(page)
-    // Open the tag picker popover
+    await page.click('[title="Settings"]')
+    await expect(page.getByText('Theme', { exact: true })).toBeVisible({ timeout: 3_000 })
+    // Open the tag picker (Map tab, the default tab)
     await page.getByRole('button', { name: '+ Tag' }).click()
-    // Preset tags appear in the popover — add "AI"
+    // Preset tags appear inline — add "AI"
     const preset = page.getByRole('button', { name: 'AI', exact: true })
     await expect(preset.first()).toBeVisible({ timeout: 3_000 })
     await preset.first().click()
     await page.waitForTimeout(400)
-    // A removable chip "AI" now sits in the footer (title="Remove tag")
+    // A removable chip "AI" now sits in the Tags block (title="Remove tag")
     const chip = page.locator('[title="Remove tag"]', { hasText: 'AI' })
     await expect(chip).toBeVisible({ timeout: 3_000 })
     // Clicking the chip removes the tag
@@ -71,8 +73,10 @@ test.describe('Editor chrome — App.tsx', () => {
     await expect(page.locator('[title="Remove tag"]', { hasText: 'AI' })).toHaveCount(0)
   })
 
-  test('+ Tag picker adds a custom tag via the input + Add button', async ({ page }) => {
+  test('+ Tag picker in the settings panel adds a custom tag via the input + Add button', async ({ page }) => {
     await createMap(page)
+    await page.click('[title="Settings"]')
+    await expect(page.getByText('Theme', { exact: true })).toBeVisible({ timeout: 3_000 })
     await page.getByRole('button', { name: '+ Tag' }).click()
     const input = page.getByPlaceholder('Custom tag…')
     await expect(input).toBeVisible({ timeout: 3_000 })
@@ -83,28 +87,34 @@ test.describe('Editor chrome — App.tsx', () => {
     await expect(page.locator('[title="Remove tag"]', { hasText: custom })).toBeVisible({ timeout: 3_000 })
   })
 
-  test('Download PDF button in footer does not crash the app', async ({ page }) => {
+  test('Export PDF button in the settings panel Share tab does not crash the app', async ({ page }) => {
     await createMap(page)
     const before = await textCount(page)
-    await page.locator('[title="Download PDF"]').click()
+    await page.click('[title="Settings"]')
+    await page.getByRole('button', { name: 'Share', exact: true }).click()
+    await page.getByRole('button', { name: /Export PDF/ }).click()
     await page.waitForTimeout(1200)
     // App still alive — canvas + same nodes still rendered
     await expect(page.locator('.diagram-canvas-root')).toBeVisible()
     expect(await textCount(page)).toBe(before)
   })
 
-  test('Copy button in footer puts the diagram SVG on the clipboard', async ({ page, context }) => {
+  test('Copy SVG button in the settings panel Share tab puts the diagram SVG on the clipboard', async ({ page, context }) => {
     await context.grantPermissions(['clipboard-read', 'clipboard-write'])
     await createMap(page)
-    await page.locator('[title="Copy diagram SVG"]').click()
-    await expect(page.getByText('Copied', { exact: true })).toBeVisible({ timeout: 20_000 })
+    await page.click('[title="Settings"]')
+    await page.getByRole('button', { name: 'Share', exact: true }).click()
+    await page.getByRole('button', { name: 'Copy SVG', exact: true }).click()
+    await expect(page.getByRole('button', { name: 'SVG copied!' })).toBeVisible({ timeout: 20_000 })
     const svg = await page.evaluate(() => navigator.clipboard.readText())
     expect(svg).toContain('<svg')
     expect(svg).toContain('xmlns="http://www.w3.org/2000/svg"')
   })
 
-  test('Delete map footer button opens confirm modal; Cancel keeps the map', async ({ page }) => {
+  test('Delete map button in the settings panel Share tab opens confirm modal; Cancel keeps the map', async ({ page }) => {
     await createMap(page)
+    await page.click('[title="Settings"]')
+    await page.getByRole('button', { name: 'Share', exact: true }).click()
     await page.locator('[title="Delete map"]').click()
     // Confirm modal appears
     await expect(page.getByRole('heading', { name: 'Delete map?' })).toBeVisible({ timeout: 3_000 })
@@ -121,6 +131,8 @@ test.describe('Editor chrome — App.tsx', () => {
       const root = document.querySelector('.diagram-canvas-root svg text')
       return root?.textContent ?? null
     })
+    await page.click('[title="Settings"]')
+    await page.getByRole('button', { name: 'Share', exact: true }).click()
     await page.locator('[title="Delete map"]').click()
     await expect(page.getByRole('heading', { name: 'Delete map?' })).toBeVisible({ timeout: 3_000 })
     // Confirm via the modal's Delete button — scope to the dialog that holds the heading.
@@ -137,6 +149,8 @@ test.describe('Editor chrome — App.tsx', () => {
 
   test('clicking the modal backdrop dismisses the delete confirm (keeps map)', async ({ page }) => {
     await createMap(page)
+    await page.click('[title="Settings"]')
+    await page.getByRole('button', { name: 'Share', exact: true }).click()
     await page.locator('[title="Delete map"]').click()
     await expect(page.getByRole('heading', { name: 'Delete map?' })).toBeVisible({ timeout: 3_000 })
     // Click the dimmed backdrop (top-left corner, away from the dialog box)
@@ -144,26 +158,25 @@ test.describe('Editor chrome — App.tsx', () => {
     await expect(page.getByRole('heading', { name: 'Delete map?' })).toHaveCount(0)
     await expect(page.locator('.diagram-canvas-root')).toBeVisible()
   })
-
-  test('map view: screen takes a red hit then the canvas comes apart', async ({ page }) => {
+  test('screen takes a red hit then the canvas comes apart, from the Settings panel delete', async ({ page }) => {
     await createMap(page)
+    await page.locator('[title="Settings"]').click()
+    await page.getByRole('button', { name: 'Share' }).click()
     await page.locator('[title="Delete map"]').first().click()
     await expect(page.getByText('Delete map?')).toBeVisible({ timeout: 5000 })
-    // the editor's confirm modal renders at root level, after the footer button
     await page.locator('button').filter({ hasText: /^Delete$/ }).last().click()
     await page.waitForTimeout(120)
     const hit = await page.evaluate(() => {
       const skins = Array.from(document.querySelectorAll('div[aria-hidden="true"]')) as HTMLElement[]
       const skin = skins.find(s => s.style.background.includes('radial-gradient'))
       if (!skin) return null
-      return { opacity: getComputedStyle(skin).opacity, fixed: getComputedStyle(skin).position, red: skin.style.background.includes('239,68,68') }
+      return { opacity: getComputedStyle(skin).opacity, red: skin.style.background.includes('239,68,68') }
     })
-    console.log('HIT ' + JSON.stringify(hit))
     expect(hit).not.toBeNull()
     expect(Number(hit!.opacity)).toBeGreaterThan(0)
     await page.waitForTimeout(500)
     const specks = await page.evaluate(() => document.querySelectorAll('div[aria-hidden="true"] i').length)
-    console.log('CANVAS-SCATTER ' + specks)
     expect(specks).toBeGreaterThan(50)
   })
+
 })

@@ -1,4 +1,4 @@
-import { displayTitle } from './links.js'
+import { nodeFontSize, nodeHeight, nodeWidth, estimateTextWidth } from './nodeMetrics.js'
 
 export type FlatOutlineItem = { title: string; indent: number }
 
@@ -108,34 +108,32 @@ export function assembleOutlineTree(items: FlatOutlineItem[]): OutlineAssembly {
 }
 
 // --- Node-width formulas -----------------------------------------------------------
-// These 3 intentionally differ: each entry point shipped with its own formula and the
-// stored widths feed the saved layout, so unifying them would visibly resize existing
-// map styles. Single source of truth for the formulas lives here; do not merge them
-// without re-deriving what every layout expects.
+// All 3 now measure with the SAME shared box table (src/lib/nodeMetrics): text width at
+// the depth's font, plus both paddings, plus the icon zone when a badge is drawn. They
+// differ only in the upper clamp each entry point ships with, so an imported map and a
+// generated map keep their own maximum box width.
 
-/** Editor-canonical width - font sizes must match Node.tsx. Used by the store. */
+/** Root box side used by every outline entry point (a circle, so width == height). */
+export const OUTLINE_ROOT_SIZE = 180
+
+/** Editor-canonical width - same table Node.tsx draws with. Used by the store. */
 export function computeNodeWidth(title: string, depth: number, hasIcon: boolean): number {
-  const fontSize = depth === 1 ? 22 : depth === 2 ? 16 : depth === 3 ? 13 : 11
-  const charW = fontSize * 0.64
-  const textPad = 24
-  const textW = Math.ceil(displayTitle(title).length * charW) + textPad
-  // icon zone takes ~20% of node width, so text zone = 80% of total
-  const total = hasIcon ? Math.ceil(textW / 0.8) : textW
-  return Math.max(140, Math.min(400, total))
+  return Math.min(400, nodeWidth(estimateTextWidth(title, nodeFontSize(depth)), depth, {
+    hasIcon,
+    height: nodeHeight(depth),
+  }))
 }
 
-/** API import endpoint variant (api/ai/mindmaps): flat 7.5px/char, cap 260. */
+/** API import endpoint variant (api/ai/mindmaps): same table, cap 260. */
 export function computeImportNodeWidth(title: string, depth: number): number {
-  if (depth === 0) return 180
-  const base = Math.max(100, displayTitle(title).length * 7.5 + 32)
-  return Math.min(base, 260)
+  if (depth === 0) return OUTLINE_ROOT_SIZE
+  return Math.min(260, nodeWidth(estimateTextWidth(title, nodeFontSize(depth)), depth))
 }
 
-/** AI generate endpoint variant (api/ai/generate-mindmap): per-depth char width, cap 300. */
+/** AI generate endpoint variant (api/ai/generate-mindmap): same table, cap 300. */
 export function computeGeneratedNodeWidth(title: string, depth: number): number {
-  if (depth === 0) return 180
-  const charW = depth === 1 ? 10.24 : depth === 2 ? 8.19 : 7.04
-  return Math.max(120, Math.min(300, Math.ceil(displayTitle(title).length * charW) + 32))
+  if (depth === 0) return OUTLINE_ROOT_SIZE
+  return Math.min(300, nodeWidth(estimateTextWidth(title, nodeFontSize(depth)), depth))
 }
 
 // --- JSON-tree flatten (API endpoints) ---------------------------------------------
@@ -174,7 +172,7 @@ export function flattenJsonOutline(
 
   nodes.push({
     id: rootId, title: rootKey.trim(), parentId: null, depth: 0,
-    x: 0, y: 0, width: 180, height: 180,
+    x: 0, y: 0, width: OUTLINE_ROOT_SIZE, height: OUTLINE_ROOT_SIZE,
     color: opts.rootColor, sortOrder: 0, manuallyPositioned: false,
   })
 
@@ -188,7 +186,7 @@ export function flattenJsonOutline(
       colorById.set(id, parentColor)
       nodes.push({
         id, title: obj.trim(), parentId, depth,
-        x: 0, y: 0, width: opts.computeWidth(obj.trim(), depth), height: 40,
+        x: 0, y: 0, width: opts.computeWidth(obj.trim(), depth), height: nodeHeight(depth),
         color: parentColor, sortOrder, manuallyPositioned: false,
       })
       return
@@ -206,7 +204,7 @@ export function flattenJsonOutline(
 
     nodes.push({
       id, title: titleKey.trim(), parentId, depth,
-      x: 0, y: 0, width: opts.computeWidth(titleKey.trim(), depth), height: 40,
+      x: 0, y: 0, width: opts.computeWidth(titleKey.trim(), depth), height: nodeHeight(depth),
       color, sortOrder, manuallyPositioned: false,
       icon: obj.icon as string | undefined,
       emoji: opts.useEmoji ? obj.emoji as string | undefined : undefined,

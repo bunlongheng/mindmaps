@@ -194,7 +194,7 @@ test.describe('Viewer — decoded share (?d=) VIEW ONLY', () => {
     await expect(page.locator('.diagram-canvas-root svg text').filter({ hasText: 'Branch One' }).first()).toBeVisible({ timeout: 5_000 })
     // No back/format chrome in the viewer.
     await expect(page.locator('[title="All maps"]')).toHaveCount(0)
-    await expect(page.locator('[title="Format"]')).toHaveCount(0)
+    await expect(page.locator('[title="Settings"]')).toHaveCount(0)
   })
 
   test('a malformed ?d= payload falls back to the normal app (no crash)', async ({ page }) => {

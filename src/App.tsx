@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { CuteToast, showToast } from './components/CuteToast'
 import { DiagramCanvas } from './components/canvas/DiagramCanvas'
@@ -13,8 +13,7 @@ import { decodeShareURL } from './lib/export/share'
 import { hasGoogleAuth, renderGoogleButton } from './lib/googleAuth'
 import { readSession, saveSession, clearSession, SESSION_EXPIRED } from './lib/session'
 import { emberVanish, damageFlash } from './lib/emberVanish'
-import { levelCounts } from './lib/nodeCounts'
-import { ArrowLeft, SlidersHorizontal, Tag, X, FileDown, Trash2, Copy, Check, Info, Network, Share2, Sparkles, GitBranch, Lightbulb, Workflow, ListTree, Waypoints, Image as ImageIcon } from 'lucide-react'
+import { ArrowLeft, SlidersHorizontal, Tag, FileDown, Network, Share2, Sparkles, GitBranch, Lightbulb, Workflow, ListTree, Waypoints, Image as ImageIcon } from 'lucide-react'
 import { Confetti } from './components/Confetti'
 import { MindmapsLogo } from './components/MindmapsLogo'
 
@@ -33,21 +32,6 @@ const LOGIN_ICONS = [
   { Icon: GitBranch, top: '80%', left: '82%', size: 40, dur: 6.5, delay: 1.8 },
   { Icon: ImageIcon, top: '18%', left: '70%', size: 30, dur: 5.8, delay: 0.8 },
 ]
-
-// 8 cohesive colors — all Tailwind-500 level, same saturation family
-const TAG_PALETTE = [
-  '#6366f1', '#14b8a6', '#ec4899', '#f59e0b',
-  '#22c55e', '#3b82f6', '#f97316', '#8b5cf6',
-]
-const PRESET_TAGS = ['AI', 'Work', 'Personal', 'Research']
-
-function buildTagColorMap(allTags: string[]): Map<string, string> {
-  const sorted = [...new Set(allTags)].sort()
-  return new Map(sorted.map((tag, i) => [tag, TAG_PALETTE[i % TAG_PALETTE.length]]))
-}
-function tagBg(tag: string, colorMap: Map<string, string>): string {
-  return colorMap.get(tag) ?? '#64748b'
-}
 
 type View = 'home' | 'editor' | 'viewer'
 
@@ -158,52 +142,13 @@ export default function App() {
   // Realtime removed — data now on Linode PostgreSQL
   // Shallow-selected slice so App only re-renders when one of these actually changes,
   // not on every store write (resizePreview, HUD flags, etc.). Actions are stable refs.
-  const { activeMindmap, isDirty, setActiveMindmap, addNode, selectedNodeIds, setSelectedNodeIds, setPasteImportFn, diagrams } = useMindmapStore(
+  const { activeMindmap, isDirty, setActiveMindmap, addNode, selectedNodeIds, setSelectedNodeIds, setPasteImportFn } = useMindmapStore(
     useShallow(s => ({
       activeMindmap: s.activeMindmap, isDirty: s.isDirty, setActiveMindmap: s.setActiveMindmap, addNode: s.addNode,
-      selectedNodeIds: s.selectedNodeIds, setSelectedNodeIds: s.setSelectedNodeIds, setPasteImportFn: s.setPasteImportFn, diagrams: s.diagrams,
+      selectedNodeIds: s.selectedNodeIds, setSelectedNodeIds: s.setSelectedNodeIds, setPasteImportFn: s.setPasteImportFn,
     })),
   )
   const [flashDiagramId] = useState<string | null>(null)
-  const [showTagFooter, setShowTagFooter] = useState(false)
-  const [tagInput, setTagInput] = useState('')
-  const tagFooterRef = useRef<HTMLDivElement>(null)
-  const [showMapInfo, setShowMapInfo] = useState(false)
-  const mapInfoRef = useRef<HTMLDivElement>(null)
-
-  const tagColorMap = useMemo(() => {
-    const all = [...new Set([...PRESET_TAGS, ...diagrams.flatMap(d => d.tags ?? [])])]
-    return buildTagColorMap(all)
-  }, [diagrams])
-
-  // Close tag footer on outside click (capture phase to catch SVG canvas events)
-  useEffect(() => {
-    if (!showTagFooter) return
-    function onDown(e: MouseEvent) {
-      if (tagFooterRef.current && !tagFooterRef.current.contains(e.target as Node)) setShowTagFooter(false)
-    }
-    document.addEventListener('mousedown', onDown, true)
-    return () => document.removeEventListener('mousedown', onDown, true)
-  }, [showTagFooter])
-
-  // Close map-info popover on outside click or Escape
-  useEffect(() => {
-    if (!showMapInfo) return
-    function onDown(e: MouseEvent) {
-      if (mapInfoRef.current && !mapInfoRef.current.contains(e.target as Node)) setShowMapInfo(false)
-    }
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') setShowMapInfo(false)
-    }
-    document.addEventListener('mousedown', onDown, true)
-    document.addEventListener('keydown', onKey)
-    return () => {
-      document.removeEventListener('mousedown', onDown, true)
-      document.removeEventListener('keydown', onKey)
-    }
-  }, [showMapInfo])
-
-  const mapInfo = useMemo(() => levelCounts(activeMindmap?.nodes ?? []), [activeMindmap?.nodes])
   const [diagramLoading, setDiagramLoading] = useState(() => !!(getMapParam() || getShareParam()))
   const [view, setView] = useState<View>(() => {
     if (decodeShareURL()) return 'viewer'
@@ -217,7 +162,6 @@ export default function App() {
   const isTouch = useIsTouchDevice()
   const [showImport, setShowImport] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
-  const [copiedSvg, setCopiedSvg] = useState(false)
   const [showConfetti, setShowConfetti] = useState(() => new URLSearchParams(window.location.search).has('imported'))
   const confettiCount = (() => { const t = new URLSearchParams(window.location.search).get('tokens'); return t ? Math.min(280, Math.max(40, Math.round(parseInt(t) / 1000 * 60))) : 60 })()
 
@@ -383,6 +327,18 @@ export default function App() {
     window.history.replaceState({}, '', tag ? `?tag=${tag}` : window.location.pathname)
   }, [setSelectedNodeIds, loadDiagramList, saveDiagram])
 
+  // You took the hit: the screen flashes red, then the map on screen comes apart
+  // before we drop back to the library. Every delete path goes through here so the
+  // Settings panel and the confirm modal behave the same.
+  const animatedDelete = useCallback((id: string, name: string) => {
+    const wait = damageFlash()
+    const go = () => {
+      emberVanish(document.querySelector('.diagram-canvas-root'))
+      deleteDiagram(id, name).finally(() => handleBack())
+    }
+    if (wait) setTimeout(go, wait); else go()
+  }, [deleteDiagram, handleBack])
+
   const handleNodeSelect = useCallback((nodeId: string | null) => {
     if (nodeId) setSelectedPanelNodeId(nodeId)
   }, [])
@@ -521,10 +477,10 @@ export default function App() {
 
 
 
-        {/* Format toggle button — top right, only when a diagram is loaded */}
+        {/* Settings toggle button — top right, only when a diagram is loaded */}
         {activeMindmap && <button
           onClick={() => setShowPanel(p => !p)}
-          title="Format"
+          title="Settings"
           style={{
             position: 'fixed', top: 14, right: 14, zIndex: 20,
             width: isMobile ? 48 : undefined,
@@ -542,7 +498,7 @@ export default function App() {
           onMouseLeave={e => { if (!showPanel) e.currentTarget.style.background = '#fff' }}
         >
           <SlidersHorizontal size={isMobile ? 22 : 15} />
-          {!isMobile && 'Format'}
+          {!isMobile && 'Settings'}
         </button>}
       </div>
 
@@ -551,13 +507,8 @@ export default function App() {
         <SidePanel
           nodeId={selectedPanelNodeId}
           onClose={() => { setSelectedPanelNodeId(null); setSelectedNodeIds([]); setShowPanel(false) }}
-          onDelete={activeMindmap ? () => {
-            const name = activeMindmap.name
-            deleteDiagram(activeMindmap.id, name).then(() => {
-              handleBack()
-              setTimeout(() => showToast(`"${name}" deleted`, { color: '#ef4444' }), 50)
-            })
-          } : undefined}
+          onDelete={activeMindmap ? () => animatedDelete(activeMindmap.id, activeMindmap.name) : undefined}
+          onUpdateTags={updateTags}
         />
       )}
 
@@ -584,18 +535,7 @@ export default function App() {
               }}>Cancel</button>
               <button onClick={() => {
                 setShowDeleteConfirm(false)
-                if (activeMindmap) {
-                  const id = activeMindmap.id
-                  const name = activeMindmap.name
-                  // You took the hit: the screen flashes red, then the map on
-                  // screen comes apart before we drop back to the library.
-                  const wait = damageFlash()
-                  const go = () => {
-                    emberVanish(document.querySelector('.diagram-canvas-root'))
-                    deleteDiagram(id, name).finally(() => handleBack())
-                  }
-                  if (wait) setTimeout(go, wait); else go()
-                }
+                if (activeMindmap) animatedDelete(activeMindmap.id, activeMindmap.name)
               }} style={{
                 padding: '8px 18px', background: '#ef4444', color: '#fff',
                 border: 'none', borderRadius: 9, cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
@@ -604,173 +544,6 @@ export default function App() {
           </div>
         </div>
       )}
-
-      {/* ── Tag footer bar ── */}
-      {activeMindmap && (() => {
-        const currentTags = activeMindmap.tags ?? []
-        const allTagsList = [...new Set([...PRESET_TAGS, ...diagrams.flatMap(d => d.tags ?? [])])]
-        const available = allTagsList.filter(t => !currentTags.includes(t))
-        function addTag(tag: string) {
-          const t = tag.trim()
-          if (!t || currentTags.includes(t)) return
-          updateTags(activeMindmap!.id, [...currentTags, t])
-          setTagInput('')
-        }
-        function removeTag(tag: string) {
-          updateTags(activeMindmap!.id, currentTags.filter(t => t !== tag))
-        }
-        return (
-          <div ref={tagFooterRef} style={{
-            position: 'fixed', bottom: 12, left: '50%', transform: 'translateX(-50%)',
-            zIndex: 15, background: 'rgba(255,255,255,0.96)', backdropFilter: 'blur(12px)',
-            border: '1px solid #e2e8f0',
-            borderRadius: 14,
-            boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '6px 14px',
-            minHeight: 38,
-          }}>
-            {/* Tag icon */}
-            <Tag size={13} color="#94a3b8" style={{ flexShrink: 0 }} />
-
-            {/* Current tags */}
-            {currentTags.map(t => (
-              <span key={t} style={{
-                display: 'inline-flex', alignItems: 'center', gap: 4,
-                fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 10,
-                background: tagBg(t, tagColorMap), color: '#fff',
-                cursor: 'pointer',
-              }} onClick={() => removeTag(t)} title="Remove tag">
-                {t} <X size={8} strokeWidth={3} />
-              </span>
-            ))}
-
-            {/* Add tag toggle — hidden on mobile */}
-            {!isMobile && <button onClick={() => setShowTagFooter(p => !p)} style={{
-              fontSize: 11, fontWeight: 600, padding: '3px 9px', borderRadius: 10,
-              background: showTagFooter ? '#1e293b' : '#f1f5f9',
-              color: showTagFooter ? '#fff' : '#64748b',
-              border: 'none', cursor: 'pointer', fontFamily: 'inherit',
-              display: 'flex', alignItems: 'center', gap: 4,
-            }}>
-              + Tag
-            </button>}
-
-            {/* PDF / Star / Delete */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-              <button onClick={() => import('./lib/export/exportPdf').then(m => m.exportDiagramAsPdf(activeMindmap!.name))} title="Download PDF" style={{
-                height: 22, padding: '0 8px', border: '1px solid #e2e8f0', borderRadius: 6,
-                background: 'transparent', cursor: 'pointer', fontSize: 11, fontWeight: 500,
-                color: '#64748b', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 4,
-              }}>
-                <FileDown size={11} /> PDF
-              </button>
-              <button
-                onClick={() => {
-                  import('./lib/export/copySvg').then(async m => {
-                    if (await m.copyDiagramSvg()) {
-                      setCopiedSvg(true)
-                      setTimeout(() => setCopiedSvg(false), 2000)
-                    }
-                  })
-                }}
-                title="Copy diagram SVG"
-                style={{
-                  height: 22, padding: '0 8px', borderRadius: 6,
-                  border: `1px solid ${copiedSvg ? '#bbf7d0' : '#e2e8f0'}`,
-                  background: 'transparent', cursor: 'pointer', fontSize: 11, fontWeight: 500,
-                  color: copiedSvg ? '#16a34a' : '#64748b', fontFamily: 'inherit',
-                  display: 'flex', alignItems: 'center', gap: 4,
-                }}>
-                {copiedSvg ? <Check size={11} /> : <Copy size={11} />} {copiedSvg ? 'Copied' : 'Copy SVG'}
-              </button>
-              <div ref={mapInfoRef} style={{ position: 'relative' }}>
-                <button onClick={() => setShowMapInfo(p => !p)} title="Map info" style={{
-                  height: 22, padding: '0 8px', borderRadius: 6,
-                  border: `1px solid ${showMapInfo ? '#c7d2fe' : '#e2e8f0'}`,
-                  background: 'transparent', cursor: 'pointer', fontSize: 11, fontWeight: 500,
-                  color: showMapInfo ? '#4f46e5' : '#64748b', fontFamily: 'inherit',
-                  display: 'flex', alignItems: 'center', gap: 4,
-                }}>
-                  <Info size={11} />
-                </button>
-                {showMapInfo && (
-                  <div style={{
-                    position: 'absolute', bottom: '100%', left: '50%', transform: 'translateX(-50%)', marginBottom: 6,
-                    background: '#fff', borderRadius: 12, padding: 12,
-                    boxShadow: '0 -4px 24px rgba(0,0,0,0.12), 0 0 0 1px #e2e8f0',
-                    fontFamily: 'inherit', minWidth: 170, whiteSpace: 'nowrap',
-                  }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-                      <tbody>
-                        {mapInfo.byDepth.map((count, depth) => (
-                          <tr key={depth}>
-                            <td style={{ padding: '2px 10px 2px 0', color: '#64748b', fontWeight: 500 }}>
-                              {depth === 0 ? 'Root' : `L${depth}`}
-                            </td>
-                            <td style={{ padding: '2px 0', color: '#1e293b', fontWeight: 600, textAlign: 'right' }}>{count}</td>
-                          </tr>
-                        ))}
-                        <tr>
-                          <td style={{ padding: '4px 10px 0 0', borderTop: '1px solid #e2e8f0', color: '#64748b', fontWeight: 600 }}>Total</td>
-                          <td style={{ padding: '4px 0 0', borderTop: '1px solid #e2e8f0', color: '#1e293b', fontWeight: 700, textAlign: 'right' }}>{mapInfo.total}</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                    {mapInfo.largestBranch && (
-                      <div style={{ marginTop: 8, fontSize: 10, color: '#94a3b8' }}>
-                        Deepest: L{mapInfo.deepest}. Largest branch: {mapInfo.largestBranch.title}, {mapInfo.largestBranch.count} nodes.
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-<button onClick={() => setShowDeleteConfirm(true)} title="Delete map" style={{
-                height: 22, padding: '0 8px', border: '1px solid #fecaca', borderRadius: 6,
-                background: 'transparent', cursor: 'pointer', fontSize: 11, fontWeight: 500,
-                color: '#ef4444', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 4,
-              }}>
-                <Trash2 size={11} /> Delete
-              </button>
-            </div>
-
-            {/* Tag picker popover */}
-            {showTagFooter && (
-              <div style={{
-                position: 'absolute', bottom: '100%', left: 14, marginBottom: 6,
-                background: '#fff', borderRadius: 12, padding: 12,
-                boxShadow: '0 -4px 24px rgba(0,0,0,0.12), 0 0 0 1px #e2e8f0',
-                display: 'flex', flexDirection: 'column', gap: 8, width: 240,
-              }}>
-                {available.length > 0 && (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-                    {available.map(t => (
-                      <button key={t} onClick={() => { addTag(t); setShowTagFooter(false) }}
-                        style={{
-                          fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 10,
-                          background: `${tagBg(t, tagColorMap)}22`, color: tagBg(t, tagColorMap),
-                          border: `1px solid ${tagBg(t, tagColorMap)}55`,
-                          cursor: 'pointer', fontFamily: 'inherit',
-                        }}>{t}</button>
-                    ))}
-                  </div>
-                )}
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <input value={tagInput} onChange={e => setTagInput(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Enter') { addTag(tagInput); setShowTagFooter(false); e.preventDefault() } }}
-                    placeholder="Custom tag…"
-                    style={{ flex: 1, fontSize: 12, padding: '6px 10px', border: '1px solid #e2e8f0', borderRadius: 8, outline: 'none', fontFamily: 'inherit', color: '#1e293b' }}
-                    autoFocus
-                  />
-                  <button onClick={() => { addTag(tagInput); setShowTagFooter(false) }}
-                    style={{ padding: '6px 12px', background: '#6366f1', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontFamily: 'inherit', fontWeight: 600 }}>
-                    Add
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        )
-      })()}
     </div>
   )
 }

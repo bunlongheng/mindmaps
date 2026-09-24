@@ -1,3 +1,5 @@
+import { displayTitle } from './links'
+
 export interface SubtreeCounts {
   childCounts: Map<string, number>
   descendantCounts: Map<string, number>
@@ -52,7 +54,7 @@ export function levelCounts(nodes: { id: string; parentId: string | null; depth:
   for (const n of nodes) {
     if (n.depth !== 1) continue
     const count = descendantCounts.get(n.id) ?? 0
-    if (!largestBranch || count > largestBranch.count) largestBranch = { title: n.title, count }
+    if (!largestBranch || count > largestBranch.count) largestBranch = { title: displayTitle(n.title), count }
   }
 
   return { byDepth, total: nodes.length, deepest: byDepth.length - 1, largestBranch }

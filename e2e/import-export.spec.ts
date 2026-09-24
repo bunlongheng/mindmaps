@@ -126,28 +126,33 @@ test.describe('Export — Keyboard Copy', () => {
 
 // ─── Canvas Toolbar ─────────────────────────────────────────────
 
-test.describe('Canvas Toolbar', () => {
-  test('Tag button exists on canvas toolbar', async ({ page }) => {
+test.describe('Settings Panel', () => {
+  test('Tag button exists in the settings panel Map tab', async ({ page }) => {
     await createMap(page)
+    await page.click('[title="Settings"]')
     const tagBtn = page.locator('text="+ Tag"').first()
     await expect(tagBtn).toBeVisible()
   })
 
-  test('PDF button exists on canvas toolbar', async ({ page }) => {
+  test('Export PDF button exists in the settings panel Share tab', async ({ page }) => {
     await createMap(page)
-    const pdfBtn = page.locator('text="PDF"').first()
+    await page.click('[title="Settings"]')
+    await page.getByRole('button', { name: 'Share', exact: true }).click()
+    const pdfBtn = page.locator('text="Export PDF"').first()
     await expect(pdfBtn).toBeVisible()
   })
 
-  test('Delete button exists on canvas toolbar', async ({ page }) => {
+  test('Delete button exists in the settings panel Share tab', async ({ page }) => {
     await createMap(page)
-    const deleteBtn = page.locator('text="Delete"').first()
+    await page.click('[title="Settings"]')
+    await page.getByRole('button', { name: 'Share', exact: true }).click()
+    const deleteBtn = page.locator('[title="Delete map"]').first()
     await expect(deleteBtn).toBeVisible()
   })
 
-  test('Format button exists', async ({ page }) => {
+  test('Settings button exists', async ({ page }) => {
     await createMap(page)
-    const formatBtn = page.locator('[title="Format"]')
+    const formatBtn = page.locator('[title="Settings"]')
     await expect(formatBtn).toBeVisible()
   })
 
@@ -159,7 +164,9 @@ test.describe('Canvas Toolbar', () => {
 
   test('PDF export does not crash', async ({ page }) => {
     await createMap(page)
-    const pdfBtn = page.locator('text="PDF"').first()
+    await page.click('[title="Settings"]')
+    await page.getByRole('button', { name: 'Share', exact: true }).click()
+    const pdfBtn = page.locator('text="Export PDF"').first()
     if (await pdfBtn.isVisible()) {
       await pdfBtn.click()
       await page.waitForTimeout(2_000)

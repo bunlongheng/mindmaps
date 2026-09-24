@@ -3,9 +3,10 @@ import type { MindmapNode } from '../../types'
 import { useMindmapStore } from '../../store/mindmapStore'
 import { NodeIcon, getLucideIcon } from './NodeIcon'
 import { wrapText } from '../../lib/layout/mindmap'
-import { rootPillWidth, rootPillFontSize, rootTitleNeedsPill, rootCircleDiameter, rootDrawnWidth } from '../../lib/rootPill'
+import { rootPillWidth, rootPillFontSize, rootTitleNeedsPill, rootCircleDiameter, rootDrawnWidth, ROOT_FONT } from '../../lib/rootPill'
 import { hexToRgb, darken, depthFill } from '../../lib/color'
 import { shapeRx } from '../../lib/nodeShape'
+import { nodeMetrics, ICON_GAP } from '../../lib/nodeMetrics'
 import { parseLinkedTitle, sliceSegments, lineRanges, type LinkSegment } from '../../lib/links'
 
 interface NodeProps {
@@ -64,9 +65,10 @@ function openNodeUrl(url: string) {
 }
 
 /**
- * Draw parsed title runs as <tspan>s, linked runs wrapped in an SVG <a>. The click
- * and pointerdown are stopped so following a link never also selects or drags the node.
- * A link label split across 2 wrapped lines draws as one anchor per line.
+ * Draw parsed title runs as <tspan>s, linked runs wrapped in an SVG <a>. A plain click
+ * on a link behaves like clicking the node (select, drag, double-click to edit), so a
+ * node whose whole title is a link stays editable. Cmd/Ctrl-click (or middle-click)
+ * opens the link. A link label split across 2 wrapped lines draws as one anchor per line.
  */
 function renderRuns(segments: LinkSegment[], keyPrefix: string) {
   return segments.map((seg, i) => seg.url ? (
@@ -76,8 +78,11 @@ function renderRuns(segments: LinkSegment[], keyPrefix: string) {
       target="_blank"
       rel="noopener noreferrer"
       style={{ pointerEvents: 'auto', cursor: 'pointer' }}
-      onClick={e => e.stopPropagation()}
-      onPointerDown={e => e.stopPropagation()}
+      onClick={e => {
+        if (e.metaKey || e.ctrlKey || e.button === 1) { e.stopPropagation(); return }
+        e.preventDefault()  // plain click: let the node handle it, do not navigate
+      }}
+      onAuxClick={e => { if (e.button === 1) e.stopPropagation() }}
     >
       <tspan style={{ textDecoration: 'underline' }}>{seg.text}</tspan>
     </a>
@@ -116,7 +121,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   const isRootPill = isRoot && diagramType !== 'mindmap' && (
     node.shape === 'pill' ? true :
     node.shape === 'circle' ? false :
-    rootTitleNeedsPill(node.title, node.fontSize ?? 28)
+    rootTitleNeedsPill(node.title, node.fontSize ?? ROOT_FONT)
   )
   const isMindmapCircle = diagramType === 'mindmap' && node.depth === 1
   const isMindmapL2Plus = diagramType === 'mindmap' && node.depth >= 2
@@ -166,9 +171,11 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   // Node-level overrides from panel
   if (node.borderColor) { strokeColor = node.borderColor; strokeW = Math.max(strokeW, node.borderWidth ?? 1.5) }
 
-  // Depth-based font sizes
-  const defaultFontSize = node.depth === 0 ? 34 : node.depth === 1 ? 26 : node.depth === 2 ? 19 : node.depth === 3 ? 16 : 13
-  const baseFontSize = node.fontSize ?? defaultFontSize
+  // Depth-based font size + padding from the one shared box table (src/lib/nodeMetrics),
+  // so the canvas, the server renderer and every layout agree on what a node holds.
+  const metric = nodeMetrics(node.depth)
+  const baseFontSize = node.fontSize ?? metric.fontSize
+  const padX = metric.padX
   // Root pill grows to fit the title up to a max width; past that the font shrinks
   // so long titles never overflow. Shared with the layout (src/lib/rootPill) so
   // the trunk meets the pill's edge instead of starting inside it.
@@ -211,7 +218,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
       if (node.shape !== 'circle' && (node.shape === 'pill' || rootTitleNeedsPill(val, baseFontSize))) {
         // pill: auto width, fixed height
         updates.width = rootPillWidth(val, baseFontSize)
-        updates.height = 90
+        updates.height = nodeMetrics(0).height
       } else {
         // circle: equal width and height, grown to fit the title
         const diameter = rootCircleDiameter(val, baseFontSize)
@@ -344,6 +351,10 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   const hasBadge = (hasEmoji || hasIcon) && !isRoot && !isMindmapL2Plus && !drawCircle
   const editX = isRoot ? cx - r * 0.75 : hasBadge ? node.height : (align === 'left' ? 8 : 2)
   const editW = isRoot ? r * 1.5 : hasBadge ? displayW - node.height - 4 : displayW - editX - 2
+  // The editor shows the raw title (markdown links included), which can be far longer
+  // than the drawn label, so let the field grow past the box instead of clipping it.
+  const rawEditW = Math.min(1100, Math.ceil(draft.length * fontSize * 0.6) + 24)
+  const editWFit = editing ? Math.max(editW, rawEditW) : editW
 
   return (
     <g data-node-id={node.id} style={{
@@ -404,9 +415,9 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
           {isRootPill ? (
             <rect x={0} y={0} width={displayW} height={node.height}
               rx={node.height / 2} ry={node.height / 2}
-              fill={bg} fillOpacity={0.8} stroke={strokeColor} strokeWidth={strokeW} />
+              fill={bg} fillOpacity={1} stroke={strokeColor} strokeWidth={strokeW} />
           ) : (
-            <circle cx={cx} cy={cy} r={r} fill={bg} fillOpacity={0.8}
+            <circle cx={cx} cy={cy} r={r} fill={bg} fillOpacity={1}
               stroke={strokeColor} strokeWidth={strokeW} />
           )}
 
@@ -512,9 +523,9 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
 
       {editing ? (
         <foreignObject
-          x={editX}
+          x={isRoot ? Math.min(editX, cx - editWFit / 2) : editX}
           y={isRoot ? cy - fontSize * 0.7 : 2}
-          width={editW}
+          width={editWFit}
           height={isRoot ? fontSize * 1.6 : node.height - 4}
         >
           <input
@@ -545,7 +556,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
             // For fishbone: shift icon center to account for parallelogram skew
             const skOff = isFishboneNode ? node.height * 0.35 / 2 : 0
             const emojiCX = sq / 2 + skOff
-            const textX = sq + 14 + skOff
+            const textX = sq + ICON_GAP + skOff
             const h = node.height
             return (
               <>
@@ -573,7 +584,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
             const skOff = isFishboneNode ? node.height * 0.35 / 2 : 0
             const iconX = (sq - iconSize) / 2 + skOff
             const iconY = (sq - iconSize) / 2
-            const textX = sq + 14 + skOff
+            const textX = sq + ICON_GAP + skOff
             return (
               <>
                 <NodeIcon icon={resolvedIcon} x={iconX} y={iconY} size={iconSize} color={col} strokeWidth={node.depth === 1 ? 2.5 : 1.8} />
@@ -659,7 +670,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
             }
             return (
               <text
-                x={isRoot ? cx : align === 'left' ? 12 : align === 'right' ? displayW - 12 : displayW / 2}
+                x={isRoot ? cx : align === 'left' ? padX : align === 'right' ? displayW - padX : displayW / 2}
                 y={isRoot ? cy + fontSize * 0.38 : node.height / 2 + fontSize * 0.38}
                 textAnchor={isRoot ? 'middle' : textAnchor}
                 fontSize={fontSize} fontWeight={fontWeight} fontStyle={fontStyle}

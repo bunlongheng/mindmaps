@@ -13,7 +13,7 @@ import { renderMindmapSvg } from '../../lib/render-svg'
 import { emberVanish, blinkDoomed } from '../../lib/emberVanish'
 import { hexToRgb, l1PaletteColor, applyDepthBackground } from '../../lib/color'
 import { AIThinkingOverlay } from '../AIThinkingOverlay'
-import { soundHover, soundClick, soundPaste } from '../../lib/sounds'
+import { soundHover, soundPaste } from '../../lib/sounds'
 
 const PRESET_TAGS = ['AI', 'Work', 'Personal', 'Research']
 
@@ -1157,7 +1157,7 @@ function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isPublic, tags, tagCo
       onTouchStart={() => { longPressTimer.current = setTimeout(() => setHovered(true), 500) }}
       onTouchEnd={() => { if (longPressTimer.current) clearTimeout(longPressTimer.current) }}
       onTouchMove={() => { if (longPressTimer.current) clearTimeout(longPressTimer.current) }}
-      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); soundClick(); onOpen() } }}
+      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen() } }}
       style={{
         background: 'var(--card-bg)',
         border: `1px solid ${flash ? '#6366f1' : hovered ? 'var(--card-border-hover)' : 'var(--card-border)'}`,
@@ -1169,7 +1169,7 @@ function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isPublic, tags, tagCo
           : '0 1px 4px rgba(0,0,0,0.06)',
         transform: hovered ? 'translateY(-2px)' : 'translateY(0)',
       }}
-      onClick={() => { soundClick(); onOpen() }}
+      onClick={() => { onOpen() }}
     >
       {/* Header */}
       <div style={{ padding: '10px 13px 8px', background: '#f8fafc', borderBottom: '1px solid #eef0f5' }}>
@@ -1236,8 +1236,8 @@ function DiagramRow({ diagram, timeAgo, onOpen, onDelete, isPublic, tags, tagCol
       onMouseLeave={() => setHovered(false)}
       onFocus={() => setHovered(true)}
       onBlur={() => setHovered(false)}
-      onClick={() => { soundClick(); onOpen() }}
-      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); soundClick(); onOpen() } }}
+      onClick={() => { onOpen() }}
+      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen() } }}
       style={{
         display: 'flex', alignItems: 'center', gap: 12,
         background: 'var(--card-bg)',

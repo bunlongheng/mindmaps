@@ -7,9 +7,10 @@ import { authorizeOwner, ownerId } from '../_lib/authorizeOwner.js'
 import { renderMindmapSvg } from '../_lib/render-svg.js'
 import {
   parseIndentedOutline, normalizeOutlineRoots, assembleOutlineTree,
-  flattenJsonOutline, computeImportNodeWidth, OUTLINE_META_KEYS,
+  flattenJsonOutline, computeImportNodeWidth, OUTLINE_META_KEYS, OUTLINE_ROOT_SIZE,
   type OutlineNode,
 } from '../../src/lib/outline.js'
+import { nodeHeight } from '../../src/lib/nodeMetrics.js'
 
 const DEFAULT_BRANCH_COLORS = [
   '#6366f1', '#8b5cf6', '#ec4899', '#ef4444',
@@ -41,7 +42,7 @@ function parseOutline(text: string, BRANCH_COLORS: string[] = DEFAULT_BRANCH_COL
       id: nodeIds[i], title: p.title, parentId,
       depth, x: 0, y: 0,
       width: computeImportNodeWidth(p.title, depth),
-      height: depth === 0 ? 180 : 40,
+      height: depth === 0 ? OUTLINE_ROOT_SIZE : nodeHeight(depth),
       // Legacy quirk kept as-is: sortOrder here is the parent's total child count, not
       // the per-child index. Layouts sort stably, so render order is unchanged.
       color, sortOrder: siblingTotals.get(parentIdx) ?? 0,
