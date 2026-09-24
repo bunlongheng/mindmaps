@@ -6,7 +6,7 @@ import { useIsMobile } from '../../hooks/useIsMobile'
 import { getTheme, THEMES, isDarkBg } from '../../lib/themes'
 import { L1_PALETTE } from '../../lib/color'
 import type { Theme } from '../../lib/themes'
-import { X, AlignLeft, AlignCenter, AlignRight, Copy, Check, FileDown, Trash2, Sparkles, Code2, Square, Squircle, Pill, Circle, Tag } from 'lucide-react'
+import { X, AlignLeft, AlignCenter, AlignRight, Copy, Check, FileDown, Trash2, Sparkles, Code2, Square, Squircle, Circle, Tag } from 'lucide-react'
 import { getLucideIcon } from '../canvas/NodeIcon'
 import { showToast, dismissToast } from '../CuteToast'
 import { soundChaChing } from '../../lib/sounds'
@@ -368,7 +368,7 @@ export function SidePanel({ nodeId, onClose, onDelete, onUpdateTags }: SidePanel
                       {([
                         { v: 'rect' as const,    label: 'Rectangle', icon: <Square size={12}/> },
                         { v: 'rounded' as const, label: 'Rounded',   icon: <Squircle size={12}/> },
-                        { v: 'pill' as const,    label: 'Pill',      icon: <Pill size={12}/> },
+                        { v: 'pill' as const,    label: 'Pill',      icon: <svg width="14" height="12" viewBox="0 0 14 12" fill="none" aria-hidden="true"><rect x="1" y="2.5" width="12" height="7" rx="3.5" stroke="currentColor" strokeWidth="1.5" /></svg> },
                         { v: 'circle' as const,  label: 'Circle',    icon: <Circle size={12}/> },
                       ] as const).map(({ v, label, icon }) => (
                         <button key={v} title={label} aria-label={label}
