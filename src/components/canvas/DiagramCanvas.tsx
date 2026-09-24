@@ -5,7 +5,6 @@ import { getTheme } from '../../lib/themes'
 import { EdgeLayer } from './EdgeLayer'
 import { Node } from './Node'
 import { useKeyboard } from '../../hooks/useKeyboard'
-import { soundClick } from '../../lib/sounds'
 import { L1_PALETTE } from '../../lib/color'
 import { computeSubtreeCounts } from '../../lib/nodeCounts'
 
@@ -419,7 +418,6 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract }: DiagramCan
   }, [])
 
   const handleSelect = useCallback((id: string, multi: boolean) => {
-    soundClick()
     if (multi) {
       const next = selectedNodeIds.includes(id) ? selectedNodeIds.filter(n => n !== id) : [...selectedNodeIds, id]
       setSelectedNodeIds(next)
