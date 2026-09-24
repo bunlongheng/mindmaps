@@ -1,5 +1,5 @@
-import type { MindmapNode } from '../../types'
-import { nodeHeight, nodeMinWidth } from '../nodeMetrics'
+import type { MindmapNode } from '../../types/index.js'
+import { nodeHeight, nodeMinWidth } from '../nodeMetrics.js'
 
 const ROOT_X = 120
 export const BRACE_GAP = 50  // horizontal space per level (includes the brace connector)

@@ -1,4 +1,4 @@
-import type { Diagram } from '../../types'
+import type { Diagram } from '../../types/index.js'
 
 export function exportToJSON(diagram: Diagram): string {
   type NodeEntry = string | Record<string, unknown>

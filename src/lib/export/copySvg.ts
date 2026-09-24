@@ -1,4 +1,4 @@
-import { showToast } from '../../components/CuteToast'
+import { showToast } from '../../components/CuteToast.js'
 
 const SVG_NS = 'http://www.w3.org/2000/svg'
 
