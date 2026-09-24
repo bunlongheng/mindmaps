@@ -69,6 +69,28 @@ describe('GET /api/og', () => {
     expect(res.body).toContain('og:image')
   })
 
+  it('points og:url at the canonical /s/<id> and the image at /api/og-image?id=', async () => {
+    queryMock.mockResolvedValue({ rows: [{ name: 'Canonical', nodes: [{ id: '1' }] }] })
+    const res = mockRes()
+    await handler(mockReq(UUID.real), res)
+    expect(res.body).toContain(`<meta property="og:url" content="https://mindmaps-bheng.vercel.app/s/${UUID.real}"/>`)
+    expect(res.body).toContain(`<meta property="og:image" content="https://mindmaps-bheng.vercel.app/api/og-image?id=${UUID.real}"/>`)
+    expect(res.body).toContain('<meta property="og:image:type" content="image/png"/>')
+    expect(res.body).toContain('<meta property="og:image:alt" content="Canonical"/>')
+    // A human still lands on the app, not on the OG shell.
+    expect(res.body).toContain(`content="0;url=/?share=${UUID.real}"`)
+    expect(res.headers['Cache-Control']).toBe('public, s-maxage=600, stale-while-revalidate=86400')
+  })
+
+  it('leaks no name for a private map - the generic card only', async () => {
+    queryMock.mockResolvedValue({ rows: [] })
+    const res = mockRes()
+    await handler(mockReq(UUID.missing), res)
+    expect(res.body).toContain('<meta property="og:title" content="Mindmaps"/>')
+    expect(res.body).toContain('Visual mind map and diagram tool')
+    expect(res.body).not.toContain('node')
+  })
+
   it('escapes HTML-unsafe characters in the map name', async () => {
     queryMock.mockResolvedValue({
       rows: [{ name: '<script>alert(1)</script>', type: 'logic-chart', tags: [], nodes: [] }],

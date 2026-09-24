@@ -1,5 +1,11 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "functions": {
+    "api/og-image.ts": { "includeFiles": "api/_fonts/**" }
+  },
+  "rewrites": [
+    { "source": "/s/:id", "destination": "/api/og?id=:id" }
+  ],
   "headers": [
     {
       "source": "/(.*)",

@@ -284,5 +284,5 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const appUrl = process.env.MINDMAP_APP_URL ?? 'https://mindmaps-bheng.vercel.app'
   const totalTokens = (aiData.usage?.input_tokens ?? 0) + (aiData.usage?.output_tokens ?? 0)
-  return res.status(201).json({ id, title, url: `${appUrl}/?id=${id}`, nodeCount: nodes.length, usage: { total_tokens: totalTokens } })
+  return res.status(201).json({ id, title, url: `${appUrl}/s/${id}`, nodeCount: nodes.length, usage: { total_tokens: totalTokens } })
 }
