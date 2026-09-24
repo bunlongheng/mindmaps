@@ -12,6 +12,7 @@ import {
 } from '../../lib/color'
 import { computeSubtreeCounts } from '../../lib/nodeCounts'
 import { radialNodeExtent } from '../../lib/layout/mindmap'
+import { GLOSS_LINEAR_ID, GLOSS_RADIAL_ID, GLOSS_RADIAL_CX, GLOSS_RADIAL_CY, GLOSS_RADIAL_R, GLOSS_STOPS } from '../../lib/gloss'
 
 interface DiagramCanvasProps {
   onNodeSelect: (nodeId: string | null) => void
@@ -471,31 +472,41 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract }: DiagramCan
         onPointerCancel={handleBgPointerUp}
         style={{ userSelect: 'none', touchAction: 'none' }}
       >
-        {neonFilters.length > 0 && (
-          <defs>
-            {neonFilters.map(f => (
-              <filter key={f.id} id={f.id} x="-75%" y="-75%" width="250%" height="250%"
+        <defs>
+          {/* Box gloss - defined once per render (root/L1/L2 boxes reference it, see Node.tsx) */}
+          <linearGradient id={GLOSS_LINEAR_ID} x1="0" y1="0" x2="0" y2="1" gradientUnits="objectBoundingBox">
+            {GLOSS_STOPS.map((s, i) => <stop key={i} offset={s.offset} stopColor="#ffffff" stopOpacity={s.opacity} />)}
+          </linearGradient>
+          <radialGradient id={GLOSS_RADIAL_ID} cx={GLOSS_RADIAL_CX} cy={GLOSS_RADIAL_CY} r={GLOSS_RADIAL_R} gradientUnits="objectBoundingBox">
+            {GLOSS_STOPS.map((s, i) => <stop key={i} offset={s.offset} stopColor="#ffffff" stopOpacity={s.opacity} />)}
+          </radialGradient>
+          {/* Neon halo filters - one per distinct circle diameter, dark themes only */}
+          {neonFilters.length > 0 && (
+            <>
+              {neonFilters.map(f => (
+                <filter key={f.id} id={f.id} x="-75%" y="-75%" width="250%" height="250%"
+                  colorInterpolationFilters="sRGB">
+                  <feGaussianBlur in="SourceGraphic" stdDeviation={f.halo} result="wide" />
+                  <feComponentTransfer in="wide" result="halo">
+                    <feFuncA type="linear" slope={NEON_HALO_OPACITY} />
+                  </feComponentTransfer>
+                  <feGaussianBlur in="SourceGraphic" stdDeviation={f.core} result="tight" />
+                  <feComponentTransfer in="tight" result="core">
+                    <feFuncA type="linear" slope={NEON_CORE_OPACITY} />
+                  </feComponentTransfer>
+                  <feMerge>
+                    <feMergeNode in="halo" />
+                    <feMergeNode in="core" />
+                  </feMerge>
+                </filter>
+              ))}
+              <filter id={NEON_TEXT_FILTER} x="-60%" y="-60%" width="220%" height="220%"
                 colorInterpolationFilters="sRGB">
-                <feGaussianBlur in="SourceGraphic" stdDeviation={f.halo} result="wide" />
-                <feComponentTransfer in="wide" result="halo">
-                  <feFuncA type="linear" slope={NEON_HALO_OPACITY} />
-                </feComponentTransfer>
-                <feGaussianBlur in="SourceGraphic" stdDeviation={f.core} result="tight" />
-                <feComponentTransfer in="tight" result="core">
-                  <feFuncA type="linear" slope={NEON_CORE_OPACITY} />
-                </feComponentTransfer>
-                <feMerge>
-                  <feMergeNode in="halo" />
-                  <feMergeNode in="core" />
-                </feMerge>
+                <feGaussianBlur stdDeviation={NEON_TEXT_BLUR} />
               </filter>
-            ))}
-            <filter id={NEON_TEXT_FILTER} x="-60%" y="-60%" width="220%" height="220%"
-              colorInterpolationFilters="sRGB">
-              <feGaussianBlur stdDeviation={NEON_TEXT_BLUR} />
-            </filter>
-          </defs>
-        )}
+            </>
+          )}
+        </defs>
         <g ref={gRef}>
           <EdgeLayer nodes={hideDetails ? activeMindmap.nodes.filter(n => n.depth <= 2) : activeMindmap.nodes} lineStyle={lineStyle} diagramType={diagramType} paletteColors={paletteColors} />
           {(hideDetails ? activeMindmap.nodes.filter(n => n.depth <= 2) : activeMindmap.nodes).map(node => (

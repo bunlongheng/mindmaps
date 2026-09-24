@@ -13,6 +13,7 @@ import {
 import { shapeRx } from '../../lib/nodeShape'
 import { nodeMetrics, ICON_GAP } from '../../lib/nodeMetrics'
 import { parseLinkedTitle, sliceSegments, lineRanges, type LinkSegment } from '../../lib/links'
+import { GLOSS_LINEAR_ID, GLOSS_RADIAL_ID, glossApplies, glossOpacity } from '../../lib/gloss'
 
 interface NodeProps {
   node: MindmapNode
@@ -185,6 +186,13 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   const rootNeon = neon && isRoot ? neonRootColor(node.color) : null
   if (neon && (isRoot || isRadial)) textColor = NEON_TEXT
   if (rootNeon) strokeColor = lighten(rootNeon, 0.4)
+
+  // Root, L1 and L2 boxes carry a soft top-of-box gloss; L3+ are already pale, so
+  // it would be lost. Dark-background boxes get the stronger gradient stops (via
+  // glossOpacity), light-background ones the softer scaled-down version. Read from
+  // the base fill, so a neon orb keeps the strong stops its dark canvas calls for.
+  const showGloss = glossApplies(node.depth)
+  const glossFillOpacity = glossOpacity(isLight(bg))
 
   // A dot is 5-8px across, so the 2px L2+ ring would swallow it whole.
   if (isRadialDot) strokeW = 1
@@ -380,6 +388,10 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   // Neon halo: one shared, diameter-bucketed filter per render (defined in
   // DiagramCanvas), so a 200-node map carries a handful of filters, not 400.
   const neonGlow = neon && (isRoot || isRadial)
+  // A parallelogram has no rx, so its gloss overlay needs a real clip to the polygon
+  // rather than a matching corner radius.
+  const glossFbClipId = `gloss-fb-${node.id}`
+  const showFishboneGloss = isFishboneNode && !nodeShape && showGloss
   const hasBadge = (hasEmoji || hasIcon) && !isRoot && !isRadial && !drawCircle
   const editX = isRoot ? cx - r * 0.75 : hasBadge ? node.height : (align === 'left' ? 8 : 2)
   const editW = isRoot ? r * 1.5 : hasBadge ? displayW - node.height - 4 : displayW - editX - 2
@@ -394,7 +406,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
       transition: isDragging ? 'none' : 'transform 0.22s cubic-bezier(0.4,0,0.2,1)',
       pointerEvents: noInteract ? 'none' : undefined,
     }}>
-    {(!isRoot && !isRadial) || showGlow || rootNeon ? (
+    {(!isRoot && !isRadial) || showGlow || rootNeon || showFishboneGloss ? (
       <defs>
         {!isRoot && !isRadial && (
           <clipPath id={clipId}>
@@ -413,6 +425,14 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
             <stop offset="100%" stopColor={rootNeon} />
           </radialGradient>
         )}
+        {showFishboneGloss && (() => {
+          const sk = node.height * 0.35
+          const w = displayW, h = node.height
+          const pts = fishboneAbove
+            ? `${sk},0 ${w},0 ${w - sk},${h} 0,${h}`
+            : `0,0 ${w - sk},0 ${w},${h} ${sk},${h}`
+          return <clipPath id={glossFbClipId}><polygon points={pts} /></clipPath>
+        })()}
       </defs>
     ) : null}
     <g
@@ -477,6 +497,15 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
               stroke={strokeColor} strokeWidth={strokeW} />
           )}
 
+          {/* Gloss — soft top-of-box highlight, root pill or root circle */}
+          {showGloss && (isRootPill ? (
+            <rect x={0} y={0} width={displayW} height={node.height} rx={node.height / 2} ry={node.height / 2}
+              fill={`url(#${GLOSS_LINEAR_ID})`} fillOpacity={glossFillOpacity} style={{ pointerEvents: 'none' }} />
+          ) : (
+            <circle cx={cx} cy={cy} r={r} fill={`url(#${GLOSS_RADIAL_ID})`} fillOpacity={glossFillOpacity}
+              style={{ pointerEvents: 'none' }} />
+          ))}
+
           {/* Front ring glints — circle root only, never on the mind map */}
           {!isRootPill && diagramType !== 'mindmap' && (() => { const ar = r; return (
           <>
@@ -516,6 +545,9 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
           )}
           <circle cx={cx} cy={cy} r={r} fill={nodeFill} fillOpacity={bgOpacity} />
           <circle cx={cx} cy={cy} r={r} fill="none" stroke={strokeColor} strokeWidth={strokeW} />
+          {showGloss && (
+            <circle cx={cx} cy={cy} r={r} fill={`url(#${GLOSS_RADIAL_ID})`} fillOpacity={glossFillOpacity} />
+          )}
         </g>
         </>
       ) : drawCircle ? (
@@ -525,6 +557,9 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
           filter="drop-shadow(0 1px 4px rgba(0,0,0,0.1))">
           <circle cx={cx} cy={cy} r={r} fill={nodeFill} fillOpacity={bgOpacity} />
           <circle cx={cx} cy={cy} r={r} fill="none" stroke={strokeColor} strokeWidth={strokeW} />
+          {showGloss && (
+            <circle cx={cx} cy={cy} r={r} fill={`url(#${GLOSS_RADIAL_ID})`} fillOpacity={glossFillOpacity} />
+          )}
         </g>
         </>
       ) : isFishboneNode && !nodeShape ? (() => {
@@ -551,6 +586,10 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
             return <polygon points={badgePts} fill="#ffffff" />
           })()}
           <polygon points={pts} fill="none" stroke={strokeColor} strokeWidth={strokeW} />
+          {showGloss && (
+            <rect x={0} y={0} width={w} height={h} clipPath={`url(#${glossFbClipId})`}
+              fill={`url(#${GLOSS_LINEAR_ID})`} fillOpacity={glossFillOpacity} />
+          )}
         </g>
         </>)
       })() : (
@@ -562,6 +601,11 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
         <g clipPath={`url(#${clipId})`} style={{ pointerEvents: 'none' }}
           filter={previewW !== null ? 'drop-shadow(0 0 8px rgba(59,130,246,0.7))' : 'drop-shadow(0 1px 4px rgba(0,0,0,0.1))'}>
           <rect x={0} y={0} width={displayW} height={node.height} fill={nodeFill} fillOpacity={bgOpacity} />
+          {/* Gloss — soft top-of-box highlight, root/L1/L2 boxes only */}
+          {showGloss && (
+            <rect x={0} y={0} width={displayW} height={node.height} rx={effectiveRx} ry={effectiveRx}
+              fill={`url(#${GLOSS_LINEAR_ID})`} fillOpacity={glossFillOpacity} />
+          )}
           {/* White badge behind border — border ring sits on top */}
           {(hasEmoji || hasIcon) && (
             <rect x={0} y={0} width={node.height + 1} height={node.height} fill="#ffffff" />

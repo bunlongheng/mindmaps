@@ -31,6 +31,7 @@ import { shapeRx } from './nodeShape.js'
 import { parseLinkedTitle, sliceSegments, lineRanges, type LinkSegment } from './links.js'
 import { nodeCenter, nodeCenterLeft, nodeCenterRight, buildStraightPath, buildCurvedPath, buildOrthogonalPath, buildRadialBranchPath } from './geometry.js'
 import { computeSubtreeCounts } from './nodeCounts.js'
+import { GLOSS_LINEAR_ID, GLOSS_RADIAL_ID, glossApplies, glossOpacity, glossDefsSvg } from './gloss.js'
 
 // The stored DB row shape (SELECT in api/mindmaps.ts / INSERT in api/ai/mindmaps.ts).
 export interface MindmapRow {
@@ -342,6 +343,12 @@ function renderNode(node: MindmapNode, type: DiagramType, paletteColor: string |
   if (rootNeon) strokeColor = lighten(rootNeon, 0.4)
   if (node.borderColor) { strokeColor = node.borderColor; strokeW = Math.max(strokeW, node.borderWidth ?? 1.5) }
 
+  // Root, L1 and L2 boxes carry a soft top-of-box gloss; L3+ are already pale, so
+  // it would be lost. Dark-background boxes get the stronger gradient stops, light
+  // ones the softer scaled-down version (mirrors Node.tsx).
+  const showGloss = glossApplies(node.depth)
+  const glossFillOpacity = glossOpacity(isLight(bg))
+
   // Same shared box table the canvas reads (src/lib/nodeMetrics), so a card preview
   // and the opened map can never draw a label at a different size.
   const metric = nodeMetrics(node.depth)
@@ -382,6 +389,13 @@ function renderNode(node: MindmapNode, type: DiagramType, paletteColor: string |
       const rootFill = rootNeon ? `url(#${NEON_ROOT_GRADIENT})` : esc(bg)
       parts.push(`<circle cx="${r2(cx)}" cy="${r2(cy)}" r="${r2(displayW / 2)}" fill="${rootFill}" stroke="${esc(strokeColor)}" stroke-width="${strokeW}"/>`)
     }
+    if (showGloss) {
+      if (isRootPill) {
+        parts.push(`<rect x="0" y="0" width="${r2(displayW)}" height="${r2(h)}" rx="${r2(h / 2)}" ry="${r2(h / 2)}" fill="url(#${GLOSS_LINEAR_ID})" fill-opacity="${glossFillOpacity}"/>`)
+      } else {
+        parts.push(`<circle cx="${r2(cx)}" cy="${r2(cy)}" r="${r2(displayW / 2)}" fill="url(#${GLOSS_RADIAL_ID})" fill-opacity="${glossFillOpacity}"/>`)
+      }
+    }
   } else if (isRadial) {
     const cr = displayW / 2
     if (neon) {
@@ -391,10 +405,16 @@ function renderNode(node: MindmapNode, type: DiagramType, paletteColor: string |
     }
     parts.push(`<circle cx="${r2(cx)}" cy="${r2(cy)}" r="${r2(cr)}" fill="${esc(bg)}"/>`)
     parts.push(`<circle cx="${r2(cx)}" cy="${r2(cy)}" r="${r2(cr)}" fill="none" stroke="${esc(strokeColor)}" stroke-width="${strokeW}"/>`)
+    if (showGloss) {
+      parts.push(`<circle cx="${r2(cx)}" cy="${r2(cy)}" r="${r2(cr)}" fill="url(#${GLOSS_RADIAL_ID})" fill-opacity="${glossFillOpacity}"/>`)
+    }
   } else if (drawCircle) {
     const cr = displayW / 2
     parts.push(`<circle cx="${r2(cx)}" cy="${r2(cy)}" r="${r2(cr)}" fill="${esc(bg)}"/>`)
     parts.push(`<circle cx="${r2(cx)}" cy="${r2(cy)}" r="${r2(cr)}" fill="none" stroke="${esc(strokeColor)}" stroke-width="${strokeW}"/>`)
+    if (showGloss) {
+      parts.push(`<circle cx="${r2(cx)}" cy="${r2(cy)}" r="${r2(cr)}" fill="url(#${GLOSS_RADIAL_ID})" fill-opacity="${glossFillOpacity}"/>`)
+    }
   } else if (isFishboneNode && !nodeShape) {
     // Parallelogram skewed toward the spine (SPINE_Y = 400 in the fishbone layout)
     const sk = h * 0.35
@@ -411,8 +431,17 @@ function renderNode(node: MindmapNode, type: DiagramType, paletteColor: string |
       parts.push(`<polygon points="${badgePts}" fill="#ffffff"/>`)
     }
     parts.push(`<polygon points="${pts}" fill="none" stroke="${esc(strokeColor)}" stroke-width="${strokeW}"/>`)
+    // Parallelogram has no rx, so the gloss overlay clips to the polygon instead.
+    if (showGloss) {
+      const clipId = `gloss-fb-${esc(node.id)}`
+      parts.push(`<defs><clipPath id="${clipId}"><polygon points="${pts}"/></clipPath></defs>`)
+      parts.push(`<rect x="0" y="0" width="${r2(displayW)}" height="${r2(h)}" clip-path="url(#${clipId})" fill="url(#${GLOSS_LINEAR_ID})" fill-opacity="${glossFillOpacity}"/>`)
+    }
   } else {
     parts.push(`<rect x="0" y="0" width="${r2(displayW)}" height="${r2(h)}" rx="${effectiveRx}" ry="${effectiveRx}" fill="${esc(bg)}"/>`)
+    if (showGloss) {
+      parts.push(`<rect x="0" y="0" width="${r2(displayW)}" height="${r2(h)}" rx="${effectiveRx}" ry="${effectiveRx}" fill="url(#${GLOSS_LINEAR_ID})" fill-opacity="${glossFillOpacity}"/>`)
+    }
     if (hasEmoji || hasIcon) {
       parts.push(`<rect x="0" y="0" width="${r2(h + 1)}" height="${r2(h)}" fill="#ffffff"/>`)
     }
@@ -526,11 +555,10 @@ export function renderMindmapSvg(row: MindmapRow): string {
   // canvas that becomes one two-layer neon filter per distinct circle size, plus the
   // branch and text blurs and the root orb's gradient - filter primitives only, so
   // the resvg rasterizer behind the share image draws what the browser draws.
-  const defs = type !== 'mindmap' ? ''
+  const mmDefs = type !== 'mindmap' ? ''
     : !neon
-      ? '<defs><filter id="mm-glow" x="-70%" y="-70%" width="240%" height="240%"><feGaussianBlur stdDeviation="6"/></filter></defs>'
-      : '<defs>'
-        + neonFilterSpecs(nodes.map(n => Math.max(n.width, n.height))).map(f =>
+      ? '<filter id="mm-glow" x="-70%" y="-70%" width="240%" height="240%"><feGaussianBlur stdDeviation="6"/></filter>'
+      : neonFilterSpecs(nodes.map(n => Math.max(n.width, n.height))).map(f =>
             `<filter id="${f.id}" x="-75%" y="-75%" width="250%" height="250%" color-interpolation-filters="sRGB">`
             + `<feGaussianBlur in="SourceGraphic" stdDeviation="${f.halo}" result="wide"/>`
             + `<feComponentTransfer in="wide" result="halo"><feFuncA type="linear" slope="${NEON_HALO_OPACITY}"/></feComponentTransfer>`
@@ -542,7 +570,8 @@ export function renderMindmapSvg(row: MindmapRow): string {
         + (rootNode
             ? `<radialGradient id="${NEON_ROOT_GRADIENT}"><stop offset="0%" stop-color="${lighten(neonRootColor(rootNode.color), NEON_ROOT_LIGHTEN)}"/><stop offset="100%" stop-color="${neonRootColor(rootNode.color)}"/></radialGradient>`
             : '')
-        + '</defs>'
+  // Gloss gradients live in the same <defs>, referenced by every root/L1/L2 box below.
+  const defs = `<defs>${glossDefsSvg()}${mmDefs}</defs>`
 
   // viewBox from laid-out bounds (+ slack for spines that extend past the nodes)
   const pad = 60

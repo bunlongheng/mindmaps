@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, it, expect } from 'vitest'
 import { renderMindmapSvg } from '../_lib/render-svg.js'
-import { depthFill, L1_PALETTE } from '../../src/lib/color.js'
+import { depthFill, L1_PALETTE, NEON_ROOT_GRADIENT } from '../../src/lib/color.js'
 import { computeMindmapLayout, radialLabelSide } from '../../src/lib/layout/mindmap.js'
 
 const mkNodes = () => {
@@ -200,16 +200,18 @@ describe('renderMindmapSvg smoke', () => {
       expect([...svgOfTheme('default').matchAll(/<path /g)].length).toBe(branches)
     })
 
-    it('carries a filter and a radialGradient only on the dark themes', () => {
+    it('carries a filter and the root orb gradient only on the dark themes', () => {
+      // The gloss overlay defines its own radialGradient on every theme, so this
+      // asserts the neon root orb gradient by id, not any radialGradient at all.
       for (const t of ['cyberpunk', 'monokai']) {
         const svg = svgOfTheme(t)
         expect(svg).toContain('<filter')
-        expect(svg).toContain('<radialGradient')
+        expect(svg).toContain(`<radialGradient id="${NEON_ROOT_GRADIENT}"`)
         expect(svg).toContain('mm-neon-')
       }
       for (const t of ['default', 'retro']) {
         const svg = svgOfTheme(t)
-        expect(svg).not.toContain('<radialGradient')
+        expect(svg).not.toContain(`<radialGradient id="${NEON_ROOT_GRADIENT}"`)
         expect(svg).not.toContain('mm-neon-')
         expect(svg).toContain('mm-glow')   // today's subtle halo, untouched
       }
