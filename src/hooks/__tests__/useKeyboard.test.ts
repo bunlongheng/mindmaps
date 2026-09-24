@@ -170,6 +170,42 @@ describe('useKeyboard', () => {
     expect(useMindmapStore.getState().activeMindmap!.nodes.length).toBeLessThan(afterAdd)
   })
 
+  it('Cmd+Z fires undo while a range input (a Settings slider) has focus', () => {
+    loadDiagram()
+    useMindmapStore.getState().addNode('root', 'Extra')
+    const afterAdd = useMindmapStore.getState().activeMindmap!.nodes.length
+    renderHook(() => useKeyboard())
+    const slider = document.createElement('input')
+    slider.type = 'range'
+    const e = key({ key: 'z', metaKey: true, target: slider })
+    expect(e.defaultPrevented).toBe(true)
+    expect(useMindmapStore.getState().activeMindmap!.nodes.length).toBeLessThan(afterAdd)
+  })
+
+  it('Cmd+Z is left to the browser while a text input has focus', () => {
+    loadDiagram()
+    useMindmapStore.getState().addNode('root', 'Extra')
+    const afterAdd = useMindmapStore.getState().activeMindmap!.nodes.length
+    renderHook(() => useKeyboard())
+    const text = document.createElement('input')
+    text.type = 'text'
+    const e = key({ key: 'z', metaKey: true, target: text })
+    expect(e.defaultPrevented).toBe(false)
+    expect(useMindmapStore.getState().activeMindmap!.nodes.length).toBe(afterAdd)
+  })
+
+  it('Cmd+Z is left to the browser inside a contenteditable', () => {
+    loadDiagram()
+    useMindmapStore.getState().addNode('root', 'Extra')
+    const afterAdd = useMindmapStore.getState().activeMindmap!.nodes.length
+    renderHook(() => useKeyboard())
+    const editable = document.createElement('div')
+    Object.defineProperty(editable, 'isContentEditable', { value: true })
+    const e = key({ key: 'z', metaKey: true, target: editable })
+    expect(e.defaultPrevented).toBe(false)
+    expect(useMindmapStore.getState().activeMindmap!.nodes.length).toBe(afterAdd)
+  })
+
   it('Cmd+Y triggers redo', () => {
     loadDiagram()
     useMindmapStore.getState().addNode('root', 'Extra')

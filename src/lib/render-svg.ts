@@ -11,16 +11,27 @@
 // render as a tiny neutral placeholder instead of pulling the icon library.
 import type { MindmapNode, DiagramType, LineStyle } from '../types/index.js'
 import { computeMindmapsLayout } from './layout/mindmaps-layout.js'
-import { computeMindmapLayout, wrapText } from './layout/mindmap.js'
+import { computeMindmapLayout, wrapText, initialFontSize, nodeInitial, radialLabelFor, radialNodeExtent, LABEL_FONT, RADIAL_ROOT_FONT } from './layout/mindmap.js'
 import { computeFishboneLayout, FISHBONE_SLANT } from './layout/fishbone.js'
 import { computeTimelineLayout } from './layout/timeline.js'
 import { getTheme } from './themes.js'
-import { L1_PALETTE, hexToRgb, darken, depthFill, applyDepthTransparency, edgeWidthForDepth } from './color.js'
+import {
+  hexToRgb, darken, depthFill, applyDepthTransparency, edgeWidthForDepth,
+  radialEdgeWidth, RADIAL_EDGE_OPACITY, isDarkBg, lighten, neonFilterId, neonFilterSpecs,
+  neonRootColor, NEON_CORE_OPACITY, NEON_EDGE_CORE_OPACITY, NEON_EDGE_FILTER,
+  NEON_EDGE_GLOW_BLUR, NEON_EDGE_GLOW_OPACITY, NEON_EDGE_GLOW_WIDTH, NEON_EDGE_LIGHTEN,
+  NEON_HALO_OPACITY, NEON_ROOT_GRADIENT, NEON_ROOT_LIGHTEN, NEON_TEXT, NEON_TEXT_BLUR,
+  NEON_TEXT_FILTER, NEON_TEXT_MUTED, NEON_TEXT_MUTED_OPACITY,
+} from './color.js'
+import { computeBranchColors } from './branchColor.js'
 import { rootPillWidth, rootPillFontSize, rootTitleNeedsPill, ROOT_FONT } from './rootPill.js'
 import { nodeMetrics, ICON_GAP } from './nodeMetrics.js'
+import { normalizeWidthsPerDepth } from './widthNormalize.js'
 import { shapeRx } from './nodeShape.js'
 import { parseLinkedTitle, sliceSegments, lineRanges, type LinkSegment } from './links.js'
-import { nodeCenter, nodeCenterLeft, nodeCenterRight, buildStraightPath, buildCurvedPath, buildOrthogonalPath } from './geometry.js'
+import { nodeCenter, nodeCenterLeft, nodeCenterRight, buildStraightPath, buildCurvedPath, buildOrthogonalPath, buildRadialBranchPath } from './geometry.js'
+import { computeSubtreeCounts } from './nodeCounts.js'
+import { GLOSS_LINEAR_ID, GLOSS_RADIAL_ID, glossApplies, glossOpacity, glossDefsSvg } from './gloss.js'
 
 // The stored DB row shape (SELECT in api/mindmaps.ts / INSERT in api/ai/mindmaps.ts).
 export interface MindmapRow {
@@ -49,22 +60,6 @@ function isLight(hex: string): boolean {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b > 140
 }
 
-/** Make all nodes at a depth share the widest width (mindmapStore normalizeWidthsPerDepth). */
-function normalizeWidthsPerDepth(nodes: MindmapNode[], type: DiagramType): MindmapNode[] {
-  const maxByDepth = new Map<number, number>()
-  for (const n of nodes) {
-    if (n.depth > 0 && n.shape !== 'circle' && !(type === 'mindmap' && n.depth >= 2)) {
-      maxByDepth.set(n.depth, Math.max(maxByDepth.get(n.depth) ?? 0, n.width))
-    }
-  }
-  return nodes.map(n => {
-    if (n.depth <= 0) return n
-    if (n.shape === 'circle') return n   // circle-shaped nodes keep their own square
-    if (type === 'mindmap' && n.depth >= 2) return n
-    return { ...n, width: maxByDepth.get(n.depth) ?? n.width }
-  })
-}
-
 /** Layout dispatch (mindmapStore runLayout). */
 function runLayout(nodes: MindmapNode[], type: DiagramType): MindmapNode[] {
   switch (type) {
@@ -75,30 +70,14 @@ function runLayout(nodes: MindmapNode[], type: DiagramType): MindmapNode[] {
   }
 }
 
-/** 12-colour-wheel colour per node id (DiagramCanvas computePaletteColors). */
-function computePaletteColors(nodes: MindmapNode[]): Map<string, string | null> {
-  const byId = new Map(nodes.map(n => [n.id, n]))
-  const colors = new Map<string, string | null>()
-  const resolve = (n: MindmapNode): string | null => {
-    const cached = colors.get(n.id)
-    if (cached !== undefined) return cached
-    let c: string | null = null
-    if (n.depth === 1) c = L1_PALETTE[(((n.sortOrder ?? 0) % 12) + 12) % 12]
-    else if (n.depth > 1) {
-      const parent = n.parentId ? byId.get(n.parentId) : undefined
-      c = parent ? resolve(parent) : null
-    }
-    colors.set(n.id, c)
-    return c
-  }
-  for (const n of nodes) resolve(n)
-  return colors
-}
-
 /** Load pipeline (mindmapStore setActiveMindmap): reset sizes -> layout -> normalize -> layout. */
 function layoutForRender(raw: MindmapNode[], type: DiagramType): MindmapNode[] {
   const fresh = raw.map(n => {
-    if (n.depth !== 0) return { ...n, width: 0, height: 0, manuallyPositioned: false }
+    if (n.depth !== 0) {
+      return n.widthMode === 'manual'
+        ? { ...n, height: 0, manuallyPositioned: false }
+        : { ...n, width: 0, height: 0, manuallyPositioned: false }
+    }
     const isPill = parseLinkedTitle(n.title).text.length >= 15 || n.width !== n.height
     if (isPill) return { ...n, width: rootPillWidth(n.title, n.fontSize ?? ROOT_FONT), height: nodeMetrics(0).height, manuallyPositioned: false }
     return { ...n, manuallyPositioned: false }
@@ -152,36 +131,26 @@ function deepEdge(parent: MindmapNode, child: MindmapNode, lineStyle: LineStyle)
   return `<path d="${d}" stroke="${esc(edgeStroke(child.color, child.depth))}" stroke-width="${edgeWidthForDepth(child.depth)}" fill="none" stroke-linecap="round"/>`
 }
 
-function renderEdges(nodes: MindmapNode[], type: DiagramType, lineStyle: LineStyle, pc: (n: MindmapNode) => string): string {
+function renderEdges(nodes: MindmapNode[], type: DiagramType, lineStyle: LineStyle, pc: (n: MindmapNode) => string, neon = false): string {
   const nodeMap = new Map(nodes.map(n => [n.id, n]))
 
+  // Radial constellation: thin, same-handed curves from circle edge to circle edge,
+  // identical to the canvas (EdgeLayer.tsx) so a card preview matches the opened map.
+  // On a dark canvas each branch is drawn twice - a blurred glow line under a crisp
+  // lightened core - so it reads as a luminous tube, exactly as the canvas draws it.
   if (type === 'mindmap') {
-    return nodes.filter(n => n.parentId && nodeMap.has(n.parentId)).map(n => {
-      const parent = nodeMap.get(n.parentId!)!
-      const x1 = parent.x + parent.width / 2
-      const y1 = parent.y + parent.height / 2
-      const x2 = n.x + n.width / 2
-      const y2 = n.y + n.height / 2
-      const dx = x2 - x1, dy = y2 - y1
-      const len = Math.hypot(dx, dy) || 1
-      const ux = dx / len, uy = dy / len
-      // Ellipse perimeter intersection: r = 1/sqrt((ux/a)^2 + (uy/b)^2)
-      const edgeR = (w: number, h: number) => {
-        const a = w / 2, b = h / 2
-        const d = Math.sqrt((ux / a) ** 2 + (uy / b) ** 2)
-        return d === 0 ? a : 1 / d
-      }
-      const parentR = edgeR(parent.width, parent.height)
-      const childR = edgeR(n.width, n.height)
-      const sx = x1 + ux * parentR, sy = y1 + uy * parentR
-      const ex = x2 - ux * childR, ey = y2 - uy * childR
-      const mx = (sx + ex) / 2, my = (sy + ey) / 2
-      const d = lineStyle === 'straight'
-        ? `M ${r2(sx)} ${r2(sy)} L ${r2(ex)} ${r2(ey)}`
-        : `M ${r2(sx)} ${r2(sy)} Q ${r2(mx)} ${r2(my)} ${r2(ex)} ${r2(ey)}`
-      const width = edgeWidthForDepth(n.depth)
-      return `<path d="${d}" stroke="${esc(pc(n))}" stroke-width="${width}" fill="none" stroke-linecap="round"/>`
+    const branches = nodes.filter(n => n.parentId && nodeMap.has(n.parentId))
+      .map(n => ({ n, d: buildRadialBranchPath(nodeMap.get(n.parentId!)!, n) }))
+    const core = branches.map(({ n, d }) => {
+      const stroke = neon && pc(n).startsWith('#') ? lighten(pc(n), NEON_EDGE_LIGHTEN) : pc(n)
+      const op = neon ? NEON_EDGE_CORE_OPACITY : RADIAL_EDGE_OPACITY
+      return `<path d="${d}" stroke="${esc(stroke)}" stroke-opacity="${op}" stroke-width="${radialEdgeWidth(n.depth)}" fill="none" stroke-linecap="round"/>`
     }).join('')
+    if (!neon) return core
+    // One blur pass for every glow line in the map, not one filter per branch.
+    const glow = branches.map(({ n, d }) =>
+      `<path d="${d}" stroke="${esc(pc(n))}" stroke-width="${NEON_EDGE_GLOW_WIDTH}" fill="none" stroke-linecap="round"/>`).join('')
+    return `<g filter="url(#${NEON_EDGE_FILTER})" opacity="${NEON_EDGE_GLOW_OPACITY}">${glow}</g>${core}`
   }
 
   if (type === 'fishbone') {
@@ -326,11 +295,14 @@ function centeredWrappedText(label: string, segments: LinkSegment[], cx: number,
   return `<text text-anchor="middle" font-size="${fontSize}" font-weight="${fontWeight}" fill="${esc(fill)}">${tspans}</text>`
 }
 
-function renderNode(node: MindmapNode, type: DiagramType, paletteColor: string | null): string {
+function renderNode(node: MindmapNode, type: DiagramType, paletteColor: string | null, descendants = 0, rootCenter: { x: number; y: number } | null = null, neon = false): string {
   const isRoot = node.depth === 0
   const isL2Plus = node.depth >= 2
-  const isMindmapL2Plus = type === 'mindmap' && node.depth >= 2
   const isFishboneNode = type === 'fishbone' && node.depth >= 1
+  // Radial constellation node, mirroring Node.tsx: a circle sized by its own subtree,
+  // with the label drawn outside it. An explicit per-node shape opts out.
+  const isRadial = type === 'mindmap' && !isRoot && !node.shape
+  const isRadialDot = isRadial && node.depth >= 3
   const col = (isRoot ? null : paletteColor) ?? node.color
   const rx = isRoot ? 4 : 3
   // An explicit per-node shape overrides the diagram's own default geometry, exactly
@@ -356,31 +328,44 @@ function renderNode(node: MindmapNode, type: DiagramType, paletteColor: string |
     bg = col.startsWith('#') ? depthFill(col, node.depth) : '#f8fafc'
     textColor = isLight(bg) ? '#1a1d2e' : '#ffffff'
     strokeColor = col
-    strokeW = 2
+    strokeW = isRadialDot ? 1 : 2
   } else {
     bg = col
     textColor = isLight(col) ? '#1a1d2e' : '#ffffff'
     strokeColor = col.startsWith('#') ? darken(col, 0.25) : col
     strokeW = 2
   }
+  // Neon (dark canvas): white glyphs inside every orb, and a root orb painted with a
+  // radial gradient of its own colour lightened at the centre. Paint only - the
+  // geometry above is untouched, exactly as on the canvas (Node.tsx).
+  const rootNeon = neon && isRoot && type === 'mindmap' ? neonRootColor(node.color) : null
+  if (neon && (isRadial || rootNeon)) textColor = NEON_TEXT
+  if (rootNeon) strokeColor = lighten(rootNeon, 0.4)
   if (node.borderColor) { strokeColor = node.borderColor; strokeW = Math.max(strokeW, node.borderWidth ?? 1.5) }
+
+  // Root, L1 and L2 boxes carry a soft top-of-box gloss; L3+ are already pale, so
+  // it would be lost. Dark-background boxes get the stronger gradient stops, light
+  // ones the softer scaled-down version (mirrors Node.tsx).
+  const showGloss = glossApplies(node.depth)
+  const glossFillOpacity = glossOpacity(isLight(bg))
 
   // Same shared box table the canvas reads (src/lib/nodeMetrics), so a card preview
   // and the opened map can never draw a label at a different size.
   const metric = nodeMetrics(node.depth)
   // Coerced: fontSize is typed number but arrives as unvalidated stored JSON, and it
   // lands in an SVG attribute that the home grid injects with dangerouslySetInnerHTML.
-  const baseFontSize = Number(node.fontSize) || metric.fontSize
+  const baseFontSize = Number(node.fontSize)
+    || (isRoot && type === 'mindmap' ? RADIAL_ROOT_FONT : metric.fontSize)
   const fontSize = isRootPill ? rootPillFontSize(node.title, baseFontSize) : baseFontSize
   const fontWeight = node.bold ? '700' : (isRoot ? '500' : node.depth === 1 ? '500' : '400')
 
   const hasEmoji = !isRoot && !!node.emoji
   const hasIcon = !isRoot && !hasEmoji && !!node.icon
   const displayW = isRootPill ? rootPillWidth(node.title, baseFontSize)
-    : (isMindmapL2Plus || drawCircle) ? Math.max(node.width, node.height)
+    : (isRadial || drawCircle) ? Math.max(node.width, node.height)
     : node.width
   // Circle-shaped nodes draw in a square box; the layout already sizes them square.
-  const h = drawCircle ? Math.max(displayW, node.height) : node.height
+  const h = (isRadial || drawCircle) ? Math.max(displayW, node.height) : node.height
   const cx = displayW / 2
   const cy = h / 2
   const parsedTitle = parseLinkedTitle(node.title)
@@ -395,12 +380,41 @@ function renderNode(node: MindmapNode, type: DiagramType, paletteColor: string |
     if (isRootPill) {
       parts.push(`<rect x="0" y="0" width="${r2(displayW)}" height="${r2(h)}" rx="${r2(h / 2)}" ry="${r2(h / 2)}" fill="${esc(bg)}" stroke="${esc(strokeColor)}" stroke-width="${strokeW}"/>`)
     } else {
-      parts.push(`<circle cx="${r2(cx)}" cy="${r2(cy)}" r="${r2(displayW / 2)}" fill="${esc(bg)}" stroke="${esc(strokeColor)}" stroke-width="${strokeW}"/>`)
+      if (type === 'mindmap' && !rootNeon) {
+        parts.push(`<circle cx="${r2(cx)}" cy="${r2(cy)}" r="${r2(displayW / 2 * 1.08)}" fill="${esc(bg)}" opacity="0.22" filter="url(#mm-glow)"/>`)
+      }
+      if (rootNeon) {
+        parts.push(`<circle cx="${r2(cx)}" cy="${r2(cy)}" r="${r2(displayW / 2)}" fill="${esc(rootNeon)}" filter="url(#${neonFilterId(displayW)})"/>`)
+      }
+      const rootFill = rootNeon ? `url(#${NEON_ROOT_GRADIENT})` : esc(bg)
+      parts.push(`<circle cx="${r2(cx)}" cy="${r2(cy)}" r="${r2(displayW / 2)}" fill="${rootFill}" stroke="${esc(strokeColor)}" stroke-width="${strokeW}"/>`)
+    }
+    if (showGloss) {
+      if (isRootPill) {
+        parts.push(`<rect x="0" y="0" width="${r2(displayW)}" height="${r2(h)}" rx="${r2(h / 2)}" ry="${r2(h / 2)}" fill="url(#${GLOSS_LINEAR_ID})" fill-opacity="${glossFillOpacity}"/>`)
+      } else {
+        parts.push(`<circle cx="${r2(cx)}" cy="${r2(cy)}" r="${r2(displayW / 2)}" fill="url(#${GLOSS_RADIAL_ID})" fill-opacity="${glossFillOpacity}"/>`)
+      }
+    }
+  } else if (isRadial) {
+    const cr = displayW / 2
+    if (neon) {
+      parts.push(`<circle cx="${r2(cx)}" cy="${r2(cy)}" r="${r2(cr)}" fill="${esc(col)}" filter="url(#${neonFilterId(displayW)})"/>`)
+    } else if (node.depth <= 2) {
+      parts.push(`<circle cx="${r2(cx)}" cy="${r2(cy)}" r="${r2(cr * 1.1)}" fill="${esc(col)}" opacity="0.3" filter="url(#mm-glow)"/>`)
+    }
+    parts.push(`<circle cx="${r2(cx)}" cy="${r2(cy)}" r="${r2(cr)}" fill="${esc(bg)}"/>`)
+    parts.push(`<circle cx="${r2(cx)}" cy="${r2(cy)}" r="${r2(cr)}" fill="none" stroke="${esc(strokeColor)}" stroke-width="${strokeW}"/>`)
+    if (showGloss) {
+      parts.push(`<circle cx="${r2(cx)}" cy="${r2(cy)}" r="${r2(cr)}" fill="url(#${GLOSS_RADIAL_ID})" fill-opacity="${glossFillOpacity}"/>`)
     }
   } else if (drawCircle) {
     const cr = displayW / 2
     parts.push(`<circle cx="${r2(cx)}" cy="${r2(cy)}" r="${r2(cr)}" fill="${esc(bg)}"/>`)
     parts.push(`<circle cx="${r2(cx)}" cy="${r2(cy)}" r="${r2(cr)}" fill="none" stroke="${esc(strokeColor)}" stroke-width="${strokeW}"/>`)
+    if (showGloss) {
+      parts.push(`<circle cx="${r2(cx)}" cy="${r2(cy)}" r="${r2(cr)}" fill="url(#${GLOSS_RADIAL_ID})" fill-opacity="${glossFillOpacity}"/>`)
+    }
   } else if (isFishboneNode && !nodeShape) {
     // Parallelogram skewed toward the spine (SPINE_Y = 400 in the fishbone layout)
     const sk = h * 0.35
@@ -417,9 +431,18 @@ function renderNode(node: MindmapNode, type: DiagramType, paletteColor: string |
       parts.push(`<polygon points="${badgePts}" fill="#ffffff"/>`)
     }
     parts.push(`<polygon points="${pts}" fill="none" stroke="${esc(strokeColor)}" stroke-width="${strokeW}"/>`)
+    // Parallelogram has no rx, so the gloss overlay clips to the polygon instead.
+    if (showGloss) {
+      const clipId = `gloss-fb-${esc(node.id)}`
+      parts.push(`<defs><clipPath id="${clipId}"><polygon points="${pts}"/></clipPath></defs>`)
+      parts.push(`<rect x="0" y="0" width="${r2(displayW)}" height="${r2(h)}" clip-path="url(#${clipId})" fill="url(#${GLOSS_LINEAR_ID})" fill-opacity="${glossFillOpacity}"/>`)
+    }
   } else {
     parts.push(`<rect x="0" y="0" width="${r2(displayW)}" height="${r2(h)}" rx="${effectiveRx}" ry="${effectiveRx}" fill="${esc(bg)}"/>`)
-    if ((hasEmoji || hasIcon) && !isMindmapL2Plus) {
+    if (showGloss) {
+      parts.push(`<rect x="0" y="0" width="${r2(displayW)}" height="${r2(h)}" rx="${effectiveRx}" ry="${effectiveRx}" fill="url(#${GLOSS_LINEAR_ID})" fill-opacity="${glossFillOpacity}"/>`)
+    }
+    if (hasEmoji || hasIcon) {
       parts.push(`<rect x="0" y="0" width="${r2(h + 1)}" height="${r2(h)}" fill="#ffffff"/>`)
     }
     parts.push(`<rect x="0" y="0" width="${r2(displayW)}" height="${r2(h)}" rx="${effectiveRx}" ry="${effectiveRx}" fill="none" stroke="${esc(strokeColor)}" stroke-width="${strokeW * 2}"/>`)
@@ -427,7 +450,42 @@ function renderNode(node: MindmapNode, type: DiagramType, paletteColor: string |
 
   // ── Label + badge ──
   const skOff = isFishboneNode ? (h * 0.35) / 2 : 0
-  if (isMindmapL2Plus || drawCircle || (isRoot && type === 'mindmap')) {
+  if (isRadial) {
+    // Same three bands the canvas draws, from the same helper the layout reserved
+    // room with: the initial inside the circle, the name and subtree size under a
+    // depth-1 circle, the name pointing OUTWARD from a depth-2 one, and nothing
+    // beside a dot. The whole title always survives in <title> for hover.
+    parts.push(`<title>${esc(label)}</title>`)
+    if (!isRadialDot) {
+      const glyph = Number(node.fontSize) || initialFontSize(node.depth, displayW)
+      if (hasEmoji) {
+        parts.push(`<text x="${r2(cx)}" y="${r2(cy + glyph * 0.36)}" text-anchor="middle" font-size="${glyph}">${esc(node.emoji)}</text>`)
+      } else if (hasIcon) {
+        // No icon library server-side: a neutral ring stands in for the lucide glyph.
+        parts.push(`<circle cx="${r2(cx)}" cy="${r2(cy)}" r="${r2(glyph / 2.4)}" fill="none" stroke="${esc(textColor)}" stroke-width="2"/>`)
+      } else {
+        if (neon) {
+          parts.push(`<text x="${r2(cx)}" y="${r2(cy + glyph * 0.36)}" text-anchor="middle" font-size="${glyph}" font-weight="600" fill="${NEON_TEXT}" filter="url(#${NEON_TEXT_FILTER})">${esc(nodeInitial(node.title))}</text>`)
+        }
+        parts.push(`<text x="${r2(cx)}" y="${r2(cy + glyph * 0.36)}" text-anchor="middle" font-size="${glyph}" font-weight="600" fill="${esc(textColor)}">${esc(nodeInitial(node.title))}</text>`)
+      }
+    }
+    const lbl = radialLabelFor(node, rootCenter?.x ?? 0, rootCenter?.y ?? 0)
+    if (lbl) {
+      const body = lbl.text === label ? labelBody : esc(lbl.text)
+      const size = node.depth === 1 ? LABEL_FONT.title1 : LABEL_FONT.title2
+      const weight = node.depth === 1 ? '600' : '400'
+      const fill = neon
+        ? (node.depth === 1 ? NEON_TEXT : NEON_TEXT_MUTED)
+        : (node.depth === 1 ? '#1a1d2e' : '#475569')
+      const fillOp = neon && node.depth !== 1 ? ` fill-opacity="${NEON_TEXT_MUTED_OPACITY}"` : ''
+      parts.push(`<text x="${r2(lbl.tx)}" y="${r2(lbl.ty)}" text-anchor="${lbl.anchor}" font-size="${size}" font-weight="${weight}" fill="${fill}"${fillOp}>${body}</text>`)
+      if (lbl.countY !== null && descendants > 0) {
+        const countFill = neon ? `${NEON_TEXT_MUTED}" fill-opacity="${NEON_TEXT_MUTED_OPACITY}` : esc(col)
+        parts.push(`<text x="${r2(lbl.tx)}" y="${r2(lbl.countY)}" text-anchor="${lbl.anchor}" font-size="${LABEL_FONT.count1}" font-weight="600" fill="${countFill}">${descendants}</text>`)
+      }
+    }
+  } else if (drawCircle || (isRoot && type === 'mindmap')) {
     parts.push(centeredWrappedText(label, parsedTitle.segments, cx, cy, fontSize, fontWeight, textColor))
   } else if (hasEmoji) {
     const emojiSize = Math.round(h * 0.52)
@@ -450,11 +508,23 @@ function renderNode(node: MindmapNode, type: DiagramType, paletteColor: string |
   return `<g transform="translate(${r2(node.x)},${r2(node.y)})">${parts.join('')}</g>`
 }
 
+/**
+ * Drawn extent of a node, labels included. The radial mind map hangs its names
+ * outside the circles, so the home card and the share image have to reserve room for
+ * text that lives beyond the node's own box - otherwise the outermost labels are
+ * cropped off the preview. The extent comes from the same helper the layout reserved
+ * the space with (src/lib/layout/mindmap radialNodeExtent).
+ */
+function nodeBounds(n: MindmapNode, type: DiagramType, rootCenter: { x: number; y: number } | null): { left: number; right: number; top: number; bottom: number } {
+  if (type === 'mindmap' && rootCenter) return radialNodeExtent(n, rootCenter.x, rootCenter.y)
+  return { left: n.x, right: n.x + n.width, top: n.y, bottom: n.y + n.height }
+}
+
 // ── Entry point ──────────────────────────────────────────────────────────────
 
 export function renderMindmapSvg(row: MindmapRow): string {
   const type: DiagramType = VALID_TYPES.has(row.type) ? row.type as DiagramType : 'logic-chart'
-  const lineStyle: LineStyle = VALID_LINE_STYLES.has(row.line_style ?? '') ? row.line_style as LineStyle : 'orthogonal'
+  const lineStyle: LineStyle = VALID_LINE_STYLES.has(row.line_style ?? '') ? row.line_style as LineStyle : 'curved'
   const theme = getTheme(row.theme_id ?? 'default')
 
   const raw: MindmapNode[] = Array.isArray(row.nodes)
@@ -466,24 +536,56 @@ export function renderMindmapSvg(row: MindmapRow): string {
   }
 
   const nodes = layoutForRender(raw, type)
-  const paletteColors = computePaletteColors(nodes)
+  const paletteColors = computeBranchColors(nodes)
   const pc = (n: MindmapNode) => paletteColors.get(n.id) ?? n.color
+  const { descendantCounts } = computeSubtreeCounts(nodes)
+
+  // The radial mind map glows on a dark canvas, exactly as it does on the canvas
+  // renderer, so a home card and a share image match the opened map.
+  const neon = type === 'mindmap' && isDarkBg(theme.canvasBg)
 
   // Draw order: edges under nodes (DiagramCanvas)
-  const edges = renderEdges(nodes, type, lineStyle, pc)
-  const nodeMarkup = nodes.map(n => renderNode(n, type, paletteColors.get(n.id) ?? null)).join('')
+  const edges = renderEdges(nodes, type, lineStyle, pc, neon)
+  const rootNode = nodes.find(n => n.parentId === null)
+  const rootCenter = rootNode ? { x: rootNode.x + rootNode.width / 2, y: rootNode.y + rootNode.height / 2 } : null
+  const nodeMarkup = nodes.map(n =>
+    renderNode(n, type, paletteColors.get(n.id) ?? null, descendantCounts.get(n.id) ?? 0, rootCenter, neon)).join('')
+  // One blur filter for every glow in the map: the radial mind map's soft coloured
+  // halo. Defined once so a 200-node map carries one filter, not 200. On a dark
+  // canvas that becomes one two-layer neon filter per distinct circle size, plus the
+  // branch and text blurs and the root orb's gradient - filter primitives only, so
+  // the resvg rasterizer behind the share image draws what the browser draws.
+  const mmDefs = type !== 'mindmap' ? ''
+    : !neon
+      ? '<filter id="mm-glow" x="-70%" y="-70%" width="240%" height="240%"><feGaussianBlur stdDeviation="6"/></filter>'
+      : neonFilterSpecs(nodes.map(n => Math.max(n.width, n.height))).map(f =>
+            `<filter id="${f.id}" x="-75%" y="-75%" width="250%" height="250%" color-interpolation-filters="sRGB">`
+            + `<feGaussianBlur in="SourceGraphic" stdDeviation="${f.halo}" result="wide"/>`
+            + `<feComponentTransfer in="wide" result="halo"><feFuncA type="linear" slope="${NEON_HALO_OPACITY}"/></feComponentTransfer>`
+            + `<feGaussianBlur in="SourceGraphic" stdDeviation="${r2(f.core)}" result="tight"/>`
+            + `<feComponentTransfer in="tight" result="core"><feFuncA type="linear" slope="${NEON_CORE_OPACITY}"/></feComponentTransfer>`
+            + '<feMerge><feMergeNode in="halo"/><feMergeNode in="core"/></feMerge></filter>').join('')
+        + `<filter id="${NEON_EDGE_FILTER}" x="-5%" y="-5%" width="110%" height="110%" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="${NEON_EDGE_GLOW_BLUR}"/></filter>`
+        + `<filter id="${NEON_TEXT_FILTER}" x="-60%" y="-60%" width="220%" height="220%" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="${NEON_TEXT_BLUR}"/></filter>`
+        + (rootNode
+            ? `<radialGradient id="${NEON_ROOT_GRADIENT}"><stop offset="0%" stop-color="${lighten(neonRootColor(rootNode.color), NEON_ROOT_LIGHTEN)}"/><stop offset="100%" stop-color="${neonRootColor(rootNode.color)}"/></radialGradient>`
+            : '')
+  // Gloss gradients live in the same <defs>, referenced by every root/L1/L2 box below.
+  const defs = `<defs>${glossDefsSvg()}${mmDefs}</defs>`
 
   // viewBox from laid-out bounds (+ slack for spines that extend past the nodes)
   const pad = 60
-  const minX = Math.min(...nodes.map(n => n.x)) - pad
-  const minY = Math.min(...nodes.map(n => n.y)) - pad
-  const maxX = Math.max(...nodes.map(n => n.x + n.width)) + pad + (type === 'fishbone' || type === 'timeline' ? 120 : 0)
-  const maxY = Math.max(...nodes.map(n => n.y + n.height)) + pad
+  const box = nodes.map(n => nodeBounds(n, type, rootCenter))
+  const minX = Math.min(...box.map(b => b.left)) - pad
+  const minY = Math.min(...box.map(b => b.top)) - pad
+  const maxX = Math.max(...box.map(b => b.right)) + pad + (type === 'fishbone' || type === 'timeline' ? 120 : 0)
+  const maxY = Math.max(...box.map(b => b.bottom)) + pad
   const w = Math.max(1, Math.ceil(maxX - minX))
   const hgt = Math.max(1, Math.ceil(maxY - minY))
 
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${r2(minX)} ${r2(minY)} ${w} ${hgt}" width="${w}" height="${hgt}" font-family="${FONT}">` +
     `<title>${esc(row.name)}</title>` +
+    defs +
     `<rect x="${r2(minX)}" y="${r2(minY)}" width="${w}" height="${hgt}" fill="${theme.canvasBg}"/>` +
     `<g>${edges}</g><g>${nodeMarkup}</g></svg>`
 }

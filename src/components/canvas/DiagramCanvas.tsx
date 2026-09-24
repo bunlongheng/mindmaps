@@ -5,37 +5,20 @@ import { getTheme } from '../../lib/themes'
 import { EdgeLayer } from './EdgeLayer'
 import { Node } from './Node'
 import { useKeyboard } from '../../hooks/useKeyboard'
-import { L1_PALETTE } from '../../lib/color'
+import { computeBranchColors } from '../../lib/branchColor'
+import {
+  isDarkBg, neonFilterSpecs,
+  NEON_CORE_OPACITY, NEON_HALO_OPACITY, NEON_TEXT_BLUR, NEON_TEXT_FILTER,
+} from '../../lib/color'
 import { computeSubtreeCounts } from '../../lib/nodeCounts'
+import { radialNodeExtent } from '../../lib/layout/mindmap'
+import { GLOSS_LINEAR_ID, GLOSS_RADIAL_ID, GLOSS_RADIAL_CX, GLOSS_RADIAL_CY, GLOSS_RADIAL_R, GLOSS_STOPS } from '../../lib/gloss'
 
 interface DiagramCanvasProps {
   onNodeSelect: (nodeId: string | null) => void
   readOnly?: boolean
   noInteract?: boolean
   onDelete?: () => void
-}
-
-// Resolve every node's 12-colour-wheel palette colour in one O(n) pass, so Node and
-// EdgeLayer no longer each run l1PaletteColor's O(n) ancestor walk per node per render
-// (which was O(n^2) per render). Same semantics as l1PaletteColor in src/lib/color.ts:
-// null for the root or when no L1 ancestor exists (callers fall back to the stored colour).
-function computePaletteColors(nodes: { id: string; parentId: string | null; depth: number; sortOrder?: number }[]) {
-  const byId = new Map(nodes.map(n => [n.id, n]))
-  const colors = new Map<string, string | null>()
-  const resolve = (n: { id: string; parentId: string | null; depth: number; sortOrder?: number }): string | null => {
-    const cached = colors.get(n.id)
-    if (cached !== undefined) return cached
-    let c: string | null = null
-    if (n.depth === 1) c = L1_PALETTE[(((n.sortOrder ?? 0) % 12) + 12) % 12]
-    else if (n.depth > 1) {
-      const parent = n.parentId ? byId.get(n.parentId) : undefined
-      c = parent ? resolve(parent) : null
-    }
-    colors.set(n.id, c)
-    return c
-  }
-  for (const n of nodes) resolve(n)
-  return colors
 }
 
 export function DiagramCanvas({ onNodeSelect, readOnly, noInteract }: DiagramCanvasProps) {
@@ -49,8 +32,23 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract }: DiagramCan
     })),
   )
   const counts = useMemo(() => computeSubtreeCounts(activeMindmap?.nodes ?? []), [activeMindmap?.nodes])
-  const paletteColors = useMemo(() => computePaletteColors(activeMindmap?.nodes ?? []), [activeMindmap?.nodes])
+  // "Outward" in a radial mind map is measured from the root, so every Node needs the
+  // root's centre. Resolved once here rather than by an O(n) find inside each node.
+  const rootCenter = useMemo(() => {
+    const r = activeMindmap?.nodes.find(n => n.parentId === null)
+    return r ? { x: r.x + r.width / 2, y: r.y + r.height / 2 } : null
+  }, [activeMindmap?.nodes])
+
+  const paletteColors = useMemo(() => computeBranchColors(activeMindmap?.nodes ?? []), [activeMindmap?.nodes])
   const canvasBg = getTheme(themeId).canvasBg
+  // The radial mind map's neon glow on a dark canvas: one filter per distinct circle
+  // size, defined once here and shared by every orb, so a 200-node map carries a
+  // handful of filters instead of two per node. Empty on light themes.
+  const neonFilters = useMemo(
+    () => (diagramType === 'mindmap' && isDarkBg(canvasBg)
+      ? neonFilterSpecs((activeMindmap?.nodes ?? []).map(n => Math.max(n.width, n.height)))
+      : []),
+    [diagramType, canvasBg, activeMindmap?.nodes])
   const svgRef = useRef<SVGSVGElement>(null!)
   const gRef = useRef<SVGGElement>(null!)
   const [, setPan] = useState({ x: 0, y: 0 })
@@ -91,11 +89,41 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract }: DiagramCan
     if (gRef.current) gRef.current.setAttribute('transform', `translate(${p.x},${p.y}) scale(${z})`)
   }, [])
 
-  // Load at 100% so the text is readable, anchored on the root instead of shrinking the
-  // whole map to fit. Mind maps grow in every direction, so the root sits at the centre;
+  // Fit the whole map into the viewport (zoom capped at 100%). Used by the shared
+  // view-only page on load and by Cmd+0 anywhere, so a visitor sees the entire map first.
+  const fitToContent = useCallback(() => {
+    const svg = svgRef.current
+    if (!svg || !activeMindmap?.nodes.length) return
+    const { width: svgW, height: svgH } = svg.getBoundingClientRect()
+    if (svgW === 0 || svgH === 0) return
+    const nodes = activeMindmap.nodes
+    // A radial mind map hangs its names outside the circles, so the fit has to cover
+    // the label boxes too or the outermost titles are cropped off the viewport.
+    const root = nodes.find(n => n.parentId === null)
+    const ext = diagramType === 'mindmap' && root
+      ? nodes.map(n => radialNodeExtent(n, root.x + root.width / 2, root.y + root.height / 2))
+      : nodes.map(n => ({ left: n.x, top: n.y, right: n.x + n.width, bottom: n.y + n.height }))
+    const minX = Math.min(...ext.map(e => e.left))
+    const minY = Math.min(...ext.map(e => e.top))
+    const maxX = Math.max(...ext.map(e => e.right))
+    const maxY = Math.max(...ext.map(e => e.bottom))
+    const pad = 80
+    const newZoom = Math.max(0.05, Math.min((svgW - pad * 2) / Math.max(1, maxX - minX), (svgH - pad * 2) / Math.max(1, maxY - minY), 1))
+    const cx = (minX + maxX) / 2
+    const cy = (minY + maxY) / 2
+    zoomCurrentRef.current = newZoom
+    setZoom(newZoom)  // badge only
+    const p = { x: svgW / 2 - cx * newZoom, y: svgH / 2 - cy * newZoom }
+    panRef.current = p
+    setPan(p)         // keep pan state in sync for selBox coords
+    applyTransform(p, newZoom)
+  }, [activeMindmap, diagramType, applyTransform])
+
+  // Editor load: 100% so the text is readable, anchored on the root instead of shrinking
+  // the whole map. Mind maps grow in every direction, so the root sits at the centre;
   // logic charts, fishbones and timelines read left to right, so the root sits near the
   // left edge and the branches get the width.
-  const fitView = useCallback(() => {
+  const anchorRoot = useCallback(() => {
     const svg = svgRef.current
     if (!svg || !activeMindmap?.nodes.length) return
     const { width: svgW, height: svgH } = svg.getBoundingClientRect()
@@ -108,13 +136,23 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract }: DiagramCan
     const anchorX = diagramType === 'mindmap' ? svgW / 2 : Math.min(svgW / 2, Math.max(root.width / 2 + 40, svgW * 0.18))
     zoomCurrentRef.current = newZoom
     setZoom(newZoom)  // badge only
-
     const p = { x: anchorX - cx * newZoom, y: svgH / 2 - cy * newZoom }
     panRef.current = p
     setPan(p)         // keep pan state in sync for selBox coords
     applyTransform(p, newZoom)
   }, [activeMindmap, diagramType, applyTransform])
 
+  // The shared view-only page fits the whole map; the editor opens at 100% on the root.
+  const fitView = readOnly ? fitToContent : anchorRoot
+
+  // Cmd+0 / Ctrl+0 fits the whole map, in the editor and on the shared page alike.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === '0') { e.preventDefault(); fitToContent() }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [fitToContent])
 
   // Auto-fit on initial diagram load or diagram type switch
   useEffect(() => {
@@ -434,6 +472,41 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract }: DiagramCan
         onPointerCancel={handleBgPointerUp}
         style={{ userSelect: 'none', touchAction: 'none' }}
       >
+        <defs>
+          {/* Box gloss - defined once per render (root/L1/L2 boxes reference it, see Node.tsx) */}
+          <linearGradient id={GLOSS_LINEAR_ID} x1="0" y1="0" x2="0" y2="1" gradientUnits="objectBoundingBox">
+            {GLOSS_STOPS.map((s, i) => <stop key={i} offset={s.offset} stopColor="#ffffff" stopOpacity={s.opacity} />)}
+          </linearGradient>
+          <radialGradient id={GLOSS_RADIAL_ID} cx={GLOSS_RADIAL_CX} cy={GLOSS_RADIAL_CY} r={GLOSS_RADIAL_R} gradientUnits="objectBoundingBox">
+            {GLOSS_STOPS.map((s, i) => <stop key={i} offset={s.offset} stopColor="#ffffff" stopOpacity={s.opacity} />)}
+          </radialGradient>
+          {/* Neon halo filters - one per distinct circle diameter, dark themes only */}
+          {neonFilters.length > 0 && (
+            <>
+              {neonFilters.map(f => (
+                <filter key={f.id} id={f.id} x="-75%" y="-75%" width="250%" height="250%"
+                  colorInterpolationFilters="sRGB">
+                  <feGaussianBlur in="SourceGraphic" stdDeviation={f.halo} result="wide" />
+                  <feComponentTransfer in="wide" result="halo">
+                    <feFuncA type="linear" slope={NEON_HALO_OPACITY} />
+                  </feComponentTransfer>
+                  <feGaussianBlur in="SourceGraphic" stdDeviation={f.core} result="tight" />
+                  <feComponentTransfer in="tight" result="core">
+                    <feFuncA type="linear" slope={NEON_CORE_OPACITY} />
+                  </feComponentTransfer>
+                  <feMerge>
+                    <feMergeNode in="halo" />
+                    <feMergeNode in="core" />
+                  </feMerge>
+                </filter>
+              ))}
+              <filter id={NEON_TEXT_FILTER} x="-60%" y="-60%" width="220%" height="220%"
+                colorInterpolationFilters="sRGB">
+                <feGaussianBlur stdDeviation={NEON_TEXT_BLUR} />
+              </filter>
+            </>
+          )}
+        </defs>
         <g ref={gRef}>
           <EdgeLayer nodes={hideDetails ? activeMindmap.nodes.filter(n => n.depth <= 2) : activeMindmap.nodes} lineStyle={lineStyle} diagramType={diagramType} paletteColors={paletteColors} />
           {(hideDetails ? activeMindmap.nodes.filter(n => n.depth <= 2) : activeMindmap.nodes).map(node => (
@@ -451,6 +524,7 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract }: DiagramCan
               noInteract={noInteract}
               l1Colors={node.depth === 0 ? activeMindmap.nodes.filter(n => n.depth === 1).map(n => n.color) : undefined}
               paletteColor={paletteColors.get(node.id) ?? null}
+              rootCenter={rootCenter}
               childCount={counts.childCounts.get(node.id) ?? 0}
               descendantCount={counts.descendantCounts.get(node.id) ?? 0}
               nodeCount={activeMindmap.nodes.length}

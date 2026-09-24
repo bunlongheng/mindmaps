@@ -83,9 +83,31 @@ export function autoW(title: string, depth: number, hasIcon: boolean, bold = fal
   const w = nodeWidth(measured, depth, { hasIcon, height, extra: slant })
   return Math.max(nodeMinWidth(depth), Math.min(MAX_AUTO_W, w))
 }
+
+/** A manual node keeps the width the user dragged; everyone else auto-sizes from title. */
+function boxW(node: MindmapNode, depth: number, hasIcon: boolean, bold: boolean): number {
+  if (node.widthMode === 'manual' && node.width > 0) return node.width
+  return autoW(node.title, depth, hasIcon, bold)
+}
 const SPINE_SEG = 340         // horizontal gap between L1 attachment points
 const BONE_HEIGHT_BASE = 260  // minimum vertical distance from spine to L1 tip
-const L2_MIN_SPACING = 56     // minimum vertical gap between L2 nodes on the diagonal
+const L2_GAP = 24             // minimum vertical gap between reserved L2 slots on the diagonal
+const L3_GAP = 12             // vertical gap between stacked L3 boxes
+
+/**
+ * Reserved vertical slot for an L2 and its L3 stack: at least the L2's own height, or
+ * the L3 block's height when that is taller, so neighbouring L2 slots on the same bone
+ * never collide (root cause of the old overlap: L2 pitch ignored how many L3 children
+ * hung off each one).
+ */
+function l2Slot(l2: MindmapNode, nodes: MindmapNode[]) {
+  const { w: l2w, h: l2h } = shapedNodeSize(l2, nodeFontSize(2), boxW(l2, 2, !!(l2.icon || l2.emoji), !!l2.bold), boxH(2))
+  const l3s = nodes.filter(n => n.parentId === l2.id)
+    .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+  const l3Sizes = l3s.map(l3 => shapedNodeSize(l3, nodeFontSize(3), boxW(l3, 3, !!(l3.icon || l3.emoji), !!l3.bold), boxH(3)))
+  const l3Total = l3Sizes.reduce((sum, sz) => sum + sz.h, 0) + Math.max(0, l3s.length - 1) * L3_GAP
+  return { l2w, l2h, l3s, l3Sizes, l3Total, slotH: Math.max(l2h, l3Total) }
+}
 
 export function computeFishboneLayout(nodes: MindmapNode[]): MindmapNode[] {
   const root = nodes.find(n => n.parentId === null)
@@ -107,13 +129,21 @@ export function computeFishboneLayout(nodes: MindmapNode[]): MindmapNode[] {
     const l2s = nodes.filter(n => n.parentId === l1.id)
       .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
     const n2 = l2s.length
+    const slots = l2s.map(l2 => l2Slot(l2, nodes))
 
-    // Grow bone height so L2 nodes never overlap — need n2 * L2_MIN_SPACING minimum
-    const boneHeight = Math.max(BONE_HEIGHT_BASE, n2 * L2_MIN_SPACING + 40)
+    // Bottom-up: the bone needs at least the sum of every L2's reserved slot (its own
+    // box, or its taller L3 stack) plus a gap around and between each. If that exceeds
+    // the old minimum, push the L1 head further out rather than let slots overlap.
+    const boneEdgeHMin = BONE_HEIGHT_BASE - boxH(1) / 2
+    const slotTotal = slots.reduce((sum, s) => sum + s.slotH, 0)
+    const need = slotTotal + (n2 + 1) * L2_GAP
+    const boneEdgeH = Math.max(boneEdgeHMin, need)
+    const pad = n2 > 0 ? (boneEdgeH - slotTotal) / (n2 + 1) : boneEdgeH
 
+    const boneHeight = boneEdgeH + boxH(1) / 2
     const l1CX = attachX + FISHBONE_SLANT
     const l1CY = above ? SPINE_Y - boneHeight : SPINE_Y + boneHeight
-    const { w: l1w, h: l1h } = shapedNodeSize(l1, nodeFontSize(1), autoW(l1.title, 1, !!(l1.icon || l1.emoji), !!l1.bold), boxH(1))
+    const { w: l1w, h: l1h } = shapedNodeSize(l1, nodeFontSize(1), boxW(l1, 1, !!(l1.icon || l1.emoji), !!l1.bold), boxH(1))
 
     result.push({
       ...l1,
@@ -121,35 +151,42 @@ export function computeFishboneLayout(nodes: MindmapNode[]): MindmapNode[] {
       width: l1w, height: l1h, manuallyPositioned: false,
     })
 
-    // Effective bone length is from spine to the NEAR EDGE of L1 box
-    // (this must match what EdgeLayer draws, so stubs land on the line)
-    const boneEdgeH = boneHeight - boxH(1) / 2
+    // Offset of each L2's diagonal anchor measured from the L1 tip end of the bone,
+    // stacked so reserved slots never touch.
+    let cum = pad
+    const centerFromTip: number[] = []
+    for (let j = 0; j < n2; j++) {
+      cum += slots[j].slotH / 2
+      centerFromTip.push(cum)
+      cum += slots[j].slotH / 2 + pad
+    }
 
     l2s.forEach((l2, j) => {
-      // Space evenly along diagonal, furthest from spine first
-      const t = (n2 - j) / (n2 + 1)
+      // Furthest from spine first, same order the diagonal always used.
+      const t = (boneEdgeH - centerFromTip[j]) / boneEdgeH
       const diagX = attachX + FISHBONE_SLANT * t
       const diagY = SPINE_Y + (above ? -1 : 1) * boneEdgeH * t
 
-      const { w: l2w, h: l2h } = shapedNodeSize(l2, nodeFontSize(2), autoW(l2.title, 2, !!(l2.icon || l2.emoji), !!l2.bold), boxH(2))
+      const { l2w, l2h, l3s, l3Sizes, l3Total } = slots[j]
       const l2X = diagX + 28
       const l2Y = diagY - l2h / 2
 
       result.push({ ...l2, x: l2X, y: l2Y, width: l2w, height: l2h, manuallyPositioned: false })
 
-      // L3 nodes stack vertically away from the spine (not horizontally)
-      const l3s = nodes.filter(n => n.parentId === l2.id)
-        .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
-      const l3dir = above ? -1 : 1  // stack further from spine
-      l3s.forEach((l3, k) => {
-        const { w: l3w, h: l3h } = shapedNodeSize(l3, nodeFontSize(3), autoW(l3.title, 3, !!(l3.icon || l3.emoji), !!l3.bold), boxH(3))
+      // L3 nodes stack vertically to the right of L2, centred on its own diagonal
+      // anchor so the block clears L2's own box and never lands in a neighbour's slot.
+      // Placed furthest-from-spine first, same "away from spine" order as before.
+      const stackOrder = above ? [...l3s].reverse().map((l3, idx) => ({ l3, size: l3Sizes[l3Sizes.length - 1 - idx] })) : l3s.map((l3, idx) => ({ l3, size: l3Sizes[idx] }))
+      let l3Top = diagY - l3Total / 2
+      for (const { l3, size } of stackOrder) {
         result.push({
           ...l3,
           x: l2X + l2w + 16,
-          y: l2Y + l3dir * k * (l3h + 12),
-          width: l3w, height: l3h, manuallyPositioned: false,
+          y: l3Top,
+          width: size.w, height: size.h, manuallyPositioned: false,
         })
-      })
+        l3Top += size.h + L3_GAP
+      }
     })
   })
 

@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor, act, cleanup } from '@testing-library/react'
 import { SidePanel } from '../SidePanel'
 import { useMindmapStore } from '../../../store/mindmapStore'
+import { getTheme } from '../../../lib/themes'
 import type { Diagram, MindmapNode } from '../../../types'
 
 // Silence toast DOM noise
@@ -90,6 +91,45 @@ describe('SidePanel — tabs and structure', () => {
     expect(screen.getByText('Share')).toBeInTheDocument()
   })
 
+  it('renders Undo and Redo, disabled while history is empty', () => {
+    loadDiagram()
+    render(<SidePanel nodeId={null} onClose={vi.fn()} />)
+    const undoBtn = screen.getByLabelText('Undo') as HTMLButtonElement
+    const redoBtn = screen.getByLabelText('Redo') as HTMLButtonElement
+    expect(undoBtn).toBeDisabled()
+    expect(redoBtn).toBeDisabled()
+    expect(undoBtn.style.opacity).toBe('0.4')
+    expect(redoBtn.style.opacity).toBe('0.4')
+    expect(undoBtn.title).toBe('Undo (Cmd+Z)')
+    expect(redoBtn.title).toBe('Redo (Cmd+Shift+Z)')
+  })
+
+  it('Undo is enabled once there is history and calls undo', () => {
+    loadDiagram()
+    act(() => { useMindmapStore.getState().batchUpdateNodes(['c1'], { color: '#123456' }) })
+    render(<SidePanel nodeId={null} onClose={vi.fn()} />)
+    const undoBtn = screen.getByLabelText('Undo') as HTMLButtonElement
+    expect(undoBtn).not.toBeDisabled()
+    expect(undoBtn.style.opacity).toBe('1')
+    act(() => { fireEvent.click(undoBtn) })
+    expect(useMindmapStore.getState().past).toHaveLength(0)
+    expect(useMindmapStore.getState().activeMindmap!.nodes.find(n => n.id === 'c1')!.color).toBe('#ef4444')
+  })
+
+  it('Redo is enabled after an undo and calls redo', () => {
+    loadDiagram()
+    act(() => {
+      useMindmapStore.getState().batchUpdateNodes(['c1'], { color: '#123456' })
+      useMindmapStore.getState().undo()
+    })
+    render(<SidePanel nodeId={null} onClose={vi.fn()} />)
+    const redoBtn = screen.getByLabelText('Redo') as HTMLButtonElement
+    expect(redoBtn).not.toBeDisabled()
+    act(() => { fireEvent.click(redoBtn) })
+    expect(useMindmapStore.getState().future).toHaveLength(0)
+    expect(useMindmapStore.getState().activeMindmap!.nodes.find(n => n.id === 'c1')!.color).toBe('#123456')
+  })
+
   it('defaults to map tab when no node is selected', () => {
     loadDiagram()
     render(<SidePanel nodeId={null} onClose={vi.fn()} />)
@@ -105,11 +145,8 @@ describe('SidePanel — tabs and structure', () => {
   it('clicking close calls onClose', () => {
     loadDiagram()
     const onClose = vi.fn()
-    const { container } = render(<SidePanel nodeId={null} onClose={onClose} />)
-    // The close button is the X button after the tabs (width 30)
-    const buttons = container.querySelectorAll('button')
-    const closeBtn = Array.from(buttons).find(b => (b as HTMLElement).style.width === '30px')!
-    fireEvent.click(closeBtn)
+    render(<SidePanel nodeId={null} onClose={onClose} />)
+    fireEvent.click(screen.getByLabelText('Close panel'))
     expect(onClose).toHaveBeenCalled()
   })
 
@@ -253,8 +290,7 @@ describe('SidePanel — Style tab', () => {
     expect(swatches.length).toBe(11)
     fireEvent.click(swatches[1])
     const node = useMindmapStore.getState().activeMindmap!.nodes.find(n => n.id === 'c1')!
-    // default theme color index 1 is #f97316
-    expect(node.color).toBe('#f97316')
+    expect(node.color).toBe(getTheme('default').colors[1])
   })
 
   it('ColorField custom color input changes color', () => {
@@ -265,15 +301,53 @@ describe('SidePanel — Style tab', () => {
     expect(useMindmapStore.getState().activeMindmap!.nodes.find(n => n.id === 'c1')!.color).toBe('#123456')
   })
 
-  it('width slider invokes resizeNodeDepth', () => {
+  it('ColorField swatch click sets color and colorMode manual; Auto swatch clears it', () => {
     loadDiagram()
-    const spy = vi.spyOn(useMindmapStore.getState(), 'resizeNodeDepth')
+    const { container } = render(<SidePanel nodeId="c1" onClose={vi.fn()} />)
+    const swatches = (Array.from(container.querySelectorAll('button')) as HTMLElement[]).filter(
+      b => b.style.borderRadius === '5px' && b.style.background.startsWith('rgb')
+    )
+    fireEvent.click(swatches[2])
+    let node = useMindmapStore.getState().activeMindmap!.nodes.find(n => n.id === 'c1')!
+    expect(node.color).toBe(getTheme('default').colors[2])
+    expect(node.colorMode).toBe('manual')
+
+    // Auto swatch is the round conic-gradient button preceding the solid swatches
+    const autoSwatch = (Array.from(container.querySelectorAll('button')) as HTMLElement[]).find(
+      b => b.style.borderRadius === '50%' && b.title === 'Auto (wheel-driven)'
+    )
+    expect(autoSwatch).toBeTruthy()
+    fireEvent.click(autoSwatch!)
+    node = useMindmapStore.getState().activeMindmap!.nodes.find(n => n.id === 'c1')!
+    expect(node.colorMode).toBeUndefined()
+  })
+
+  it('Auto chip is selected by default for a node with no widthMode', () => {
+    loadDiagram()
+    render(<SidePanel nodeId="c1" onClose={vi.fn()} />)
+    const autoChip = screen.getByRole('button', { name: 'Auto' })
+    expect(autoChip).toHaveStyle({ color: '#3b82f6' })
+  })
+
+  it('dragging the width slider switches the node to manual and sets the width', () => {
+    loadDiagram()
     const { container } = render(<SidePanel nodeId="c1" onClose={vi.fn()} />)
     const slider = container.querySelector('input[type="range"]') as HTMLInputElement
     expect(slider).toBeTruthy()
     fireEvent.change(slider, { target: { value: '300' } })
-    expect(spy).toHaveBeenCalledWith(1, 300)
-    spy.mockRestore()
+    const node = useMindmapStore.getState().activeMindmap!.nodes.find(n => n.id === 'c1')!
+    expect(node.widthMode).toBe('manual')
+    expect(node.width).toBe(300)
+  })
+
+  it('clicking Auto clears a manual width', () => {
+    loadDiagram()
+    const { container } = render(<SidePanel nodeId="c1" onClose={vi.fn()} />)
+    const slider = container.querySelector('input[type="range"]') as HTMLInputElement
+    fireEvent.change(slider, { target: { value: '300' } })
+    expect(useMindmapStore.getState().activeMindmap!.nodes.find(n => n.id === 'c1')!.widthMode).toBe('manual')
+    fireEvent.click(screen.getByRole('button', { name: 'Auto' }))
+    expect(useMindmapStore.getState().activeMindmap!.nodes.find(n => n.id === 'c1')!.widthMode).toBe('auto')
   })
 
   it('hides width slider for mindmap shallow nodes', () => {
@@ -324,6 +398,55 @@ describe('SidePanel — Style tab', () => {
     render(<SidePanel nodeId="root" onClose={vi.fn()} />)
     // In mindmap, shape/line rows hidden — Branch block has no Circle/Pill
     expect(screen.queryByText('Circle')).toBeNull()
+  })
+
+  it('Branch selected tile carries the same selected style as a selected Type tile', () => {
+    loadDiagram() // default diagramType 'logic-chart', root shape defaults to circle
+    render(<SidePanel nodeId="root" onClose={vi.fn()} />)
+    const selectedShapeTile = screen.getByText('Circle').closest('button')!
+    expect(selectedShapeTile).toHaveStyle({ borderColor: '#3b82f6', background: '#eff6ff' })
+
+    // Map tab hosts the Type block — its selected tile uses the same treatment
+    fireEvent.click(screen.getByText('Map'))
+    const selectedTypeTile = screen.getByText('Logic Chart').closest('button')!
+    expect(selectedTypeTile).toHaveStyle({ borderColor: '#3b82f6', background: '#eff6ff' })
+  })
+
+  it('no tile in the Branch block uses a black border', () => {
+    loadDiagram()
+    render(<SidePanel nodeId="root" onClose={vi.fn()} />)
+    const branchBlock = screen.getByText('Branch').closest('div')!
+    const tiles = branchBlock.querySelectorAll('button')
+    tiles.forEach(tile => {
+      expect(tile).not.toHaveStyle({ borderColor: '#1a1d2e' })
+    })
+  })
+
+  it('the Branch Line picker and the Map tab Line picker render the same 3 labels in the same order', () => {
+    loadDiagram()
+    render(<SidePanel nodeId="root" onClose={vi.fn()} />)
+    const branchBlock = screen.getByText('Branch').closest('div')!
+    const branchLabels = Array.from(branchBlock.querySelectorAll('button span')).map(s => s.textContent)
+    expect(branchLabels).toEqual(expect.arrayContaining(['Brace', 'Straight', 'Square']))
+
+    fireEvent.click(screen.getByText('Map'))
+    const lineBlock = screen.getByText('Line').closest('div')!
+    const mapLabels = Array.from(lineBlock.querySelectorAll('button span'))
+      .map(s => s.textContent)
+      .filter(t => t !== '▼' && t !== 'Line')
+    expect(mapLabels).toEqual(['Brace', 'Straight', 'Square'])
+  })
+
+  it('both Line pickers switch the store line style the same way', () => {
+    loadDiagram()
+    render(<SidePanel nodeId="root" onClose={vi.fn()} />)
+    fireEvent.click(screen.getByText('Map'))
+    fireEvent.click(screen.getByText('Square'))
+    expect(useMindmapStore.getState().lineStyle).toBe('orthogonal')
+
+    fireEvent.click(screen.getByText('Style'))
+    fireEvent.click(screen.getByText('Brace'))
+    expect(useMindmapStore.getState().lineStyle).toBe('curved')
   })
 })
 

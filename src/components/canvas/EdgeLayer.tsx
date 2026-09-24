@@ -4,7 +4,13 @@ import { Edge } from './Edge'
 import { FISHBONE_SLANT } from '../../lib/layout/fishbone'
 import { useMindmapStore } from '../../store/mindmapStore'
 import { rootDrawnWidth } from '../../lib/rootPill'
-import { edgeWidthForDepth } from '../../lib/color'
+import { buildRadialBranchPath, radialBranchPoints } from '../../lib/geometry'
+import { getTheme } from '../../lib/themes'
+import {
+  edgeWidthForDepth, radialEdgeWidth, RADIAL_EDGE_OPACITY, isDarkBg, lighten,
+  NEON_EDGE_FILTER, NEON_EDGE_GLOW_WIDTH, NEON_EDGE_GLOW_OPACITY, NEON_EDGE_GLOW_BLUR,
+  NEON_EDGE_CORE_OPACITY, NEON_EDGE_LIGHTEN,
+} from '../../lib/color'
 
 
 interface EdgeLayerProps {
@@ -84,6 +90,10 @@ function BracketConnector({ parent, children, goRight = true, showOrderNumbers =
 
 export function EdgeLayer({ nodes, lineStyle, diagramType, paletteColors }: EdgeLayerProps) {
   const showOrderNumbers = useMindmapStore(s => s.showOrderNumbers)
+  const themeId = useMindmapStore(s => s.themeId)
+  // On a dark canvas the radial branches are luminous tubes, not hairlines: a blurred
+  // glow line under a crisp lightened core. Light themes keep the single thin line.
+  const neon = diagramType === 'mindmap' && isDarkBg(getTheme(themeId).canvasBg)
   const nodeMap = new Map(nodes.map(n => [n.id, n]))
   // Connector/badge colour from the 12-colour wheel, matching the node fills.
   const pc = (n: MindmapNode) => paletteColors?.get(n.id) ?? n.color
@@ -168,56 +178,49 @@ export function EdgeLayer({ nodes, lineStyle, diagramType, paletteColors }: Edge
     )
   }
 
-  // ── Mindmap (radial) ──────────────────────────────────────────────────────
+  // ── Mind map (radial constellation) ───────────────────────────────────────
+  // Thin, same-handed curves from circle edge to circle edge in the branch's own
+  // colour - never a straight spoke through the centre. The width still comes from
+  // the shared table (src/lib/color edgeWidthForDepth), scaled down for this type.
   if (diagramType === 'mindmap') {
-    const edges = nodes.filter(n => n.parentId && nodeMap.has(n.parentId))
+    const edges = nodes.filter(n => n.parentId && nodeMap.has(n.parentId)).map(n => {
+      const parent = nodeMap.get(n.parentId!)!
+      // The root circle auto-sizes from its title, so measure what is drawn.
+      const parentW = parent.depth === 0 ? rootDrawnWidth(parent, diagramType) : parent.width
+      const { sx, sy, ux, uy } = radialBranchPoints(parent, n, parentW)
+      return { n, d: buildRadialBranchPath(parent, n, parentW), ox: sx + ux * 16, oy: sy + uy * 16 }
+    })
     return (
       <g>
-        {edges.map(n => {
-          const parent = nodeMap.get(n.parentId!)!
-          const x1 = parent.x + parent.width / 2
-          const y1 = parent.y + parent.height / 2
-          const x2 = n.x + n.width / 2
-          const y2 = n.y + n.height / 2
-
-          const isL1 = n.depth === 1
-          const dx = x2 - x1, dy = y2 - y1
-          const len = Math.hypot(dx, dy) || 1
-          const ux = dx / len, uy = dy / len
-
-          // Ellipse perimeter intersection: r = 1/sqrt((ux/a)^2 + (uy/b)^2)
-          function edgeR(w: number, h: number) {
-            const a = w / 2, b = h / 2
-            const d = Math.sqrt((ux / a) ** 2 + (uy / b) ** 2)
-            return d === 0 ? a : 1 / d
-          }
-          const parentR = edgeR(parent.width, parent.height)
-          const childR = edgeR(n.width, n.height)
-
-          // Edge endpoints touch the node perimeter
-          const sx = x1 + ux * parentR
-          const sy = y1 + uy * parentR
-          const ex = x2 - ux * childR
-          const ey = y2 - uy * childR
-          const mx = (sx + ex) / 2
-          const my = (sy + ey) / 2
-
-          const numDist = parentR + 16
-          const ox = x1 + ux * numDist
-          const oy = y1 + uy * numDist
-
-          const edgePath = lineStyle === 'straight'
-            ? `M ${sx} ${sy} L ${ex} ${ey}`
-            : `M ${sx} ${sy} Q ${mx} ${my} ${ex} ${ey}`
-
+        {/* One blur pass for every glow line in the map, not one filter per branch. */}
+        {neon && (
+          <>
+            <defs>
+              <filter id={NEON_EDGE_FILTER} x="-5%" y="-5%" width="110%" height="110%"
+                colorInterpolationFilters="sRGB">
+                <feGaussianBlur stdDeviation={NEON_EDGE_GLOW_BLUR} />
+              </filter>
+            </defs>
+            <g filter={`url(#${NEON_EDGE_FILTER})`} opacity={NEON_EDGE_GLOW_OPACITY}
+              style={{ pointerEvents: 'none' }}>
+              {edges.map(({ n, d }) => (
+                <path key={n.id} d={d} stroke={pc(n)} strokeWidth={NEON_EDGE_GLOW_WIDTH}
+                  fill="none" strokeLinecap="round" />
+              ))}
+            </g>
+          </>
+        )}
+        {edges.map(({ n, d, ox, oy }) => {
+          const core = neon && pc(n).startsWith('#') ? lighten(pc(n), NEON_EDGE_LIGHTEN) : pc(n)
           return (
             <g key={n.id}>
               <path
-                d={edgePath}
-                stroke={pc(n)} strokeWidth={edgeWidthForDepth(n.depth)}
+                d={d}
+                stroke={core} strokeOpacity={neon ? NEON_EDGE_CORE_OPACITY : RADIAL_EDGE_OPACITY}
+                strokeWidth={radialEdgeWidth(n.depth)}
                 fill="none" strokeLinecap="round"
               />
-              {isL1 && showOrderNumbers && (
+              {n.depth === 1 && showOrderNumbers && (
                 <g style={{ pointerEvents: 'none' }}>
                   <circle cx={ox} cy={oy} r={9} fill="#ffffff" stroke={pc(n)} strokeWidth={2} />
                   <text x={ox} y={oy} textAnchor="middle" dominantBaseline="central"

@@ -3,6 +3,26 @@ import { useMindmapStore } from '../store/mindmapStore'
 import { showToast } from '../components/CuteToast'
 import { exportToJSON } from '../lib/export/json'
 
+// Input types that hold no text: the browser has no undo stack of its own for them,
+// so map shortcuts (Cmd+Z included) must keep working while one has focus.
+const NON_TEXT_INPUTS = new Set([
+  'range', 'checkbox', 'radio', 'button', 'submit', 'reset', 'color', 'file', 'image',
+])
+
+/**
+ * True only where the user is typing: a text input (the inline node editor included),
+ * a textarea, or a contenteditable. There the browser's own undo wins.
+ */
+function isTextEntry(target: EventTarget | null): boolean {
+  const el = target as HTMLElement | null
+  if (!el || !el.tagName) return false
+  if (el.isContentEditable) return true
+  const tag = el.tagName.toLowerCase()
+  if (tag === 'textarea') return true
+  if (tag === 'input') return !NON_TEXT_INPUTS.has(((el as HTMLInputElement).type || 'text').toLowerCase())
+  return false
+}
+
 export function useKeyboard() {
   useEffect(() => {
     function tryLoad(text: string) {
@@ -20,8 +40,7 @@ export function useKeyboard() {
     }
 
     function onKeyDown(e: KeyboardEvent) {
-      const tag = (e.target as HTMLElement | null)?.tagName?.toLowerCase() ?? ''
-      if (tag === 'input' || tag === 'textarea') return
+      if (isTextEntry(e.target)) return
 
       const { deleteSelectedNodes, dissolveNode, dissolveSelectedNodes, setSelectedNodeIds, undo, redo, activeMindmap, selectedNodeIds } = useMindmapStore.getState()
 
@@ -49,8 +68,7 @@ export function useKeyboard() {
       if ((e.metaKey || e.ctrlKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) { e.preventDefault(); redo() }
     }
     function onCopy(e: ClipboardEvent) {
-      const tag = (e.target as HTMLElement | null)?.tagName?.toLowerCase() ?? ''
-      if (tag === 'input' || tag === 'textarea') return
+      if (isTextEntry(e.target)) return
       const { activeMindmap, selectedNodeIds } = useMindmapStore.getState()
       if (!activeMindmap) return
       e.preventDefault()
@@ -74,8 +92,7 @@ export function useKeyboard() {
     }
 
     function onPaste(e: ClipboardEvent) {
-      const tag = (e.target as HTMLElement | null)?.tagName?.toLowerCase() ?? ''
-      if (tag === 'input' || tag === 'textarea') return
+      if (isTextEntry(e.target)) return
       const text = e.clipboardData?.getData('text/plain') ?? ''
       if (text.trim()) { e.preventDefault(); tryLoad(text) }
     }

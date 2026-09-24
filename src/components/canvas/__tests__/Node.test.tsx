@@ -4,9 +4,11 @@ import { createRef } from 'react'
 import { Node } from '../Node'
 import { useMindmapStore } from '../../../store/mindmapStore'
 import type { Diagram, DiagramType, MindmapNode } from '../../../types'
-import { depthFill, hexToRgb } from '../../../lib/color'
+import { depthFill, hexToRgb, neonFilterId, L1_PALETTE, NEON_ROOT_GRADIENT, NEON_TEXT, NEON_TEXT_MUTED, NEON_TEXT_MUTED_OPACITY } from '../../../lib/color'
+import { computeBranchColors } from '../../../lib/branchColor'
 import { renderMindmapSvg } from '../../../lib/render-svg'
 import { nodeFontSize } from '../../../lib/nodeMetrics'
+import { GLOSS_LINEAR_ID, GLOSS_RADIAL_ID } from '../../../lib/gloss'
 
 vi.mock('../../../components/CuteToast', () => ({ showToast: vi.fn() }))
 
@@ -86,7 +88,7 @@ function setPoint(svgRef: React.RefObject<SVGSVGElement | null>, x: number, y: n
 
 beforeEach(() => {
   useMindmapStore.getState().clearDiagram()
-  useMindmapStore.setState({ resizePreview: null, showChildCount: false, showOrderNumbers: true })
+  useMindmapStore.setState({ resizePreview: null, showChildCount: false, showOrderNumbers: true, themeId: 'default' })
 })
 afterEach(() => cleanup())
 
@@ -246,6 +248,87 @@ describe('Node — rendering by depth / type', () => {
   })
 })
 
+describe('Node — gloss overlay', () => {
+  // The overlay references a shared gradient id (defined once, by DiagramCanvas) rather
+  // than an inline per-node gradient, so a standalone Node still emits the referencing
+  // element even without that outer <defs> present.
+  const glossRects = (c: HTMLElement) => Array.from(c.querySelectorAll(`rect[fill="url(#${GLOSS_LINEAR_ID})"]`))
+  const glossCircles = (c: HTMLElement) => Array.from(c.querySelectorAll(`circle[fill="url(#${GLOSS_RADIAL_ID})"]`))
+
+  it('an L1 box renders a gloss overlay referencing the shared linear gradient', () => {
+    loadStore([makeRoot(), makeNode()])
+    const { container } = renderNode(makeNode())
+    expect(glossRects(container).length).toBe(1)
+  })
+
+  it('an L2 box also renders the gloss overlay', () => {
+    const l2 = makeNode({ id: 'n2', depth: 2, parentId: 'n1' })
+    loadStore([makeRoot(), makeNode(), l2])
+    const { container } = renderNode(l2)
+    expect(glossRects(container).length).toBe(1)
+  })
+
+  it('an L3 box renders no gloss overlay (too pale for it to show)', () => {
+    const l3 = makeNode({ id: 'n3', depth: 3, parentId: 'n2' })
+    loadStore([makeRoot(), makeNode(), makeNode({ id: 'n2', depth: 2, parentId: 'n1' }), l3])
+    const { container } = renderNode(l3)
+    expect(glossRects(container).length).toBe(0)
+  })
+
+  it('a root pill renders a linear gloss overlay matching its own corner radius', () => {
+    const root = makeRoot({ title: 'A very very long root title here', width: 400, height: 90 })
+    loadStore([root, makeNode()])
+    const { container } = renderNode(root)
+    const rects = glossRects(container)
+    expect(rects.length).toBe(1)
+    expect(rects[0].getAttribute('rx')).toBe(String(90 / 2))
+  })
+
+  it('a root circle renders a radial gloss overlay', () => {
+    const root = makeRoot({ title: 'Hi', shape: 'circle' })
+    loadStore([root, makeNode()])
+    const { container } = renderNode(root)
+    expect(glossCircles(container).length).toBe(1)
+  })
+
+  it('a mindmap L1 circle renders a radial gloss overlay', () => {
+    const n = makeNode({ depth: 1 })
+    loadStore([makeRoot(), n], 'mindmap')
+    const { container } = renderNode(n)
+    expect(glossCircles(container).length).toBe(1)
+  })
+
+  it('a mindmap L3 dot renders no gloss overlay', () => {
+    const l1 = makeNode({ depth: 1 })
+    const l2 = makeNode({ id: 'n2', depth: 2, parentId: 'n1', width: 30, height: 30 })
+    const l3 = makeNode({ id: 'n3', depth: 3, parentId: 'n2', width: 7, height: 7 })
+    loadStore([makeRoot(), l1, l2, l3], 'mindmap')
+    const { container } = renderNode(l3)
+    expect(glossCircles(container).length).toBe(0)
+  })
+
+  it('a fishbone L1 parallelogram renders a gloss overlay clipped to the polygon', () => {
+    const n = makeNode({ depth: 1, y: 100 }) // above spine
+    loadStore([makeRoot(), n], 'fishbone')
+    const { container } = renderNode(n)
+    const rects = glossRects(container)
+    expect(rects.length).toBe(1)
+    expect(rects[0].getAttribute('clip-path')).toMatch(/^url\(#gloss-fb-/)
+  })
+
+  it('a light L1 box scales the gloss down (fill-opacity < 1); a dark one keeps it at 1', () => {
+    const light = makeNode({ id: 'nl', color: '#fefefe' })
+    const dark = makeNode({ id: 'nd', color: '#101010' })
+    loadStore([makeRoot(), light, dark])
+    const { container: cl } = renderNode(light)
+    const { container: cd } = renderNode(dark)
+    const opL = Number(glossRects(cl)[0].getAttribute('fill-opacity'))
+    const opD = Number(glossRects(cd)[0].getAttribute('fill-opacity'))
+    expect(opL).toBeLessThan(1)
+    expect(opD).toBe(1)
+  })
+})
+
 describe('Node — icons & emoji', () => {
   it('renders an emoji badge on a non-root node', () => {
     const n = makeNode({ emoji: '🚀' })
@@ -326,6 +409,21 @@ describe('Node — child / descendant counts (fireflies)', () => {
     const { container } = renderNode(n, { paletteColor: '#ED1C24' })
     expect(container.querySelector('rect[fill="#ED1C24"]')).toBeTruthy()
   })
+
+  it('a manual-coloured depth-1 node renders that colour, and its child renders depthFill(that colour, 2)', () => {
+    const manualColor = '#123456'
+    const l1 = makeNode({ id: 'a', colorMode: 'manual', color: manualColor })
+    const l2 = makeNode({ id: 'b', parentId: 'a', depth: 2, color: manualColor })
+    loadStore([makeRoot(), l1, l2])
+    const branchColors = computeBranchColors([makeRoot(), l1, l2])
+
+    const l1Render = renderNode(l1, { paletteColor: branchColors.get('a') ?? null })
+    expect(l1Render.container.querySelector(`rect[fill="${manualColor}"]`)).toBeTruthy()
+    cleanup()
+
+    const l2Render = renderNode(l2, { paletteColor: branchColors.get('b') ?? null })
+    expect(l2Render.container.querySelector(`rect[fill="${depthFill(manualColor, 2)}"]`)).toBeTruthy()
+  })
 })
 
 describe('Node — mindmap type', () => {
@@ -351,15 +449,152 @@ describe('Node — mindmap type', () => {
     expect(container.querySelector('[data-node-id="n1"]')).toBeTruthy()
   })
 
-  it('renders a mindmap L2+ circle node (transparent rect + wrapped text)', () => {
+  it('renders a mindmap L1 as a circle labelled with its title and subtree size', () => {
+    const root = makeRoot({ title: 'Center' })
+    const n = makeNode({ depth: 1, title: 'Supervised', width: 72, height: 72 })
+    loadStore([root, n], 'mindmap')
+    const { container } = renderNode(n, { descendantCount: 29 })
+    expect(container.querySelector('circle')).toBeTruthy()
+    expect(container.querySelector('rect')).toBeNull()      // a circle, never a box
+    const texts = Array.from(container.querySelectorAll('text')).map(t => t.textContent)
+    expect(texts).toContain('Supervised')                    // the name, on one line
+    expect(texts).toContain('29')                            // the subtree size under it
+    expect(texts).toContain('S')                             // the initial inside the circle
+    expect(container.querySelector('tspan')).toBeNull()      // never wrapped into a column
+  })
+
+  // ── Neon paint on a dark canvas ───────────────────────────────────────────
+  // Only paint changes: the circle grows a two-layer glow, the name turns white and
+  // the count turns light grey. A light theme keeps today's subtle look.
+  it('gives a mindmap L1 a glow and white label text on a dark theme', () => {
+    const root = makeRoot({ title: 'Center' })
+    const n = makeNode({ depth: 1, title: 'Supervised', width: 72, height: 72 })
+    loadStore([root, n], 'mindmap')
+    useMindmapStore.setState({ themeId: 'cyberpunk' })
+    const { container } = renderNode(n, { descendantCount: 29, paletteColor: L1_PALETTE[0] })
+
+    const glow = container.querySelector(`circle[filter="url(#${neonFilterId(72)})"]`)
+    expect(glow).toBeTruthy()
+    expect(glow!.getAttribute('fill')).toBe(L1_PALETTE[0])
+
+    const name = [...container.querySelectorAll('text')].find(t => t.textContent === 'Supervised')!
+    expect(name.getAttribute('fill')).toBe(NEON_TEXT)
+    const count = [...container.querySelectorAll('text')].find(t => t.textContent === '29')!
+    expect(count.getAttribute('fill')).toBe(NEON_TEXT_MUTED)
+    expect(count.getAttribute('fill-opacity')).toBe(String(NEON_TEXT_MUTED_OPACITY))
+  })
+
+  it('leaves a mindmap L1 unglowed with dark label text on a light theme', () => {
+    const root = makeRoot({ title: 'Center' })
+    const n = makeNode({ depth: 1, title: 'Supervised', width: 72, height: 72 })
+    loadStore([root, n], 'mindmap')
+    useMindmapStore.setState({ themeId: 'default' })
+    const { container } = renderNode(n, { descendantCount: 29, paletteColor: L1_PALETTE[0] })
+
+    expect(container.querySelector(`circle[filter="url(#${neonFilterId(72)})"]`)).toBeNull()
+    const name = [...container.querySelectorAll('text')].find(t => t.textContent === 'Supervised')!
+    expect(name.getAttribute('fill')).toBe('#1a1d2e')
+  })
+
+  it('paints the mindmap root as a gradient orb on a dark theme only', () => {
+    const root = makeRoot({ title: 'Center', color: '#06b6d4' })
+    loadStore([root, makeNode({ depth: 1 })], 'mindmap')
+    useMindmapStore.setState({ themeId: 'cyberpunk' })
+    const { container } = renderNode(root)
+    expect(container.querySelector(`radialGradient#${NEON_ROOT_GRADIENT}`)).toBeTruthy()
+    expect(container.querySelector(`circle[fill="url(#${NEON_ROOT_GRADIENT})"]`)).toBeTruthy()
+
+    cleanup()
+    useMindmapStore.setState({ themeId: 'default' })
+    const light = renderNode(root).container
+    expect(light.querySelector(`radialGradient#${NEON_ROOT_GRADIENT}`)).toBeNull()
+  })
+
+  it('renders a mindmap L2 as a smaller circle with the title beside it', () => {
     const root = makeRoot()
     const l1 = makeNode({ depth: 1 })
-    const l2 = makeNode({ id: 'n2', depth: 2, parentId: 'n1', title: 'A long mindmap leaf node label', width: 120, height: 120 })
+    const l2 = makeNode({ id: 'n2', depth: 2, parentId: 'n1', title: 'A long mindmap leaf node label', width: 30, height: 30 })
     loadStore([root, l1, l2], 'mindmap')
     const { container } = renderNode(l2, { isSelected: true })
     expect(container.querySelector('[data-node-id="n2"]')).toBeTruthy()
-    // tspan-wrapped text
-    expect(container.querySelector('tspan')).toBeTruthy()
+    const texts = Array.from(container.querySelectorAll('text'))
+    expect(texts.map(t => t.textContent)).toContain('A long mindmap leaf node label')
+    expect(container.querySelector('tspan')).toBeNull()
+  })
+
+  it('renders a mindmap L3 as a bare dot carrying its title for hover', () => {
+    const root = makeRoot()
+    const l1 = makeNode({ depth: 1 })
+    const l2 = makeNode({ id: 'n2', depth: 2, parentId: 'n1', width: 30, height: 30 })
+    const l3 = makeNode({ id: 'n3', depth: 3, parentId: 'n2', title: 'Deep leaf', width: 7, height: 7 })
+    loadStore([root, l1, l2, l3], 'mindmap')
+    const { container } = renderNode(l3)
+    expect(container.querySelector('title')?.textContent).toBe('Deep leaf')
+    expect(container.querySelectorAll('text')).toHaveLength(0)  // no label until selected
+    expect(container.querySelector('circle')).toBeTruthy()
+  })
+
+  it('leaves a selected dot unlabelled - a dot never carries drawn text', () => {
+    const root = makeRoot()
+    const l1 = makeNode({ depth: 1 })
+    const l3 = makeNode({ id: 'n3', depth: 3, parentId: 'n1', title: 'Deep leaf', width: 7, height: 7 })
+    loadStore([root, l1, l3], 'mindmap')
+    const { container } = renderNode(l3, { isSelected: true })
+    expect(container.querySelectorAll('text')).toHaveLength(0)
+    expect(container.querySelector('title')?.textContent).toBe('Deep leaf')
+  })
+
+  it('cuts a long depth-2 label but keeps the whole title in the data and on hover', () => {
+    const long = 'Hook reads the file on each prompt - flips on next message, no restart'
+    const root = makeRoot()
+    const l1 = makeNode({ depth: 1 })
+    const l2 = makeNode({ id: 'n2', depth: 2, parentId: 'n1', title: long, width: 30, height: 30 })
+    loadStore([root, l1, l2], 'mindmap')
+    const { container } = renderNode(l2, { rootCenter: { x: 0, y: 0 } })
+    const drawn = Array.from(container.querySelectorAll('text')).map(t => t.textContent ?? '')
+      .find(t => t.length > 5)!
+    expect(drawn.length).toBeLessThanOrEqual(32)
+    expect(drawn.endsWith('\u2026')).toBe(true)
+    expect(container.querySelector('title')?.textContent).toBe(long)   // full text on hover
+  })
+
+  it('shows a selected depth-2 node its whole title', () => {
+    const long = 'Hook reads the file on each prompt - flips on next message, no restart'
+    const root = makeRoot()
+    const l1 = makeNode({ depth: 1 })
+    const l2 = makeNode({ id: 'n2', depth: 2, parentId: 'n1', title: long, width: 30, height: 30 })
+    loadStore([root, l1, l2], 'mindmap')
+    const { container } = renderNode(l2, { isSelected: true, rootCenter: { x: 0, y: 0 } })
+    expect(Array.from(container.querySelectorAll('text')).map(t => t.textContent)).toContain(long)
+  })
+
+  it('points a depth-2 label outward: left of a left-half circle, right of a right-half one', () => {
+    const root = makeRoot()
+    const l1 = makeNode({ depth: 1 })
+    const mk = (x: number) => makeNode({ id: 'n2', depth: 2, parentId: 'n1', title: 'Side', x, y: 0, width: 30, height: 30 })
+    const labelAt = (x: number) => {
+      loadStore([root, l1, mk(x)], 'mindmap')
+      const { container } = renderNode(mk(x), { rootCenter: { x: 0, y: 0 } })
+      const t = Array.from(container.querySelectorAll('text')).find(el => el.textContent === 'Side')!
+      const out = { x: Number(t.getAttribute('x')), anchor: t.getAttribute('text-anchor') }
+      cleanup()
+      return out
+    }
+    const right = labelAt(400)
+    expect(right.x).toBeGreaterThan(30)        // past the circle's right edge
+    expect(right.anchor).toBe('start')
+    const left = labelAt(-400)
+    expect(left.x).toBeLessThan(0)             // past the circle's left edge
+    expect(left.anchor).toBe('end')
+  })
+
+  it('honours an explicit shape instead of the radial circle', () => {
+    const root = makeRoot()
+    const l1 = makeNode({ depth: 1 })
+    const box = makeNode({ id: 'n2', depth: 2, parentId: 'n1', title: 'Boxed', shape: 'rect', width: 120, height: 40 })
+    loadStore([root, l1, box], 'mindmap')
+    const { container } = renderNode(box)
+    expect(container.querySelector('rect')).toBeTruthy()
   })
 
   it('renders mindmap L2+ with emoji centered', () => {
@@ -957,7 +1192,7 @@ describe('Node — links inside node text', () => {
     expect(input.value).toBe(raw)
   })
 
-  it('wraps a mindmap circle label into per-line anchors', () => {
+  it('keeps a markdown link in a mindmap label clickable', () => {
     const n = makeNode({ title: 'ticket [SHAR-1](https://j.example/SHAR-1) fix', depth: 2, width: 120, height: 120 })
     loadStore([makeRoot(), makeNode({ depth: 1 }), n], 'mindmap')
     const { container } = renderNode(n)
@@ -1014,5 +1249,46 @@ describe('Node — links inside node text', () => {
       })
       expect(svg).toMatch(/<text[^>]*font-size="31"[^>]*>Child<\/text>/)
     })
+  })
+})
+
+describe('render-svg — gloss overlay', () => {
+  it('defines the gloss gradients exactly once and overlays root, L1 and L2 only', () => {
+    const nodes = [
+      // A long title forces the pill shape (rect), so root, L1 and L2 all get the
+      // same rect-shaped linear overlay and the count below is unambiguous.
+      makeRoot({ title: 'A very very long root title here', width: 400, height: 90 }),
+      makeNode({ id: 'd1', title: 'L1', depth: 1, parentId: 'root' }),
+      makeNode({ id: 'd2', title: 'L2', depth: 2, parentId: 'd1' }),
+      makeNode({ id: 'd3', title: 'L3', depth: 3, parentId: 'd2' }),
+    ]
+    const svg = renderMindmapSvg({
+      id: 'x', name: 'Gloss test', type: 'logic-chart', line_style: 'orthogonal',
+      theme_id: 'default', nodes: nodes as never,
+    })
+    // Exactly one definition of each gradient type, referenced by every eligible box.
+    expect(svg.match(new RegExp(`<linearGradient id="${GLOSS_LINEAR_ID}"`, 'g'))).toHaveLength(1)
+    expect(svg.match(new RegExp(`<radialGradient id="${GLOSS_RADIAL_ID}"`, 'g'))).toHaveLength(1)
+    // Root pill/circle, L1 and L2 each get one overlay rect; L3 gets none.
+    expect(svg.match(new RegExp(`fill="url\\(#${GLOSS_LINEAR_ID}\\)"`, 'g'))).toHaveLength(3)
+  })
+
+  it('a fishbone L1 parallelogram overlay clips to the polygon, not a plain rect', () => {
+    const nodes = [makeRoot(), makeNode({ depth: 1, y: 100 })]
+    const svg = renderMindmapSvg({
+      id: 'x', name: 'Fishbone gloss', type: 'fishbone', line_style: 'orthogonal',
+      theme_id: 'default', nodes: nodes as never,
+    })
+    expect(svg).toMatch(/<clipPath id="gloss-fb-[^"]+"><polygon/)
+  })
+
+  it('a mindmap L1 circle overlays the radial gradient, offset toward the top-left', () => {
+    const nodes = [makeRoot(), makeNode({ depth: 1 })]
+    const svg = renderMindmapSvg({
+      id: 'x', name: 'Mindmap gloss', type: 'mindmap', line_style: 'orthogonal',
+      theme_id: 'default', nodes: nodes as never,
+    })
+    expect(svg).toContain(`fill="url(#${GLOSS_RADIAL_ID})"`)
+    expect(svg).toMatch(/<radialGradient[^>]*cx="3[0-9]%"[^>]*cy="2[0-9]%"/)
   })
 })

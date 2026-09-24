@@ -2,12 +2,18 @@ import { useRef, useState, useCallback } from 'react'
 import type { MindmapNode } from '../../types'
 import { useMindmapStore } from '../../store/mindmapStore'
 import { NodeIcon, getLucideIcon } from './NodeIcon'
-import { wrapText } from '../../lib/layout/mindmap'
+import { wrapText, initialFontSize, nodeInitial, radialLabelFor, LABEL_FONT, RADIAL_ROOT_FONT } from '../../lib/layout/mindmap'
 import { rootPillWidth, rootPillFontSize, rootTitleNeedsPill, rootCircleDiameter, rootDrawnWidth, ROOT_FONT } from '../../lib/rootPill'
-import { hexToRgb, darken, depthFill } from '../../lib/color'
+import { getTheme } from '../../lib/themes'
+import {
+  hexToRgb, darken, depthFill, isDarkBg, lighten, neonFilterId, neonRootColor,
+  NEON_ROOT_GRADIENT, NEON_ROOT_LIGHTEN, NEON_TEXT, NEON_TEXT_FILTER,
+  NEON_TEXT_MUTED, NEON_TEXT_MUTED_OPACITY,
+} from '../../lib/color'
 import { shapeRx } from '../../lib/nodeShape'
 import { nodeMetrics, ICON_GAP } from '../../lib/nodeMetrics'
 import { parseLinkedTitle, sliceSegments, lineRanges, type LinkSegment } from '../../lib/links'
+import { GLOSS_LINEAR_ID, GLOSS_RADIAL_ID, glossApplies, glossOpacity } from '../../lib/gloss'
 
 interface NodeProps {
   node: MindmapNode
@@ -25,6 +31,7 @@ interface NodeProps {
   childCount?: number       // direct children, precomputed once by DiagramCanvas (was an O(n) per-node selector)
   descendantCount?: number  // total subtree size, precomputed once (was an O(n^2) per-node selector)
   nodeCount?: number        // total nodes in the map, used to gate decorative animations on large maps
+  rootCenter?: { x: number; y: number } | null  // the radial mind map measures "outward" from here; precomputed once by DiagramCanvas
 }
 
 // Decorative SMIL animations (fireflies, SiriWave) burn CPU/GPU at idle, so skip them
@@ -100,7 +107,7 @@ function isLight(hex: string): boolean {
   return lum > 140
 }
 
-export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onDragMove, onRootDragOffset, svgRef, readOnly, noInteract = false, l1Colors = [], paletteColor = null, childCount = 0, descendantCount = 0, nodeCount = 0 }: NodeProps) {
+export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onDragMove, onRootDragOffset, svgRef, readOnly, noInteract = false, l1Colors = [], paletteColor = null, childCount = 0, descendantCount = 0, nodeCount = 0, rootCenter = null }: NodeProps) {
   const isRoot = node.depth === 0
   const isL2Plus = node.depth >= 2
   // Brighter/more-vivid version of the node colour, used for all coloured fills.
@@ -115,7 +122,13 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   const inputRef = useRef<HTMLInputElement>(null)
   const resizePreview = useMindmapStore(s => s.resizePreview)
   const diagramType = useMindmapStore(s => s.diagramType)
+  const themeId = useMindmapStore(s => s.themeId)
   const showChildCount = useMindmapStore(s => s.showChildCount)
+  // On a dark canvas the radial mind map is painted as a living circuit: every circle
+  // is a glowing orb, the root a violet-to-blue one, and the labels are white or light
+  // grey. Only paint changes - sizes, positions and hit areas are identical. Light
+  // themes read none of this and keep today's subtle look.
+  const neon = diagramType === 'mindmap' && isDarkBg(getTheme(themeId).canvasBg)
   const canDrag = (isRoot && diagramType !== 'mindmap') || diagramType === 'logic-chart'
   // Root shape: in mindmap mode always circle; otherwise user-set or auto from title length
   const isRootPill = isRoot && diagramType !== 'mindmap' && (
@@ -123,9 +136,14 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
     node.shape === 'circle' ? false :
     rootTitleNeedsPill(node.title, node.fontSize ?? ROOT_FONT)
   )
-  const isMindmapCircle = diagramType === 'mindmap' && node.depth === 1
-  const isMindmapL2Plus = diagramType === 'mindmap' && node.depth >= 2
   const isFishbone = diagramType === 'fishbone'
+  // The Mind Map type draws a radial constellation (src/lib/layout/mindmap): every
+  // node is a circle sized by the weight of its own subtree, with the label drawn
+  // OUTSIDE the circle - under it at depth 1, beside it at depth 2, and only on
+  // selection for the dots at depth 3 and deeper. An explicit per-node shape opts a
+  // node out of the scheme and keeps its own box, as it does in every other type.
+  const isRadial = diagramType === 'mindmap' && !isRoot && !node.shape
+  const isRadialDot = isRadial && node.depth >= 3
   // An explicit per-node shape overrides the diagram's own default geometry
   // (fishbone parallelogram, mindmap L2 box). Absence keeps today's look.
   const nodeShape = isRoot ? undefined : node.shape
@@ -153,12 +171,6 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
     textColor = isLight(bg) ? '#1a1d2e' : '#ffffff'
     strokeColor = col
     strokeW = 2
-  } else if (isMindmapCircle) {
-    // L1 mindmap: solid color fill with darker border, same as logic chart
-    bg = col
-    textColor = isLight(col) ? '#1a1d2e' : '#ffffff'
-    strokeColor = col.startsWith('#') ? darken(col, 0.25) : col
-    strokeW = 2
   } else {
     // L1 all other diagrams: solid color fill, darker border so white badge is framed
     bg = col
@@ -168,13 +180,32 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   }
 
 
+  // Neon: the glyph inside an orb is white whatever colour the orb is, and the root
+  // orb is a radial gradient (its own colour lightened at the centre) with a rim to
+  // match. Only the paint moves - the geometry above is untouched.
+  const rootNeon = neon && isRoot ? neonRootColor(node.color) : null
+  if (neon && (isRoot || isRadial)) textColor = NEON_TEXT
+  if (rootNeon) strokeColor = lighten(rootNeon, 0.4)
+
+  // Root, L1 and L2 boxes carry a soft top-of-box gloss; L3+ are already pale, so
+  // it would be lost. Dark-background boxes get the stronger gradient stops (via
+  // glossOpacity), light-background ones the softer scaled-down version. Read from
+  // the base fill, so a neon orb keeps the strong stops its dark canvas calls for.
+  const showGloss = glossApplies(node.depth)
+  const glossFillOpacity = glossOpacity(isLight(bg))
+
+  // A dot is 5-8px across, so the 2px L2+ ring would swallow it whole.
+  if (isRadialDot) strokeW = 1
+
   // Node-level overrides from panel
   if (node.borderColor) { strokeColor = node.borderColor; strokeW = Math.max(strokeW, node.borderWidth ?? 1.5) }
 
   // Depth-based font size + padding from the one shared box table (src/lib/nodeMetrics),
   // so the canvas, the server renderer and every layout agree on what a node holds.
   const metric = nodeMetrics(node.depth)
-  const baseFontSize = node.fontSize ?? metric.fontSize
+  // The mind map root is a centre circle, not a pill, so it takes its own size.
+  const baseFontSize = node.fontSize
+    ?? (isRoot && diagramType === 'mindmap' ? RADIAL_ROOT_FONT : metric.fontSize)
   const padX = metric.padX
   // Root pill grows to fit the title up to a max width; past that the font shrinks
   // so long titles never overflow. Shared with the layout (src/lib/rootPill) so
@@ -289,14 +320,15 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   const hasIcon = !!resolvedIcon && !!getLucideIcon(resolvedIcon)
   // Root pill: always auto-size from title so it never relies on stale stored width.
   const autoPillW = isRootPill ? rootDrawnWidth(node, diagramType) : null
-  // Mindmap L2+ circles: force width = height so it's always a circle
-  const circleW = (isMindmapL2Plus || drawCircle) ? Math.max(node.width, node.height) : null
+  // Circles draw in a square box: force width = height so it's always round
+  const circleW = (isRadial || drawCircle) ? Math.max(node.width, node.height) : null
   const displayW = previewW ?? (autoPillW ?? circleW ?? node.width)
   // The title is stored raw (markdown and all); everything drawn and measured uses
   // the display text, so a box never sizes to characters nobody sees.
   const parsedTitle = parseLinkedTitle(node.title)
   const countSuffix = (showChildCount && node.depth >= 1 && childCount > 0) ? ` (${childCount})` : ''
   const label = parsedTitle.text + countSuffix
+  const plainLabel = parsedTitle.text
   const labelSegments: LinkSegment[] = countSuffix
     ? [...parsedTitle.segments, { text: countSuffix }]
     : parsedTitle.segments
@@ -304,7 +336,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   // All coordinates are relative to (node.x, node.y)
   // Circle-shaped nodes draw in a square box; the layout already sizes them square,
   // this Math.max is only a guard so a stale stored box can never clip the circle.
-  const boxH = drawCircle ? Math.max(displayW, node.height) : node.height
+  const boxH = (isRadial || drawCircle) ? Math.max(displayW, node.height) : node.height
   const cx = displayW / 2
   const cy = boxH / 2
   const r = displayW / 2
@@ -348,7 +380,19 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   }
 
   const clipId = `clip-${node.id}`
-  const hasBadge = (hasEmoji || hasIcon) && !isRoot && !isMindmapL2Plus && !drawCircle
+  // Soft coloured glow under a mind map circle - the reference look's "alive" cue.
+  // Only the root and the two labelled rings carry it; the dots are too small to
+  // show a blur and one filter per dot would be pure cost.
+  const glowId = `glow-${node.id}`
+  const showGlow = diagramType === 'mindmap' && !neon && (isRoot || (isRadial && node.depth <= 2))
+  // Neon halo: one shared, diameter-bucketed filter per render (defined in
+  // DiagramCanvas), so a 200-node map carries a handful of filters, not 400.
+  const neonGlow = neon && (isRoot || isRadial)
+  // A parallelogram has no rx, so its gloss overlay needs a real clip to the polygon
+  // rather than a matching corner radius.
+  const glossFbClipId = `gloss-fb-${node.id}`
+  const showFishboneGloss = isFishboneNode && !nodeShape && showGloss
+  const hasBadge = (hasEmoji || hasIcon) && !isRoot && !isRadial && !drawCircle
   const editX = isRoot ? cx - r * 0.75 : hasBadge ? node.height : (align === 'left' ? 8 : 2)
   const editW = isRoot ? r * 1.5 : hasBadge ? displayW - node.height - 4 : displayW - editX - 2
   // The editor shows the raw title (markdown links included), which can be far longer
@@ -362,13 +406,35 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
       transition: isDragging ? 'none' : 'transform 0.22s cubic-bezier(0.4,0,0.2,1)',
       pointerEvents: noInteract ? 'none' : undefined,
     }}>
-    {!isRoot && (
+    {(!isRoot && !isRadial) || showGlow || rootNeon || showFishboneGloss ? (
       <defs>
-        <clipPath id={clipId}>
-          <rect x={0} y={0} width={displayW} height={boxH} rx={effectiveRx} ry={effectiveRx} />
-        </clipPath>
+        {!isRoot && !isRadial && (
+          <clipPath id={clipId}>
+            <rect x={0} y={0} width={displayW} height={boxH} rx={effectiveRx} ry={effectiveRx} />
+          </clipPath>
+        )}
+        {showGlow && (
+          <filter id={glowId} x="-70%" y="-70%" width="240%" height="240%">
+            <feGaussianBlur stdDeviation={Math.max(3, displayW * 0.11)} />
+          </filter>
+        )}
+        {/* One root per map, so its gradient costs nothing to define here. */}
+        {rootNeon && (
+          <radialGradient id={NEON_ROOT_GRADIENT}>
+            <stop offset="0%" stopColor={lighten(rootNeon, NEON_ROOT_LIGHTEN)} />
+            <stop offset="100%" stopColor={rootNeon} />
+          </radialGradient>
+        )}
+        {showFishboneGloss && (() => {
+          const sk = node.height * 0.35
+          const w = displayW, h = node.height
+          const pts = fishboneAbove
+            ? `${sk},0 ${w},0 ${w - sk},${h} 0,${h}`
+            : `0,0 ${w - sk},0 ${w},${h} ${sk},${h}`
+          return <clipPath id={glossFbClipId}><polygon points={pts} /></clipPath>
+        })()}
       </defs>
-    )}
+    ) : null}
     <g
       onPointerDown={handlePointerDown}
       onPointerMove={onPointerMove}
@@ -378,14 +444,24 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
       style={{ cursor: editing ? 'default' : canDrag ? 'grab' : 'pointer', userSelect: 'none' }}
     >
       {/* Fireflies around nodes with children — count = all descendants */}
-      {showDecor && node.depth >= 1 && descendantCount > 0 && (
+      {showDecor && diagramType !== 'mindmap' && node.depth >= 1 && descendantCount > 0 && (
         <Fireflies cx={displayW / 2} cy={node.height / 2} r={Math.max(displayW, node.height) * 0.45} color={col} count={descendantCount} />
       )}
 
       {isRoot ? (
         <>
-          {/* Siri glow + spinning rings — circle root only */}
-          {!isRootPill && (() => { const ar = r; return (
+          {/* Soft coloured glow under the mind map root */}
+          {showGlow && (
+            <circle cx={cx} cy={cy} r={r * 1.08} fill={col.startsWith('#') ? col : bg}
+              opacity={0.22} filter={`url(#${glowId})`} style={{ pointerEvents: 'none' }} />
+          )}
+          {rootNeon && (
+            <circle cx={cx} cy={cy} r={r} fill={rootNeon}
+              filter={`url(#${neonFilterId(displayW)})`} style={{ pointerEvents: 'none' }} />
+          )}
+
+          {/* Siri glow + spinning rings — circle root only, never on the mind map */}
+          {!isRootPill && diagramType !== 'mindmap' && (() => { const ar = r; return (
           <>
           {showDecor && <SiriWave cx={cx} cy={cy} r={ar} colors={l1Colors} />}
 
@@ -417,12 +493,21 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
               rx={node.height / 2} ry={node.height / 2}
               fill={bg} fillOpacity={1} stroke={strokeColor} strokeWidth={strokeW} />
           ) : (
-            <circle cx={cx} cy={cy} r={r} fill={bg} fillOpacity={1}
+            <circle cx={cx} cy={cy} r={r} fill={rootNeon ? `url(#${NEON_ROOT_GRADIENT})` : bg} fillOpacity={1}
               stroke={strokeColor} strokeWidth={strokeW} />
           )}
 
-          {/* Front ring glints — circle root only */}
-          {!isRootPill && (() => { const ar = r; return (
+          {/* Gloss — soft top-of-box highlight, root pill or root circle */}
+          {showGloss && (isRootPill ? (
+            <rect x={0} y={0} width={displayW} height={node.height} rx={node.height / 2} ry={node.height / 2}
+              fill={`url(#${GLOSS_LINEAR_ID})`} fillOpacity={glossFillOpacity} style={{ pointerEvents: 'none' }} />
+          ) : (
+            <circle cx={cx} cy={cy} r={r} fill={`url(#${GLOSS_RADIAL_ID})`} fillOpacity={glossFillOpacity}
+              style={{ pointerEvents: 'none' }} />
+          ))}
+
+          {/* Front ring glints — circle root only, never on the mind map */}
+          {!isRootPill && diagramType !== 'mindmap' && (() => { const ar = r; return (
           <>
           <ellipse cx={cx} cy={cy} rx={ar * 2.0} ry={ar * 0.32}
             stroke="#d1d5db" strokeWidth={2} fill="none" opacity={0.55}
@@ -443,10 +528,27 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
           </>)})()}
 
           {/* Roaming fireflies in the L1 colours — twinkle around the root */}
-          {showDecor && l1Colors.length > 0 && (
+          {showDecor && diagramType !== 'mindmap' && l1Colors.length > 0 && (
             <Fireflies cx={cx} cy={cy} r={Math.max(displayW, node.height) / 2}
               colors={l1Colors} count={Math.min(20, Math.max(10, l1Colors.length))} color={l1Colors[0]} />
           )}
+        </>
+      ) : isRadial ? (
+        <>
+        <circle cx={cx} cy={cy} r={r} fill="transparent" />
+        <g style={{ pointerEvents: 'none' }}>
+          {showGlow && (
+            <circle cx={cx} cy={cy} r={r * 1.1} fill={col} opacity={0.3} filter={`url(#${glowId})`} />
+          )}
+          {neonGlow && (
+            <circle cx={cx} cy={cy} r={r} fill={col} filter={`url(#${neonFilterId(displayW)})`} />
+          )}
+          <circle cx={cx} cy={cy} r={r} fill={nodeFill} fillOpacity={bgOpacity} />
+          <circle cx={cx} cy={cy} r={r} fill="none" stroke={strokeColor} strokeWidth={strokeW} />
+          {showGloss && (
+            <circle cx={cx} cy={cy} r={r} fill={`url(#${GLOSS_RADIAL_ID})`} fillOpacity={glossFillOpacity} />
+          )}
+        </g>
         </>
       ) : drawCircle ? (
         <>
@@ -455,19 +557,9 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
           filter="drop-shadow(0 1px 4px rgba(0,0,0,0.1))">
           <circle cx={cx} cy={cy} r={r} fill={nodeFill} fillOpacity={bgOpacity} />
           <circle cx={cx} cy={cy} r={r} fill="none" stroke={strokeColor} strokeWidth={strokeW} />
-        </g>
-        </>
-      ) : isMindmapL2Plus && !nodeShape ? (
-        <>
-        <rect x={0} y={0} width={displayW} height={node.height} fill="transparent" />
-        <g style={{ pointerEvents: 'none' }}
-          filter="drop-shadow(0 1px 4px rgba(0,0,0,0.1))">
-          <rect x={0} y={0} width={displayW} height={node.height}
-            rx={effectiveRx} ry={effectiveRx}
-            fill={nodeFill} fillOpacity={bgOpacity} />
-          <rect x={0} y={0} width={displayW} height={node.height}
-            rx={effectiveRx} ry={effectiveRx}
-            fill="none" stroke={strokeColor} strokeWidth={strokeW * 2} />
+          {showGloss && (
+            <circle cx={cx} cy={cy} r={r} fill={`url(#${GLOSS_RADIAL_ID})`} fillOpacity={glossFillOpacity} />
+          )}
         </g>
         </>
       ) : isFishboneNode && !nodeShape ? (() => {
@@ -494,6 +586,10 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
             return <polygon points={badgePts} fill="#ffffff" />
           })()}
           <polygon points={pts} fill="none" stroke={strokeColor} strokeWidth={strokeW} />
+          {showGloss && (
+            <rect x={0} y={0} width={w} height={h} clipPath={`url(#${glossFbClipId})`}
+              fill={`url(#${GLOSS_LINEAR_ID})`} fillOpacity={glossFillOpacity} />
+          )}
         </g>
         </>)
       })() : (
@@ -505,8 +601,13 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
         <g clipPath={`url(#${clipId})`} style={{ pointerEvents: 'none' }}
           filter={previewW !== null ? 'drop-shadow(0 0 8px rgba(59,130,246,0.7))' : 'drop-shadow(0 1px 4px rgba(0,0,0,0.1))'}>
           <rect x={0} y={0} width={displayW} height={node.height} fill={nodeFill} fillOpacity={bgOpacity} />
+          {/* Gloss — soft top-of-box highlight, root/L1/L2 boxes only */}
+          {showGloss && (
+            <rect x={0} y={0} width={displayW} height={node.height} rx={effectiveRx} ry={effectiveRx}
+              fill={`url(#${GLOSS_LINEAR_ID})`} fillOpacity={glossFillOpacity} />
+          )}
           {/* White badge behind border — border ring sits on top */}
-          {(hasEmoji || hasIcon) && !isMindmapL2Plus && (
+          {(hasEmoji || hasIcon) && (
             <rect x={0} y={0} width={node.height + 1} height={node.height} fill="#ffffff" />
           )}
           {/* Border ring — doubled stroke so clip cuts outer half, stays inset */}
@@ -548,9 +649,72 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
             }}
           />
         </foreignObject>
-      ) : (
+      ) : isRadial ? (() => {
+        // Labels live OUTSIDE the circle, so this group is never clipped to the box.
+        // Where each one sits, and how far it is cut, comes from the same helper the
+        // layout used to reserve room for it (src/lib/layout/mindmap radialLabelFor),
+        // so a label can never land where nothing was kept clear for it.
+        const glyph = node.fontSize ?? initialFontSize(node.depth, displayW)
+        // Selecting a node shows its whole title, however long; otherwise it is cut.
+        const label = radialLabelFor(node, rootCenter?.x ?? 0, rootCenter?.y ?? 0, isSelected)
+        // A markdown link in the title still renders as a real anchor in the label -
+        // but only while the whole title is on show, since a cut one no longer lines
+        // up with the runs.
+        const hasLinkRuns = parsedTitle.segments.some(seg => !!seg.url)
+        const titleBody = label && hasLinkRuns && label.text === plainLabel
+          ? renderRuns(parsedTitle.segments, 'rl')
+          : label?.text
+        return (
+        <g style={{ pointerEvents: 'none' }}>
+          <title>{plainLabel}</title>
+          {/* Inside the circle: the node's emoji or icon, else the title's initial */}
+          {!isRadialDot && (
+            hasEmoji && resolvedEmoji ? (
+              <text x={cx} y={cy + glyph * 0.36} textAnchor="middle" fontSize={glyph}>{resolvedEmoji}</text>
+            ) : hasIcon && resolvedIcon ? (
+              <NodeIcon icon={resolvedIcon} x={cx - glyph / 2} y={cy - glyph / 2}
+                size={glyph} color={textColor} strokeWidth={2} />
+            ) : (
+              <>
+                {/* Faint glow under the white initial, from the one shared text filter */}
+                {neon && (
+                  <text x={cx} y={cy + glyph * 0.36} textAnchor="middle"
+                    fontSize={glyph} fontWeight="600" fontStyle={fontStyle}
+                    fontFamily="Inter, system-ui, sans-serif" fill={NEON_TEXT}
+                    filter={`url(#${NEON_TEXT_FILTER})`}>{nodeInitial(node.title)}</text>
+                )}
+                <text x={cx} y={cy + glyph * 0.36} textAnchor="middle"
+                  fontSize={glyph} fontWeight="600" fontStyle={fontStyle}
+                  fontFamily="Inter, system-ui, sans-serif" fill={textColor}>{nodeInitial(node.title)}</text>
+              </>
+            )
+          )}
+          {/* Depth 1 carries the map: its name and its subtree size sit under the circle.
+              Depth 2 reads outward, away from the root. A dot carries no drawn label. */}
+          {label && (
+            <>
+              <text x={label.tx} y={label.ty} textAnchor={label.anchor}
+                fontSize={node.depth === 1 ? LABEL_FONT.title1 : LABEL_FONT.title2}
+                fontWeight={node.depth === 1 ? '600' : '400'}
+                fontFamily="Inter, system-ui, sans-serif"
+                fillOpacity={neon && node.depth !== 1 ? NEON_TEXT_MUTED_OPACITY : 1}
+                fill={neon
+                  ? (node.depth === 1 ? NEON_TEXT : NEON_TEXT_MUTED)
+                  : (node.depth === 1 ? '#1a1d2e' : '#475569')}>{titleBody}</text>
+              {label.countY !== null && descendantCount > 0 && (
+                <text x={label.tx} y={label.countY} textAnchor={label.anchor}
+                  fontSize={LABEL_FONT.count1} fontWeight="600"
+                  fontFamily="Inter, system-ui, sans-serif"
+                  fillOpacity={neon ? NEON_TEXT_MUTED_OPACITY : 1}
+                  fill={neon ? NEON_TEXT_MUTED : col}>{descendantCount}</text>
+              )}
+            </>
+          )}
+        </g>
+        )
+      })() : (
         <g clipPath={isRoot ? undefined : `url(#${clipId})`}>
-          {hasEmoji && resolvedEmoji && !isMindmapL2Plus && !drawCircle && (() => {
+          {hasEmoji && resolvedEmoji && !drawCircle && (() => {
             const sq = node.height
             const emojiSize = Math.round(sq * 0.52)
             // For fishbone: shift icon center to account for parallelogram skew
@@ -577,7 +741,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
               </>
             )
           })()}
-          {hasIcon && resolvedIcon && !isMindmapL2Plus && !drawCircle && (() => {
+          {hasIcon && resolvedIcon && !drawCircle && (() => {
             const sq = node.height  // white square = full node height
             const iconSize = Math.round(sq * 0.48)
             // For fishbone: center icon within the skewed badge area
@@ -600,8 +764,8 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
               </>
             )
           })()}
-          {((!hasIcon && !hasEmoji) || isRoot || isMindmapL2Plus || drawCircle) && (() => {
-            if (isMindmapL2Plus || drawCircle) {
+          {((!hasIcon && !hasEmoji) || isRoot || drawCircle) && (() => {
+            if (drawCircle) {
               const maxChars = Math.max(8, Math.ceil(Math.sqrt(label.length * 1.8)))
               const lines = wrapText(label, maxChars)
               const ranges = lineRanges(label, lines)
@@ -683,8 +847,9 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
         </g>
       )}
 
-      {/* Resize handle — right edge, non-root only, not mindmap circles */}
-      {!isRoot && !readOnly && (
+      {/* Resize handle — right edge, non-root boxes only. A radial mind map circle
+          takes its diameter from its subtree, so there is nothing to drag. */}
+      {!isRoot && !readOnly && !isRadial && (
         <g style={{ cursor: 'ew-resize', userSelect: 'none' }}>
           {/* Hit area — all pointer events on this rect so capture works */}
           <rect
@@ -697,7 +862,6 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
         </g>
       )}
 
-      {/* Mindmap L2+ icons are rendered centered inside the circle (in the text block above) */}
 
 
       {/* Selection ring — always on top. Hidden on touch devices (noInteract), not merely on
@@ -727,7 +891,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
               style={{ pointerEvents: 'none' }} />
           </>
         )
-      ) : drawCircle ? (
+      ) : (drawCircle || isRadial) ? (
         <>
           <circle cx={cx} cy={cy} r={r + 5}
             fill="none" stroke="rgba(59,130,246,0.18)" strokeWidth={6}

@@ -273,7 +273,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     await pool.query(
       `INSERT INTO mindmaps (id, user_id, name, type, line_style, sharing_enabled, theme_id, nodes, tags)
-       VALUES ($1,$2,$3,$4,'orthogonal',$5,$6,$7,$8)
+       VALUES ($1,$2,$3,$4,'curved',$5,$6,$7,$8)
        ON CONFLICT (id) DO UPDATE SET name=$3, nodes=$7, updated_at=now()`,
       [id, mapOwnerId, title, type, sharing === true, themeId, JSON.stringify(nodes), ['AI']]
     )

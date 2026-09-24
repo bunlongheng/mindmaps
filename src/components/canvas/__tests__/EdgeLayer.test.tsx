@@ -3,6 +3,7 @@ import { render, cleanup } from '@testing-library/react'
 import { EdgeLayer } from '../EdgeLayer'
 import { useMindmapStore } from '../../../store/mindmapStore'
 import type { DiagramType, LineStyle, MindmapNode } from '../../../types'
+import { lighten, NEON_EDGE_LIGHTEN, RADIAL_EDGE_OPACITY } from '../../../lib/color'
 
 vi.mock('../../../components/CuteToast', () => ({ showToast: vi.fn() }))
 
@@ -22,7 +23,7 @@ function renderLayer(nodes: MindmapNode[], lineStyle: LineStyle, diagramType: Di
 }
 
 beforeEach(() => {
-  useMindmapStore.setState({ showOrderNumbers: true })
+  useMindmapStore.setState({ showOrderNumbers: true, themeId: 'default' })
 })
 afterEach(() => cleanup())
 
@@ -180,6 +181,33 @@ describe('EdgeLayer — mindmap', () => {
     const { container } = renderLayer([root, l1, orphan], 'straight', 'mindmap')
     // only the valid edge renders
     expect(container.querySelectorAll('path').length).toBe(1)
+  })
+
+  // ── Neon branches on a dark canvas ────────────────────────────────────────
+  // Each branch becomes a luminous tube: a blurred glow line under a crisp core.
+  it('draws 2 paths per branch on a dark theme and 1 on a light one', () => {
+    const nodes = [root, l1, l2, l3]   // 3 branches
+    useMindmapStore.setState({ themeId: 'cyberpunk' })
+    expect(renderLayer(nodes, 'straight', 'mindmap').container.querySelectorAll('path').length).toBe(6)
+    cleanup()
+    useMindmapStore.setState({ themeId: 'default' })
+    expect(renderLayer(nodes, 'straight', 'mindmap').container.querySelectorAll('path').length).toBe(3)
+  })
+
+  it('defines the branch blur once and lightens the core line', () => {
+    useMindmapStore.setState({ themeId: 'cyberpunk' })
+    const { container } = renderLayer([root, l1, l2, l3], 'straight', 'mindmap')
+    expect(container.querySelectorAll('filter#mm-neon-edge').length).toBe(1)
+    const strokes = [...container.querySelectorAll('path')].map(p => p.getAttribute('stroke'))
+    expect(strokes).toContain(l1.color)                              // the glow line
+    expect(strokes).toContain(lighten(l1.color, NEON_EDGE_LIGHTEN))  // the crisp core
+  })
+
+  it('leaves a light theme on the single thin branch it draws today', () => {
+    useMindmapStore.setState({ themeId: 'default' })
+    const { container } = renderLayer([root, l1], 'straight', 'mindmap')
+    expect(container.querySelector('filter#mm-neon-edge')).toBeFalsy()
+    expect(container.querySelector('path')!.getAttribute('stroke-opacity')).toBe(String(RADIAL_EDGE_OPACITY))
   })
 })
 
