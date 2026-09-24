@@ -843,3 +843,56 @@ describe('HomePage — no user', () => {
     expect(screen.getByText('Project Plan')).toBeInTheDocument()
   })
 })
+
+// The home grid is the delete path people actually use, so the lock has to be visible
+// and enforced here - not only in the Share panel.
+describe('HomePage - a locked map cannot be deleted from the grid', () => {
+  const LOCKED: DiagramMeta[] = [
+    { id: 'L1', name: 'Locked Map', type: 'logic-chart', updatedAt: new Date().toISOString(), locked: true },
+    { id: 'U1', name: 'Open Map', type: 'logic-chart', updatedAt: new Date().toISOString() },
+  ]
+
+  function hover(name: string) {
+    fireEvent.mouseEnter(screen.getByText(name).closest('div[style*="cursor: pointer"]')!)
+  }
+
+  it('disables the row delete control when locked and leaves it enabled otherwise', () => {
+    seedDiagrams(LOCKED)
+    render(<HomePage onOpen={vi.fn()} user={USER} onSignOut={vi.fn()} />)
+    hover('Locked Map')
+    const locked = screen.getByLabelText('Delete Locked Map')
+    expect(locked).toBeDisabled()
+    expect(locked.getAttribute('title')).toBe('This map is locked - unlock it to delete')
+    hover('Open Map')
+    const open = screen.getByLabelText('Delete Open Map')
+    expect(open).not.toBeDisabled()
+    expect(open.getAttribute('title')).toBe('Delete')
+  })
+
+  it('disables the card delete control in grid view', () => {
+    localStorage.setItem('mindmaps:viewMode', 'grid')
+    seedDiagrams(LOCKED)
+    render(<HomePage onOpen={vi.fn()} user={USER} onSignOut={vi.fn()} />)
+    hover('Locked Map')
+    const locked = screen.getByLabelText('Delete Locked Map')
+    expect(locked).toBeDisabled()
+    expect(locked.getAttribute('title')).toBe('This map is locked - unlock it to delete')
+    hover('Open Map')
+    expect(screen.getByLabelText('Delete Open Map')).not.toBeDisabled()
+  })
+
+  it('a disabled delete opens no confirm dialog and removes nothing', () => {
+    seedDiagrams(LOCKED)
+    render(<HomePage onOpen={vi.fn()} user={USER} onSignOut={vi.fn()} />)
+    hover('Locked Map')
+    fireEvent.click(screen.getByLabelText('Delete Locked Map'))
+    expect(screen.queryByText('Delete map?')).not.toBeInTheDocument()
+    expect(useMindmapStore.getState().diagrams.find(d => d.id === 'L1')).toBeDefined()
+  })
+
+  it('marks the locked map with a padlock badge, and only that one', () => {
+    seedDiagrams(LOCKED)
+    render(<HomePage onOpen={vi.fn()} user={USER} onSignOut={vi.fn()} />)
+    expect(screen.getAllByLabelText('Locked')).toHaveLength(1)
+  })
+})

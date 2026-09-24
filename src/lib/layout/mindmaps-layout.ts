@@ -1,5 +1,6 @@
 import type { MindmapNode } from '../../types/index.js'
 import { rootPillWidth, rootCircleDiameter, rootTitleNeedsPill } from '../rootPill.js'
+import { displayTitle } from '../links.js'
 
 const DEFAULT_H: Record<number, number> = { 1: 54, 2: 38, 3: 34 }
 const DEFAULT_HEIGHT = 30
@@ -16,7 +17,7 @@ function autoWidth(node: MindmapNode, depth: number): number {
   const h = DEFAULT_H[depth] ?? DEFAULT_HEIGHT
   // For L1 with icon/emoji: white square takes full height, add that + gap to text width
   const iconSquareW = hasVisual && depth === 1 ? h + 10 : 0
-  const textW = node.title.length * fontSize * 0.64 + 32 + iconSquareW
+  const textW = displayTitle(node.title).length * fontSize * 0.64 + 32 + iconSquareW
   const min = depth === 1 ? 160 : depth === 2 ? 110 : 90
   return Math.max(min, Math.ceil(textW))
 }

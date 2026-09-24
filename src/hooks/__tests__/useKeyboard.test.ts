@@ -385,3 +385,57 @@ describe('useKeyboard', () => {
     })
   })
 })
+
+// A locked map (and the shared VIEW ONLY page) ride the same readOnly flag: the
+// shortcuts that change the map are off, while selecting and escaping still work.
+describe('useKeyboard - readOnly', () => {
+  beforeEach(() => {
+    useMindmapStore.getState().clearDiagram()
+    vi.clearAllMocks()
+  })
+
+  it('Delete does not remove the selected node', () => {
+    loadDiagram()
+    useMindmapStore.getState().setSelectedNodeIds(['c1'])
+    renderHook(() => useKeyboard(true))
+    key({ key: 'Delete' })
+    expect(useMindmapStore.getState().activeMindmap!.nodes.find(n => n.id === 'c1')).toBeDefined()
+  })
+
+  it('Cmd+Delete does not dissolve the selected node', () => {
+    loadDiagram()
+    useMindmapStore.getState().setSelectedNodeIds(['c1'])
+    renderHook(() => useKeyboard(true))
+    key({ key: 'Backspace', metaKey: true })
+    expect(useMindmapStore.getState().activeMindmap!.nodes.find(n => n.id === 'c1')).toBeDefined()
+  })
+
+  it('Cmd+Z does not undo', () => {
+    loadDiagram()
+    const spy = vi.spyOn(useMindmapStore.getState(), 'undo')
+    renderHook(() => useKeyboard(true))
+    key({ key: 'z', metaKey: true })
+    expect(spy).not.toHaveBeenCalled()
+  })
+
+  it('a paste does not replace the map', () => {
+    loadDiagram()
+    renderHook(() => useKeyboard(true))
+    const getData = vi.fn().mockReturnValue('Root\n    Child')
+    const e = new Event('paste', { bubbles: true, cancelable: true }) as ClipboardEvent
+    Object.defineProperty(e, 'clipboardData', { value: { getData }, configurable: true })
+    Object.defineProperty(e, 'target', { value: document.createElement('div') })
+    window.dispatchEvent(e)
+    expect(e.defaultPrevented).toBe(false)
+    expect(useMindmapStore.getState().activeMindmap!.id).toBe('kb-diagram')
+  })
+
+  it('selecting and clearing the selection still work', () => {
+    loadDiagram()
+    renderHook(() => useKeyboard(true))
+    key({ key: 'a', metaKey: true })
+    expect(useMindmapStore.getState().selectedNodeIds.length).toBeGreaterThan(0)
+    key({ key: 'Escape' })
+    expect(useMindmapStore.getState().selectedNodeIds).toEqual([])
+  })
+})

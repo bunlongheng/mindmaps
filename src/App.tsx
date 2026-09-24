@@ -480,7 +480,11 @@ export default function App() {
         <DiagramCanvas
           onNodeSelect={handleNodeSelect}
           onDelete={activeMindmap ? () => setShowDeleteConfirm(true) : undefined}
-          readOnly={isTouch}
+          // Read-only covers both reasons a map cannot be edited: a touch device, where
+          // the canvas is look-only, and a locked map. Either way zoom, pan and export work.
+          readOnly={isTouch || (activeMindmap?.locked ?? false)}
+          // No-interaction is touch only. A locked map on a desktop still selects nodes,
+          // so the selection ring must stay visible there.
           noInteract={isTouch}
         />
 

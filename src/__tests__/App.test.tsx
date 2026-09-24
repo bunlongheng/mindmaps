@@ -497,6 +497,38 @@ describe('App — viewer / share view', () => {
   })
 })
 
+// A locked map is not a separate mode: it rides the same readOnly prop the share
+// view already uses, so the canvas stops editing while zoom/pan/export stay live.
+describe('App - a locked map opens read-only', () => {
+  function stubMapFetch(locked: boolean) {
+    setUrl('/?map=m1')
+    const d = makeDiagram()
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      if (typeof url === 'string' && url.includes('id=m1')) {
+        return { ok: true, json: async () => ({
+          id: 'm1', name: d.name, type: d.type, nodes: d.nodes,
+          line_style: d.lineStyle, theme_id: 'default', tags: d.tags, locked,
+        }) }
+      }
+      return { ok: true, json: async () => [] }
+    }))
+  }
+
+  it('passes readOnly to the canvas when the map is locked', async () => {
+    stubMapFetch(true)
+    render(<App />)
+    await waitFor(() => expect(screen.getByTestId('canvas')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByTestId('canvas').getAttribute('data-readonly')).toBe('1'))
+  })
+
+  it('leaves the canvas editable when the map is not locked', async () => {
+    stubMapFetch(false)
+    render(<App />)
+    await waitFor(() => expect(screen.getByTestId('canvas')).toBeInTheDocument())
+    expect(screen.getByTestId('canvas').getAttribute('data-readonly')).toBe('0')
+  })
+})
+
 describe('App — loading spinner & URL normalization', () => {
   it('shows a loading spinner while a deep-linked map loads', async () => {
     setUrl('/?map=m1')

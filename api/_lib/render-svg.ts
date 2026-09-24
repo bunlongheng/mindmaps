@@ -17,6 +17,7 @@ import { computeTimelineLayout } from '../../src/lib/layout/timeline.js'
 import { getTheme } from '../../src/lib/themes.js'
 import { L1_PALETTE, hexToRgb, darken, applyDepthTransparency } from '../../src/lib/color.js'
 import { rootPillWidth, rootPillFontSize, rootTitleNeedsPill } from '../../src/lib/rootPill.js'
+import { parseLinkedTitle, sliceSegments, lineRanges, type LinkSegment } from '../../src/lib/links.js'
 import { nodeCenter, nodeCenterLeft, nodeCenterRight, buildStraightPath, buildCurvedPath, buildOrthogonalPath } from '../../src/lib/geometry.js'
 
 // The stored DB row shape (SELECT in api/mindmaps.ts / INSERT in api/ai/mindmaps.ts).
@@ -104,7 +105,7 @@ function computePaletteColors(nodes: MindmapNode[]): Map<string, string | null> 
 function layoutForRender(raw: MindmapNode[], type: DiagramType): MindmapNode[] {
   const fresh = raw.map(n => {
     if (n.depth !== 0) return { ...n, width: 0, height: 0, manuallyPositioned: false }
-    const isPill = n.title.length >= 15 || n.width !== n.height
+    const isPill = parseLinkedTitle(n.title).text.length >= 15 || n.width !== n.height
     if (isPill) return { ...n, width: rootPillWidth(n.title, n.fontSize ?? 28), height: 90, manuallyPositioned: false }
     return { ...n, manuallyPositioned: false }
   })
@@ -310,14 +311,24 @@ function renderEdges(nodes: MindmapNode[], type: DiagramType, lineStyle: LineSty
 
 // ── Nodes (ported from Node.tsx, static visuals only) ────────────────────────
 
+/** Title runs as <tspan>s; http(s) runs wrapped in an SVG <a> so the exported
+ *  image carries real, clickable links. Only http(s) ever reaches here (see links.ts). */
+function runTspans(segments: LinkSegment[]): string {
+  return segments.map(seg => seg.url
+    ? `<a href="${esc(seg.url)}" target="_blank" rel="noopener noreferrer"><tspan text-decoration="underline">${esc(seg.text)}</tspan></a>`
+    : `<tspan>${esc(seg.text)}</tspan>`).join('')
+}
+
 /** Multi-line centered <text> (mindmap circles + mindmap root). */
-function centeredWrappedText(label: string, cx: number, cy: number, fontSize: number, fontWeight: string, fill: string): string {
+function centeredWrappedText(label: string, segments: LinkSegment[], cx: number, cy: number, fontSize: number, fontWeight: string, fill: string): string {
   const maxChars = Math.max(8, Math.ceil(Math.sqrt(label.length * 1.8)))
   const lines = wrapText(label, maxChars)
+  const ranges = lineRanges(label, lines)
+  const hasLinks = segments.some(seg => !!seg.url)
   const lineH = fontSize * 1.3
   const startY = cy - ((lines.length - 1) * lineH) / 2 + fontSize * 0.38
   const tspans = lines.map((line, i) =>
-    `<tspan x="${r2(cx)}" y="${r2(startY + i * lineH)}">${esc(line)}</tspan>`).join('')
+    `<tspan x="${r2(cx)}" y="${r2(startY + i * lineH)}">${hasLinks ? runTspans(sliceSegments(segments, ranges[i][0], ranges[i][1])) : esc(line)}</tspan>`).join('')
   return `<text text-anchor="middle" font-size="${fontSize}" font-weight="${fontWeight}" fill="${esc(fill)}">${tspans}</text>`
 }
 
@@ -367,7 +378,9 @@ function renderNode(node: MindmapNode, type: DiagramType, paletteColor: string |
   const h = node.height
   const cx = displayW / 2
   const cy = h / 2
-  const label = node.title
+  const parsedTitle = parseLinkedTitle(node.title)
+  const label = parsedTitle.text
+  const labelBody = parsedTitle.segments.some(seg => !!seg.url) ? runTspans(parsedTitle.segments) : esc(label)
   const align = isRoot ? 'center' : node.depth === 1 ? (node.textAlign ?? 'left') : 'left'
 
   const parts: string[] = []
@@ -406,11 +419,11 @@ function renderNode(node: MindmapNode, type: DiagramType, paletteColor: string |
   // ── Label + badge ──
   const skOff = isFishboneNode ? (h * 0.35) / 2 : 0
   if (isMindmapL2Plus || (isRoot && type === 'mindmap')) {
-    parts.push(centeredWrappedText(label, cx, cy, fontSize, fontWeight, textColor))
+    parts.push(centeredWrappedText(label, parsedTitle.segments, cx, cy, fontSize, fontWeight, textColor))
   } else if (hasEmoji) {
     const emojiSize = Math.round(h * 0.52)
     parts.push(`<text x="${r2(h / 2 + skOff)}" y="${r2(h / 2 + emojiSize * 0.36)}" text-anchor="middle" font-size="${emojiSize}">${esc(node.emoji)}</text>`)
-    parts.push(`<text x="${r2(h + 14 + skOff)}" y="${r2(h / 2 + fontSize * 0.38)}" text-anchor="start" font-size="${fontSize}" font-weight="${fontWeight}" fill="${esc(textColor)}">${esc(label)}</text>`)
+    parts.push(`<text x="${r2(h + 14 + skOff)}" y="${r2(h / 2 + fontSize * 0.38)}" text-anchor="start" font-size="${fontSize}" font-weight="${fontWeight}" fill="${esc(textColor)}">${labelBody}</text>`)
   } else if (hasIcon) {
     // Neutral placeholder for the lucide icon (no icon dep server-side)
     const iconSize = Math.round(h * 0.48)
@@ -418,11 +431,11 @@ function renderNode(node: MindmapNode, type: DiagramType, paletteColor: string |
     const iy = (h - iconSize) / 2
     parts.push(`<rect x="${r2(ix)}" y="${r2(iy)}" width="${iconSize}" height="${iconSize}" rx="${Math.round(iconSize / 4)}" fill="none" stroke="${esc(col)}" stroke-width="2"/>`)
     parts.push(`<circle cx="${r2(ix + iconSize / 2)}" cy="${r2(iy + iconSize / 2)}" r="${r2(iconSize / 6)}" fill="${esc(col)}"/>`)
-    parts.push(`<text x="${r2(h + 14 + skOff)}" y="${r2(h / 2 + fontSize * 0.38)}" text-anchor="start" font-size="${fontSize}" font-weight="${fontWeight}" fill="${esc(textColor)}">${esc(label)}</text>`)
+    parts.push(`<text x="${r2(h + 14 + skOff)}" y="${r2(h / 2 + fontSize * 0.38)}" text-anchor="start" font-size="${fontSize}" font-weight="${fontWeight}" fill="${esc(textColor)}">${labelBody}</text>`)
   } else {
     const tx = isRoot ? cx : align === 'left' ? 12 + skOff : align === 'right' ? displayW - 12 : displayW / 2
     const anchor = isRoot || align === 'center' ? 'middle' : align === 'right' ? 'end' : 'start'
-    parts.push(`<text x="${r2(tx)}" y="${r2(isRoot ? cy + fontSize * 0.38 : h / 2 + fontSize * 0.38)}" text-anchor="${anchor}" font-size="${fontSize}" font-weight="${fontWeight}" fill="${esc(textColor)}">${esc(label)}</text>`)
+    parts.push(`<text x="${r2(tx)}" y="${r2(isRoot ? cy + fontSize * 0.38 : h / 2 + fontSize * 0.38)}" text-anchor="${anchor}" font-size="${fontSize}" font-weight="${fontWeight}" fill="${esc(textColor)}">${labelBody}</text>`)
   }
 
   return `<g transform="translate(${r2(node.x)},${r2(node.y)})">${parts.join('')}</g>`

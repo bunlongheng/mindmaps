@@ -5,6 +5,7 @@ import { NodeIcon, getLucideIcon } from './NodeIcon'
 import { wrapText } from '../../lib/layout/mindmap'
 import { rootPillWidth, rootPillFontSize, rootTitleNeedsPill, rootCircleDiameter, rootDrawnWidth } from '../../lib/rootPill'
 import { hexToRgb, darken } from '../../lib/color'
+import { parseLinkedTitle, sliceSegments, lineRanges, type LinkSegment } from '../../lib/links'
 
 interface NodeProps {
   node: MindmapNode
@@ -67,6 +68,29 @@ function vivify(hex: string, sat = 1.35, light = 1.04): string {
 function openNodeUrl(url: string) {
   const href = /^https?:\/\//i.test(url) ? url : `https://${url}`
   window.open(href, '_blank', 'noopener,noreferrer')
+}
+
+/**
+ * Draw parsed title runs as <tspan>s, linked runs wrapped in an SVG <a>. The click
+ * and pointerdown are stopped so following a link never also selects or drags the node.
+ * A link label split across 2 wrapped lines draws as one anchor per line.
+ */
+function renderRuns(segments: LinkSegment[], keyPrefix: string) {
+  return segments.map((seg, i) => seg.url ? (
+    <a
+      key={`${keyPrefix}-${i}`}
+      href={seg.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      style={{ pointerEvents: 'auto', cursor: 'pointer' }}
+      onClick={e => e.stopPropagation()}
+      onPointerDown={e => e.stopPropagation()}
+    >
+      <tspan style={{ textDecoration: 'underline' }}>{seg.text}</tspan>
+    </a>
+  ) : (
+    <tspan key={`${keyPrefix}-${i}`}>{seg.text}</tspan>
+  ))
 }
 
 /** Returns true if the color is light enough that black text is readable */
@@ -261,9 +285,15 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   // Mindmap L2+ circles: force width = height so it's always a circle
   const circleW = isMindmapL2Plus ? Math.max(node.width, node.height) : null
   const displayW = previewW ?? (autoPillW ?? circleW ?? node.width)
-  const label = (showChildCount && node.depth >= 1 && childCount > 0)
-    ? `${node.title} (${childCount})`
-    : node.title
+  // The title is stored raw (markdown and all); everything drawn and measured uses
+  // the display text, so a box never sizes to characters nobody sees.
+  const parsedTitle = parseLinkedTitle(node.title)
+  const countSuffix = (showChildCount && node.depth >= 1 && childCount > 0) ? ` (${childCount})` : ''
+  const label = parsedTitle.text + countSuffix
+  const labelSegments: LinkSegment[] = countSuffix
+    ? [...parsedTitle.segments, { text: countSuffix }]
+    : parsedTitle.segments
+  const hasLinks = labelSegments.some(s => !!s.url)
   // All coordinates are relative to (node.x, node.y)
   const cx = displayW / 2
   const cy = node.height / 2
@@ -520,7 +550,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
                   fontFamily="Inter, system-ui, sans-serif"
                   fill={textColor}
                   style={{ pointerEvents: 'none' }}
-                >{label}</text>
+                >{hasLinks ? renderRuns(labelSegments, 'lbl') : label}</text>
               </>
             )
           })()}
@@ -543,7 +573,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
                   fontFamily="Inter, system-ui, sans-serif"
                   fill={textColor}
                   style={{ pointerEvents: 'none' }}
-                >{label}</text>
+                >{hasLinks ? renderRuns(labelSegments, 'lbl') : label}</text>
               </>
             )
           })()}
@@ -551,6 +581,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
             if (isMindmapL2Plus) {
               const maxChars = Math.max(8, Math.ceil(Math.sqrt(label.length * 1.8)))
               const lines = wrapText(label, maxChars)
+              const ranges = lineRanges(label, lines)
               const lineH = fontSize * 1.3
               const hasVisual = hasIcon || hasEmoji
               const iconSize = fontSize * 1.4
@@ -585,7 +616,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
                   >
                     {lines.map((line, i) => (
                       <tspan key={i} x={displayW / 2} y={i === 0 ? firstLineY : undefined} dy={i === 0 ? undefined : lineH}>
-                        {line}
+                        {hasLinks ? renderRuns(sliceSegments(labelSegments, ranges[i][0], ranges[i][1]), `l${i}`) : line}
                       </tspan>
                     ))}
                   </text>
@@ -595,6 +626,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
             if (isRoot && diagramType === 'mindmap') {
               const maxChars = Math.max(8, Math.ceil(Math.sqrt(label.length * 1.8)))
               const lines = wrapText(label, maxChars)
+              const ranges = lineRanges(label, lines)
               const lineH = fontSize * 1.3
               const startY = cy - ((lines.length - 1) * lineH) / 2
               return (
@@ -607,7 +639,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
                 >
                   {lines.map((line, i) => (
                     <tspan key={i} x={cx} dy={i === 0 ? startY + fontSize * 0.38 : lineH}>
-                      {line}
+                      {hasLinks ? renderRuns(sliceSegments(labelSegments, ranges[i][0], ranges[i][1]), `r${i}`) : line}
                     </tspan>
                   ))}
                 </text>
@@ -622,7 +654,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
                 fontFamily="Inter, system-ui, sans-serif"
                 fill={textColor}
                 style={{ pointerEvents: 'none' }}
-              >{label}</text>
+              >{hasLinks ? renderRuns(labelSegments, 'lbl') : label}</text>
             )
           })()}
         </g>

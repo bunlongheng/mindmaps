@@ -1,3 +1,5 @@
+import { displayTitle } from './links.js'
+
 export type FlatOutlineItem = { title: string; indent: number }
 
 // Node shape produced by the outline -> nodes pipelines (API import + AI generate).
@@ -116,7 +118,7 @@ export function computeNodeWidth(title: string, depth: number, hasIcon: boolean)
   const fontSize = depth === 1 ? 22 : depth === 2 ? 16 : depth === 3 ? 13 : 11
   const charW = fontSize * 0.64
   const textPad = 24
-  const textW = Math.ceil(title.length * charW) + textPad
+  const textW = Math.ceil(displayTitle(title).length * charW) + textPad
   // icon zone takes ~20% of node width, so text zone = 80% of total
   const total = hasIcon ? Math.ceil(textW / 0.8) : textW
   return Math.max(140, Math.min(400, total))
@@ -125,7 +127,7 @@ export function computeNodeWidth(title: string, depth: number, hasIcon: boolean)
 /** API import endpoint variant (api/ai/mindmaps): flat 7.5px/char, cap 260. */
 export function computeImportNodeWidth(title: string, depth: number): number {
   if (depth === 0) return 180
-  const base = Math.max(100, title.length * 7.5 + 32)
+  const base = Math.max(100, displayTitle(title).length * 7.5 + 32)
   return Math.min(base, 260)
 }
 
@@ -133,7 +135,7 @@ export function computeImportNodeWidth(title: string, depth: number): number {
 export function computeGeneratedNodeWidth(title: string, depth: number): number {
   if (depth === 0) return 180
   const charW = depth === 1 ? 10.24 : depth === 2 ? 8.19 : 7.04
-  return Math.max(120, Math.min(300, Math.ceil(title.length * charW) + 32))
+  return Math.max(120, Math.min(300, Math.ceil(displayTitle(title).length * charW) + 32))
 }
 
 // --- JSON-tree flatten (API endpoints) ---------------------------------------------
