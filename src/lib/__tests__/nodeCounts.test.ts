@@ -41,4 +41,16 @@ describe('levelCounts', () => {
     expect(result.total).toBe(0)
     expect(result.largestBranch).toBeNull()
   })
+
+  it('strips markdown link syntax from the largest branch title', () => {
+    const nodes: FixtureNode[] = [
+      node('root', null, 0, 'Root'),
+      node('a', 'root', 1, 'UBS billing repoint [SHAR-6305](https://example.com/SHAR-6305)'),
+      node('a1', 'a', 2),
+    ]
+
+    const result = levelCounts(nodes)
+
+    expect(result.largestBranch).toEqual({ title: 'UBS billing repoint SHAR-6305', count: 1 })
+  })
 })

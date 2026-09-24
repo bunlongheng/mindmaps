@@ -428,10 +428,17 @@ describe('SidePanel — Map tab', () => {
     expect(useMindmapStore.getState().showChildCount).toBe(true)
   })
 
-  it('lists all themes and switches theme', () => {
+  it('lists all themes as cards and switches theme', () => {
     loadDiagram()
     render(<SidePanel nodeId={null} onClose={vi.fn()} />)
     expect(screen.getByText('Rainbow Light')).toBeInTheDocument()
+    expect(screen.getByText('Retro B&W')).toBeInTheDocument()
+    expect(screen.getByText('Cyberpunk Neon')).toBeInTheDocument()
+    expect(screen.getByText('Monokai')).toBeInTheDocument()
+    // Active card (default theme) carries the selected border/background
+    const activeCard = screen.getByText('Rainbow Light').closest('button')!
+    expect(activeCard.style.border).toContain('rgb(59, 130, 246)')
+    expect(activeCard.style.background).toContain('rgb(239, 246, 255)')
     fireEvent.click(screen.getByText('Monokai'))
     expect(useMindmapStore.getState().themeId).toBe('monokai')
   })
@@ -455,6 +462,8 @@ describe('SidePanel — Map tab', () => {
   it('Details block shows the right per-level counts', () => {
     loadDiagram()
     render(<SidePanel nodeId={null} onClose={vi.fn()} />)
+    // Details starts collapsed - open it first
+    fireEvent.click(screen.getByText('Details'))
     // makeDiagram(): root (depth 0) + 2 L1 nodes + 1 L2 node => Root 1, L1 2, L2 1, Total 4
     expect(screen.getByText('Root')).toBeInTheDocument()
     expect(screen.getByText('L1')).toBeInTheDocument()
