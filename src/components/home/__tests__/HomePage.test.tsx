@@ -843,3 +843,27 @@ describe('HomePage — no user', () => {
     expect(screen.getByText('Project Plan')).toBeInTheDocument()
   })
 })
+
+describe('HomePage — CachedNodeCount badge (grid card)', () => {
+  it('shows "N nodes" next to the date when the map nodes are cached', () => {
+    localStorage.setItem('mindmaps:viewMode', 'grid')
+    localStorage.setItem('mindmaps:diagram:m1', JSON.stringify({
+      id: 'm1', themeId: 'default', lineStyle: 'orthogonal',
+      nodes: [
+        { id: 'r', title: 'Root', parentId: null, depth: 0, color: '#000', x: 0, y: 0, width: 140, height: 140, sortOrder: 0 },
+        { id: 'a', title: 'A', parentId: 'r', depth: 1, color: '#f00', x: 0, y: 0, width: 80, height: 40, sortOrder: 0 },
+        { id: 'b', title: 'B', parentId: 'r', depth: 1, color: '#0f0', x: 0, y: 0, width: 80, height: 40, sortOrder: 1 },
+      ],
+    }))
+    seedDiagrams(SAMPLE)
+    render(<HomePage onOpen={vi.fn()} user={USER} onSignOut={vi.fn()} />)
+    expect(screen.getByText('3 nodes')).toBeInTheDocument()
+  })
+
+  it('shows nothing when the map nodes are not cached', () => {
+    localStorage.setItem('mindmaps:viewMode', 'grid')
+    seedDiagrams(SAMPLE)
+    render(<HomePage onOpen={vi.fn()} user={USER} onSignOut={vi.fn()} />)
+    expect(screen.queryByText(/nodes$/)).toBeNull()
+  })
+})
