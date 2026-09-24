@@ -15,7 +15,7 @@ import { computeMindmapLayout, wrapText } from './layout/mindmap.js'
 import { computeFishboneLayout, FISHBONE_SLANT } from './layout/fishbone.js'
 import { computeTimelineLayout } from './layout/timeline.js'
 import { getTheme } from './themes.js'
-import { L1_PALETTE, hexToRgb, darken, applyDepthTransparency } from './color.js'
+import { L1_PALETTE, hexToRgb, darken, depthFill, applyDepthTransparency } from './color.js'
 import { rootPillWidth, rootPillFontSize, rootTitleNeedsPill } from './rootPill.js'
 import { parseLinkedTitle, sliceSegments, lineRanges, type LinkSegment } from './links.js'
 import { nodeCenter, nodeCenterLeft, nodeCenterRight, buildStraightPath, buildCurvedPath, buildOrthogonalPath } from './geometry.js'
@@ -45,15 +45,6 @@ function isLight(hex: string): boolean {
   if (!hex.startsWith('#')) return true
   const [r, g, b] = hexToRgb(hex)
   return 0.2126 * r + 0.7152 * g + 0.0722 * b > 140
-}
-
-/** Mix a hex color toward white (Node.tsx lighten). */
-function lighten(hex: string, amount = 0.85): string {
-  const [r, g, b] = hexToRgb(hex)
-  const nr = Math.round(r + (255 - r) * amount)
-  const ng = Math.round(g + (255 - g) * amount)
-  const nb = Math.round(b + (255 - b) * amount)
-  return `rgb(${nr},${ng},${nb})`
 }
 
 /** Make all nodes at a depth share the widest width (mindmapStore normalizeWidthsPerDepth). */
@@ -352,9 +343,9 @@ function renderNode(node: MindmapNode, type: DiagramType, paletteColor: string |
   if (isRoot) {
     bg = '#1a1d2e'; textColor = '#ffffff'; strokeColor = '#1a1d2e'; strokeW = 5
   } else if (isL2Plus) {
-    const lightenAmt = node.depth === 2 ? 0.58 : node.depth === 3 ? 0.68 : 0.76
-    bg = col.startsWith('#') ? lighten(col, lightenAmt) : '#f8fafc'
-    textColor = col.startsWith('#') ? darken(col, 0.55) : col
+    // Same shared depth ladder as the canvas (src/lib/color depthFill).
+    bg = col.startsWith('#') ? depthFill(col, node.depth) : '#f8fafc'
+    textColor = isLight(bg) ? '#1a1d2e' : '#ffffff'
     strokeColor = col
     strokeW = 2
   } else {

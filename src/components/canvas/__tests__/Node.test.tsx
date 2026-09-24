@@ -4,6 +4,7 @@ import { createRef } from 'react'
 import { Node } from '../Node'
 import { useMindmapStore } from '../../../store/mindmapStore'
 import type { Diagram, DiagramType, MindmapNode } from '../../../types'
+import { depthFill, hexToRgb } from '../../../lib/color'
 
 vi.mock('../../../components/CuteToast', () => ({ showToast: vi.fn() }))
 
@@ -136,6 +137,32 @@ describe('Node — rendering by depth / type', () => {
     loadStore([makeRoot(), makeNode(), makeNode({ id: 'n2', depth: 2, parentId: 'n1' }), l3])
     const { container } = renderNode(l3)
     expect(container.querySelector('[data-node-id="n3"]')).toBeTruthy()
+  })
+
+  it('steps the fill visibly darker at depth 2 than at depth 3', () => {
+    // The one shared ladder (lib/color depthFill) drives both the canvas and the
+    // server renderer, so the fill the canvas paints must be exactly its output.
+    const base = '#ED1C24'
+    const fillOf = (depth: number) => {
+      const n = makeNode({ id: `d${depth}`, depth, parentId: 'n1' })
+      loadStore([makeRoot(), makeNode(), n])
+      const { container } = renderNode(n, { paletteColor: base })
+      const rect = Array.from(container.querySelectorAll('rect'))
+        .map(el => el.getAttribute('fill') ?? '')
+        .find(f => f.startsWith('#') && f !== '#ffffff')
+      cleanup()
+      return rect!
+    }
+    const f2 = fillOf(2)
+    const f3 = fillOf(3)
+    expect(f2).toBe(depthFill(base, 2))
+    expect(f3).toBe(depthFill(base, 3))
+    const [r2, g2, b2] = hexToRgb(f2)
+    const [r3, g3, b3] = hexToRgb(f3)
+    // Depth 3 is the weaker (whiter) fill by a wide, eye-visible margin
+    expect(g3 - g2).toBeGreaterThanOrEqual(20)
+    expect(b3 - b2).toBeGreaterThanOrEqual(20)
+    expect(r3).toBeGreaterThanOrEqual(r2)
   })
 
   it('renders an L4 node (deepest lighten branch)', () => {

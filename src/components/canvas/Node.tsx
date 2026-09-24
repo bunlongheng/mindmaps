@@ -4,7 +4,7 @@ import { useMindmapStore } from '../../store/mindmapStore'
 import { NodeIcon, getLucideIcon } from './NodeIcon'
 import { wrapText } from '../../lib/layout/mindmap'
 import { rootPillWidth, rootPillFontSize, rootTitleNeedsPill, rootCircleDiameter, rootDrawnWidth } from '../../lib/rootPill'
-import { hexToRgb, darken } from '../../lib/color'
+import { hexToRgb, darken, depthFill } from '../../lib/color'
 import { parseLinkedTitle, sliceSegments, lineRanges, type LinkSegment } from '../../lib/links'
 
 interface NodeProps {
@@ -31,14 +31,6 @@ const DECOR_MAX_NODES = 60
 const prefersReducedMotion = typeof window !== 'undefined' && typeof window.matchMedia === 'function'
   ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
   : false
-
-function lighten(hex: string, amount = 0.85): string {
-  const [r,g,b] = hexToRgb(hex)
-  const nr = Math.round(r + (255 - r) * amount)
-  const ng = Math.round(g + (255 - g) * amount)
-  const nb = Math.round(b + (255 - b) * amount)
-  return `rgb(${nr},${ng},${nb})`
-}
 
 // Boost saturation so the palette reads brighter / more vivid (keeps hue + ~lightness).
 function vivify(hex: string, sat = 1.35, light = 1.04): string {
@@ -143,9 +135,10 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
     strokeColor = '#1a1d2e'
     strokeW = 5
   } else if (isL2Plus) {
-    const lightenAmt = node.depth === 2 ? 0.58 : node.depth === 3 ? 0.68 : 0.76
-    bg = col.startsWith('#') ? lighten(col, lightenAmt) : '#f8fafc'
-    textColor = col.startsWith('#') ? darken(col, 0.55) : col
+    // One shared depth ladder (src/lib/color depthFill) so the canvas and the
+    // server renderer that draws the home-grid card previews never drift.
+    bg = col.startsWith('#') ? depthFill(col, node.depth) : '#f8fafc'
+    textColor = isLight(bg) ? '#1a1d2e' : '#ffffff'
     strokeColor = col
     strokeW = 2
   } else if (isMindmapCircle) {
