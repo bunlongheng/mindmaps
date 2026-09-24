@@ -91,11 +91,35 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract }: DiagramCan
     if (gRef.current) gRef.current.setAttribute('transform', `translate(${p.x},${p.y}) scale(${z})`)
   }, [])
 
-  // Load at 100% so the text is readable, anchored on the root instead of shrinking the
-  // whole map to fit. Mind maps grow in every direction, so the root sits at the centre;
+  // Fit the whole map into the viewport (zoom capped at 100%). Used by the shared
+  // view-only page on load and by Cmd+0 anywhere, so a visitor sees the entire map first.
+  const fitToContent = useCallback(() => {
+    const svg = svgRef.current
+    if (!svg || !activeMindmap?.nodes.length) return
+    const { width: svgW, height: svgH } = svg.getBoundingClientRect()
+    if (svgW === 0 || svgH === 0) return
+    const nodes = activeMindmap.nodes
+    const minX = Math.min(...nodes.map(n => n.x))
+    const minY = Math.min(...nodes.map(n => n.y))
+    const maxX = Math.max(...nodes.map(n => n.x + n.width))
+    const maxY = Math.max(...nodes.map(n => n.y + n.height))
+    const pad = 80
+    const newZoom = Math.max(0.05, Math.min((svgW - pad * 2) / Math.max(1, maxX - minX), (svgH - pad * 2) / Math.max(1, maxY - minY), 1))
+    const cx = (minX + maxX) / 2
+    const cy = (minY + maxY) / 2
+    zoomCurrentRef.current = newZoom
+    setZoom(newZoom)  // badge only
+    const p = { x: svgW / 2 - cx * newZoom, y: svgH / 2 - cy * newZoom }
+    panRef.current = p
+    setPan(p)         // keep pan state in sync for selBox coords
+    applyTransform(p, newZoom)
+  }, [activeMindmap, applyTransform])
+
+  // Editor load: 100% so the text is readable, anchored on the root instead of shrinking
+  // the whole map. Mind maps grow in every direction, so the root sits at the centre;
   // logic charts, fishbones and timelines read left to right, so the root sits near the
   // left edge and the branches get the width.
-  const fitView = useCallback(() => {
+  const anchorRoot = useCallback(() => {
     const svg = svgRef.current
     if (!svg || !activeMindmap?.nodes.length) return
     const { width: svgW, height: svgH } = svg.getBoundingClientRect()
@@ -108,13 +132,23 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract }: DiagramCan
     const anchorX = diagramType === 'mindmap' ? svgW / 2 : Math.min(svgW / 2, Math.max(root.width / 2 + 40, svgW * 0.18))
     zoomCurrentRef.current = newZoom
     setZoom(newZoom)  // badge only
-
     const p = { x: anchorX - cx * newZoom, y: svgH / 2 - cy * newZoom }
     panRef.current = p
     setPan(p)         // keep pan state in sync for selBox coords
     applyTransform(p, newZoom)
   }, [activeMindmap, diagramType, applyTransform])
 
+  // The shared view-only page fits the whole map; the editor opens at 100% on the root.
+  const fitView = readOnly ? fitToContent : anchorRoot
+
+  // Cmd+0 / Ctrl+0 fits the whole map, in the editor and on the shared page alike.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === '0') { e.preventDefault(); fitToContent() }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [fitToContent])
 
   // Auto-fit on initial diagram load or diagram type switch
   useEffect(() => {

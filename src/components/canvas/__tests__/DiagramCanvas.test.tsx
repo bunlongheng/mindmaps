@@ -603,3 +603,18 @@ describe('DiagramCanvas — root drag auto-pan', () => {
     rafSpy.mockRestore()
   })
 })
+
+describe('DiagramCanvas - fit to view', () => {
+  it('Cmd+0 fits the whole map and drops the zoom below 100 percent on a wide map', () => {
+    loadStore([makeRoot(), makeNode({ id: 'n1' })])
+    const { container } = renderCanvas()
+    // A tiny viewport: the laid-out map cannot fit at 100 percent, so fit must shrink it.
+    const svg = container.querySelector('svg') as SVGSVGElement
+    svg.getBoundingClientRect = () => ({ x: 0, y: 0, width: 300, height: 200, top: 0, left: 0, right: 300, bottom: 200, toJSON() {} } as DOMRect)
+    act(() => { fireEvent.keyDown(window, { key: '0', metaKey: true }) })
+    const g = container.querySelector('svg > g') as SVGGElement
+    const m = /scale\(([\d.]+)\)/.exec(g.getAttribute('transform') ?? '')
+    expect(m).not.toBeNull()
+    expect(Number(m![1])).toBeLessThan(1)
+  })
+})
