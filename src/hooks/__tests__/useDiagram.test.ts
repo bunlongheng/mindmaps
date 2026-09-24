@@ -490,66 +490,6 @@ describe('deleteDiagram', () => {
     await act(async () => { await result.current.deleteDiagram('d1', 'Del') })
     await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled())
   })
-
-  // A locked map is refused with 423. The card is already gone from the grid by then,
-  // so the map has to come back and the message has to say why - a guard the user
-  // cannot see is not a guard.
-  describe('the server refuses a locked map (423)', () => {
-    function seedLocked() {
-      useMindmapStore.getState().setDiagrams([
-        { id: 'd1', name: 'Del', type: 'logic-chart', updatedAt: '2024-01-01', locked: true },
-        { id: 'd2', name: 'Keep', type: 'logic-chart', updatedAt: '2024-01-01' },
-      ])
-      localStorage.setItem('mindmaps:diagram:d1', JSON.stringify({ id: 'd1', name: 'Del', nodes: [] }))
-    }
-
-    it('puts the map back into the store, still locked', async () => {
-      fetchMock.mockResolvedValue(jsonResponse({ error: 'locked' }, false, 423))
-      seedLocked()
-      const { result } = renderHook(() => useDiagram('u1'))
-      await act(async () => { await result.current.deleteDiagram('d1', 'Del') })
-      await vi.waitFor(() => expect(useMindmapStore.getState().diagrams.find(d => d.id === 'd1')).toBeDefined())
-      expect(useMindmapStore.getState().diagrams.find(d => d.id === 'd1')!.locked).toBe(true)
-      expect(useMindmapStore.getState().diagrams.find(d => d.id === 'd2')).toBeDefined()
-    })
-
-    it('puts the map back into localStorage, cache and list', async () => {
-      fetchMock.mockResolvedValue(jsonResponse({ error: 'locked' }, false, 423))
-      seedLocked()
-      const { result } = renderHook(() => useDiagram('u1'))
-      await act(async () => { await result.current.deleteDiagram('d1', 'Del') })
-      await vi.waitFor(() => expect(localStorage.getItem('mindmaps:diagram:d1')).not.toBeNull())
-      const list = JSON.parse(localStorage.getItem('mindmaps:list') ?? '[]') as { id: string }[]
-      expect(list.some(m => m.id === 'd1')).toBe(true)
-    })
-
-    it('names the lock instead of the generic not-synced toast', async () => {
-      fetchMock.mockResolvedValue(jsonResponse({ error: 'locked' }, false, 423))
-      seedLocked()
-      const { result } = renderHook(() => useDiagram('u1'))
-      await act(async () => { await result.current.deleteDiagram('d1', 'Del') })
-      await vi.waitFor(() => {
-        const said = vi.mocked(showToast).mock.calls.map(c => String(c[0]))
-        expect(said.some(m => m.includes('is locked - unlock it to delete'))).toBe(true)
-      })
-      const said = vi.mocked(showToast).mock.calls.map(c => String(c[0]))
-      expect(said.some(m => m.includes('"Del"'))).toBe(true)
-      expect(said.some(m => m.includes('not synced'))).toBe(false)
-    })
-
-    it('still uses the generic not-synced toast for any other failure', async () => {
-      fetchMock.mockResolvedValue(jsonResponse({ error: 'boom' }, false, 500))
-      seedLocked()
-      const { result } = renderHook(() => useDiagram('u1'))
-      await act(async () => { await result.current.deleteDiagram('d1', 'Del') })
-      await vi.waitFor(() => {
-        const said = vi.mocked(showToast).mock.calls.map(c => String(c[0]))
-        expect(said.some(m => m.includes('not synced'))).toBe(true)
-      })
-      // A 500 is not a lock - the optimistic removal stands.
-      expect(useMindmapStore.getState().diagrams.find(d => d.id === 'd1')).toBeUndefined()
-    })
-  })
 })
 
 // ── updateTags ────────────────────────────────────────────────────────────────

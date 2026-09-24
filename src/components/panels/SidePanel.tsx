@@ -3,8 +3,7 @@ import { useShallow } from 'zustand/react/shallow'
 import { NODE_ICONS } from '../../lib/icons'
 import { useMindmapStore } from '../../store/mindmapStore'
 import { getTheme, THEMES, isDarkBg } from '../../lib/themes'
-import { LOCKED_DELETE_HINT } from '../../hooks/useDiagram'
-import { X, AlignLeft, AlignCenter, AlignRight, Copy, Check, FileDown, Trash2, Sparkles, Code2, Lock, Unlock } from 'lucide-react'
+import { X, AlignLeft, AlignCenter, AlignRight, Copy, Check, FileDown, Trash2, Sparkles, Code2 } from 'lucide-react'
 import { getLucideIcon } from '../canvas/NodeIcon'
 import { showToast, dismissToast } from '../CuteToast'
 import { soundChaChing } from '../../lib/sounds'
@@ -89,14 +88,14 @@ export function SidePanel({ nodeId, onClose, onDelete }: SidePanelProps) {
   // changes, not on every store write (resizePreview during drags, HUD flags, etc.).
   const {
     activeMindmap, updateNode, batchUpdateNodes, selectedNodeIds,
-    lineStyle, setLineStyle, diagramType, setDiagramType, setShareEnabled, setLocked, rerunLayout,
+    lineStyle, setLineStyle, diagramType, setDiagramType, setShareEnabled, rerunLayout,
     themeId, setTheme, showOrderNumbers, setShowOrderNumbers, showChildCount, setShowChildCount, autoAssignIcons,
     resizeNodeDepth,
   } = useMindmapStore(
     useShallow(s => ({
       activeMindmap: s.activeMindmap, updateNode: s.updateNode, batchUpdateNodes: s.batchUpdateNodes, selectedNodeIds: s.selectedNodeIds,
       lineStyle: s.lineStyle, setLineStyle: s.setLineStyle, diagramType: s.diagramType, setDiagramType: s.setDiagramType,
-      setShareEnabled: s.setShareEnabled, setLocked: s.setLocked, rerunLayout: s.rerunLayout,
+      setShareEnabled: s.setShareEnabled, rerunLayout: s.rerunLayout,
       themeId: s.themeId, setTheme: s.setTheme, showOrderNumbers: s.showOrderNumbers, setShowOrderNumbers: s.setShowOrderNumbers,
       showChildCount: s.showChildCount, setShowChildCount: s.setShowChildCount, autoAssignIcons: s.autoAssignIcons,
       resizeNodeDepth: s.resizeNodeDepth,
@@ -109,7 +108,6 @@ export function SidePanel({ nodeId, onClose, onDelete }: SidePanelProps) {
   const [copied, setCopied] = useState(false)
   const [copiedSvg, setCopiedSvg] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
-  const locked = activeMindmap?.locked ?? false
   const node = nodeId ? (activeMindmap?.nodes.find(n => n.id === nodeId) ?? null) : null
   const [title, setTitle] = useState(node?.title ?? '')
   const [url, setUrl] = useState(node?.url ?? '')
@@ -724,43 +722,18 @@ export function SidePanel({ nodeId, onClose, onDelete }: SidePanelProps) {
                 onMouseLeave={e => (e.currentTarget.style.background = '#fff')}>
                 <FileDown size={13} /> Export PDF
               </button>
-              <button
-                onClick={() => { void setLocked(!locked) }}
-                aria-label={locked ? 'Unlock map' : 'Lock map'}
-                aria-pressed={locked}
-                title={locked ? 'Unlock this map' : 'Lock this map so it cannot be edited or deleted by accident'}
-                style={{
-                  padding: '9px 12px', borderRadius: 8,
-                  border: `1px solid ${locked ? '#c7d2fe' : '#e0e2e7'}`,
-                  background: locked ? '#eef2ff' : '#fff',
-                  cursor: 'pointer', fontSize: 12, fontWeight: 500,
-                  color: locked ? '#4f46e5' : '#374151', fontFamily: 'inherit',
-                  display: 'flex', alignItems: 'center', gap: 6,
-                }}>
-                {locked ? <Lock size={13} /> : <Unlock size={13} />}
-              </button>
-              <button
-                onClick={() => setShowDeleteConfirm(true)}
-                disabled={locked}
-                aria-label="Delete map"
-                title={locked ? LOCKED_DELETE_HINT : 'Delete this map'}
-                style={{
-                  padding: '9px 12px', borderRadius: 8,
-                  border: '1px solid #fecaca', background: '#fff',
-                  cursor: locked ? 'not-allowed' : 'pointer', fontSize: 12, fontWeight: 500,
-                  color: '#ef4444', fontFamily: 'inherit', opacity: locked ? 0.45 : 1,
-                  display: 'flex', alignItems: 'center', gap: 6,
-                }}
-                onMouseEnter={e => { if (!locked) e.currentTarget.style.background = '#fef2f2' }}
+              <button onClick={() => setShowDeleteConfirm(true)} style={{
+                padding: '9px 12px', borderRadius: 8,
+                border: '1px solid #fecaca', background: '#fff',
+                cursor: 'pointer', fontSize: 12, fontWeight: 500,
+                color: '#ef4444', fontFamily: 'inherit',
+                display: 'flex', alignItems: 'center', gap: 6,
+              }}
+                onMouseEnter={e => { e.currentTarget.style.background = '#fef2f2' }}
                 onMouseLeave={e => { e.currentTarget.style.background = '#fff' }}>
                 <Trash2 size={13} />
               </button>
             </div>
-            <p style={{ fontSize: 10, color: '#9ca3af', margin: 0, lineHeight: 1.5 }}>
-              {locked
-                ? 'Locked - this map cannot be edited or deleted. It is an accident guard, not a password: unlock it here any time.'
-                : 'Lock the map to stop accidental edits and deletes. No password - you can unlock it here any time.'}
-            </p>
           </SBlock>
 
           {/* Delete confirmation modal */}

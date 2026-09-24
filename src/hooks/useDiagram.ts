@@ -10,12 +10,6 @@ import type { Diagram, DiagramMeta, MindmapNode } from '../types'
 // ── API config ─────────────────────────────────────────────────────────────
 const API_BASE = '/api/mindmaps'
 
-// One wording for the lock guard, shared by every delete control (home grid + Share
-// panel) so the two places never drift apart.
-export const LOCKED_DELETE_HINT = 'This map is locked - unlock it to delete'
-export const lockedDeleteToast = (name: string) =>
-  `"${name}" is locked - unlock it to delete. Nothing was deleted.`
-
 // Attach the signed session token (set at login) to every API call.
 export function authHeaders(): Record<string, string> {
   const h: Record<string, string> = { 'Content-Type': 'application/json' }
@@ -69,18 +63,6 @@ export function lsDeleteDiagram(id: string) {
   lsSaveList(lsGetList().filter(m => m.id !== id))
 }
 
-// Undo exactly what lsDeleteDiagram removed, byte for byte - no updated_at bump, no
-// meta rebuild. Used when the server refuses the delete and the optimistic removal
-// has to be taken back.
-function lsRestoreDiagram(d: Diagram | null, meta: DiagramMeta | undefined) {
-  try {
-    if (d) localStorage.setItem(lsKey(d.id), JSON.stringify(d))
-    if (!meta) return
-    const list = lsGetList()
-    if (!list.some(m => m.id === meta.id)) lsSaveList([meta, ...list])
-  } catch { /* no storage */ }
-}
-
 // ── DB row → Diagram ─────────────────────────────────────────────────────────
 
 // Some legacy/AI-generated rows were saved with type 'logic' (not a valid
@@ -126,7 +108,6 @@ function rowToDiagram(row: Record<string, unknown>): Diagram {
     sharingEnabled: (row.sharing_enabled ?? false) as boolean,
     themeId:        (row.theme_id as string | undefined) ?? 'default',
     tags:           (row.tags as string[] | undefined) ?? [],
-    locked:         (row.locked ?? false) as boolean,
     nodes,
   }
 }
@@ -156,7 +137,6 @@ export function useDiagram(userId: string | null = null) {
         updatedAt: d.updated_at as string,
         isPublic: (d.sharing_enabled ?? false) as boolean,
         tags: (d.tags as string[]) ?? [],
-        locked: (d.locked ?? false) as boolean,
       }))
       setDiagrams(list)
     } catch {
@@ -313,9 +293,6 @@ export function useDiagram(userId: string | null = null) {
       store.setActiveMindmap(null)
       store.setIsDirty(false)
     }
-    // Snapshot before the optimistic removal so a refused delete can be taken back.
-    const cached = lsGetDiagram(id)
-    const cachedMeta = store.diagrams.find(d => d.id === id)
     lsDeleteDiagram(id)
     const { diagrams } = useMindmapStore.getState()
     setDiagrams(diagrams.filter(d => d.id !== id))
@@ -323,21 +300,7 @@ export function useDiagram(userId: string | null = null) {
     showToast(`"${name ?? 'Map'}" deleted`, { color: '#1a1d2e' })
 
     if (userId) {
-      // The grid disables delete on a locked map, but a map can be locked in another
-      // tab between page load and this click. The server answers 423; put the map back
-      // and name the lock, rather than hiding it behind the generic "not synced" toast.
-      fetch(`${API_BASE}?id=${id}&user_id=${userId}`, { method: 'DELETE', headers: authHeaders() })
-        .then(res => {
-          if (res.status === 423) {
-            lsRestoreDiagram(cached, cachedMeta)
-            const current = useMindmapStore.getState().diagrams
-            if (cachedMeta && !current.some(d => d.id === id)) setDiagrams([cachedMeta, ...current])
-            showToast(lockedDeleteToast(name ?? 'Map'), { color: '#f59e0b', duration: 4000 })
-            return
-          }
-          if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        })
-        .catch(() => { showToast(`Saved locally - "${name ?? 'Map'}" not synced`, { color: '#f59e0b' }) })
+      syncToServer(`${API_BASE}?id=${id}&user_id=${userId}`, { method: 'DELETE', headers: authHeaders() }, name ?? 'Map')
     }
   }, [setDiagrams, userId])
 

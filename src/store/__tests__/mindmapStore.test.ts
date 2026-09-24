@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { useMindmapStore, flushMindmapPersist } from '../mindmapStore'
 import type { Diagram, MindmapNode } from '../../types'
 
@@ -546,64 +546,6 @@ describe('mindmapStore', () => {
     it('does nothing without active diagram', () => {
       useMindmapStore.getState().setShareEnabled(true)
       expect(useMindmapStore.getState().activeMindmap).toBeNull()
-    })
-  })
-
-  describe('setLocked', () => {
-    // Lock writes straight through to the API; the store is optimistic and rolls back.
-    function mockFetch(ok: boolean) {
-      const fn = vi.fn(async () => ({ ok }) as Response)
-      vi.stubGlobal('fetch', fn)
-      return fn
-    }
-
-    afterEach(() => { vi.unstubAllGlobals() })
-
-    it('sets the flag optimistically and keeps it when the API accepts', async () => {
-      const fetchMock = mockFetch(true)
-      loadDiagram()
-      useMindmapStore.setState({ diagrams: [{ id: 'test-diagram', name: 'Test', type: 'logic-chart', updatedAt: '2024-01-01' }] })
-      await useMindmapStore.getState().setLocked(true)
-      expect(useMindmapStore.getState().activeMindmap!.locked).toBe(true)
-      expect(useMindmapStore.getState().diagrams[0].locked).toBe(true)
-      expect(fetchMock).toHaveBeenCalledTimes(1)
-      const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
-      expect(init.method).toBe('PUT')
-      expect(JSON.parse(init.body as string)).toMatchObject({ id: 'test-diagram', locked: true })
-      // Locking must not mark the map dirty - it is not a content edit.
-      expect(useMindmapStore.getState().isDirty).toBe(false)
-    })
-
-    it('rolls the flag back when the API call fails', async () => {
-      mockFetch(false)
-      loadDiagram()
-      useMindmapStore.setState({ diagrams: [{ id: 'test-diagram', name: 'Test', type: 'logic-chart', updatedAt: '2024-01-01' }] })
-      await useMindmapStore.getState().setLocked(true)
-      expect(useMindmapStore.getState().activeMindmap!.locked).toBe(false)
-      expect(useMindmapStore.getState().diagrams[0].locked).toBe(false)
-    })
-
-    it('rolls back when fetch itself throws', async () => {
-      vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('offline') }))
-      loadDiagram()
-      await useMindmapStore.getState().setLocked(true)
-      expect(useMindmapStore.getState().activeMindmap!.locked).toBe(false)
-    })
-
-    it('unlocks a locked map', async () => {
-      mockFetch(true)
-      loadDiagram({ ...makeDiagram(), locked: true })
-      await useMindmapStore.getState().setLocked(false)
-      expect(useMindmapStore.getState().activeMindmap!.locked).toBe(false)
-    })
-
-    it('no-ops without an active map and when the value is unchanged', async () => {
-      const fetchMock = mockFetch(true)
-      await useMindmapStore.getState().setLocked(true)
-      expect(useMindmapStore.getState().activeMindmap).toBeNull()
-      loadDiagram()
-      await useMindmapStore.getState().setLocked(false)
-      expect(fetchMock).not.toHaveBeenCalled()
     })
   })
 

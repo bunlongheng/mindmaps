@@ -114,20 +114,6 @@ function runLayout(nodes: MindmapNode[], type: DiagramType): MindmapNode[] {
   }
 }
 
-// PUT just the locked flag. Kept local (rather than reusing useDiagram's authHeaders)
-// so the store does not import the hook that imports the store.
-async function putLocked(id: string, locked: boolean): Promise<boolean> {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-  try {
-    const token = localStorage.getItem('mindmaps:token')
-    if (token) headers['Authorization'] = `Bearer ${token}`
-  } catch { /* no storage */ }
-  try {
-    const res = await fetch('/api/mindmaps', { method: 'PUT', headers, body: JSON.stringify({ id, locked }) })
-    return res.ok
-  } catch { return false }
-}
-
 interface HistoryState { nodes: MindmapNode[] }
 
 interface MindmapStore {
@@ -167,7 +153,6 @@ interface MindmapStore {
   resizeNodeDepth: (depth: number, width: number) => void
   rerunLayout: () => void
   setShareEnabled: (enabled: boolean) => void
-  setLocked: (locked: boolean) => Promise<void>
   setShowOrderNumbers: (v: boolean) => void
   setShowChildCount: (v: boolean) => void
   setHideDetails: (v: boolean) => void
@@ -550,29 +535,6 @@ export const useMindmapStore = create<MindmapStore>()(
       const state = get()
       if (!state.activeMindmap) return
       set({ activeMindmap: { ...state.activeMindmap, sharingEnabled: enabled }, isDirty: true })
-    },
-
-    // Lock is written straight through (not via the debounced map save) because a
-    // locked map stops being saved by the editor at all. Optimistic, with a rollback
-    // if the write fails so the UI never shows a lock the server does not have.
-    setLocked: async (locked) => {
-      const state = get()
-      const map = state.activeMindmap
-      if (!map) return
-      const previous = map.locked ?? false
-      if (previous === locked) return
-      const applyLock = (v: boolean) => {
-        const s = get()
-        set({
-          activeMindmap: s.activeMindmap?.id === map.id ? { ...s.activeMindmap, locked: v } : s.activeMindmap,
-          diagrams: s.diagrams.map(d => (d.id === map.id ? { ...d, locked: v } : d)),
-        })
-      }
-      applyLock(locked)
-      if (!(await putLocked(map.id, locked))) {
-        applyLock(previous)
-        showToast('Could not change the lock - try again', { color: '#f59e0b' })
-      }
     },
 
     setShowOrderNumbers: (v) => {

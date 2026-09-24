@@ -38,8 +38,6 @@ export interface Diagram {
   showOrderNumbers?: boolean
   themeId?: string
   tags?: string[]
-  /** Accident guard: a locked map cannot be edited or deleted. Not a security boundary. */
-  locked?: boolean
 }
 
 export interface DiagramMeta {
@@ -49,5 +47,4 @@ export interface DiagramMeta {
   updatedAt: string
   isPublic?: boolean
   tags?: string[]
-  locked?: boolean
 }
