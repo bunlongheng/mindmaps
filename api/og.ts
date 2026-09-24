@@ -13,15 +13,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   let name = 'Mindmaps'
   let desc = 'Visual mind map and diagram tool'
   let nodeCount = 0
-  let type = 'logic-chart'
-  let tags: string[] = []
 
   try {
-    const r = await pool.query('SELECT name, type, tags, nodes FROM mindmaps WHERE id=$1 AND sharing_enabled=true', [id])
+    const r = await pool.query('SELECT name, nodes FROM mindmaps WHERE id=$1 AND sharing_enabled=true', [id])
     if (r.rows.length) {
       name = r.rows[0].name || 'Untitled'
-      type = r.rows[0].type || 'logic-chart'
-      tags = r.rows[0].tags || []
       const nodes = r.rows[0].nodes
       nodeCount = Array.isArray(nodes) ? nodes.length : 0
       desc = `${name} - ${nodeCount} node${nodeCount !== 1 ? 's' : ''}`
@@ -29,13 +25,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   } catch { /* fall through with defaults */ }
 
   const base = 'https://mindmaps-bheng.vercel.app'
-  const url = `${base}/?share=${id}`
-  const imgParams = new URLSearchParams({ name, nodes: String(nodeCount), type, tags: tags.join(',') })
-  const image = `${base}/api/og-image?${imgParams}`
+  // /s/<id> is the one canonical share URL - vercel.json rewrites it here, so the
+  // link a human copies and the link an unfurler crawls are the same string.
+  const url = `${base}/s/${id}`
+  const image = `${base}/api/og-image?id=${id}`
   const safeName = esc(name)
   const safeDesc = esc(desc)
 
   res.setHeader('Content-Type', 'text/html')
+  res.setHeader('Cache-Control', 'public, s-maxage=600, stale-while-revalidate=86400')
   res.send(`<!DOCTYPE html>
 <html>
 <head>
@@ -45,8 +43,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   <meta property="og:title" content="${safeName}"/>
   <meta property="og:description" content="${safeDesc}"/>
   <meta property="og:image" content="${image}"/>
+  <meta property="og:image:type" content="image/png"/>
   <meta property="og:image:width" content="1200"/>
   <meta property="og:image:height" content="630"/>
+  <meta property="og:image:alt" content="${safeName}"/>
   <meta property="og:url" content="${url}"/>
   <meta property="og:site_name" content="Mindmaps"/>
   <meta name="twitter:card" content="summary_large_image"/>

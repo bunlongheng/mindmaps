@@ -58,7 +58,7 @@ server.registerTool(
   {
     title: 'Create mindmap',
     description:
-      'Create a mind map in the Mindmaps app from an outline YOU write (no server-side AI, no Anthropic spend). `outline` is a JSON string like {"Root":[{"icon":"brain","Category A":["item 1","item 2"]}]} OR indented text (2 spaces per level). Returns the id, shareable url, svg_url, and node count; pass format:"svg" to also get the inline SVG string. Maps are always filed under the owner\'s library - you never pass an owner, and a mismatched one is rejected with 403 rather than silently orphaned.',
+      'Create a mind map in the Mindmaps app from an outline YOU write (no server-side AI, no Anthropic spend). `outline` is a JSON string like {"Root":[{"icon":"brain","Category A":["item 1","item 2"]}]} OR indented text (2 spaces per level). Returns the id, the canonical shareable url (https://<app>/s/<id>, which unfurls with the real diagram as its preview image), svg_url, and node count; pass format:"svg" to also get the inline SVG string. Maps are always filed under the owner\'s library - you never pass an owner, and a mismatched one is rejected with 403 rather than silently orphaned.',
     inputSchema: {
       title: z.string().describe('The map title / root label, e.g. "Machine Learning"'),
       outline: z.string().describe('JSON-string outline (categories with items, optional per-category "icon") OR indented text. Omit for an empty root.').optional(),
@@ -103,6 +103,7 @@ server.registerTool(
       'A node may carry "shape": one of rect, rounded, pill, circle. Omit it to keep the diagram\'s default box.',
       'Node text may carry links: markdown [label](https://...) or a bare https:// url renders as a clickable anchor. Only http/https is linked; bare ticket keys are not.',
       'The map is owned by the configured owner and (by default) shared so the returned url opens without auth.',
+      'The returned url is always /s/<id> - the one canonical share link. Hand that to a human or paste it in chat; it carries the OG tags and redirects to the app.',
     ],
     example_json_outline: {
       title: 'Machine Learning',

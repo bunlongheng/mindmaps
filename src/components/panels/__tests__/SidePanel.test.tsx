@@ -658,7 +658,8 @@ describe('SidePanel — Share tab', () => {
     render(<SidePanel nodeId={null} onClose={vi.fn()} />)
     fireEvent.click(screen.getByText('Share'))
     fireEvent.click(screen.getByText('Copy Link'))
-    expect(navigator.clipboard.writeText).toHaveBeenCalled()
+    // The one canonical share shape - /s/<id>, not the old /api/og?id= link.
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(`${window.location.origin}/s/d1`)
     await waitFor(() => expect(screen.getByText('Copied!')).toBeInTheDocument())
   })
 

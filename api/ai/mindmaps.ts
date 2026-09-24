@@ -155,7 +155,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const appUrl = process.env.MINDMAP_APP_URL ?? 'https://mindmaps-bheng.vercel.app'
   const out: Record<string, unknown> = {
     id,
-    url: `${appUrl}/?id=${id}`,
+    url: `${appUrl}/s/${id}`,
     svg_url: `${appUrl}/api/mindmaps?id=${id}&format=svg`,
     nodeCount: nodes.length,
   }

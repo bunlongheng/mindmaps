@@ -232,7 +232,7 @@ export function SidePanel({ nodeId, onClose, onDelete, onUpdateTags }: SidePanel
 
 
   const shareUrl = activeMindmap
-    ? `${window.location.origin}/api/og?id=${activeMindmap.id}`
+    ? `${window.location.origin}/s/${activeMindmap.id}`
     : ''
 
 
