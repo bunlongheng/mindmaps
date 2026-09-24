@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { hexToRgb, applyDepthTransparency, applyDepthBackground, darken, l1PaletteColor, L1_PALETTE } from '../color'
+import { hexToRgb, applyDepthTransparency, applyDepthBackground, darken, l1PaletteColor, L1_PALETTE, depthFill, depthStrength, DEPTH_STRENGTH, DEPTH_STRENGTH_FLOOR } from '../color'
 
 describe('hexToRgb', () => {
   it('parses standard hex', () => {
@@ -111,5 +111,55 @@ describe('l1PaletteColor', () => {
   it('returns null when no L1 ancestor exists (broken chain)', () => {
     const orphan = { id: 'g', parentId: 'ghost', depth: 2, sortOrder: 0 }
     expect(l1PaletteColor(orphan, [root, orphan])).toBeNull()
+  })
+})
+
+describe('depth ladder (DEPTH_STRENGTH / depthStrength / depthFill)', () => {
+  it('matches the documented table', () => {
+    expect(DEPTH_STRENGTH).toEqual({ 1: 1, 2: 0.8, 3: 0.6, 4: 0.5 })
+    expect(DEPTH_STRENGTH_FLOOR).toBe(0.4)
+    expect(depthStrength(1)).toBe(1)
+    expect(depthStrength(2)).toBe(0.8)
+    expect(depthStrength(3)).toBe(0.6)
+    expect(depthStrength(4)).toBe(0.5)
+  })
+
+  it('floors at depth 5 and deeper', () => {
+    expect(depthStrength(5)).toBe(DEPTH_STRENGTH_FLOOR)
+    expect(depthStrength(9)).toBe(DEPTH_STRENGTH_FLOOR)
+  })
+
+  it('is monotonically weaker with depth, never rising', () => {
+    const strengths = [1, 2, 3, 4, 5, 6].map(depthStrength)
+    for (let i = 1; i < strengths.length; i++) {
+      expect(strengths[i]).toBeLessThanOrEqual(strengths[i - 1])
+    }
+    // Every named step is a real step, not a repeat
+    expect(new Set([1, 2, 3, 4].map(depthStrength)).size).toBe(4)
+  })
+
+  it('leaves the root colour untouched', () => {
+    expect(depthFill('#ED1C24', 0)).toBe('#ED1C24')
+  })
+
+  it('returns the full colour at depth 1', () => {
+    expect(depthFill('#ed1c24', 1)).toBe('#ed1c24')
+  })
+
+  it('steps visibly toward white as depth grows', () => {
+    const chan = (hex: string) => hexToRgb(hex)
+    const d2 = chan(depthFill('#ed1c24', 2))
+    const d3 = chan(depthFill('#ed1c24', 3))
+    const d4 = chan(depthFill('#ed1c24', 4))
+    // Green channel is the one with room to move on red; each step gains >= 20
+    expect(d3[1] - d2[1]).toBeGreaterThanOrEqual(20)
+    expect(d4[1] - d3[1]).toBeGreaterThanOrEqual(20)
+    expect(d3[2] - d2[2]).toBeGreaterThan(0)
+  })
+
+  it('mixes exactly (1 - strength) toward white', () => {
+    // #000000 at 60% strength -> 40% of the way to white -> 102
+    expect(depthFill('#000000', 3)).toBe('#666666')
+    expect(depthFill('#ffffff', 5)).toBe('#ffffff')
   })
 })

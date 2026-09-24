@@ -189,6 +189,26 @@ describe('SidePanel — Style tab', () => {
     expect(useMindmapStore.getState().activeMindmap!.nodes.find(n => n.id === 'c1')!.textAlign).toBe('left')
   })
 
+  it('sets the node box shape', () => {
+    loadDiagram()
+    render(<SidePanel nodeId="c1" onClose={vi.fn()} />)
+    const shapeOf = () => useMindmapStore.getState().activeMindmap!.nodes.find(n => n.id === 'c1')!.shape
+    for (const label of ['Rectangle', 'Rounded', 'Pill', 'Circle'] as const) {
+      fireEvent.click(screen.getByLabelText(label))
+      expect(shapeOf()).toBe(label === 'Rectangle' ? 'rect' : label.toLowerCase())
+    }
+  })
+
+  it('sets the box shape on every selected node', () => {
+    loadDiagram()
+    act(() => { useMindmapStore.getState().setSelectedNodeIds(['c1', 'c2']) })
+    render(<SidePanel nodeId="c1" onClose={vi.fn()} />)
+    fireEvent.click(screen.getByLabelText('Circle'))
+    const map = useMindmapStore.getState().activeMindmap!
+    expect(map.nodes.find(n => n.id === 'c1')!.shape).toBe('circle')
+    expect(map.nodes.find(n => n.id === 'c2')!.shape).toBe('circle')
+  })
+
   it('ColorField swatches change node color', () => {
     loadDiagram()
     const { container } = render(<SidePanel nodeId="c1" onClose={vi.fn()} />)

@@ -4,6 +4,7 @@ import { createRef } from 'react'
 import { Node } from '../Node'
 import { useMindmapStore } from '../../../store/mindmapStore'
 import type { Diagram, DiagramType, MindmapNode } from '../../../types'
+import { depthFill, hexToRgb } from '../../../lib/color'
 
 vi.mock('../../../components/CuteToast', () => ({ showToast: vi.fn() }))
 
@@ -138,11 +139,69 @@ describe('Node — rendering by depth / type', () => {
     expect(container.querySelector('[data-node-id="n3"]')).toBeTruthy()
   })
 
+  it('steps the fill visibly darker at depth 2 than at depth 3', () => {
+    // The one shared ladder (lib/color depthFill) drives both the canvas and the
+    // server renderer, so the fill the canvas paints must be exactly its output.
+    const base = '#ED1C24'
+    const fillOf = (depth: number) => {
+      const n = makeNode({ id: `d${depth}`, depth, parentId: 'n1' })
+      loadStore([makeRoot(), makeNode(), n])
+      const { container } = renderNode(n, { paletteColor: base })
+      const rect = Array.from(container.querySelectorAll('rect'))
+        .map(el => el.getAttribute('fill') ?? '')
+        .find(f => f.startsWith('#') && f !== '#ffffff')
+      cleanup()
+      return rect!
+    }
+    const f2 = fillOf(2)
+    const f3 = fillOf(3)
+    expect(f2).toBe(depthFill(base, 2))
+    expect(f3).toBe(depthFill(base, 3))
+    const [r2, g2, b2] = hexToRgb(f2)
+    const [r3, g3, b3] = hexToRgb(f3)
+    // Depth 3 is the weaker (whiter) fill by a wide, eye-visible margin
+    expect(g3 - g2).toBeGreaterThanOrEqual(20)
+    expect(b3 - b2).toBeGreaterThanOrEqual(20)
+    expect(r3).toBeGreaterThanOrEqual(r2)
+  })
+
   it('renders an L4 node (deepest lighten branch)', () => {
     const l4 = makeNode({ id: 'n4', depth: 4, parentId: 'n3' })
     loadStore([makeRoot(), l4])
     const { container } = renderNode(l4)
     expect(container.querySelector('[data-node-id="n4"]')).toBeTruthy()
+  })
+
+  it('draws the right primitive for each box shape', () => {
+    // rect squares the corners, rounded keeps today's radius, pill fully rounds the
+    // ends, circle becomes a real <circle> sized to fit the label.
+    // The clip box carries the node's corner radius (the fill rect is clipped by it)
+    const boxRx = (c: HTMLElement) => c.querySelector('clipPath rect')!.getAttribute('rx')
+
+    const rect = makeNode({ id: 'sr', shape: 'rect' })
+    loadStore([makeRoot(), rect])
+    expect(boxRx(renderNode(rect).container)).toBe('0')
+    cleanup()
+
+    const rounded = makeNode({ id: 'sd', shape: 'rounded' })
+    loadStore([makeRoot(), rounded])
+    expect(boxRx(renderNode(rounded).container)).toBe('3')
+    cleanup()
+
+    const pill = makeNode({ id: 'sp', shape: 'pill', height: 40 })
+    loadStore([makeRoot(), pill])
+    expect(boxRx(renderNode(pill).container)).toBe('20')
+    cleanup()
+
+    const circle = makeNode({ id: 'sc', shape: 'circle' })
+    loadStore([makeRoot(), circle])
+    const { container } = renderNode(circle)
+    const circles = Array.from(container.querySelectorAll('circle'))
+    expect(circles.length).toBeGreaterThan(0)
+    // The drawn circle must be wide enough for the label it holds
+    const drawn = useMindmapStore.getState().activeMindmap!.nodes.find(n => n.id === 'sc')!
+    expect(drawn.width).toBe(drawn.height)
+    expect(Number(circles[0].getAttribute('r'))).toBeGreaterThanOrEqual(drawn.width / 2)
   })
 
   it('handles a non-hex color (falls back to default fill)', () => {

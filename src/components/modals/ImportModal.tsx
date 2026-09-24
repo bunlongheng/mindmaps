@@ -90,6 +90,7 @@ JSON object with optional icon/emoji/color per node. Children inherit parent col
   ]
 }
 Node text may carry links: markdown [label](https://...) or a bare https:// url renders clickable (http/https only).
+A node may carry "shape": rect | rounded | pill | circle. Omit it to keep the default box.
 Indented outlines also work. Icons: kebab-case names from lucide.dev/icons.
 Diagram types: logic-chart | mindmap | fishbone | timeline
 

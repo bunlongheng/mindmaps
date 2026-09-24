@@ -22,7 +22,7 @@ export interface MindmapNode {
   icon?: string
   emoji?: string
   branchGap?: number
-  shape?: 'circle' | 'pill'
+  shape?: 'rect' | 'rounded' | 'pill' | 'circle'   // box shape; absent keeps the diagram's default look
   url?: string         // optional hyperlink — clicking the node opens it
 }
 
