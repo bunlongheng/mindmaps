@@ -784,3 +784,77 @@ describe('Node — getSVGPoint guards', () => {
     expect(useMindmapStore.getState().resizePreview).toBeNull()
   })
 })
+
+describe('Node — links inside node text', () => {
+  it('renders a markdown link as an anchor and never shows the raw syntax', () => {
+    const n = makeNode({ title: 'see [SHAR-1](https://j.example/SHAR-1) now' })
+    loadStore([makeRoot(), n])
+    const { container } = renderNode(n)
+    const a = container.querySelector('a')
+    expect(a).not.toBeNull()
+    expect(a!.getAttribute('href')).toBe('https://j.example/SHAR-1')
+    expect(a!.getAttribute('target')).toBe('_blank')
+    expect(a!.getAttribute('rel')).toBe('noopener noreferrer')
+    expect(a!.textContent).toBe('SHAR-1')
+    const label = container.querySelector('text') as Element
+    expect(label.textContent).toBe('see SHAR-1 now')
+    expect(container.innerHTML).not.toContain('](')
+  })
+
+  it('links a bare https url in the text', () => {
+    const n = makeNode({ title: 'docs https://example.com/a' })
+    loadStore([makeRoot(), n])
+    const { container } = renderNode(n)
+    const a = container.querySelector('a') as Element
+    expect(a.getAttribute('href')).toBe('https://example.com/a')
+    expect(a.textContent).toBe('https://example.com/a')
+  })
+
+  it('renders NO anchor for a javascript: target and keeps the characters literal', () => {
+    const raw = '[x](javascript:alert(1))'
+    const n = makeNode({ title: raw })
+    loadStore([makeRoot(), n])
+    const { container } = renderNode(n)
+    expect(container.querySelector('a')).toBeNull()
+    expect((container.querySelector('text') as Element).textContent).toBe(raw)
+  })
+
+  it('renders no anchor for a plain title', () => {
+    const n = makeNode({ title: 'Just a title' })
+    loadStore([makeRoot(), n])
+    const { container } = renderNode(n)
+    expect(container.querySelector('a')).toBeNull()
+    expect((container.querySelector('text') as Element).textContent).toBe('Just a title')
+  })
+
+  it('a link click does not select or drag the node', () => {
+    const n = makeNode({ title: '[SHAR-1](https://j.example/SHAR-1)' })
+    loadStore([makeRoot(), n])
+    const { container, onSelect } = renderNode(n)
+    const a = container.querySelector('a') as Element
+    act(() => { fireEvent.pointerDown(a, { pointerType: 'mouse', pointerId: 11, bubbles: true }) })
+    act(() => { fireEvent.click(a, { bubbles: true }) })
+    expect(onSelect).not.toHaveBeenCalled()
+  })
+
+  it('keeps the raw markdown in the edit input so the link can be edited', () => {
+    const raw = 'see [SHAR-1](https://j.example/SHAR-1) now'
+    const n = makeNode({ title: raw })
+    loadStore([makeRoot(), n])
+    const { container } = renderNode(n)
+    const g = container.querySelector('[data-node-id="n1"] > g') as Element
+    act(() => { fireEvent.doubleClick(g) })
+    const input = container.querySelector('input') as HTMLInputElement
+    expect(input.value).toBe(raw)
+  })
+
+  it('wraps a mindmap circle label into per-line anchors', () => {
+    const n = makeNode({ title: 'ticket [SHAR-1](https://j.example/SHAR-1) fix', depth: 2, width: 120, height: 120 })
+    loadStore([makeRoot(), makeNode({ depth: 1 }), n], 'mindmap')
+    const { container } = renderNode(n)
+    const anchors = container.querySelectorAll('a')
+    expect(anchors.length).toBeGreaterThan(0)
+    Array.from(anchors).forEach(a => expect(a.getAttribute('href')).toBe('https://j.example/SHAR-1'))
+    expect(container.innerHTML).not.toContain('](')
+  })
+})

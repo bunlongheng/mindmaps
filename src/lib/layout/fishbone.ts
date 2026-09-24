@@ -1,4 +1,5 @@
 import type { MindmapNode } from '../../types/index.js'
+import { displayTitle } from '../links.js'
 
 export const FISHBONE_SLANT = 90
 
@@ -15,7 +16,7 @@ function autoW(title: string, depth: number, hasIcon: boolean): number {
   const charW = fontSize * 0.64
   const pad = 24
   const iconZone = hasIcon ? 44 : 0
-  const textW = Math.ceil(title.length * charW) + pad + iconZone
+  const textW = Math.ceil(displayTitle(title).length * charW) + pad + iconZone
   const min = depth === 0 ? 200 : depth === 1 ? 160 : depth === 2 ? 130 : 110
   return Math.max(min, Math.min(500, textW))
 }
