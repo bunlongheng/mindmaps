@@ -204,11 +204,11 @@ describe('DiagramCanvas — rubber-band selection', () => {
     ref.cur = { x: maxX, y: maxY }
     act(() => { fireEvent.pointerMove(svg, { pointerType: 'mouse', clientX: 999, clientY: 799, pointerId: 1 }) })
     // the dashed marquee rect is visible during the drag
-    expect(container.querySelector('rect[fill="rgba(59,130,246,0.07)"]')).toBeTruthy()
+    expect(container.querySelector('rect[fill="rgba(59,130,246,0.06)"]')).toBeTruthy()
     expect(useMindmapStore.getState().selectedNodeIds).toContain('n1')
     act(() => { fireEvent.pointerUp(svg, { pointerType: 'mouse', pointerId: 1 }) })
     // The dashed rubber-band rect (unique fill) is cleared after pointer up
-    expect(container.querySelector('rect[fill="rgba(59,130,246,0.07)"]')).toBeFalsy()
+    expect(container.querySelector('rect[fill="rgba(59,130,246,0.06)"]')).toBeFalsy()
   })
 
   it('marquee with a single hit reports that node id to onNodeSelect', () => {
@@ -289,7 +289,7 @@ describe('DiagramCanvas — mouse down on a non-background element', () => {
     act(() => { fireEvent.pointerDown(g, { pointerType: 'mouse', clientX: 50, clientY: 50, pointerId: 8 }) })
     act(() => { fireEvent.pointerUp(g, { pointerType: 'mouse', pointerId: 8 }) })
     // no rubber-band rect was created
-    expect((g.ownerSVGElement as SVGSVGElement).querySelector('rect[fill="rgba(59,130,246,0.07)"]')).toBeFalsy()
+    expect((g.ownerSVGElement as SVGSVGElement).querySelector('rect[fill="rgba(59,130,246,0.06)"]')).toBeFalsy()
   })
 })
 

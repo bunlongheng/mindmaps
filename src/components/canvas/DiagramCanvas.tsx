@@ -461,11 +461,10 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract }: DiagramCan
             <rect
               x={selBox.x} y={selBox.y}
               width={selBox.w} height={selBox.h}
-              fill="rgba(59,130,246,0.07)"
-              stroke="#3b82f6"
-              strokeWidth={1.5 / zoom}
-              strokeDasharray={`${5 / zoom} ${3 / zoom}`}
-              rx={3 / zoom}
+              fill="rgba(59,130,246,0.06)"
+              stroke="rgba(59,130,246,0.55)"
+              strokeWidth={1 / zoom}
+              rx={2 / zoom}
               style={{ pointerEvents: 'none' }}
             />
           )}
