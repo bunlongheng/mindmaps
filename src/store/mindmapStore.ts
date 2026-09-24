@@ -100,7 +100,16 @@ function runLayout(nodes: MindmapNode[], type: DiagramType): MindmapNode[] {
   }
 }
 
-interface HistoryState { nodes: MindmapNode[] }
+interface HistoryState {
+  nodes: MindmapNode[]
+  name: string
+  type: DiagramType
+  lineStyle: LineStyle
+  themeId: string
+  showOrderNumbers: boolean
+  sharingEnabled: boolean
+  tags: string[]
+}
 
 interface MindmapStore {
   // Data
@@ -139,6 +148,7 @@ interface MindmapStore {
   resizeNodeDepth: (depth: number, width: number) => void
   rerunLayout: () => void
   setShareEnabled: (enabled: boolean) => void
+  setMapTags: (tags: string[]) => void
   setShowOrderNumbers: (v: boolean) => void
   setShowChildCount: (v: boolean) => void
   setHideDetails: (v: boolean) => void
@@ -146,7 +156,7 @@ interface MindmapStore {
   setResizePreview: (v: { depth: number; width: number } | null) => void
   undo: () => void
   redo: () => void
-  snapshotHistory: () => void
+  snapshotHistory: (key?: string) => void
   clearDiagram: () => void
   loadFromOutline: (text: string) => void
   autoAssignIcons: () => void
@@ -154,10 +164,74 @@ interface MindmapStore {
   setPasteImportFn: (fn: ((name: string, nodes: MindmapNode[]) => void) | null) => void
 }
 
-function pushHistory(state: MindmapStore): Pick<MindmapStore, 'past' | 'future'> {
-  const current = state.activeMindmap?.nodes ?? []
+/** Deepest history we keep; older entries fall off the front. */
+const HISTORY_LIMIT = 100
+/** A burst of same-key edits (slider or colour drag) collapses into 1 entry. */
+const HISTORY_COALESCE_MS = 400
+
+let lastHistoryKey: string | null = null
+let lastHistoryAt = 0
+
+function resetHistoryCoalesce() {
+  lastHistoryKey = null
+  lastHistoryAt = 0
+}
+
+/**
+ * Key a snapshot by the fields being written, so 1 gesture is 1 entry: a width
+ * slider drag, a colour picker drag, a node drag (x/y per pointermove), or the AI
+ * icon pass writing an icon onto every node in turn.
+ */
+function fieldKey(scope: string, updates: object): string {
+  return `${scope}:${Object.keys(updates).sort().join(',')}`
+}
+
+/** Everything an edit can change that is NOT pure view state. */
+function captureHistory(state: MindmapStore): HistoryState {
+  const map = state.activeMindmap
   return {
-    past: [...state.past.slice(-30), { nodes: current }],
+    nodes: map?.nodes ?? [],
+    name: map?.name ?? '',
+    type: map?.type ?? state.diagramType,
+    lineStyle: map?.lineStyle ?? state.lineStyle,
+    themeId: map?.themeId ?? state.themeId,
+    showOrderNumbers: map?.showOrderNumbers ?? state.showOrderNumbers,
+    sharingEnabled: map?.sharingEnabled ?? false,
+    tags: map?.tags ?? [],
+  }
+}
+
+type RestoredState = Pick<MindmapStore,
+  'activeMindmap' | 'diagrams' | 'diagramType' | 'lineStyle' | 'themeId' | 'showOrderNumbers' | 'isDirty'>
+
+function applyHistory(state: MindmapStore, map: Diagram, entry: HistoryState): RestoredState {
+  try { localStorage.setItem('mindmaps:themeId', entry.themeId) } catch { /* storage unavailable */ }
+  return {
+    activeMindmap: {
+      ...map,
+      nodes: entry.nodes,
+      name: entry.name,
+      type: entry.type,
+      lineStyle: entry.lineStyle,
+      themeId: entry.themeId,
+      showOrderNumbers: entry.showOrderNumbers,
+      sharingEnabled: entry.sharingEnabled,
+      tags: entry.tags,
+    },
+    // Keep the library row in step, or the home list shows the undone name and tags.
+    diagrams: state.diagrams.map(d =>
+      d.id === map.id ? { ...d, name: entry.name, type: entry.type, tags: entry.tags } : d),
+    diagramType: entry.type,
+    lineStyle: entry.lineStyle,
+    themeId: entry.themeId,
+    showOrderNumbers: entry.showOrderNumbers,
+    isDirty: true,
+  }
+}
+
+function pushHistory(state: MindmapStore): Pick<MindmapStore, 'past' | 'future'> {
+  return {
+    past: [...state.past, captureHistory(state)].slice(-HISTORY_LIMIT),
     future: [],
   }
 }
@@ -185,6 +259,7 @@ export const useMindmapStore = create<MindmapStore>()(
     setActiveMindmap: (d) => {
       // Clearing the active map (e.g. after deleting the one being viewed): reset
       // cleanly instead of throwing on d.nodes of a null diagram.
+      resetHistoryCoalesce()
       if (!d) { set({ activeMindmap: null, isDirty: false, past: [], future: [] }); return }
       // Re-run layout on load: reset widths → compute auto-widths → normalize per depth → final layout.
       // A manual width is the one thing worth keeping across the reset — it is the
@@ -225,6 +300,7 @@ export const useMindmapStore = create<MindmapStore>()(
     setDiagramType: (t) => {
       const state = get()
       if (!state.activeMindmap) return
+      state.snapshotHistory('diagramType')
       // Clear manual positions AND reset dimensions so every layout starts fresh with correct sizes for the target type
       const resetNodes = state.activeMindmap.nodes.map(n =>
         n.depth === 0 ? { ...n, manuallyPositioned: false } : { ...n, manuallyPositioned: false, width: 0, height: 0 }
@@ -246,6 +322,7 @@ export const useMindmapStore = create<MindmapStore>()(
     setLineStyle: (s) => {
       const state = get()
       if (!state.activeMindmap) return
+      state.snapshotHistory('lineStyle')
       set({
         lineStyle: s,
         activeMindmap: { ...state.activeMindmap, lineStyle: s },
@@ -260,6 +337,7 @@ export const useMindmapStore = create<MindmapStore>()(
       const palette = getTheme(id).colors
       // Re-color all L1 nodes (depth === 1) using the new theme palette
       if (state.activeMindmap) {
+        state.snapshotHistory('theme')
         const l1s = state.activeMindmap.nodes.filter(n => n.depth === 1)
           .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
         const nodes = state.activeMindmap.nodes.map(n => {
@@ -289,9 +367,16 @@ export const useMindmapStore = create<MindmapStore>()(
       }
     },
 
-    snapshotHistory: () => {
-      const state = get()
-      set(pushHistory(state))
+    snapshotHistory: (key?: string) => {
+      const now = Date.now()
+      if (key && key === lastHistoryKey && now - lastHistoryAt < HISTORY_COALESCE_MS) {
+        // Same control still being dragged: extend the window, keep the 1 entry.
+        lastHistoryAt = now
+        return
+      }
+      lastHistoryKey = key ?? null
+      lastHistoryAt = now
+      set(pushHistory(get()))
     },
 
     addNode: (parentId, title = 'New Node') => {
@@ -333,6 +418,8 @@ export const useMindmapStore = create<MindmapStore>()(
     updateNode: (id, updates) => {
       const state = get()
       if (!state.activeMindmap) return
+      // Keyed by the fields written, so a node drag (x/y per pointermove) is 1 entry.
+      state.snapshotHistory(fieldKey('node', updates))
       const nodes = state.activeMindmap.nodes.map(n => {
         if (n.id !== id) return n
         const merged = { ...n, ...updates }
@@ -355,6 +442,7 @@ export const useMindmapStore = create<MindmapStore>()(
     batchUpdateNodes: (ids, updates) => {
       const state = get()
       if (!state.activeMindmap || ids.length === 0) return
+      state.snapshotHistory(fieldKey('batch', updates))
       const idSet = new Set(ids)
       const nodes = state.activeMindmap.nodes.map(n => idSet.has(n.id) ? { ...n, ...updates } : n)
       set({ activeMindmap: { ...state.activeMindmap, nodes }, isDirty: true })
@@ -365,6 +453,7 @@ export const useMindmapStore = create<MindmapStore>()(
       if (!state.activeMindmap) return
       const moving = state.activeMindmap.nodes.find(n => n.id === nodeId)
       if (!moving) return
+      state.snapshotHistory()
       const siblings = state.activeMindmap.nodes
         .filter(n => n.parentId === moving.parentId && n.id !== nodeId)
         .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
@@ -507,6 +596,7 @@ export const useMindmapStore = create<MindmapStore>()(
     resizeNodeDepth: (depth, width) => {
       const state = get()
       if (!state.activeMindmap) return
+      state.snapshotHistory(`resizeDepth:${depth}`)
       const clamped = Math.max(100, Math.min(500, width))
       const nodes = state.activeMindmap.nodes.map(n =>
         n.depth === depth ? { ...n, width: clamped, widthMode: 'manual' as const, manuallyPositioned: false } : n
@@ -518,6 +608,9 @@ export const useMindmapStore = create<MindmapStore>()(
     rerunLayout: () => {
       const state = get()
       if (!state.activeMindmap) return
+      // A re-layout that trails an edit (a shape change, a root title commit) belongs
+      // to that edit's entry, not to one of its own.
+      state.snapshotHistory(lastHistoryKey ?? 'layout')
       const nodes = normalizeWidthsPerDepth(state.activeMindmap.nodes.map(n => ({ ...n, manuallyPositioned: false })), state.diagramType)
       const newNodes = runLayout(nodes, state.diagramType)
       set({ activeMindmap: { ...state.activeMindmap, nodes: newNodes }, isDirty: true })
@@ -526,12 +619,25 @@ export const useMindmapStore = create<MindmapStore>()(
     setShareEnabled: (enabled) => {
       const state = get()
       if (!state.activeMindmap) return
+      state.snapshotHistory('shareEnabled')
       set({ activeMindmap: { ...state.activeMindmap, sharingEnabled: enabled }, isDirty: true })
+    },
+
+    setMapTags: (tags) => {
+      const state = get()
+      if (!state.activeMindmap) return
+      state.snapshotHistory('tags')
+      set({
+        activeMindmap: { ...state.activeMindmap, tags },
+        diagrams: state.diagrams.map(d => d.id === state.activeMindmap!.id ? { ...d, tags } : d),
+        isDirty: true,
+      })
     },
 
     setShowOrderNumbers: (v) => {
       const state = get()
       if (!state.activeMindmap) return
+      state.snapshotHistory('showOrderNumbers')
       set({ showOrderNumbers: v, activeMindmap: { ...state.activeMindmap, showOrderNumbers: v }, isDirty: true })
     },
 
@@ -545,37 +651,41 @@ export const useMindmapStore = create<MindmapStore>()(
     undo: () => {
       const state = get()
       if (state.past.length === 0 || !state.activeMindmap) return
+      resetHistoryCoalesce()
       const prev = state.past[state.past.length - 1]
       set({
+        ...applyHistory(state, state.activeMindmap, prev),
         past: state.past.slice(0, -1),
-        future: [{ nodes: state.activeMindmap.nodes }, ...state.future],
-        activeMindmap: { ...state.activeMindmap, nodes: prev.nodes },
-        isDirty: true,
+        future: [captureHistory(state), ...state.future].slice(0, HISTORY_LIMIT),
       })
     },
 
     redo: () => {
       const state = get()
       if (state.future.length === 0 || !state.activeMindmap) return
+      resetHistoryCoalesce()
       const next = state.future[0]
       set({
-        past: [...state.past, { nodes: state.activeMindmap.nodes }],
+        ...applyHistory(state, state.activeMindmap, next),
+        past: [...state.past, captureHistory(state)].slice(-HISTORY_LIMIT),
         future: state.future.slice(1),
-        activeMindmap: { ...state.activeMindmap, nodes: next.nodes },
-        isDirty: true,
       })
     },
 
     autoAssignIcons: () => {
       const state = get()
       if (!state.activeMindmap) return
+      state.snapshotHistory('autoIcons')
       const nodes = state.activeMindmap.nodes.map(n =>
         n.depth > 0 ? { ...n, icon: n.icon ?? guessIcon(n.title) } : n
       )
       set({ activeMindmap: { ...state.activeMindmap, nodes }, isDirty: true })
     },
 
-    clearDiagram: () => set({ activeMindmap: null, selectedNodeIds: [], past: [], future: [], isDirty: false }),
+    clearDiagram: () => {
+      resetHistoryCoalesce()
+      set({ activeMindmap: null, selectedNodeIds: [], past: [], future: [], isDirty: false })
+    },
 
     loadFromOutline: (text: string) => {
       const state = get()

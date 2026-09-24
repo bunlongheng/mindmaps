@@ -91,6 +91,45 @@ describe('SidePanel — tabs and structure', () => {
     expect(screen.getByText('Share')).toBeInTheDocument()
   })
 
+  it('renders Undo and Redo, disabled while history is empty', () => {
+    loadDiagram()
+    render(<SidePanel nodeId={null} onClose={vi.fn()} />)
+    const undoBtn = screen.getByLabelText('Undo') as HTMLButtonElement
+    const redoBtn = screen.getByLabelText('Redo') as HTMLButtonElement
+    expect(undoBtn).toBeDisabled()
+    expect(redoBtn).toBeDisabled()
+    expect(undoBtn.style.opacity).toBe('0.4')
+    expect(redoBtn.style.opacity).toBe('0.4')
+    expect(undoBtn.title).toBe('Undo (Cmd+Z)')
+    expect(redoBtn.title).toBe('Redo (Cmd+Shift+Z)')
+  })
+
+  it('Undo is enabled once there is history and calls undo', () => {
+    loadDiagram()
+    act(() => { useMindmapStore.getState().batchUpdateNodes(['c1'], { color: '#123456' }) })
+    render(<SidePanel nodeId={null} onClose={vi.fn()} />)
+    const undoBtn = screen.getByLabelText('Undo') as HTMLButtonElement
+    expect(undoBtn).not.toBeDisabled()
+    expect(undoBtn.style.opacity).toBe('1')
+    act(() => { fireEvent.click(undoBtn) })
+    expect(useMindmapStore.getState().past).toHaveLength(0)
+    expect(useMindmapStore.getState().activeMindmap!.nodes.find(n => n.id === 'c1')!.color).toBe('#ef4444')
+  })
+
+  it('Redo is enabled after an undo and calls redo', () => {
+    loadDiagram()
+    act(() => {
+      useMindmapStore.getState().batchUpdateNodes(['c1'], { color: '#123456' })
+      useMindmapStore.getState().undo()
+    })
+    render(<SidePanel nodeId={null} onClose={vi.fn()} />)
+    const redoBtn = screen.getByLabelText('Redo') as HTMLButtonElement
+    expect(redoBtn).not.toBeDisabled()
+    act(() => { fireEvent.click(redoBtn) })
+    expect(useMindmapStore.getState().future).toHaveLength(0)
+    expect(useMindmapStore.getState().activeMindmap!.nodes.find(n => n.id === 'c1')!.color).toBe('#123456')
+  })
+
   it('defaults to map tab when no node is selected', () => {
     loadDiagram()
     render(<SidePanel nodeId={null} onClose={vi.fn()} />)
@@ -106,11 +145,8 @@ describe('SidePanel — tabs and structure', () => {
   it('clicking close calls onClose', () => {
     loadDiagram()
     const onClose = vi.fn()
-    const { container } = render(<SidePanel nodeId={null} onClose={onClose} />)
-    // The close button is the X button after the tabs (width 30)
-    const buttons = container.querySelectorAll('button')
-    const closeBtn = Array.from(buttons).find(b => (b as HTMLElement).style.width === '30px')!
-    fireEvent.click(closeBtn)
+    render(<SidePanel nodeId={null} onClose={onClose} />)
+    fireEvent.click(screen.getByLabelText('Close panel'))
     expect(onClose).toHaveBeenCalled()
   })
 
