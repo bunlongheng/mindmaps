@@ -8,6 +8,7 @@ import { useKeyboard } from '../../hooks/useKeyboard'
 import { computeBranchColors } from '../../lib/branchColor'
 import { computeSubtreeCounts } from '../../lib/nodeCounts'
 import { radialNodeExtent } from '../../lib/layout/mindmap'
+import { GLOSS_LINEAR_ID, GLOSS_RADIAL_ID, GLOSS_RADIAL_CX, GLOSS_RADIAL_CY, GLOSS_RADIAL_R, GLOSS_STOPS } from '../../lib/gloss'
 
 interface DiagramCanvasProps {
   onNodeSelect: (nodeId: string | null) => void
@@ -459,6 +460,15 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract }: DiagramCan
         onPointerCancel={handleBgPointerUp}
         style={{ userSelect: 'none', touchAction: 'none' }}
       >
+        <defs>
+          {/* Box gloss - defined once per render (root/L1/L2 boxes reference it, see Node.tsx) */}
+          <linearGradient id={GLOSS_LINEAR_ID} x1="0" y1="0" x2="0" y2="1" gradientUnits="objectBoundingBox">
+            {GLOSS_STOPS.map((s, i) => <stop key={i} offset={s.offset} stopColor="#ffffff" stopOpacity={s.opacity} />)}
+          </linearGradient>
+          <radialGradient id={GLOSS_RADIAL_ID} cx={GLOSS_RADIAL_CX} cy={GLOSS_RADIAL_CY} r={GLOSS_RADIAL_R} gradientUnits="objectBoundingBox">
+            {GLOSS_STOPS.map((s, i) => <stop key={i} offset={s.offset} stopColor="#ffffff" stopOpacity={s.opacity} />)}
+          </radialGradient>
+        </defs>
         <g ref={gRef}>
           <EdgeLayer nodes={hideDetails ? activeMindmap.nodes.filter(n => n.depth <= 2) : activeMindmap.nodes} lineStyle={lineStyle} diagramType={diagramType} paletteColors={paletteColors} />
           {(hideDetails ? activeMindmap.nodes.filter(n => n.depth <= 2) : activeMindmap.nodes).map(node => (

@@ -23,6 +23,7 @@ import { shapeRx } from './nodeShape.js'
 import { parseLinkedTitle, sliceSegments, lineRanges, type LinkSegment } from './links.js'
 import { nodeCenter, nodeCenterLeft, nodeCenterRight, buildStraightPath, buildCurvedPath, buildOrthogonalPath, buildRadialBranchPath } from './geometry.js'
 import { computeSubtreeCounts } from './nodeCounts.js'
+import { GLOSS_LINEAR_ID, GLOSS_RADIAL_ID, glossApplies, glossOpacity, glossDefsSvg } from './gloss.js'
 
 // The stored DB row shape (SELECT in api/mindmaps.ts / INSERT in api/ai/mindmaps.ts).
 export interface MindmapRow {
@@ -333,6 +334,12 @@ function renderNode(node: MindmapNode, type: DiagramType, paletteColor: string |
   }
   if (node.borderColor) { strokeColor = node.borderColor; strokeW = Math.max(strokeW, node.borderWidth ?? 1.5) }
 
+  // Root, L1 and L2 boxes carry a soft top-of-box gloss; L3+ are already pale, so
+  // it would be lost. Dark-background boxes get the stronger gradient stops, light
+  // ones the softer scaled-down version (mirrors Node.tsx).
+  const showGloss = glossApplies(node.depth)
+  const glossFillOpacity = glossOpacity(isLight(bg))
+
   // Same shared box table the canvas reads (src/lib/nodeMetrics), so a card preview
   // and the opened map can never draw a label at a different size.
   const metric = nodeMetrics(node.depth)
@@ -369,6 +376,13 @@ function renderNode(node: MindmapNode, type: DiagramType, paletteColor: string |
       }
       parts.push(`<circle cx="${r2(cx)}" cy="${r2(cy)}" r="${r2(displayW / 2)}" fill="${esc(bg)}" stroke="${esc(strokeColor)}" stroke-width="${strokeW}"/>`)
     }
+    if (showGloss) {
+      if (isRootPill) {
+        parts.push(`<rect x="0" y="0" width="${r2(displayW)}" height="${r2(h)}" rx="${r2(h / 2)}" ry="${r2(h / 2)}" fill="url(#${GLOSS_LINEAR_ID})" fill-opacity="${glossFillOpacity}"/>`)
+      } else {
+        parts.push(`<circle cx="${r2(cx)}" cy="${r2(cy)}" r="${r2(displayW / 2)}" fill="url(#${GLOSS_RADIAL_ID})" fill-opacity="${glossFillOpacity}"/>`)
+      }
+    }
   } else if (isRadial) {
     const cr = displayW / 2
     if (node.depth <= 2) {
@@ -376,10 +390,16 @@ function renderNode(node: MindmapNode, type: DiagramType, paletteColor: string |
     }
     parts.push(`<circle cx="${r2(cx)}" cy="${r2(cy)}" r="${r2(cr)}" fill="${esc(bg)}"/>`)
     parts.push(`<circle cx="${r2(cx)}" cy="${r2(cy)}" r="${r2(cr)}" fill="none" stroke="${esc(strokeColor)}" stroke-width="${strokeW}"/>`)
+    if (showGloss) {
+      parts.push(`<circle cx="${r2(cx)}" cy="${r2(cy)}" r="${r2(cr)}" fill="url(#${GLOSS_RADIAL_ID})" fill-opacity="${glossFillOpacity}"/>`)
+    }
   } else if (drawCircle) {
     const cr = displayW / 2
     parts.push(`<circle cx="${r2(cx)}" cy="${r2(cy)}" r="${r2(cr)}" fill="${esc(bg)}"/>`)
     parts.push(`<circle cx="${r2(cx)}" cy="${r2(cy)}" r="${r2(cr)}" fill="none" stroke="${esc(strokeColor)}" stroke-width="${strokeW}"/>`)
+    if (showGloss) {
+      parts.push(`<circle cx="${r2(cx)}" cy="${r2(cy)}" r="${r2(cr)}" fill="url(#${GLOSS_RADIAL_ID})" fill-opacity="${glossFillOpacity}"/>`)
+    }
   } else if (isFishboneNode && !nodeShape) {
     // Parallelogram skewed toward the spine (SPINE_Y = 400 in the fishbone layout)
     const sk = h * 0.35
@@ -396,8 +416,17 @@ function renderNode(node: MindmapNode, type: DiagramType, paletteColor: string |
       parts.push(`<polygon points="${badgePts}" fill="#ffffff"/>`)
     }
     parts.push(`<polygon points="${pts}" fill="none" stroke="${esc(strokeColor)}" stroke-width="${strokeW}"/>`)
+    // Parallelogram has no rx, so the gloss overlay clips to the polygon instead.
+    if (showGloss) {
+      const clipId = `gloss-fb-${esc(node.id)}`
+      parts.push(`<defs><clipPath id="${clipId}"><polygon points="${pts}"/></clipPath></defs>`)
+      parts.push(`<rect x="0" y="0" width="${r2(displayW)}" height="${r2(h)}" clip-path="url(#${clipId})" fill="url(#${GLOSS_LINEAR_ID})" fill-opacity="${glossFillOpacity}"/>`)
+    }
   } else {
     parts.push(`<rect x="0" y="0" width="${r2(displayW)}" height="${r2(h)}" rx="${effectiveRx}" ry="${effectiveRx}" fill="${esc(bg)}"/>`)
+    if (showGloss) {
+      parts.push(`<rect x="0" y="0" width="${r2(displayW)}" height="${r2(h)}" rx="${effectiveRx}" ry="${effectiveRx}" fill="url(#${GLOSS_LINEAR_ID})" fill-opacity="${glossFillOpacity}"/>`)
+    }
     if (hasEmoji || hasIcon) {
       parts.push(`<rect x="0" y="0" width="${r2(h + 1)}" height="${r2(h)}" fill="#ffffff"/>`)
     }
@@ -497,9 +526,11 @@ export function renderMindmapSvg(row: MindmapRow): string {
     renderNode(n, type, paletteColors.get(n.id) ?? null, descendantCounts.get(n.id) ?? 0, rootCenter)).join('')
   // One blur filter for every glow in the map: the radial mind map's soft coloured
   // halo. Defined once so a 200-node map carries one filter, not 200.
-  const defs = type === 'mindmap'
-    ? '<defs><filter id="mm-glow" x="-70%" y="-70%" width="240%" height="240%"><feGaussianBlur stdDeviation="6"/></filter></defs>'
+  const mmGlowDef = type === 'mindmap'
+    ? '<filter id="mm-glow" x="-70%" y="-70%" width="240%" height="240%"><feGaussianBlur stdDeviation="6"/></filter>'
     : ''
+  // Gloss gradients: defined once here, referenced by every root/L1/L2 box below.
+  const defs = `<defs>${glossDefsSvg()}${mmGlowDef}</defs>`
 
   // viewBox from laid-out bounds (+ slack for spines that extend past the nodes)
   const pad = 60
