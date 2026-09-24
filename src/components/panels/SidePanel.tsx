@@ -4,6 +4,7 @@ import { NODE_ICONS } from '../../lib/icons'
 import { useMindmapStore } from '../../store/mindmapStore'
 import { useIsMobile } from '../../hooks/useIsMobile'
 import { getTheme, THEMES, isDarkBg } from '../../lib/themes'
+import { L1_PALETTE } from '../../lib/color'
 import type { Theme } from '../../lib/themes'
 import { X, AlignLeft, AlignCenter, AlignRight, Copy, Check, FileDown, Trash2, Sparkles, Code2, Square, Squircle, Pill, Circle, Tag } from 'lucide-react'
 import { getLucideIcon } from '../canvas/NodeIcon'
@@ -353,7 +354,13 @@ export function SidePanel({ nodeId, onClose, onDelete, onUpdateTags }: SidePanel
               {/* Shape */}
               <SBlock title="Shape">
                 <PRow label="Fill">
-                  <ColorField color={node.color} onChange={c => save({ color: c })} swatches={themeColors} />
+                  <ColorField
+                    color={node.color}
+                    colorMode={node.colorMode}
+                    onChange={c => save({ color: c, colorMode: 'manual' })}
+                    onAuto={() => save({ colorMode: undefined })}
+                    swatches={themeColors}
+                  />
                 </PRow>
                 {node.depth >= 1 && (
                   <PRow label="Box">
@@ -928,21 +935,32 @@ function TagsBlock({ activeMindmap, diagrams, onUpdateTags }: {
   )
 }
 
-function ColorField({ color, onChange, allowNone, swatches }: {
-  color: string; onChange: (c: string) => void; allowNone?: boolean; swatches?: string[]
+function ColorField({ color, colorMode, onChange, onAuto, allowNone, swatches }: {
+  color: string; colorMode?: 'auto' | 'manual'; onChange: (c: string) => void; onAuto?: () => void; allowNone?: boolean; swatches?: string[]
 }) {
   const inputRef = useRef<HTMLInputElement>(null)
   const isNone = color === 'none'
+  const isAuto = colorMode !== 'manual'
+  const isManual = !isAuto && !isNone
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 5 }}>
+      {onAuto && (
+        <button onClick={onAuto} title="Auto (wheel-driven)" style={{
+          width: '100%', aspectRatio: '1', borderRadius: '50%', cursor: 'pointer', padding: 0,
+          background: `conic-gradient(${L1_PALETTE.join(', ')})`,
+          border: isAuto ? '2px solid #1a1d2e' : '1.5px dashed #d1d5db',
+          outline: isAuto ? 'none' : 'none', boxShadow: isAuto ? '0 0 0 1.5px #fff inset' : 'none',
+          transform: isAuto ? 'scale(1.1)' : 'scale(1)', transition: 'all 0.1s',
+        }} />
+      )}
       {(swatches ?? []).slice(0, 11).map(c => (
         <button key={c} onClick={() => onChange(c)} style={{
           width: '100%', aspectRatio: '1', borderRadius: 5, border: 'none',
           background: c, cursor: 'pointer', padding: 0,
-          outline: !isNone && color === c ? `2.5px solid ${c === '#ffffff' ? '#94a3b8' : c}` : 'none', outlineOffset: 1.5,
-          boxShadow: !isNone && color === c ? '0 0 0 1.5px #fff inset' : (c === '#ffffff' || c === '#f1f5f9' ? '0 0 0 1px #d1d5db inset' : '0 1px 2px rgba(0,0,0,0.15)'),
-          transform: !isNone && color === c ? 'scale(1.1)' : 'scale(1)', transition: 'all 0.1s',
+          outline: isManual && color === c ? `2.5px solid ${c === '#ffffff' ? '#94a3b8' : c}` : 'none', outlineOffset: 1.5,
+          boxShadow: isManual && color === c ? '0 0 0 1.5px #fff inset' : (c === '#ffffff' || c === '#f1f5f9' ? '0 0 0 1px #d1d5db inset' : '0 1px 2px rgba(0,0,0,0.15)'),
+          transform: isManual && color === c ? 'scale(1.1)' : 'scale(1)', transition: 'all 0.1s',
         }} />
       ))}
       {/* Custom color picker as last tile */}

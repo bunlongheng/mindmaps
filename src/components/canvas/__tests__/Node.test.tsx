@@ -5,6 +5,7 @@ import { Node } from '../Node'
 import { useMindmapStore } from '../../../store/mindmapStore'
 import type { Diagram, DiagramType, MindmapNode } from '../../../types'
 import { depthFill, hexToRgb } from '../../../lib/color'
+import { computeBranchColors } from '../../../lib/branchColor'
 import { renderMindmapSvg } from '../../../lib/render-svg'
 import { nodeFontSize } from '../../../lib/nodeMetrics'
 
@@ -325,6 +326,21 @@ describe('Node — child / descendant counts (fireflies)', () => {
     loadStore([makeRoot(), n])
     const { container } = renderNode(n, { paletteColor: '#ED1C24' })
     expect(container.querySelector('rect[fill="#ED1C24"]')).toBeTruthy()
+  })
+
+  it('a manual-coloured depth-1 node renders that colour, and its child renders depthFill(that colour, 2)', () => {
+    const manualColor = '#123456'
+    const l1 = makeNode({ id: 'a', colorMode: 'manual', color: manualColor })
+    const l2 = makeNode({ id: 'b', parentId: 'a', depth: 2, color: manualColor })
+    loadStore([makeRoot(), l1, l2])
+    const branchColors = computeBranchColors([makeRoot(), l1, l2])
+
+    const l1Render = renderNode(l1, { paletteColor: branchColors.get('a') ?? null })
+    expect(l1Render.container.querySelector(`rect[fill="${manualColor}"]`)).toBeTruthy()
+    cleanup()
+
+    const l2Render = renderNode(l2, { paletteColor: branchColors.get('b') ?? null })
+    expect(l2Render.container.querySelector(`rect[fill="${depthFill(manualColor, 2)}"]`)).toBeTruthy()
   })
 })
 

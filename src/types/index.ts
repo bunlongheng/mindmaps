@@ -5,6 +5,7 @@ export interface MindmapNode {
   id: string
   title: string
   color: string        // hex base color (inherited from nearest user-set ancestor)
+  colorMode?: 'auto' | 'manual'  // 'manual': color wins for this node and its branch; absent/'auto': wheel-driven
   parentId: string | null
   depth: number
   x: number

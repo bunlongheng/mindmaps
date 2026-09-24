@@ -226,20 +226,23 @@ test.describe('SidePanel — Map tab', () => {
 const WHEEL = ['#d94f3a', '#3ad9bf', '#d93abf', '#8fd93a', '#473ad9']  // first 5 of L1_PALETTE in src/lib/color.ts
 
 test.describe('SidePanel — Style tab', () => {
-  test('Fill swatch + custom color persist to the node; L1 fill stays wheel-driven', async ({ page }) => {
+  test('Fill swatch + custom color persist to the node; a chosen fill overrides the wheel', async ({ page }) => {
     await openEditorWithPanel(page)
     await clickNode(page, 'Main Topic 1')
 
-    // Rendered fill of an L1 node comes from the 12-colour wheel by order.
+    // Rendered fill of an L1 node comes from the 12-colour wheel by order by default
+    // (absent colorMode = auto).
     await expect.poll(async () => (await fillOf(page, 'Main Topic 1'))?.toLowerCase(), { timeout: 5_000 })
       .toBe(WHEEL[0])
 
     // The picker's <input type=color> is controlled by node.color, so it proves the
     // store round-trip: click a swatch and the input must take that swatch's colour.
     const colorInput = page.locator('input[type="color"]').first()
-    // Use the 2nd swatch so the value provably CHANGES (the 1st swatch equals the
-    // node's seeded colour #ef4444, which would pass without any store write).
-    const swatch = page.locator('button[style*="aspect-ratio"]').nth(1)
+    // Swatch buttons: index 0 is the round "Auto" wheel swatch, so the solid colour
+    // swatches start at index 1. Use the 3rd overall (2nd solid) swatch so the value
+    // provably CHANGES (the 1st solid swatch equals the node's seeded colour #ef4444,
+    // which would pass without any store write).
+    const swatch = page.locator('button[style*="aspect-ratio"]').nth(2)
     const swatchColor = await swatch.evaluate(el => {
       const bg = getComputedStyle(el).backgroundColor
       const m = bg.match(/\d+/g)!.map(Number)
@@ -248,6 +251,11 @@ test.describe('SidePanel — Style tab', () => {
     expect(swatchColor).not.toBe(await colorInput.inputValue())
     await swatch.click()
     await expect.poll(() => colorInput.inputValue(), { timeout: 5_000 }).toBe(swatchColor)
+
+    // A picked fill sets colorMode manual, so the chosen colour now wins over the
+    // wheel and is what actually draws on the L1 node.
+    await expect.poll(async () => (await fillOf(page, 'Main Topic 1'))?.toLowerCase(), { timeout: 5_000 })
+      .toBe(swatchColor)
 
     // Custom color: setting the hidden <input type=color> drives the same onChange.
     await colorInput.evaluate((el: HTMLInputElement) => {
@@ -258,10 +266,9 @@ test.describe('SidePanel — Style tab', () => {
     })
     await expect.poll(() => colorInput.inputValue(), { timeout: 5_000 }).toBe('#123456')
 
-    // Regression guard for the wheel: the L1 fill is order-driven, so the custom
-    // colour must NOT repaint the node - the wheel colour wins.
+    // The custom colour is manual too, so it also draws on the node.
     await expect.poll(async () => (await fillOf(page, 'Main Topic 1'))?.toLowerCase(), { timeout: 5_000 })
-      .toBe(WHEEL[0])
+      .toBe('#123456')
   })
 
   test('reordering an L1 node recolours it along the 12-colour wheel', async ({ page }) => {

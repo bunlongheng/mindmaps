@@ -15,7 +15,8 @@ import { computeMindmapLayout, wrapText, initialFontSize, nodeInitial, radialLab
 import { computeFishboneLayout, FISHBONE_SLANT } from './layout/fishbone.js'
 import { computeTimelineLayout } from './layout/timeline.js'
 import { getTheme } from './themes.js'
-import { L1_PALETTE, hexToRgb, darken, depthFill, applyDepthTransparency, edgeWidthForDepth, radialEdgeWidth, RADIAL_EDGE_OPACITY } from './color.js'
+import { hexToRgb, darken, depthFill, applyDepthTransparency, edgeWidthForDepth, radialEdgeWidth, RADIAL_EDGE_OPACITY } from './color.js'
+import { computeBranchColors } from './branchColor.js'
 import { rootPillWidth, rootPillFontSize, rootTitleNeedsPill, ROOT_FONT } from './rootPill.js'
 import { nodeMetrics, ICON_GAP } from './nodeMetrics.js'
 import { shapeRx } from './nodeShape.js'
@@ -76,26 +77,6 @@ function runLayout(nodes: MindmapNode[], type: DiagramType): MindmapNode[] {
     case 'timeline': return computeTimelineLayout(nodes)
     default:         return computeMindmapsLayout(nodes)
   }
-}
-
-/** 12-colour-wheel colour per node id (DiagramCanvas computePaletteColors). */
-function computePaletteColors(nodes: MindmapNode[]): Map<string, string | null> {
-  const byId = new Map(nodes.map(n => [n.id, n]))
-  const colors = new Map<string, string | null>()
-  const resolve = (n: MindmapNode): string | null => {
-    const cached = colors.get(n.id)
-    if (cached !== undefined) return cached
-    let c: string | null = null
-    if (n.depth === 1) c = L1_PALETTE[(((n.sortOrder ?? 0) % 12) + 12) % 12]
-    else if (n.depth > 1) {
-      const parent = n.parentId ? byId.get(n.parentId) : undefined
-      c = parent ? resolve(parent) : null
-    }
-    colors.set(n.id, c)
-    return c
-  }
-  for (const n of nodes) resolve(n)
-  return colors
 }
 
 /** Load pipeline (mindmapStore setActiveMindmap): reset sizes -> layout -> normalize -> layout. */
@@ -504,7 +485,7 @@ export function renderMindmapSvg(row: MindmapRow): string {
   }
 
   const nodes = layoutForRender(raw, type)
-  const paletteColors = computePaletteColors(nodes)
+  const paletteColors = computeBranchColors(nodes)
   const pc = (n: MindmapNode) => paletteColors.get(n.id) ?? n.color
   const { descendantCounts } = computeSubtreeCounts(nodes)
 

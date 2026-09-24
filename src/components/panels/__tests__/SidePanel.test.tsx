@@ -265,6 +265,27 @@ describe('SidePanel — Style tab', () => {
     expect(useMindmapStore.getState().activeMindmap!.nodes.find(n => n.id === 'c1')!.color).toBe('#123456')
   })
 
+  it('ColorField swatch click sets color and colorMode manual; Auto swatch clears it', () => {
+    loadDiagram()
+    const { container } = render(<SidePanel nodeId="c1" onClose={vi.fn()} />)
+    const swatches = (Array.from(container.querySelectorAll('button')) as HTMLElement[]).filter(
+      b => b.style.borderRadius === '5px' && b.style.background.startsWith('rgb')
+    )
+    fireEvent.click(swatches[2])
+    let node = useMindmapStore.getState().activeMindmap!.nodes.find(n => n.id === 'c1')!
+    expect(node.color).toBe(getTheme('default').colors[2])
+    expect(node.colorMode).toBe('manual')
+
+    // Auto swatch is the round conic-gradient button preceding the solid swatches
+    const autoSwatch = (Array.from(container.querySelectorAll('button')) as HTMLElement[]).find(
+      b => b.style.borderRadius === '50%' && b.title === 'Auto (wheel-driven)'
+    )
+    expect(autoSwatch).toBeTruthy()
+    fireEvent.click(autoSwatch!)
+    node = useMindmapStore.getState().activeMindmap!.nodes.find(n => n.id === 'c1')!
+    expect(node.colorMode).toBeUndefined()
+  })
+
   it('width slider invokes resizeNodeDepth', () => {
     loadDiagram()
     const spy = vi.spyOn(useMindmapStore.getState(), 'resizeNodeDepth')

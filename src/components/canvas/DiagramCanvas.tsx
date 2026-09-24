@@ -5,7 +5,7 @@ import { getTheme } from '../../lib/themes'
 import { EdgeLayer } from './EdgeLayer'
 import { Node } from './Node'
 import { useKeyboard } from '../../hooks/useKeyboard'
-import { L1_PALETTE } from '../../lib/color'
+import { computeBranchColors } from '../../lib/branchColor'
 import { computeSubtreeCounts } from '../../lib/nodeCounts'
 import { radialNodeExtent } from '../../lib/layout/mindmap'
 
@@ -14,29 +14,6 @@ interface DiagramCanvasProps {
   readOnly?: boolean
   noInteract?: boolean
   onDelete?: () => void
-}
-
-// Resolve every node's 12-colour-wheel palette colour in one O(n) pass, so Node and
-// EdgeLayer no longer each run l1PaletteColor's O(n) ancestor walk per node per render
-// (which was O(n^2) per render). Same semantics as l1PaletteColor in src/lib/color.ts:
-// null for the root or when no L1 ancestor exists (callers fall back to the stored colour).
-function computePaletteColors(nodes: { id: string; parentId: string | null; depth: number; sortOrder?: number }[]) {
-  const byId = new Map(nodes.map(n => [n.id, n]))
-  const colors = new Map<string, string | null>()
-  const resolve = (n: { id: string; parentId: string | null; depth: number; sortOrder?: number }): string | null => {
-    const cached = colors.get(n.id)
-    if (cached !== undefined) return cached
-    let c: string | null = null
-    if (n.depth === 1) c = L1_PALETTE[(((n.sortOrder ?? 0) % 12) + 12) % 12]
-    else if (n.depth > 1) {
-      const parent = n.parentId ? byId.get(n.parentId) : undefined
-      c = parent ? resolve(parent) : null
-    }
-    colors.set(n.id, c)
-    return c
-  }
-  for (const n of nodes) resolve(n)
-  return colors
 }
 
 export function DiagramCanvas({ onNodeSelect, readOnly, noInteract }: DiagramCanvasProps) {
@@ -57,7 +34,7 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract }: DiagramCan
     return r ? { x: r.x + r.width / 2, y: r.y + r.height / 2 } : null
   }, [activeMindmap?.nodes])
 
-  const paletteColors = useMemo(() => computePaletteColors(activeMindmap?.nodes ?? []), [activeMindmap?.nodes])
+  const paletteColors = useMemo(() => computeBranchColors(activeMindmap?.nodes ?? []), [activeMindmap?.nodes])
   const canvasBg = getTheme(themeId).canvasBg
   const svgRef = useRef<SVGSVGElement>(null!)
   const gRef = useRef<SVGGElement>(null!)

@@ -42,6 +42,18 @@ describe('renderMindmapSvg smoke', () => {
     expect(d2).not.toBe(depthFill(L1_PALETTE[0], 3))
   })
 
+  it('draws a manual branch colour instead of the wheel colour, and carries it to descendants', () => {
+    // 'a' would default to the wheel's sortOrder-0 colour; force it manual and confirm
+    // the chosen colour - not L1_PALETTE[0] - reaches the server-rendered fill, and that
+    // 'a1' (a's child) inherits it through the same depth ladder as the wheel case.
+    const manualColor = '#123456'
+    const nodes = mkNodes().map(n => (n.id === 'a' ? { ...n, color: manualColor, colorMode: 'manual' as const } : n))
+    const svg = renderMindmapSvg({ id: 'x', name: 'M', type: 'logic-chart', line_style: 'orthogonal', theme_id: 'default', nodes: nodes as never })
+    expect(svg).toContain(`fill="${manualColor}"`)
+    expect(svg).toContain(`fill="${depthFill(manualColor, 2)}"`)
+    expect(svg).not.toContain(`fill="${L1_PALETTE[0]}"`)
+  })
+
   it('emits the matching primitive for every box shape', () => {
     // Shape every non-root node so the default radius can't mask the result.
     const shaped = (shape: 'rect' | 'rounded' | 'pill' | 'circle') => {
