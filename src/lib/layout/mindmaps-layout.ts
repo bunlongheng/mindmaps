@@ -1,6 +1,7 @@
 import type { MindmapNode } from '../../types/index.js'
 import { rootPillWidth, rootCircleDiameter, rootTitleNeedsPill } from '../rootPill.js'
 import { displayTitle } from '../links.js'
+import { shapedNodeSize } from '../nodeShape.js'
 
 const DEFAULT_H: Record<number, number> = { 1: 54, 2: 38, 3: 34 }
 const DEFAULT_HEIGHT = 30
@@ -10,9 +11,14 @@ const V_GAP = 22
 
 function getHGap(depth: number) { return H_GAPS[depth] ?? DEFAULT_H_GAP }
 
+/** Font size the canvas draws at a given depth (Node.tsx defaultFontSize, scaled). */
+function fontSizeFor(depth: number): number {
+  return depth === 1 ? 22 : depth === 2 ? 16 : depth === 3 ? 13 : 11
+}
+
 /** Auto-compute width from title text so every node fits its content */
 function autoWidth(node: MindmapNode, depth: number): number {
-  const fontSize = depth === 1 ? 22 : depth === 2 ? 16 : depth === 3 ? 13 : 11
+  const fontSize = fontSizeFor(depth)
   const hasVisual = !!(node.icon || node.emoji)
   const h = DEFAULT_H[depth] ?? DEFAULT_HEIGHT
   // For L1 with icon/emoji: white square takes full height, add that + gap to text width
@@ -40,7 +46,8 @@ function nodeSize(node: MindmapNode, depth: number) {
   }
   const w = node.width > 0 ? node.width : autoWidth(node, depth)
   const h = node.height > 0 ? node.height : (DEFAULT_H[depth] ?? DEFAULT_HEIGHT)
-  return { w, h }
+  // A circle-shaped node reserves a square box, so siblings keep clear of it.
+  return shapedNodeSize(node, fontSizeFor(depth), w, h)
 }
 
 function subtreeH(nodeId: string, depth: number, nodes: MindmapNode[]): number {

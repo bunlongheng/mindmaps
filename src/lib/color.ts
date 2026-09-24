@@ -12,6 +12,9 @@ export function applyDepthTransparency(baseHex: string, depth: number): string {
   return `rgba(${r},${g},${b},${alpha})`
 }
 
+// Legacy soft ladder, still used by the HomePage fallback minimap. For node fills
+// on the canvas and in the server renderer use depthFill() below - that is the one
+// visible depth ladder both renderers share.
 export function applyDepthBackground(baseHex: string, depth: number): string {
   if (depth === 0) return baseHex
   const [r, g, b] = hexToRgb(baseHex)
@@ -21,6 +24,40 @@ export function applyDepthBackground(baseHex: string, depth: number): string {
   const ng = Math.round(g + (255 - g) * factor)
   const nb = Math.round(b + (255 - b) * factor)
   return `rgb(${nr},${ng},${nb})`
+}
+
+/**
+ * Visible colour ladder per depth. "Strength" is how much of the branch colour
+ * survives; the remainder (1 - strength) is mixed toward white. Depth 1 keeps the
+ * full colour, every level below it steps down by a step big enough to read at a
+ * glance, and depth 5 and deeper share a floor so very deep maps stay legible.
+ *
+ *   depth 1 -> 100%   depth 2 -> 80%   depth 3 -> 60%   depth 4 -> 50%   depth 5+ -> 40%
+ *
+ * Exported so the canvas (Node.tsx), the server renderer (render-svg.ts) and the
+ * tests all read the same numbers.
+ */
+export const DEPTH_STRENGTH: Readonly<Record<number, number>> = { 1: 1, 2: 0.8, 3: 0.6, 4: 0.5 }
+
+/** Strength used at depth 5 and deeper. */
+export const DEPTH_STRENGTH_FLOOR = 0.4
+
+/** Strength of the branch colour at a given depth (see DEPTH_STRENGTH). */
+export function depthStrength(depth: number): number {
+  return DEPTH_STRENGTH[depth] ?? DEPTH_STRENGTH_FLOOR
+}
+
+/**
+ * Node fill for a branch colour at a given depth: the colour mixed toward white by
+ * (1 - strength). Depth 0 (the root) is returned untouched. Returns hex so callers
+ * can run the same isLight() readability check on the result.
+ */
+export function depthFill(baseHex: string, depth: number): string {
+  if (depth <= 0) return baseHex
+  const mix = 1 - depthStrength(depth)
+  const [r, g, b] = hexToRgb(baseHex)
+  const ch = (v: number) => Math.round(v + (255 - v) * mix).toString(16).padStart(2, '0')
+  return `#${ch(r)}${ch(g)}${ch(b)}`
 }
 
 export function darken(hex: string, amount = 0.3): string {

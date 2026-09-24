@@ -24,7 +24,7 @@ const L1_H = 44
 const L2_CIRCLE_SIZE = 80
 
 /** Compute circle diameter that fits wrapped text */
-function circleForText(rawTitle: string, fontSize: number, minSize: number): number {
+export function circleForText(rawTitle: string, fontSize: number, minSize: number): number {
   const title = displayTitle(rawTitle)
   const charW = fontSize * 0.64
   const lineH = fontSize * 1.3
@@ -70,10 +70,12 @@ function placeSubtree(
   if (!node) return
 
   const fontSize = FONT_SIZES[depth] ?? DEFAULT_FONT_SIZE
-  const isCircle = depth >= 2
-  const isL1Pill = depth === 1
+  // An explicit shape: 'circle' wins over the depth default, so a mindmap L1 can be
+  // a circle too. Every other shape keeps the depth's own box.
+  const isCircle = depth >= 2 || node.shape === 'circle'
+  const isL1Pill = depth === 1 && !isCircle
   // Auto-size circle: wrap text into lines, then size circle to fit
-  const minCircle = depth === 2 ? L2_CIRCLE_SIZE : depth === 3 ? 66 : 52
+  const minCircle = depth === 1 ? L1_H : depth === 2 ? L2_CIRCLE_SIZE : depth === 3 ? 66 : 52
   const circleSize = isCircle ? circleForText(node.title, fontSize, minCircle) : 0
   const w = isL1Pill ? autoW(node, depth) : isCircle ? circleSize : (node.width > 0 ? node.width : autoW(node, depth))
   const h = isL1Pill ? L1_H : isCircle ? circleSize : 44

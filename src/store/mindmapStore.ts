@@ -26,12 +26,13 @@ function normalizeWidthsPerDepth(nodes: MindmapNode[], type?: DiagramType): Mind
   // For mindmap type, only normalize L1 widths — L2+ are circles sized individually
   const maxByDepth = new Map<number, number>()
   for (const n of nodes) {
-    if (n.depth > 0 && !(type === 'mindmap' && n.depth >= 2)) {
+    if (n.depth > 0 && n.shape !== 'circle' && !(type === 'mindmap' && n.depth >= 2)) {
       maxByDepth.set(n.depth, Math.max(maxByDepth.get(n.depth) ?? 0, n.width))
     }
   }
   return nodes.map(n => {
     if (n.depth <= 0) return n
+    if (n.shape === 'circle') return n              // circles keep individual sizes
     if (type === 'mindmap' && n.depth >= 2) return n // circles keep individual sizes
     return { ...n, width: maxByDepth.get(n.depth) ?? n.width }
   })

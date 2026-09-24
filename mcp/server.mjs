@@ -100,6 +100,7 @@ server.registerTool(
       'Indented form: the first line is the root; each 2-space indent is one level deeper.',
       `type is one of: ${VALID_TYPES.join(', ')} (default logic-chart). Unknown types fall back to logic-chart.`,
       '"top 10 X" / "5 best Y" phrasing → a flat list of items; "break down X by category" → categorized branches.',
+      'A node may carry "shape": one of rect, rounded, pill, circle. Omit it to keep the diagram\'s default box.',
       'Node text may carry links: markdown [label](https://...) or a bare https:// url renders as a clickable anchor. Only http/https is linked; bare ticket keys are not.',
       'The map is owned by the configured owner and (by default) shared so the returned url opens without auth.',
     ],

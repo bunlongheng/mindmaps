@@ -3,12 +3,13 @@ import { useShallow } from 'zustand/react/shallow'
 import { NODE_ICONS } from '../../lib/icons'
 import { useMindmapStore } from '../../store/mindmapStore'
 import { getTheme, THEMES, isDarkBg } from '../../lib/themes'
-import { X, AlignLeft, AlignCenter, AlignRight, Copy, Check, FileDown, Trash2, Sparkles, Code2 } from 'lucide-react'
+import { X, AlignLeft, AlignCenter, AlignRight, Copy, Check, FileDown, Trash2, Sparkles, Code2, Square, Squircle, Pill, Circle } from 'lucide-react'
 import { getLucideIcon } from '../canvas/NodeIcon'
 import { showToast, dismissToast } from '../CuteToast'
 import { soundChaChing } from '../../lib/sounds'
 import { authHeaders } from '../../hooks/useDiagram'
 import type { LineStyle, DiagramType } from '../../types'
+import type { NodeShape } from '../../lib/nodeShape'
 import { QRCodeSVG } from 'qrcode.react'
 
 interface SidePanelProps {
@@ -332,6 +333,24 @@ export function SidePanel({ nodeId, onClose, onDelete }: SidePanelProps) {
                 <PRow label="Fill">
                   <ColorField color={node.color} onChange={c => save({ color: c })} swatches={themeColors} />
                 </PRow>
+                {node.depth >= 1 && (
+                  <PRow label="Box">
+                    <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                      {([
+                        { v: 'rect' as const,    label: 'Rectangle', icon: <Square size={12}/> },
+                        { v: 'rounded' as const, label: 'Rounded',   icon: <Squircle size={12}/> },
+                        { v: 'pill' as const,    label: 'Pill',      icon: <Pill size={12}/> },
+                        { v: 'circle' as const,  label: 'Circle',    icon: <Circle size={12}/> },
+                      ] as const).map(({ v, label, icon }) => (
+                        <button key={v} title={label} aria-label={label}
+                          onClick={() => { save({ shape: v as NodeShape }); setTimeout(() => rerunLayout(), 0) }}
+                          style={{ ...chip(node.shape === v), flex: 1, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          {icon}
+                        </button>
+                      ))}
+                    </div>
+                  </PRow>
+                )}
                 {node.depth >= 1 && !(diagramType === 'mindmap' && node.depth <= 2) && (
                   <PRow label="Width">
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
