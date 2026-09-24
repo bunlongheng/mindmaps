@@ -7,6 +7,7 @@ import { ImportModal } from './components/modals/ImportModal'
 import { HomePage } from './components/home/HomePage'
 import { useDiagram } from './hooks/useDiagram'
 import { useIsMobile } from './hooks/useIsMobile'
+import { useIsTouchDevice } from './hooks/useIsTouchDevice'
 import { useMindmapStore } from './store/mindmapStore'
 import { decodeShareURL } from './lib/export/share'
 import { hasGoogleAuth, renderGoogleButton } from './lib/googleAuth'
@@ -191,6 +192,7 @@ export default function App() {
   const [selectedPanelNodeId, setSelectedPanelNodeId] = useState<string | null>(null)
   const [showPanel, setShowPanel] = useState(false)
   const isMobile = useIsMobile()
+  const isTouch = useIsTouchDevice()
   const [showImport, setShowImport] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [copiedSvg, setCopiedSvg] = useState(false)
@@ -478,9 +480,12 @@ export default function App() {
         <DiagramCanvas
           onNodeSelect={handleNodeSelect}
           onDelete={activeMindmap ? () => setShowDeleteConfirm(true) : undefined}
-          // A locked map rides the same readOnly path the share view uses: no editing,
-          // dragging or renaming, but zoom, pan and export all still work.
-          readOnly={activeMindmap?.locked ?? false}
+          // Read-only covers both reasons a map cannot be edited: a touch device, where
+          // the canvas is look-only, and a locked map. Either way zoom, pan and export work.
+          readOnly={isTouch || (activeMindmap?.locked ?? false)}
+          // No-interaction is touch only. A locked map on a desktop still selects nodes,
+          // so the selection ring must stay visible there.
+          noInteract={isTouch}
         />
 
         {/* Back button — top left */}

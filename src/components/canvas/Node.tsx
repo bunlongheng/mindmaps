@@ -16,6 +16,7 @@ interface NodeProps {
   onRootDragOffset?: (offset: { dx: number; dy: number; clientX: number; clientY: number } | null) => void
   svgRef: React.RefObject<SVGSVGElement>
   readOnly?: boolean
+  noInteract?: boolean
   l1Colors?: string[]
   paletteColor?: string | null  // 12-colour-wheel colour, precomputed once by DiagramCanvas (was an O(n) l1PaletteColor walk per node per render)
   childCount?: number       // direct children, precomputed once by DiagramCanvas (was an O(n) per-node selector)
@@ -77,7 +78,7 @@ function isLight(hex: string): boolean {
   return lum > 140
 }
 
-export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onDragMove, onRootDragOffset, svgRef, readOnly, l1Colors = [], paletteColor = null, childCount = 0, descendantCount = 0, nodeCount = 0 }: NodeProps) {
+export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onDragMove, onRootDragOffset, svgRef, readOnly, noInteract = false, l1Colors = [], paletteColor = null, childCount = 0, descendantCount = 0, nodeCount = 0 }: NodeProps) {
   const isRoot = node.depth === 0
   const isL2Plus = node.depth >= 2
   // Brighter/more-vivid version of the node colour, used for all coloured fills.
@@ -315,6 +316,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
     <g data-node-id={node.id} style={{
       transform: `translate(${node.x}px, ${node.y}px)`,
       transition: isDragging ? 'none' : 'transform 0.22s cubic-bezier(0.4,0,0.2,1)',
+      pointerEvents: noInteract ? 'none' : undefined,
     }}>
     {!isRoot && (
       <defs>
@@ -328,7 +330,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
       onPointerMove={onPointerMove}
       onPointerUp={handlePointerUp}
       onDoubleClick={handleDoubleClick}
-      onClick={readOnly && node.url ? () => openNodeUrl(node.url!) : undefined}
+      onClick={noInteract ? undefined : readOnly && node.url ? () => openNodeUrl(node.url!) : undefined}
       style={{ cursor: editing ? 'default' : canDrag ? 'grab' : 'pointer', userSelect: 'none' }}
     >
       {/* Fireflies around nodes with children — count = all descendants */}
@@ -643,8 +645,10 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
       {/* Mindmap L2+ icons are rendered centered inside the circle (in the text block above) */}
 
 
-      {/* Selection ring — always on top */}
-      {isSelected && (isRoot ? (
+      {/* Selection ring — always on top. Hidden on touch devices (noInteract), not merely on
+          read-only maps (readOnly) — a desktop-mouse read-only/locked map should still show
+          what's selected; only a touch device should never show the blue ring. */}
+      {isSelected && !noInteract && (isRoot ? (
         isRootPill ? (
           <>
             <rect x={-5} y={-5} width={displayW + 10} height={node.height + 10}

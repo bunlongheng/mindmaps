@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor, act, cleanup, within } from '@testi
 import { HomePage } from '../HomePage'
 import { useMindmapStore } from '../../../store/mindmapStore'
 import type { DiagramMeta } from '../../../types'
+import { L1_PALETTE } from '../../../lib/color'
 
 vi.mock('../../CuteToast', () => ({
   showToast: vi.fn(),
@@ -608,6 +609,58 @@ describe('HomePage — DiagramMinimap', () => {
 
   it('shows "Open to preview" placeholder for a map with no cached nodes', () => {
     seedDiagrams([SAMPLE[0]])
+    render(<HomePage onOpen={vi.fn()} user={USER} onSignOut={vi.fn()} />)
+    expect(screen.getByText('Open to preview')).toBeInTheDocument()
+  })
+
+  it('renders an svg whose viewBox matches the real node bbox plus padding', () => {
+    const nodes = [
+      { id: 'r', title: 'Root', parentId: null, depth: 0, color: '#000', x: 0, y: 0, width: 40, height: 40, sortOrder: 0 },
+      { id: 'a', title: 'A', parentId: 'r', depth: 1, color: '#111', x: 100, y: 0, width: 80, height: 30, sortOrder: 0 },
+      { id: 'b', title: 'B', parentId: 'r', depth: 1, color: '#222', x: 100, y: 100, width: 80, height: 30, sortOrder: 1 },
+    ]
+    localStorage.setItem('mindmaps:diagram:bbox1', JSON.stringify({ id: 'bbox1', themeId: 'default', lineStyle: 'orthogonal', nodes }))
+    seedDiagrams([{ id: 'bbox1', name: 'BBox', type: 'logic-chart', updatedAt: new Date().toISOString(), tags: [] }])
+    const { container } = render(<HomePage onOpen={vi.fn()} user={USER} onSignOut={vi.fn()} />)
+    // Locate the minimap's svg (not one of the toolbar's lucide-icon svgs) via a
+    // resolved-colour L1 rect that only the minimap renders.
+    const rect = container.querySelector('svg rect[fill]')
+    const svg = rect?.closest('svg') ?? null
+    expect(svg).toBeTruthy()
+    const [vbX, vbY, vbW, vbH] = (svg!.getAttribute('viewBox') ?? '').split(' ').map(Number)
+    // Real bbox over all 3 nodes: minX=0, minY=0, maxX=180 (100+80), maxY=130 (100+30)
+    const bboxW = 180, bboxH = 130
+    const pad = Math.max(8, Math.max(bboxW, bboxH) * 0.06)
+    expect(vbX).toBeCloseTo(0 - pad, 5)
+    expect(vbY).toBeCloseTo(0 - pad, 5)
+    expect(vbW).toBeCloseTo(bboxW + pad * 2, 5)
+    expect(vbH).toBeCloseTo(bboxH + pad * 2, 5)
+    expect(svg!.getAttribute('preserveAspectRatio')).toBe('xMidYMid meet')
+  })
+
+  it('fills each node with its real resolved colour, never a fixed THUMB_COLORS value', () => {
+    const THUMB_COLORS = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#8b5cf6']
+    const nodes = [
+      { id: 'r', title: 'Root', parentId: null, depth: 0, color: '#000', x: 0, y: 0, width: 40, height: 40, sortOrder: 0 },
+      { id: 'a', title: 'A', parentId: 'r', depth: 1, color: '#111', x: 100, y: 0, width: 80, height: 30, sortOrder: 0 },
+      { id: 'b', title: 'B', parentId: 'r', depth: 1, color: '#222', x: 100, y: 100, width: 80, height: 30, sortOrder: 1 },
+    ]
+    localStorage.setItem('mindmaps:diagram:col1', JSON.stringify({ id: 'col1', themeId: 'default', lineStyle: 'orthogonal', nodes }))
+    seedDiagrams([{ id: 'col1', name: 'Colours', type: 'logic-chart', updatedAt: new Date().toISOString(), tags: [] }])
+    const { container } = render(<HomePage onOpen={vi.fn()} user={USER} onSignOut={vi.fn()} />)
+    // The two L1 node rects (width=80, filled) are 'a' and 'b' — resolved via
+    // l1PaletteColor by sortOrder, not the old fixed 6-colour THUMB_COLORS wireframe
+    // palette. (Their clipPath definition rects share the same width but carry no fill.)
+    const rects = Array.from(container.querySelectorAll('svg rect[fill]')).filter(r => r.getAttribute('width') === '80')
+    expect(rects.length).toBe(2)
+    expect(rects[0].getAttribute('fill')).toBe(L1_PALETTE[0])
+    expect(rects[1].getAttribute('fill')).toBe(L1_PALETTE[1])
+    rects.forEach(r => expect(THUMB_COLORS).not.toContain(r.getAttribute('fill')))
+  })
+
+  it('still renders the empty-state placeholder for a map with zero cached nodes', () => {
+    localStorage.setItem('mindmaps:diagram:empty1', JSON.stringify({ id: 'empty1', themeId: 'default', lineStyle: 'orthogonal', nodes: [] }))
+    seedDiagrams([{ id: 'empty1', name: 'Empty', type: 'logic-chart', updatedAt: new Date().toISOString(), tags: [] }])
     render(<HomePage onOpen={vi.fn()} user={USER} onSignOut={vi.fn()} />)
     expect(screen.getByText('Open to preview')).toBeInTheDocument()
   })
