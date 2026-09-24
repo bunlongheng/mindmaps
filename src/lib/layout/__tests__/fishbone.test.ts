@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeFishboneLayout, FISHBONE_SLANT } from '../fishbone'
+import { computeFishboneLayout, FISHBONE_SLANT, autoW, fontWeightFor } from '../fishbone'
 import type { MindmapNode } from '../../../types'
 
 function node(overrides: Partial<MindmapNode> & { id: string }): MindmapNode {
@@ -53,11 +53,11 @@ describe('computeFishboneLayout', () => {
     expect(byId(iconRoot, 'root').width).toBeGreaterThanOrEqual(byId(plain, 'root').width)
   })
 
-  it('caps auto width at 500 for very long titles', () => {
+  it('caps auto width at 1200 for very long titles', () => {
     const out = computeFishboneLayout([
       node({ id: 'root', depth: 0, title: 'x'.repeat(400) }),
     ])
-    expect(byId(out, 'root').width).toBe(500)
+    expect(byId(out, 'root').width).toBe(1200)
   })
 
   it('alternates L1 bones above and below the spine', () => {
@@ -203,6 +203,68 @@ describe('computeFishboneLayout', () => {
       expect(Number.isFinite(n.x)).toBe(true)
       expect(Number.isFinite(n.y)).toBe(true)
     }
+  })
+
+  it('does not clip "Appliances" with an icon at depth 1', () => {
+    // jsdom has no canvas 2d context, so autoW falls back to the same per-char estimate here.
+    const title = 'Appliances'
+    const fontSize = 22 // depth-1 font size
+    const fallbackMeasured = title.length * fontSize * 0.64
+    const pad = 32 // 16px clear space required on each side of the text
+    const iconZone = 44 + 14 // L1 icon badge (node height) + gap before the text
+    const w = autoW(title, 1, true)
+    expect(w).toBeGreaterThanOrEqual(fallbackMeasured + pad + iconZone)
+  })
+
+  it('does not clip a 60-character title - grows past the old 500px clamp instead', () => {
+    const title = 'x'.repeat(60)
+    const fallbackMeasured = title.length * 22 * 0.64 // depth-1 font size, jsdom fallback
+    const w = autoW(title, 1, false)
+    expect(w).toBeGreaterThanOrEqual(fallbackMeasured) // fits the measured text - not silently cut
+    expect(w).toBeLessThanOrEqual(1200) // documented max clamp
+  })
+
+  it('applies the same measured-width + padding + icon-zone treatment at every fishbone depth', () => {
+    const heights = { 0: 54, 1: 44, 2: 36, 3: 30 } as const
+    const fontSizes = { 0: 28, 1: 22, 2: 16, 3: 13 } as const
+    for (const depth of [0, 1, 2, 3] as const) {
+      const title = 'Cookware'
+      const fallbackMeasured = title.length * fontSizes[depth] * 0.64
+      const iconZone = heights[depth] + 14
+      const w = autoW(title, depth, true)
+      expect(w).toBeGreaterThanOrEqual(fallbackMeasured + 32 + iconZone)
+    }
+  })
+
+  it('falls back to the per-char estimate without throwing when no canvas 2d context exists (jsdom)', () => {
+    expect(() => autoW('Cookware', 1, true)).not.toThrow()
+    const w = autoW('Cookware', 1, true)
+    expect(w).toBeGreaterThanOrEqual(160) // depth-1 min floor
+  })
+
+  it('mirrors Node.tsx fontWeight: bold is always 700, else depth 0/1 -> 500, depth 2/3 -> 400', () => {
+    expect(fontWeightFor(0, true)).toBe('700')
+    expect(fontWeightFor(1, true)).toBe('700')
+    expect(fontWeightFor(2, true)).toBe('700')
+    expect(fontWeightFor(3, true)).toBe('700')
+    expect(fontWeightFor(0, false)).toBe('500')
+    expect(fontWeightFor(1, false)).toBe('500')
+    expect(fontWeightFor(2, false)).toBe('400')
+    expect(fontWeightFor(3, false)).toBe('400')
+  })
+
+  it('does not clip a bold title - measures at weight 700, not 600', () => {
+    // jsdom has no canvas 2d context, so autoW falls back to the same per-char estimate here
+    // (the fallback doesn't vary by weight, but this locks in that the bold flag threads through
+    // without narrowing the box, and pairs with the fontWeightFor test that checks the real weight).
+    const title = 'Appliances'
+    const fontSize = 22 // depth-1 font size
+    const fallbackMeasured = title.length * fontSize * 0.64
+    const pad = 32
+    const iconZone = 44 + 14
+    const w = autoW(title, 1, true, true) // bold: true
+    expect(w).toBeGreaterThanOrEqual(fallbackMeasured + pad + iconZone)
+    expect(w).toBeGreaterThanOrEqual(autoW(title, 1, true, false)) // bold never narrower than plain
   })
 
   it('produces finite numeric positions and positive sizes for every node', () => {
