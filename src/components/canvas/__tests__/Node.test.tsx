@@ -922,13 +922,25 @@ describe('Node — links inside node text', () => {
     expect((container.querySelector('text') as Element).textContent).toBe('Just a title')
   })
 
-  it('a link click does not select or drag the node', () => {
+  it('a plain click on a link selects the node like any other click, so a linked title stays editable', () => {
     const n = makeNode({ title: '[SHAR-1](https://j.example/SHAR-1)' })
     loadStore([makeRoot(), n])
     const { container, onSelect } = renderNode(n)
     const a = container.querySelector('a') as Element
     act(() => { fireEvent.pointerDown(a, { pointerType: 'mouse', pointerId: 11, bubbles: true }) })
+    act(() => { fireEvent.pointerUp(a, { pointerType: 'mouse', pointerId: 11, bubbles: true }) })
     act(() => { fireEvent.click(a, { bubbles: true }) })
+    expect(onSelect).toHaveBeenCalled()
+  })
+
+  it('cmd-click on a link opens it and does not select the node', () => {
+    const n = makeNode({ title: '[SHAR-1](https://j.example/SHAR-1)' })
+    loadStore([makeRoot(), n])
+    const { container, onSelect } = renderNode(n)
+    const a = container.querySelector('a') as Element
+    const ev = new MouseEvent('click', { bubbles: true, cancelable: true, metaKey: true })
+    act(() => { a.dispatchEvent(ev) })
+    expect(ev.defaultPrevented).toBe(false)
     expect(onSelect).not.toHaveBeenCalled()
   })
 

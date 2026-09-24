@@ -91,7 +91,7 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract }: DiagramCan
     if (gRef.current) gRef.current.setAttribute('transform', `translate(${p.x},${p.y}) scale(${z})`)
   }, [])
 
-  // Load at 50% so the text stays readable, anchored on the root instead of shrinking the
+  // Load at 100% so the text is readable, anchored on the root instead of shrinking the
   // whole map to fit. Mind maps grow in every direction, so the root sits at the centre;
   // logic charts, fishbones and timelines read left to right, so the root sits near the
   // left edge and the branches get the width.
@@ -102,7 +102,7 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract }: DiagramCan
     if (svgW === 0 || svgH === 0) return
     const nodes = activeMindmap.nodes
     const root = nodes.find(n => n.parentId === null) ?? nodes[0]
-    const newZoom = 0.5
+    const newZoom = 1
     const cx = root.x + root.width / 2
     const cy = root.y + root.height / 2
     const anchorX = diagramType === 'mindmap' ? svgW / 2 : Math.min(svgW / 2, Math.max(root.width / 2 + 40, svgW * 0.18))
@@ -129,16 +129,8 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract }: DiagramCan
   const selStart = useRef<{ cx: number; cy: number } | null>(null)
   const isDragging = useRef(false)
 
-  // Space+drag (Figma-style hand tool) panning
-  const spaceHeld = useRef(false)
+  // Middle-button hand-tool panning (Space+drag was removed: it fought with typing)
   const mousePanRef = useRef<{ x: number; y: number } | null>(null)
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => { if (e.code === 'Space' && !(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)) { spaceHeld.current = true } }
-    const onKeyUp = (e: KeyboardEvent) => { if (e.code === 'Space') spaceHeld.current = false }
-    window.addEventListener('keydown', onKeyDown)
-    window.addEventListener('keyup', onKeyUp)
-    return () => { window.removeEventListener('keydown', onKeyDown); window.removeEventListener('keyup', onKeyUp) }
-  }, [])
 
   // Pinch-to-zoom state
   const activePointers = useRef<Map<number, { x: number; y: number }>>(new Map())
@@ -234,8 +226,8 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract }: DiagramCan
     // Mouse on background: capture for pan/select
     e.preventDefault()
     ;(e.currentTarget as Element).setPointerCapture(e.pointerId)
-    // Space+drag or middle-button = Figma-style hand-tool pan
-    if (spaceHeld.current || e.button === 1) {
+    // Middle-button = hand-tool pan
+    if (e.button === 1) {
       mousePanRef.current = { x: e.clientX, y: e.clientY }
       return
     }
@@ -248,7 +240,7 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract }: DiagramCan
 
   const handleBgPointerMove = useCallback((e: React.PointerEvent) => {
     activePointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
-    // Mouse hand-tool pan (space+drag or middle-button)
+    // Mouse hand-tool pan (middle-button)
     if (mousePanRef.current) {
       const dx = e.clientX - mousePanRef.current.x
       const dy = e.clientY - mousePanRef.current.y

@@ -338,19 +338,6 @@ describe('DiagramCanvas — touch & pinch', () => {
 })
 
 describe('DiagramCanvas — space/middle-button pan', () => {
-  it('space+drag pans without clearing selection', () => {
-    loadStore([makeRoot(), makeNode()])
-    act(() => { useMindmapStore.getState().setSelectedNodeIds(['n1']) })
-    const { svg, g } = renderCanvas()
-    act(() => { fireEvent.keyDown(window, { code: 'Space' }) })
-    act(() => { fireEvent.pointerDown(svg, { pointerType: 'mouse', clientX: 100, clientY: 100, pointerId: 1 }) })
-    act(() => { fireEvent.pointerMove(svg, { pointerType: 'mouse', clientX: 160, clientY: 140, pointerId: 1 }) })
-    expect(g.getAttribute('transform')).toContain('translate')
-    act(() => { fireEvent.pointerUp(svg, { pointerType: 'mouse', pointerId: 1 }) })
-    // selection preserved
-    expect(useMindmapStore.getState().selectedNodeIds).toContain('n1')
-    act(() => { fireEvent.keyUp(window, { code: 'Space' }) })
-  })
 
   it('middle-button drag pans', () => {
     loadStore([makeRoot(), makeNode()])
@@ -361,16 +348,6 @@ describe('DiagramCanvas — space/middle-button pan', () => {
     act(() => { fireEvent.pointerUp(svg, { pointerType: 'mouse', pointerId: 1 }) })
   })
 
-  it('space key from an input field does not enable pan', () => {
-    loadStore([makeRoot(), makeNode()])
-    renderCanvas()
-    const input = document.createElement('input')
-    document.body.appendChild(input)
-    act(() => { fireEvent.keyDown(input, { code: 'Space' }) })
-    document.body.removeChild(input)
-    // no assertion crash — spaceHeld stays false
-    expect(true).toBe(true)
-  })
 })
 
 describe('DiagramCanvas — drag reorder snap', () => {

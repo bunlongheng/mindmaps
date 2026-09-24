@@ -390,9 +390,9 @@ function renderNode(node: MindmapNode, type: DiagramType, paletteColor: string |
   // ── Shape ──
   if (isRoot) {
     if (isRootPill) {
-      parts.push(`<rect x="0" y="0" width="${r2(displayW)}" height="${r2(h)}" rx="${r2(h / 2)}" ry="${r2(h / 2)}" fill="${esc(bg)}" fill-opacity="0.8" stroke="${esc(strokeColor)}" stroke-width="${strokeW}"/>`)
+      parts.push(`<rect x="0" y="0" width="${r2(displayW)}" height="${r2(h)}" rx="${r2(h / 2)}" ry="${r2(h / 2)}" fill="${esc(bg)}" stroke="${esc(strokeColor)}" stroke-width="${strokeW}"/>`)
     } else {
-      parts.push(`<circle cx="${r2(cx)}" cy="${r2(cy)}" r="${r2(displayW / 2)}" fill="${esc(bg)}" fill-opacity="0.8" stroke="${esc(strokeColor)}" stroke-width="${strokeW}"/>`)
+      parts.push(`<circle cx="${r2(cx)}" cy="${r2(cy)}" r="${r2(displayW / 2)}" fill="${esc(bg)}" stroke="${esc(strokeColor)}" stroke-width="${strokeW}"/>`)
     }
   } else if (drawCircle) {
     const cr = displayW / 2

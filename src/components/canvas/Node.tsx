@@ -64,9 +64,10 @@ function openNodeUrl(url: string) {
 }
 
 /**
- * Draw parsed title runs as <tspan>s, linked runs wrapped in an SVG <a>. The click
- * and pointerdown are stopped so following a link never also selects or drags the node.
- * A link label split across 2 wrapped lines draws as one anchor per line.
+ * Draw parsed title runs as <tspan>s, linked runs wrapped in an SVG <a>. A plain click
+ * on a link behaves like clicking the node (select, drag, double-click to edit), so a
+ * node whose whole title is a link stays editable. Cmd/Ctrl-click (or middle-click)
+ * opens the link. A link label split across 2 wrapped lines draws as one anchor per line.
  */
 function renderRuns(segments: LinkSegment[], keyPrefix: string) {
   return segments.map((seg, i) => seg.url ? (
@@ -76,8 +77,11 @@ function renderRuns(segments: LinkSegment[], keyPrefix: string) {
       target="_blank"
       rel="noopener noreferrer"
       style={{ pointerEvents: 'auto', cursor: 'pointer' }}
-      onClick={e => e.stopPropagation()}
-      onPointerDown={e => e.stopPropagation()}
+      onClick={e => {
+        if (e.metaKey || e.ctrlKey || e.button === 1) { e.stopPropagation(); return }
+        e.preventDefault()  // plain click: let the node handle it, do not navigate
+      }}
+      onAuxClick={e => { if (e.button === 1) e.stopPropagation() }}
     >
       <tspan style={{ textDecoration: 'underline' }}>{seg.text}</tspan>
     </a>
@@ -344,6 +348,10 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   const hasBadge = (hasEmoji || hasIcon) && !isRoot && !isMindmapL2Plus && !drawCircle
   const editX = isRoot ? cx - r * 0.75 : hasBadge ? node.height : (align === 'left' ? 8 : 2)
   const editW = isRoot ? r * 1.5 : hasBadge ? displayW - node.height - 4 : displayW - editX - 2
+  // The editor shows the raw title (markdown links included), which can be far longer
+  // than the drawn label, so let the field grow past the box instead of clipping it.
+  const rawEditW = Math.min(1100, Math.ceil(draft.length * fontSize * 0.6) + 24)
+  const editWFit = editing ? Math.max(editW, rawEditW) : editW
 
   return (
     <g data-node-id={node.id} style={{
@@ -512,9 +520,9 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
 
       {editing ? (
         <foreignObject
-          x={editX}
+          x={isRoot ? Math.min(editX, cx - editWFit / 2) : editX}
           y={isRoot ? cy - fontSize * 0.7 : 2}
-          width={editW}
+          width={editWFit}
           height={isRoot ? fontSize * 1.6 : node.height - 4}
         >
           <input
