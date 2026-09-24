@@ -404,9 +404,9 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
           {isRootPill ? (
             <rect x={0} y={0} width={displayW} height={node.height}
               rx={node.height / 2} ry={node.height / 2}
-              fill={bg} fillOpacity={0.8} stroke={strokeColor} strokeWidth={strokeW} />
+              fill={bg} fillOpacity={1} stroke={strokeColor} strokeWidth={strokeW} />
           ) : (
-            <circle cx={cx} cy={cy} r={r} fill={bg} fillOpacity={0.8}
+            <circle cx={cx} cy={cy} r={r} fill={bg} fillOpacity={1}
               stroke={strokeColor} strokeWidth={strokeW} />
           )}
 
