@@ -116,12 +116,12 @@ describe('l1PaletteColor', () => {
 
 describe('depth ladder (DEPTH_STRENGTH / depthStrength / depthFill)', () => {
   it('matches the documented table', () => {
-    expect(DEPTH_STRENGTH).toEqual({ 1: 1, 2: 0.8, 3: 0.4, 4: 0.3 })
-    expect(DEPTH_STRENGTH_FLOOR).toBe(0.25)
+    expect(DEPTH_STRENGTH).toEqual({ 1: 1, 2: 0.8, 3: 0.3, 4: 0.22 })
+    expect(DEPTH_STRENGTH_FLOOR).toBe(0.18)
     expect(depthStrength(1)).toBe(1)
     expect(depthStrength(2)).toBe(0.8)
-    expect(depthStrength(3)).toBe(0.4)
-    expect(depthStrength(4)).toBe(0.3)
+    expect(depthStrength(3)).toBe(0.3)
+    expect(depthStrength(4)).toBe(0.22)
   })
 
   it('floors at depth 5 and deeper', () => {
@@ -151,15 +151,16 @@ describe('depth ladder (DEPTH_STRENGTH / depthStrength / depthFill)', () => {
     const d2 = chan(depthFill('#ed1c24', 2))
     const d3 = chan(depthFill('#ed1c24', 3))
     const d4 = chan(depthFill('#ed1c24', 4))
-    // Green channel is the one with room to move on red; each step gains >= 20
-    expect(d3[1] - d2[1]).toBeGreaterThanOrEqual(20)
-    expect(d4[1] - d3[1]).toBeGreaterThanOrEqual(20)
+    // Green channel is the one with room to move on red; the L2 to L3 step is the big
+    // one (80 to 30 percent), the deeper steps are gentler but still visible
+    expect(d3[1] - d2[1]).toBeGreaterThanOrEqual(60)
+    expect(d4[1] - d3[1]).toBeGreaterThanOrEqual(12)
     expect(d3[2] - d2[2]).toBeGreaterThan(0)
   })
 
   it('mixes exactly (1 - strength) toward white', () => {
-    // #000000 at 40% strength -> 60% of the way to white -> 153
-    expect(depthFill('#000000', 3)).toBe('#999999')
+    // #000000 at 30% strength -> 70% of the way to white -> 179
+    expect(depthFill('#000000', 3)).toBe('#b3b3b3')
     expect(depthFill('#ffffff', 5)).toBe('#ffffff')
   })
 })

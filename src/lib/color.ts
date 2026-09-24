@@ -37,10 +37,10 @@ export function applyDepthBackground(baseHex: string, depth: number): string {
  * Exported so the canvas (Node.tsx), the server renderer (render-svg.ts) and the
  * tests all read the same numbers.
  */
-export const DEPTH_STRENGTH: Readonly<Record<number, number>> = { 1: 1, 2: 0.8, 3: 0.4, 4: 0.3 }
+export const DEPTH_STRENGTH: Readonly<Record<number, number>> = { 1: 1, 2: 0.8, 3: 0.3, 4: 0.22 }
 
 /** Strength used at depth 5 and deeper. */
-export const DEPTH_STRENGTH_FLOOR = 0.25
+export const DEPTH_STRENGTH_FLOOR = 0.18
 
 /** Strength of the branch colour at a given depth (see DEPTH_STRENGTH). */
 export function depthStrength(depth: number): number {
