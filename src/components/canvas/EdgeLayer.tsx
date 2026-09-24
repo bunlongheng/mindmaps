@@ -4,7 +4,8 @@ import { Edge } from './Edge'
 import { FISHBONE_SLANT } from '../../lib/layout/fishbone'
 import { useMindmapStore } from '../../store/mindmapStore'
 import { rootDrawnWidth } from '../../lib/rootPill'
-import { edgeWidthForDepth } from '../../lib/color'
+import { buildRadialBranchPath, radialBranchPoints } from '../../lib/geometry'
+import { edgeWidthForDepth, radialEdgeWidth, RADIAL_EDGE_OPACITY } from '../../lib/color'
 
 
 interface EdgeLayerProps {
@@ -168,56 +169,31 @@ export function EdgeLayer({ nodes, lineStyle, diagramType, paletteColors }: Edge
     )
   }
 
-  // ── Mindmap (radial) ──────────────────────────────────────────────────────
+  // ── Mind map (radial constellation) ───────────────────────────────────────
+  // Thin, same-handed curves from circle edge to circle edge in the branch's own
+  // colour - never a straight spoke through the centre. The width still comes from
+  // the shared table (src/lib/color edgeWidthForDepth), scaled down for this type.
   if (diagramType === 'mindmap') {
     const edges = nodes.filter(n => n.parentId && nodeMap.has(n.parentId))
     return (
       <g>
         {edges.map(n => {
           const parent = nodeMap.get(n.parentId!)!
-          const x1 = parent.x + parent.width / 2
-          const y1 = parent.y + parent.height / 2
-          const x2 = n.x + n.width / 2
-          const y2 = n.y + n.height / 2
-
-          const isL1 = n.depth === 1
-          const dx = x2 - x1, dy = y2 - y1
-          const len = Math.hypot(dx, dy) || 1
-          const ux = dx / len, uy = dy / len
-
-          // Ellipse perimeter intersection: r = 1/sqrt((ux/a)^2 + (uy/b)^2)
-          function edgeR(w: number, h: number) {
-            const a = w / 2, b = h / 2
-            const d = Math.sqrt((ux / a) ** 2 + (uy / b) ** 2)
-            return d === 0 ? a : 1 / d
-          }
-          const parentR = edgeR(parent.width, parent.height)
-          const childR = edgeR(n.width, n.height)
-
-          // Edge endpoints touch the node perimeter
-          const sx = x1 + ux * parentR
-          const sy = y1 + uy * parentR
-          const ex = x2 - ux * childR
-          const ey = y2 - uy * childR
-          const mx = (sx + ex) / 2
-          const my = (sy + ey) / 2
-
-          const numDist = parentR + 16
-          const ox = x1 + ux * numDist
-          const oy = y1 + uy * numDist
-
-          const edgePath = lineStyle === 'straight'
-            ? `M ${sx} ${sy} L ${ex} ${ey}`
-            : `M ${sx} ${sy} Q ${mx} ${my} ${ex} ${ey}`
-
+          // The root circle auto-sizes from its title, so measure what is drawn.
+          const parentW = parent.depth === 0 ? rootDrawnWidth(parent, diagramType) : parent.width
+          const d = buildRadialBranchPath(parent, n, parentW)
+          const { sx, sy, ux, uy } = radialBranchPoints(parent, n, parentW)
+          const ox = sx + ux * 16
+          const oy = sy + uy * 16
           return (
             <g key={n.id}>
               <path
-                d={edgePath}
-                stroke={pc(n)} strokeWidth={edgeWidthForDepth(n.depth)}
+                d={d}
+                stroke={pc(n)} strokeOpacity={RADIAL_EDGE_OPACITY}
+                strokeWidth={radialEdgeWidth(n.depth)}
                 fill="none" strokeLinecap="round"
               />
-              {isL1 && showOrderNumbers && (
+              {n.depth === 1 && showOrderNumbers && (
                 <g style={{ pointerEvents: 'none' }}>
                   <circle cx={ox} cy={oy} r={9} fill="#ffffff" stroke={pc(n)} strokeWidth={2} />
                   <text x={ox} y={oy} textAnchor="middle" dominantBaseline="central"
