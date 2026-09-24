@@ -4,7 +4,7 @@ import { createMap } from './helpers'
 async function createMapAndOpenFormat(page: import('@playwright/test').Page) {
   await createMap(page)
   // Open Format panel
-  await page.click('[title="Format"]')
+  await page.click('[title="Settings"]')
   await page.waitForTimeout(300)
 }
 
@@ -219,14 +219,16 @@ test.describe('Format Panel — Node Editing', () => {
 
 test.describe('Export & Actions', () => {
   test('PDF export button exists', async ({ page }) => {
-    await createMap(page)
-    const pdfBtn = page.locator('text="PDF"')
+    await createMapAndOpenFormat(page)
+    await page.getByRole('button', { name: 'Share', exact: true }).click()
+    const pdfBtn = page.locator('text="Export PDF"')
     await expect(pdfBtn.first()).toBeVisible()
   })
 
   test('Delete button exists', async ({ page }) => {
-    await createMap(page)
-    const deleteBtn = page.locator('text="Delete"')
+    await createMapAndOpenFormat(page)
+    await page.getByRole('button', { name: 'Share', exact: true }).click()
+    const deleteBtn = page.locator('[title="Delete map"]')
     await expect(deleteBtn.first()).toBeVisible()
   })
 })

@@ -50,9 +50,6 @@ vi.mock('../lib/export/share', () => ({
   decodeShareURL: () => decodeShareURL(),
   encodeShareURL: () => '',
 }))
-vi.mock('../lib/export/exportPdf', () => ({ exportDiagramAsPdf: vi.fn() }))
-vi.mock('../lib/export/copySvg', () => ({ copyDiagramSvg: vi.fn(async () => true) }))
-
 // Controllable Google Identity Services mock. renderGoogleButton captures the
 // onCredential callback so a test can simulate a Google sign-in.
 const google = vi.hoisted(() => ({
@@ -70,8 +67,6 @@ vi.mock('../lib/googleAuth', () => ({
 
 import App from '../App'
 import { showToast } from '../components/CuteToast'
-import { exportDiagramAsPdf } from '../lib/export/exportPdf'
-import { copyDiagramSvg } from '../lib/export/copySvg'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function makeDiagram(overrides: Partial<Diagram> = {}): Diagram {
@@ -288,7 +283,7 @@ describe('App — opening a map', () => {
   })
 })
 
-describe('App — editor view, panel, footer', () => {
+describe('App — editor view, panel', () => {
   function renderEditor(diagram = makeDiagram()) {
     setUrl('/?map=m1')
     vi.stubGlobal('fetch', vi.fn(async (url: string) => {
@@ -299,23 +294,19 @@ describe('App — editor view, panel, footer', () => {
     }))
   }
 
-  it('renders the editor with back + format buttons and tag footer', async () => {
+  it('renders the editor with back + settings buttons', async () => {
     renderEditor()
     render(<App />)
     await waitFor(() => expect(screen.getByTestId('canvas')).toBeInTheDocument())
     expect(screen.getByTitle('All maps')).toBeInTheDocument()
-    expect(screen.getByTitle('Format')).toBeInTheDocument()
-    // tag footer: existing tag "Work" + PDF + Delete
-    expect(screen.getByText('PDF')).toBeInTheDocument()
-    expect(screen.getByText('Delete')).toBeInTheDocument()
-    expect(screen.getByText('Work')).toBeInTheDocument()
+    expect(screen.getByTitle('Settings')).toBeInTheDocument()
   })
 
-  it('toggles the format side panel and closes it', async () => {
+  it('toggles the settings side panel and closes it', async () => {
     renderEditor()
     render(<App />)
     await waitFor(() => expect(screen.getByTestId('canvas')).toBeInTheDocument())
-    fireEvent.click(screen.getByTitle('Format'))
+    fireEvent.click(screen.getByTitle('Settings'))
     expect(screen.getByTestId('side-panel')).toBeInTheDocument()
     fireEvent.click(screen.getByTestId('panel-close'))
     expect(screen.queryByTestId('side-panel')).toBeNull()
@@ -325,7 +316,7 @@ describe('App — editor view, panel, footer', () => {
     renderEditor()
     render(<App />)
     await waitFor(() => expect(screen.getByTestId('canvas')).toBeInTheDocument())
-    fireEvent.click(screen.getByTitle('Format'))
+    fireEvent.click(screen.getByTitle('Settings'))
     fireEvent.click(screen.getByTestId('select-node'))
     expect(screen.getByTestId('side-panel')).toBeInTheDocument()
   })
@@ -336,103 +327,6 @@ describe('App — editor view, panel, footer', () => {
     await waitFor(() => expect(screen.getByTestId('canvas')).toBeInTheDocument())
     await act(async () => { fireEvent.click(screen.getByTitle('All maps')) })
     await waitFor(() => expect(screen.getByTestId('home')).toBeInTheDocument())
-  })
-
-  it('exports a PDF from the footer button', async () => {
-    renderEditor()
-    render(<App />)
-    await waitFor(() => expect(screen.getByTestId('canvas')).toBeInTheDocument())
-    fireEvent.click(screen.getByText('PDF'))
-    await waitFor(() => expect(exportDiagramAsPdf).toHaveBeenCalledWith('My Map'))
-  })
-
-  it('copies the diagram svg from the footer button', async () => {
-    renderEditor()
-    render(<App />)
-    await waitFor(() => expect(screen.getByTestId('canvas')).toBeInTheDocument())
-    await act(async () => { fireEvent.click(screen.getByText('Copy SVG')) })
-    expect(copyDiagramSvg).toHaveBeenCalled()
-    expect(screen.getByText('Copied')).toBeInTheDocument()
-  })
-
-  it('leaves the footer svg label alone when the copy fails', async () => {
-    vi.mocked(copyDiagramSvg).mockResolvedValueOnce(false)
-    renderEditor()
-    render(<App />)
-    await waitFor(() => expect(screen.getByTestId('canvas')).toBeInTheDocument())
-    await act(async () => { fireEvent.click(screen.getByText('Copy SVG')) })
-    expect(screen.getByText('Copy SVG')).toBeInTheDocument()
-  })
-
-  it('adds and removes tags in the footer', async () => {
-    renderEditor(makeDiagram({ tags: [] }))
-    render(<App />)
-    await waitFor(() => expect(screen.getByTestId('canvas')).toBeInTheDocument())
-    // open the + Tag popover
-    fireEvent.click(screen.getByText('+ Tag'))
-    // available preset tags shown; click "Work"
-    fireEvent.click(screen.getByText('Work'))
-    await waitFor(() => expect(useMindmapStore.getState().activeMindmap!.tags).toContain('Work'))
-    // now remove it by clicking the tag chip
-    fireEvent.click(screen.getByText('Work'))
-    await waitFor(() => expect(useMindmapStore.getState().activeMindmap!.tags).not.toContain('Work'))
-  })
-
-  it('adds a custom tag via the popover input on Enter', async () => {
-    renderEditor(makeDiagram({ tags: [] }))
-    render(<App />)
-    await waitFor(() => expect(screen.getByTestId('canvas')).toBeInTheDocument())
-    fireEvent.click(screen.getByText('+ Tag'))
-    const input = screen.getByPlaceholderText(/Custom tag/) as HTMLInputElement
-    fireEvent.change(input, { target: { value: 'Sprint' } })
-    fireEvent.keyDown(input, { key: 'Enter' })
-    await waitFor(() => expect(useMindmapStore.getState().activeMindmap!.tags).toContain('Sprint'))
-  })
-
-  it('adds a custom tag via the popover Add button', async () => {
-    renderEditor(makeDiagram({ tags: [] }))
-    render(<App />)
-    await waitFor(() => expect(screen.getByTestId('canvas')).toBeInTheDocument())
-    fireEvent.click(screen.getByText('+ Tag'))
-    const input = screen.getByPlaceholderText(/Custom tag/) as HTMLInputElement
-    fireEvent.change(input, { target: { value: 'Q3' } })
-    fireEvent.click(screen.getByText('Add'))
-    await waitFor(() => expect(useMindmapStore.getState().activeMindmap!.tags).toContain('Q3'))
-  })
-
-  it('closes the tag popover on outside click', async () => {
-    renderEditor(makeDiagram({ tags: [] }))
-    render(<App />)
-    await waitFor(() => expect(screen.getByTestId('canvas')).toBeInTheDocument())
-    fireEvent.click(screen.getByText('+ Tag'))
-    expect(screen.getByPlaceholderText(/Custom tag/)).toBeInTheDocument()
-    fireEvent.mouseDown(document.body)
-    await waitFor(() => expect(screen.queryByPlaceholderText(/Custom tag/)).toBeNull())
-  })
-
-  it('renders the map info button and shows per-level counts on click', async () => {
-    renderEditor()
-    render(<App />)
-    await waitFor(() => expect(screen.getByTestId('canvas')).toBeInTheDocument())
-    const infoButton = screen.getByTitle('Map info')
-    expect(infoButton).toBeInTheDocument()
-    fireEvent.click(infoButton)
-    // makeDiagram(): root (depth 0) + 1 L1 node => Root 1, L1 1, Total 2
-    expect(screen.getByText('Root')).toBeInTheDocument()
-    expect(screen.getByText('L1')).toBeInTheDocument()
-    expect(screen.getByText('Total')).toBeInTheDocument()
-    const rows = screen.getByText('Total').closest('tr')
-    expect(rows?.textContent).toContain('2')
-  })
-
-  it('closes the map info popover on Escape', async () => {
-    renderEditor()
-    render(<App />)
-    await waitFor(() => expect(screen.getByTestId('canvas')).toBeInTheDocument())
-    fireEvent.click(screen.getByTitle('Map info'))
-    expect(screen.getByText('Total')).toBeInTheDocument()
-    fireEvent.keyDown(document, { key: 'Escape' })
-    await waitFor(() => expect(screen.queryByText('Total')).toBeNull())
   })
 })
 
@@ -447,11 +341,11 @@ describe('App — delete confirm modal', () => {
     }))
   }
 
-  it('opens the delete confirm from the footer and cancels', async () => {
+  it('opens the delete confirm from the canvas delete and cancels', async () => {
     renderEditor()
     render(<App />)
     await waitFor(() => expect(screen.getByTestId('canvas')).toBeInTheDocument())
-    fireEvent.click(screen.getByText('Delete'))
+    fireEvent.click(screen.getByTestId('delete-from-canvas'))
     expect(screen.getByText('Delete map?')).toBeInTheDocument()
     fireEvent.click(screen.getByText('Cancel'))
     expect(screen.queryByText('Delete map?')).toBeNull()
@@ -461,26 +355,18 @@ describe('App — delete confirm modal', () => {
     renderEditor()
     render(<App />)
     await waitFor(() => expect(screen.getByTestId('canvas')).toBeInTheDocument())
-    fireEvent.click(screen.getByText('Delete')) // footer button opens modal
+    fireEvent.click(screen.getByTestId('delete-from-canvas')) // opens the modal
     const modal = screen.getByText('Delete map?').closest('div[style*="position: fixed"]')! as HTMLElement
     const confirmBtn = Array.from(modal.querySelectorAll('button')).find(b => b.textContent === 'Delete')!
     await act(async () => { fireEvent.click(confirmBtn) })
     await waitFor(() => expect(screen.getByTestId('home')).toBeInTheDocument())
   })
 
-  it('opening delete from the canvas onDelete works', async () => {
-    renderEditor()
-    render(<App />)
-    await waitFor(() => expect(screen.getByTestId('canvas')).toBeInTheDocument())
-    fireEvent.click(screen.getByTestId('delete-from-canvas'))
-    expect(screen.getByText('Delete map?')).toBeInTheDocument()
-  })
-
   it('clicking the modal backdrop closes the delete confirm', async () => {
     renderEditor()
     render(<App />)
     await waitFor(() => expect(screen.getByTestId('canvas')).toBeInTheDocument())
-    fireEvent.click(screen.getByText('Delete'))
+    fireEvent.click(screen.getByTestId('delete-from-canvas'))
     const backdrop = screen.getByText('Delete map?').closest('div[style*="position: fixed"]')!
     fireEvent.click(backdrop)
     expect(screen.queryByText('Delete map?')).toBeNull()
@@ -494,7 +380,7 @@ describe('App — delete confirm modal', () => {
     renderEditor()
     render(<App />)
     await waitFor(() => expect(screen.getByTestId('canvas')).toBeInTheDocument())
-    fireEvent.click(screen.getByTitle('Format'))
+    fireEvent.click(screen.getByTitle('Settings'))
     await act(async () => {
       fireEvent.click(screen.getByTestId('panel-delete'))
       await Promise.resolve()
@@ -729,7 +615,7 @@ describe('App — extra coverage', () => {
     await waitFor(() => expect(screen.getByTestId('canvas')).toBeInTheDocument())
     const back = screen.getByTitle('All maps')
     fireEvent.mouseEnter(back); fireEvent.mouseLeave(back)
-    const fmt = screen.getByTitle('Format')
+    const fmt = screen.getByTitle('Settings')
     fireEvent.mouseEnter(fmt); fireEvent.mouseLeave(fmt)
     fireEvent.click(fmt) // open panel
     fireEvent.mouseEnter(fmt); fireEvent.mouseLeave(fmt) // showPanel branch
@@ -788,17 +674,6 @@ describe('App — extra coverage', () => {
     // not possible, so assert the editor renders (line 452 guard with showImport=false).
     rerender(<App />)
     expect(screen.queryByTestId('import-modal')).toBeNull()
-  })
-
-  it('adding a duplicate tag in the footer is a no-op', async () => {
-    renderEditor(makeDiagram({ tags: ['Work'] }))
-    render(<App />)
-    await waitFor(() => expect(screen.getByTestId('canvas')).toBeInTheDocument())
-    fireEvent.click(screen.getByText('+ Tag'))
-    const input = screen.getByPlaceholderText(/Custom tag/) as HTMLInputElement
-    fireEvent.change(input, { target: { value: 'Work' } }) // already present
-    fireEvent.click(screen.getByText('Add'))
-    expect(useMindmapStore.getState().activeMindmap!.tags!.filter(t => t === 'Work').length).toBe(1)
   })
 })
 

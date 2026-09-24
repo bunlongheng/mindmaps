@@ -3,12 +3,13 @@ import { useShallow } from 'zustand/react/shallow'
 import { NODE_ICONS } from '../../lib/icons'
 import { useMindmapStore } from '../../store/mindmapStore'
 import { getTheme, THEMES, isDarkBg } from '../../lib/themes'
-import { X, AlignLeft, AlignCenter, AlignRight, Copy, Check, FileDown, Trash2, Sparkles, Code2, Square, Squircle, Pill, Circle } from 'lucide-react'
+import { X, AlignLeft, AlignCenter, AlignRight, Copy, Check, FileDown, Trash2, Sparkles, Code2, Square, Squircle, Pill, Circle, Tag } from 'lucide-react'
 import { getLucideIcon } from '../canvas/NodeIcon'
 import { showToast, dismissToast } from '../CuteToast'
 import { soundChaChing } from '../../lib/sounds'
 import { authHeaders } from '../../hooks/useDiagram'
-import type { LineStyle, DiagramType } from '../../types'
+import { levelCounts } from '../../lib/nodeCounts'
+import type { LineStyle, DiagramType, Diagram, DiagramMeta } from '../../types'
 import type { NodeShape } from '../../lib/nodeShape'
 import { QRCodeSVG } from 'qrcode.react'
 
@@ -16,6 +17,22 @@ interface SidePanelProps {
   nodeId: string | null
   onClose: () => void
   onDelete?: () => void
+  onUpdateTags?: (id: string, tags: string[]) => void
+}
+
+// 8 cohesive colors — all Tailwind-500 level, same saturation family
+const TAG_PALETTE = [
+  '#6366f1', '#14b8a6', '#ec4899', '#f59e0b',
+  '#22c55e', '#3b82f6', '#f97316', '#8b5cf6',
+]
+const PRESET_TAGS = ['AI', 'Work', 'Personal', 'Research']
+
+function buildTagColorMap(allTags: string[]): Map<string, string> {
+  const sorted = [...new Set(allTags)].sort()
+  return new Map(sorted.map((tag, i) => [tag, TAG_PALETTE[i % TAG_PALETTE.length]]))
+}
+function tagBg(tag: string, colorMap: Map<string, string>): string {
+  return colorMap.get(tag) ?? '#64748b'
 }
 
 const DIAGRAM_TYPES: { value: DiagramType; label: string }[] = [
@@ -84,17 +101,18 @@ function DiagramTypeIcon({ value, color }: { value: string; color: string }) {
 type Tab = 'style' | 'map' | 'share'
 
 
-export function SidePanel({ nodeId, onClose, onDelete }: SidePanelProps) {
+export function SidePanel({ nodeId, onClose, onDelete, onUpdateTags }: SidePanelProps) {
   // Shallow-selected slice so the panel only re-renders when one of these actually
   // changes, not on every store write (resizePreview during drags, HUD flags, etc.).
   const {
-    activeMindmap, updateNode, batchUpdateNodes, selectedNodeIds,
+    activeMindmap, updateNode, batchUpdateNodes, selectedNodeIds, diagrams,
     lineStyle, setLineStyle, diagramType, setDiagramType, setShareEnabled, rerunLayout,
     themeId, setTheme, showOrderNumbers, setShowOrderNumbers, showChildCount, setShowChildCount, autoAssignIcons,
     resizeNodeDepth,
   } = useMindmapStore(
     useShallow(s => ({
       activeMindmap: s.activeMindmap, updateNode: s.updateNode, batchUpdateNodes: s.batchUpdateNodes, selectedNodeIds: s.selectedNodeIds,
+      diagrams: s.diagrams,
       lineStyle: s.lineStyle, setLineStyle: s.setLineStyle, diagramType: s.diagramType, setDiagramType: s.setDiagramType,
       setShareEnabled: s.setShareEnabled, rerunLayout: s.rerunLayout,
       themeId: s.themeId, setTheme: s.setTheme, showOrderNumbers: s.showOrderNumbers, setShowOrderNumbers: s.setShowOrderNumbers,
@@ -102,6 +120,7 @@ export function SidePanel({ nodeId, onClose, onDelete }: SidePanelProps) {
       resizeNodeDepth: s.resizeNodeDepth,
     })),
   )
+  const mapInfo = useMemo(() => levelCounts(activeMindmap?.nodes ?? []), [activeMindmap?.nodes])
   const themeColors = getTheme(themeId).colors
 
   const [tab, setTab] = useState<Tab>('map')
@@ -508,6 +527,8 @@ export function SidePanel({ nodeId, onClose, onDelete }: SidePanelProps) {
       {/* ── Map tab ── */}
       {tab === 'map' && (
         <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', minHeight: 0}}>
+          <TagsBlock activeMindmap={activeMindmap} diagrams={diagrams} onUpdateTags={onUpdateTags} />
+          <HR />
           <SBlock title="Type">
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
               {DIAGRAM_TYPES.map(({ value, label }) => {
@@ -649,6 +670,22 @@ export function SidePanel({ nodeId, onClose, onDelete }: SidePanelProps) {
               })}
             </div>
           </SBlock>
+          <HR />
+          <SBlock title="Details">
+            {mapInfo.byDepth.map((count, depth) => (
+              <PRow key={depth} label={depth === 0 ? 'Root' : `L${depth}`}>
+                <div style={{ fontSize: 12, color: '#111827', fontWeight: 600, textAlign: 'right' }}>{count}</div>
+              </PRow>
+            ))}
+            <PRow label="Total">
+              <div style={{ fontSize: 12, color: '#111827', fontWeight: 700, textAlign: 'right', paddingTop: 4, borderTop: '1px solid #e8eaed' }}>{mapInfo.total}</div>
+            </PRow>
+            {mapInfo.largestBranch && (
+              <p style={{ fontSize: 10, color: '#9ca3af', margin: 0, lineHeight: 1.5 }}>
+                Deepest: L{mapInfo.deepest}. Largest branch: {mapInfo.largestBranch.title}, {mapInfo.largestBranch.count} nodes.
+              </p>
+            )}
+          </SBlock>
         </div>
       )}
 
@@ -741,7 +778,7 @@ export function SidePanel({ nodeId, onClose, onDelete }: SidePanelProps) {
                 onMouseLeave={e => (e.currentTarget.style.background = '#fff')}>
                 <FileDown size={13} /> Export PDF
               </button>
-              <button onClick={() => setShowDeleteConfirm(true)} style={{
+              <button onClick={() => setShowDeleteConfirm(true)} title="Delete map" style={{
                 padding: '9px 12px', borderRadius: 8,
                 border: '1px solid #fecaca', background: '#fff',
                 cursor: 'pointer', fontSize: 12, fontWeight: 500,
@@ -808,6 +845,92 @@ function PRow({ label, children }: { label: string; children: React.ReactNode })
       <span style={{ fontSize: 11, color: '#9ca3af', width: 38, paddingTop: 7, flexShrink: 0 }}>{label}</span>
       <div style={{ flex: 1 }}>{children}</div>
     </div>
+  )
+}
+
+function TagsBlock({ activeMindmap, diagrams, onUpdateTags }: {
+  activeMindmap: Diagram | null
+  diagrams: DiagramMeta[]
+  onUpdateTags?: (id: string, tags: string[]) => void
+}) {
+  const [showPicker, setShowPicker] = useState(false)
+  const [tagInput, setTagInput] = useState('')
+
+  const currentTags = useMemo(() => activeMindmap?.tags ?? [], [activeMindmap?.tags])
+  const tagColorMap = useMemo(() => {
+    const all = [...new Set([...PRESET_TAGS, ...diagrams.flatMap(d => d.tags ?? [])])]
+    return buildTagColorMap(all)
+  }, [diagrams])
+  const available = useMemo(() => {
+    const allTagsList = [...new Set([...PRESET_TAGS, ...diagrams.flatMap(d => d.tags ?? [])])]
+    return allTagsList.filter(t => !currentTags.includes(t))
+  }, [diagrams, currentTags])
+
+  function addTag(tag: string) {
+    const t = tag.trim()
+    if (!t || !activeMindmap || currentTags.includes(t)) return
+    onUpdateTags?.(activeMindmap.id, [...currentTags, t])
+    setTagInput('')
+  }
+  function removeTag(tag: string) {
+    if (!activeMindmap) return
+    onUpdateTags?.(activeMindmap.id, currentTags.filter(t => t !== tag))
+  }
+
+  return (
+    <SBlock title="Tags">
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+        <Tag size={13} color="#94a3b8" style={{ flexShrink: 0 }} />
+        {currentTags.map(t => (
+          <span key={t} onClick={() => removeTag(t)} title="Remove tag" style={{
+            display: 'inline-flex', alignItems: 'center', gap: 4,
+            fontSize: 11, fontWeight: 700, padding: '4px 9px', borderRadius: 10,
+            background: tagBg(t, tagColorMap), color: '#fff',
+            cursor: 'pointer', fontFamily: 'inherit',
+          }}>
+            {t} <X size={8} strokeWidth={3} />
+          </span>
+        ))}
+        <button onClick={() => setShowPicker(p => !p)} style={{
+          fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 10,
+          background: showPicker ? '#1a1d2e' : '#f1f5f9',
+          color: showPicker ? '#fff' : '#64748b',
+          border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+          display: 'flex', alignItems: 'center', gap: 4,
+        }}>
+          + Tag
+        </button>
+      </div>
+      {showPicker && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 2 }}>
+          {available.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+              {available.map(t => (
+                <button key={t} onClick={() => { addTag(t); setShowPicker(false) }}
+                  style={{
+                    fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 10,
+                    background: `${tagBg(t, tagColorMap)}22`, color: tagBg(t, tagColorMap),
+                    border: `1px solid ${tagBg(t, tagColorMap)}55`,
+                    cursor: 'pointer', fontFamily: 'inherit',
+                  }}>{t}</button>
+              ))}
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 6 }}>
+            <input value={tagInput} onChange={e => setTagInput(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') { addTag(tagInput); setShowPicker(false); e.preventDefault() } }}
+              placeholder="Custom tag…"
+              style={{ flex: 1, fontSize: 12, padding: '6px 10px', border: '1px solid #e0e2e7', borderRadius: 8, outline: 'none', fontFamily: 'inherit', color: '#111827' }}
+              autoFocus
+            />
+            <button onClick={() => { addTag(tagInput); setShowPicker(false) }}
+              style={{ padding: '6px 12px', background: '#6366f1', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontFamily: 'inherit', fontWeight: 600 }}>
+              Add
+            </button>
+          </div>
+        </div>
+      )}
+    </SBlock>
   )
 }
 

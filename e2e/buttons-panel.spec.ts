@@ -8,10 +8,10 @@ function textCount(page: Page) {
   return page.locator('.diagram-canvas-root svg text').count()
 }
 
-/** Open the editor with the Format panel showing. */
+/** Open the editor with the Settings panel showing. */
 async function openEditorWithPanel(page: Page) {
   await createMap(page)
-  await page.click('[title="Format"]')
+  await page.click('[title="Settings"]')
   await page.waitForTimeout(300)
 }
 
@@ -682,9 +682,8 @@ test('Copy SVG puts the diagram markup on the clipboard', async ({ page, context
   await context.grantPermissions(['clipboard-read', 'clipboard-write'])
   await openEditorWithPanel(page)
   await page.getByText('Share', { exact: true }).click()
-  // The footer toolbar also has a "Copy SVG" button — scope to the Share
-  // panel's own block (the div holding the "Copy Link" button) so we hit
-  // only the panel's Copy SVG button.
+  // Scope to the Share panel's own block (the div holding the "Copy Link"
+  // button) so we hit only the panel's Copy SVG button.
   const shareBlock = page.locator('div', { has: page.getByRole('button', { name: 'Copy Link' }) }).last()
   const btn = shareBlock.getByRole('button', { name: /Copy SVG/ })
   await btn.click()

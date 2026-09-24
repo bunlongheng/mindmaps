@@ -435,6 +435,34 @@ describe('SidePanel — Map tab', () => {
     fireEvent.click(screen.getByText('Monokai'))
     expect(useMindmapStore.getState().themeId).toBe('monokai')
   })
+
+  it('Tags block adds and removes a tag', () => {
+    loadDiagram(makeDiagram({ tags: [] }))
+    const onUpdateTags = (id: string, tags: string[]) => {
+      const current = useMindmapStore.getState().activeMindmap!
+      useMindmapStore.getState().setActiveMindmap({ ...current, id, tags })
+    }
+    render(<SidePanel nodeId={null} onClose={vi.fn()} onUpdateTags={onUpdateTags} />)
+    // open the + Tag picker and add the preset "Work" tag
+    fireEvent.click(screen.getByText('+ Tag'))
+    fireEvent.click(screen.getByText('Work'))
+    expect(useMindmapStore.getState().activeMindmap!.tags).toContain('Work')
+    // remove it by clicking the tag chip
+    fireEvent.click(screen.getByText('Work'))
+    expect(useMindmapStore.getState().activeMindmap!.tags).not.toContain('Work')
+  })
+
+  it('Details block shows the right per-level counts', () => {
+    loadDiagram()
+    render(<SidePanel nodeId={null} onClose={vi.fn()} />)
+    // makeDiagram(): root (depth 0) + 2 L1 nodes + 1 L2 node => Root 1, L1 2, L2 1, Total 4
+    expect(screen.getByText('Root')).toBeInTheDocument()
+    expect(screen.getByText('L1')).toBeInTheDocument()
+    expect(screen.getByText('L2')).toBeInTheDocument()
+    const totalRow = screen.getByText('Total').parentElement!
+    expect(totalRow.textContent).toContain('4')
+    expect(screen.getByText(/Largest branch: Child One, 1 nodes/)).toBeInTheDocument()
+  })
 })
 
 describe('SidePanel — Auto Icons (AI)', () => {
