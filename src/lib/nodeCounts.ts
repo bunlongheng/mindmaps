@@ -1,4 +1,4 @@
-import { displayTitle } from './links'
+import { displayTitle } from './links.js'
 
 export interface SubtreeCounts {
   childCounts: Map<string, number>

@@ -1,4 +1,4 @@
-import type { Diagram } from '../../types'
+import type { Diagram } from '../../types.js'
 
 export function encodeShareURL(diagram: Diagram): string {
   const json = JSON.stringify(diagram)

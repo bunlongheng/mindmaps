@@ -1,6 +1,6 @@
 import jsPDF from 'jspdf'
 import html2canvas from 'html2canvas'
-import { showToast } from '../../components/CuteToast'
+import { showToast } from '../../components/CuteToast.js'
 
 export async function exportDiagramAsPdf(diagramName: string) {
   const svgEl = document.querySelector('.diagram-canvas-root svg') as SVGSVGElement | null
