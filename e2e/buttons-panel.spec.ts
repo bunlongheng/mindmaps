@@ -682,9 +682,13 @@ test('Copy SVG puts the diagram markup on the clipboard', async ({ page, context
   await context.grantPermissions(['clipboard-read', 'clipboard-write'])
   await openEditorWithPanel(page)
   await page.getByText('Share', { exact: true }).click()
-  const btn = page.getByRole('button', { name: /Copy SVG/ })
+  // The footer toolbar also has a "Copy SVG" button — scope to the Share
+  // panel's own block (the div holding the "Copy Link" button) so we hit
+  // only the panel's Copy SVG button.
+  const shareBlock = page.locator('div', { has: page.getByRole('button', { name: 'Copy Link' }) }).last()
+  const btn = shareBlock.getByRole('button', { name: /Copy SVG/ })
   await btn.click()
-  await expect(page.getByRole('button', { name: 'SVG copied!' })).toBeVisible({ timeout: 20_000 })
+  await expect(shareBlock.getByRole('button', { name: 'SVG copied!' })).toBeVisible({ timeout: 20_000 })
 
   const svg = await page.evaluate(() => navigator.clipboard.readText())
   expect(svg).toContain('<svg')
