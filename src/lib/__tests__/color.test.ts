@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { hexToRgb, applyDepthTransparency, applyDepthBackground, darken, l1PaletteColor, L1_PALETTE, depthFill, depthStrength, DEPTH_STRENGTH, DEPTH_STRENGTH_FLOOR, edgeWidthForDepth, EDGE_WIDTH_BY_DEPTH } from '../color'
+import { hexToRgb, applyDepthTransparency, applyDepthBackground, darken, l1PaletteColor, L1_PALETTE, depthFill, depthStrength, DEPTH_STRENGTH, DEPTH_STRENGTH_FLOOR, edgeWidthForDepth, EDGE_WIDTH_BY_DEPTH, isDarkBg, lighten, neonBlur, neonFilterId, neonFilterSpecs, neonRootColor, NEON_ROOT_FALLBACK } from '../color'
+import { THEMES } from '../themes'
 
 describe('hexToRgb', () => {
   it('parses standard hex', () => {
@@ -245,5 +246,64 @@ describe('edge width ladder (EDGE_WIDTH_BY_DEPTH / edgeWidthForDepth)', () => {
   it('defends against depth 0 or negative by returning the L1 width', () => {
     expect(edgeWidthForDepth(0)).toBe(5)
     expect(edgeWidthForDepth(-1)).toBe(5)
+  })
+})
+
+describe('isDarkBg', () => {
+  it('calls the two dark themes dark and the two light ones light', () => {
+    const dark = ['cyberpunk', 'monokai']
+    for (const t of THEMES) {
+      expect(isDarkBg(t.canvasBg)).toBe(dark.includes(t.id))
+    }
+  })
+
+  it('handles the extremes', () => {
+    expect(isDarkBg('#000000')).toBe(true)
+    expect(isDarkBg('#ffffff')).toBe(false)
+  })
+
+  it('returns false for anything that is not a 6-digit hex', () => {
+    expect(isDarkBg('#000')).toBe(false)
+    expect(isDarkBg('rgb(0,0,0)')).toBe(false)
+    expect(isDarkBg('')).toBe(false)
+  })
+})
+
+describe('lighten', () => {
+  it('mixes toward white and is monotonic', () => {
+    expect(lighten('#000000', 1)).toBe('#ffffff')
+    expect(lighten('#000000', 0)).toBe('#000000')
+    expect(lighten('#808080', 0.5)).toBe('#c0c0c0')
+  })
+})
+
+describe('neon glow filters', () => {
+  it('scales the halo with the circle, with a floor so a dot still glows', () => {
+    expect(neonBlur(96)).toBe(18)
+    expect(neonBlur(6)).toBe(2)
+    expect(neonBlur(150)).toBeGreaterThan(neonBlur(96))
+  })
+
+  it('buckets sizes so a 200-node map shares a handful of filters', () => {
+    const widths = Array.from({ length: 200 }, (_, i) => 5 + (i % 92))
+    expect(neonFilterSpecs(widths).length).toBeLessThan(12)
+    expect(neonFilterId(96)).toBe('mm-neon-18')
+  })
+
+  it('pairs every halo with a tight core a third of its width', () => {
+    const [spec] = neonFilterSpecs([96])
+    expect(spec.core).toBeCloseTo(6, 5)
+  })
+})
+
+describe('neonRootColor', () => {
+  it('keeps a root colour that can glow', () => {
+    expect(neonRootColor('#06b6d4')).toBe('#06b6d4')
+    expect(neonRootColor('#6366f1')).toBe('#6366f1')
+  })
+
+  it('falls back to the violet when the root is near-black', () => {
+    expect(neonRootColor('#1a1d2e')).toBe(NEON_ROOT_FALLBACK)
+    expect(neonRootColor('rgb(1,2,3)')).toBe(NEON_ROOT_FALLBACK)
   })
 })

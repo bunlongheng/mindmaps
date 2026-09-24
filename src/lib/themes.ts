@@ -1,4 +1,4 @@
-import { hexToRgb, L1_PALETTE } from './color.js'
+import { L1_PALETTE } from './color.js'
 
 export interface Theme {
   id: string
@@ -65,12 +65,4 @@ export const THEME_MAP = Object.fromEntries(THEMES.map(t => [t.id, t]))
 
 export function getTheme(id: string): Theme {
   return THEME_MAP[id] ?? THEMES[0]
-}
-
-// True when a hex background is dark enough to need light text on top of it.
-export function isDarkBg(hex: string): boolean {
-  const h = hex.replace('#', '')
-  if (h.length < 6) return false
-  const [r, g, b] = hexToRgb(h)
-  return 0.299 * r + 0.587 * g + 0.114 * b < 140
 }
