@@ -176,7 +176,7 @@ export function DiagramCanvas({ onNodeSelect, readOnly }: DiagramCanvasProps) {
   const [, setSnapLine] = useState<{ x1: number; x2: number; y: number } | null>(null)
   const snapTargetRef = useRef<{ insertBeforeId: string | null } | null>(null)
 
-  useKeyboard()
+  useKeyboard(readOnly)
 
   function screenToCanvas(screenX: number, screenY: number) {
     const g = gRef.current

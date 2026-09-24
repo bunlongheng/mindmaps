@@ -478,6 +478,9 @@ export default function App() {
         <DiagramCanvas
           onNodeSelect={handleNodeSelect}
           onDelete={activeMindmap ? () => setShowDeleteConfirm(true) : undefined}
+          // A locked map rides the same readOnly path the share view uses: no editing,
+          // dragging or renaming, but zoom, pan and export all still work.
+          readOnly={activeMindmap?.locked ?? false}
         />
 
         {/* Back button — top left */}

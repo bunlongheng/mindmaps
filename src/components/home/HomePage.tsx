@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { useMindmapStore } from '../../store/mindmapStore'
-import { useDiagram, authHeaders } from '../../hooks/useDiagram'
+import { useDiagram, authHeaders, LOCKED_DELETE_HINT } from '../../hooks/useDiagram'
 import { useIsMobile } from '../../hooks/useIsMobile'
 import { showToast } from '../CuteToast'
 import type { DiagramMeta, MindmapNode } from '../../types'
-import { Plus, Search, Trash2, LayoutGrid, List, Globe, Sparkles, Loader2, Tag, X, Bot, Briefcase, User, BookOpen, Zap, GraduationCap, FlaskConical, Beaker, FileInput, type LucideIcon } from 'lucide-react'
+import { Plus, Search, Trash2, LayoutGrid, List, Globe, Lock, Sparkles, Loader2, Tag, X, Bot, Briefcase, User, BookOpen, Zap, GraduationCap, FlaskConical, Beaker, FileInput, type LucideIcon } from 'lucide-react'
 import { ImportModal } from '../modals/ImportModal'
 import { MindmapsLogo } from '../MindmapsLogo'
 import { getTheme } from '../../lib/themes'
@@ -1222,6 +1222,7 @@ function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isPublic, tags, tagCo
             {diagram.name}
           </div>
           {isPublic && <Globe size={11} color="#6366f1" style={{ flexShrink: 0 }} />}
+          {diagram.locked && <Lock size={11} color="#4f46e5" aria-label="Locked" style={{ flexShrink: 0 }} />}
           <div style={{ fontSize: 10, color: '#94a3b8', flexShrink: 0 }}>{timeAgo}</div>
         </div>
         {currentTags.length > 0 && (
@@ -1245,8 +1246,9 @@ function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isPublic, tags, tagCo
               style={{ position: 'absolute', top: 8, left: 8, width: 28, height: 28, borderRadius: 8, border: '1px solid #e2e8f0', background: 'rgba(255,255,255,0.92)', cursor: 'pointer', color: '#94a3b8', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(8px)' }}>
               <Tag size={13} />
             </button>
-            <button onClick={e => { e.stopPropagation(); setHovered(false); onDelete() }} title="Delete map" aria-label={`Delete ${diagram.name}`}
-              style={{ position: 'absolute', top: 8, right: 8, width: 28, height: 28, borderRadius: 8, border: '1px solid #fecaca', background: 'rgba(255,255,255,0.92)', cursor: 'pointer', color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(8px)' }}>
+            <button onClick={e => { e.stopPropagation(); setHovered(false); onDelete() }}
+              disabled={diagram.locked} title={diagram.locked ? LOCKED_DELETE_HINT : 'Delete map'} aria-label={`Delete ${diagram.name}`}
+              style={{ position: 'absolute', top: 8, right: 8, width: 28, height: 28, borderRadius: 8, border: '1px solid #fecaca', background: 'rgba(255,255,255,0.92)', cursor: diagram.locked ? 'not-allowed' : 'pointer', opacity: diagram.locked ? 0.45 : 1, color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(8px)' }}>
               <Trash2 size={13} />
             </button>
           </>
@@ -1301,6 +1303,7 @@ function DiagramRow({ diagram, timeAgo, onOpen, onDelete, isPublic, tags, tagCol
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <span style={{ fontSize: 13, fontWeight: 600, color: '#334155', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{diagram.name}</span>
           {isPublic && <Globe size={11} color="#6366f1" style={{ flexShrink: 0 }} />}
+          {diagram.locked && <Lock size={11} color="#4f46e5" aria-label="Locked" style={{ flexShrink: 0 }} />}
         </div>
         {currentTags.length > 0 && (
           <div style={{ display: 'flex', gap: 4, marginTop: 4, flexWrap: 'wrap' }}>
@@ -1325,8 +1328,9 @@ function DiagramRow({ diagram, timeAgo, onOpen, onDelete, isPublic, tags, tagCol
               style={{ width: 28, height: 28, borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', color: '#94a3b8', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Tag size={13} />
             </button>
-            <button onClick={e => { e.stopPropagation(); setHovered(false); onDelete() }} title="Delete" aria-label={`Delete ${diagram.name}`}
-              style={{ width: 28, height: 28, borderRadius: 8, border: '1px solid #fecaca', background: '#fff', cursor: 'pointer', color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <button onClick={e => { e.stopPropagation(); setHovered(false); onDelete() }}
+              disabled={diagram.locked} title={diagram.locked ? LOCKED_DELETE_HINT : 'Delete'} aria-label={`Delete ${diagram.name}`}
+              style={{ width: 28, height: 28, borderRadius: 8, border: '1px solid #fecaca', background: '#fff', cursor: diagram.locked ? 'not-allowed' : 'pointer', opacity: diagram.locked ? 0.45 : 1, color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Trash2 size={13} />
             </button>
           </>

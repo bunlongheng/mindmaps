@@ -3,7 +3,9 @@ import { useMindmapStore } from '../store/mindmapStore'
 import { showToast } from '../components/CuteToast'
 import { exportToJSON } from '../lib/export/json'
 
-export function useKeyboard() {
+// readOnly is the same flag DiagramCanvas passes to Node: a shared view or a locked map.
+// Keyboard shortcuts that change the map are off; selecting, escaping and copying stay on.
+export function useKeyboard(readOnly = false) {
   useEffect(() => {
     function tryLoad(text: string) {
       const trimmed = text.trim()
@@ -26,7 +28,7 @@ export function useKeyboard() {
       const { deleteSelectedNodes, dissolveNode, dissolveSelectedNodes, setSelectedNodeIds, undo, redo, activeMindmap, selectedNodeIds } = useMindmapStore.getState()
 
       if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key === 'v') {
-        navigator.clipboard?.readText().then(tryLoad).catch(() => {})
+        if (!readOnly) navigator.clipboard?.readText().then(tryLoad).catch(() => {})
         return
       }
 
@@ -37,16 +39,17 @@ export function useKeyboard() {
       }
       if ((e.metaKey || e.ctrlKey) && (e.key === 'Delete' || e.key === 'Backspace')) {
         // Always dissolve: remove node(s) but keep children re-parented up
+        if (readOnly) return
         if (selectedNodeIds.length === 1) dissolveNode(selectedNodeIds[0])
         else if (selectedNodeIds.length > 1) dissolveSelectedNodes()
         return
       }
       if (e.key === 'Delete' || e.key === 'Backspace') {
-        deleteSelectedNodes()
+        if (!readOnly) deleteSelectedNodes()
       }
       if (e.key === 'Escape') setSelectedNodeIds([])
-      if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo() }
-      if ((e.metaKey || e.ctrlKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) { e.preventDefault(); redo() }
+      if (!readOnly && (e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo() }
+      if (!readOnly && (e.metaKey || e.ctrlKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) { e.preventDefault(); redo() }
     }
     function onCopy(e: ClipboardEvent) {
       const tag = (e.target as HTMLElement | null)?.tagName?.toLowerCase() ?? ''
@@ -76,6 +79,7 @@ export function useKeyboard() {
     function onPaste(e: ClipboardEvent) {
       const tag = (e.target as HTMLElement | null)?.tagName?.toLowerCase() ?? ''
       if (tag === 'input' || tag === 'textarea') return
+      if (readOnly) return
       const text = e.clipboardData?.getData('text/plain') ?? ''
       if (text.trim()) { e.preventDefault(); tryLoad(text) }
     }
@@ -88,5 +92,5 @@ export function useKeyboard() {
       window.removeEventListener('copy', onCopy)
       window.removeEventListener('paste', onPaste)
     }
-  }, [])
+  }, [readOnly])
 }
