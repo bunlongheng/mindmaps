@@ -4,7 +4,7 @@ import { createRef } from 'react'
 import { Node } from '../Node'
 import { useMindmapStore } from '../../../store/mindmapStore'
 import type { Diagram, DiagramType, MindmapNode } from '../../../types'
-import { depthFill, hexToRgb } from '../../../lib/color'
+import { depthFill, hexToRgb, neonFilterId, L1_PALETTE, NEON_ROOT_GRADIENT, NEON_TEXT, NEON_TEXT_MUTED, NEON_TEXT_MUTED_OPACITY } from '../../../lib/color'
 import { computeBranchColors } from '../../../lib/branchColor'
 import { renderMindmapSvg } from '../../../lib/render-svg'
 import { nodeFontSize } from '../../../lib/nodeMetrics'
@@ -87,7 +87,7 @@ function setPoint(svgRef: React.RefObject<SVGSVGElement | null>, x: number, y: n
 
 beforeEach(() => {
   useMindmapStore.getState().clearDiagram()
-  useMindmapStore.setState({ resizePreview: null, showChildCount: false, showOrderNumbers: true })
+  useMindmapStore.setState({ resizePreview: null, showChildCount: false, showOrderNumbers: true, themeId: 'default' })
 })
 afterEach(() => cleanup())
 
@@ -379,6 +379,53 @@ describe('Node — mindmap type', () => {
     expect(texts).toContain('29')                            // the subtree size under it
     expect(texts).toContain('S')                             // the initial inside the circle
     expect(container.querySelector('tspan')).toBeNull()      // never wrapped into a column
+  })
+
+  // ── Neon paint on a dark canvas ───────────────────────────────────────────
+  // Only paint changes: the circle grows a two-layer glow, the name turns white and
+  // the count turns light grey. A light theme keeps today's subtle look.
+  it('gives a mindmap L1 a glow and white label text on a dark theme', () => {
+    const root = makeRoot({ title: 'Center' })
+    const n = makeNode({ depth: 1, title: 'Supervised', width: 72, height: 72 })
+    loadStore([root, n], 'mindmap')
+    useMindmapStore.setState({ themeId: 'cyberpunk' })
+    const { container } = renderNode(n, { descendantCount: 29, paletteColor: L1_PALETTE[0] })
+
+    const glow = container.querySelector(`circle[filter="url(#${neonFilterId(72)})"]`)
+    expect(glow).toBeTruthy()
+    expect(glow!.getAttribute('fill')).toBe(L1_PALETTE[0])
+
+    const name = [...container.querySelectorAll('text')].find(t => t.textContent === 'Supervised')!
+    expect(name.getAttribute('fill')).toBe(NEON_TEXT)
+    const count = [...container.querySelectorAll('text')].find(t => t.textContent === '29')!
+    expect(count.getAttribute('fill')).toBe(NEON_TEXT_MUTED)
+    expect(count.getAttribute('fill-opacity')).toBe(String(NEON_TEXT_MUTED_OPACITY))
+  })
+
+  it('leaves a mindmap L1 unglowed with dark label text on a light theme', () => {
+    const root = makeRoot({ title: 'Center' })
+    const n = makeNode({ depth: 1, title: 'Supervised', width: 72, height: 72 })
+    loadStore([root, n], 'mindmap')
+    useMindmapStore.setState({ themeId: 'default' })
+    const { container } = renderNode(n, { descendantCount: 29, paletteColor: L1_PALETTE[0] })
+
+    expect(container.querySelector(`circle[filter="url(#${neonFilterId(72)})"]`)).toBeNull()
+    const name = [...container.querySelectorAll('text')].find(t => t.textContent === 'Supervised')!
+    expect(name.getAttribute('fill')).toBe('#1a1d2e')
+  })
+
+  it('paints the mindmap root as a gradient orb on a dark theme only', () => {
+    const root = makeRoot({ title: 'Center', color: '#06b6d4' })
+    loadStore([root, makeNode({ depth: 1 })], 'mindmap')
+    useMindmapStore.setState({ themeId: 'cyberpunk' })
+    const { container } = renderNode(root)
+    expect(container.querySelector(`radialGradient#${NEON_ROOT_GRADIENT}`)).toBeTruthy()
+    expect(container.querySelector(`circle[fill="url(#${NEON_ROOT_GRADIENT})"]`)).toBeTruthy()
+
+    cleanup()
+    useMindmapStore.setState({ themeId: 'default' })
+    const light = renderNode(root).container
+    expect(light.querySelector(`radialGradient#${NEON_ROOT_GRADIENT}`)).toBeNull()
   })
 
   it('renders a mindmap L2 as a smaller circle with the title beside it', () => {

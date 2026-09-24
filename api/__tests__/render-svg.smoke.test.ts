@@ -185,6 +185,61 @@ describe('renderMindmapSvg smoke', () => {
     })
   })
 
+  // ── Neon on a dark canvas ──────────────────────────────────────────────────
+  // The cards and the share images draw with this renderer, so a dark-theme mind map
+  // has to glow exactly the way the canvas does - and a light one must not change.
+  describe('neon (dark themes)', () => {
+    const svgOfTheme = (theme: string) => renderMindmapSvg({
+      id: 'x', name: 'Machine Learning', type: 'mindmap', line_style: 'curved',
+      theme_id: theme, nodes: mkNodes() as never,
+    })
+
+    it('draws 2 paths per branch on a dark theme and 1 on a light one', () => {
+      const branches = mkNodes().length - 1
+      expect([...svgOfTheme('cyberpunk').matchAll(/<path /g)].length).toBe(branches * 2)
+      expect([...svgOfTheme('default').matchAll(/<path /g)].length).toBe(branches)
+    })
+
+    it('carries a filter and a radialGradient only on the dark themes', () => {
+      for (const t of ['cyberpunk', 'monokai']) {
+        const svg = svgOfTheme(t)
+        expect(svg).toContain('<filter')
+        expect(svg).toContain('<radialGradient')
+        expect(svg).toContain('mm-neon-')
+      }
+      for (const t of ['default', 'retro']) {
+        const svg = svgOfTheme(t)
+        expect(svg).not.toContain('<radialGradient')
+        expect(svg).not.toContain('mm-neon-')
+        expect(svg).toContain('mm-glow')   // today's subtle halo, untouched
+      }
+    })
+
+    it('uses SVG filter primitives only, so resvg can rasterize the share image', () => {
+      const svg = svgOfTheme('cyberpunk')
+      expect(svg).toContain('<feGaussianBlur')
+      expect(svg).toContain('<feMerge>')
+      expect(svg).toContain('<feComponentTransfer')
+      expect(svg).not.toContain('style=')      // no CSS filters anywhere
+      expect(svg).not.toContain('filter: ')
+      expect(svg).not.toContain('NaN')
+    })
+
+    it('whitens the depth-1 names and greys the counts, light greys the depth-2 labels', () => {
+      const svg = svgOfTheme('cyberpunk')
+      expect(svg).toMatch(/<text[^>]*fill="#ffffff"[^>]*>Supervised<\/text>/)
+      expect(svg).toMatch(/<text[^>]*fill="#cbd5e1" fill-opacity="0.8"[^>]*>Regression<\/text>/)
+      expect(svg).not.toContain('fill="#1a1d2e">Supervised')
+    })
+
+    it('shares one bucketed glow filter per circle size, not one per node', () => {
+      const filters = [...svgOfTheme('cyberpunk').matchAll(/<filter id="(mm-neon-\d+)"/g)]
+      expect(filters.length).toBeGreaterThan(0)
+      expect(filters.length).toBeLessThan(mkNodes().length)
+      expect(new Set(filters.map(f => f[1])).size).toBe(filters.length)
+    })
+  })
+
   it('renders curved logic-chart + JSON-string nodes + empty map', () => {
     const svg = renderMindmapSvg({ id: 'x', name: 'T', type: 'logic-chart', line_style: 'curved', theme_id: 'retro', nodes: JSON.stringify(mkNodes()) })
     expect(svg).toContain('<path')

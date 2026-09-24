@@ -150,3 +150,97 @@ export const ROOT_COLORS = [
   '#ffffff', '#f1f5f9', '#94a3b8', '#475569',
   '#1e293b', '#1a1d2e', '#000000', '#fde68a',
 ]
+
+/** True when a hex background is dark enough to need light paint on top of it. */
+export function isDarkBg(hex: string): boolean {
+  const h = hex.replace('#', '')
+  if (h.length < 6) return false
+  const [r, g, b] = hexToRgb(h)
+  return 0.299 * r + 0.587 * g + 0.114 * b < 140
+}
+
+/** Mix a hex colour toward white by `amount` (0..1). Returns hex, so the result can
+ *  be fed straight back into a gradient stop or another mix. */
+export function lighten(hex: string, amount = 0.25): string {
+  const [r, g, b] = hexToRgb(hex)
+  const ch = (v: number) => Math.round(v + (255 - v) * amount).toString(16).padStart(2, '0')
+  return `#${ch(r)}${ch(g)}${ch(b)}`
+}
+
+// ── Neon (radial mind map on a dark canvas) ─────────────────────────────────
+// On a dark theme the radial mind map is painted as a living circuit: every circle
+// is an orb with a wide soft halo and a tight bright one, every branch is a
+// luminous tube (a blurred glow line under a crisp lightened core), and the labels
+// are white or light grey. Light themes keep the subtle look and read none of this.
+// The numbers live here so the canvas (Node/EdgeLayer) and the server renderer
+// (render-svg, whose output the home cards and share images use) cannot drift.
+
+/** Wide halo blur, as a fraction of the circle's diameter (18px on a 96px circle). */
+export const NEON_HALO_RATIO = 0.18
+/** Tight core blur, as a fraction of the diameter (6px on a 96px circle). */
+export const NEON_CORE_RATIO = 0.06
+export const NEON_HALO_OPACITY = 0.35
+export const NEON_CORE_OPACITY = 0.7
+/** The blurred glow line drawn under every branch. */
+export const NEON_EDGE_GLOW_WIDTH = 4
+export const NEON_EDGE_GLOW_OPACITY = 0.5
+export const NEON_EDGE_GLOW_BLUR = 3
+/** The crisp core line on top of it, in the branch colour lightened by this much. */
+export const NEON_EDGE_CORE_OPACITY = 0.95
+export const NEON_EDGE_LIGHTEN = 0.25
+/** Label paint: names white, counts and depth-2 labels light grey at 80%. */
+export const NEON_TEXT = '#ffffff'
+export const NEON_TEXT_MUTED = '#cbd5e1'
+export const NEON_TEXT_MUTED_OPACITY = 0.8
+/** Blur under the white initial inside a circle. */
+export const NEON_TEXT_BLUR = 2
+/** Violet-blue stand-in when the root's own colour is itself too dark to glow. */
+export const NEON_ROOT_FALLBACK = '#7c5cff'
+/** How far the root orb's gradient is lightened at its centre. */
+export const NEON_ROOT_LIGHTEN = 0.55
+
+/** Shared ids, so both renderers reference the same defs. */
+export const NEON_EDGE_FILTER = 'mm-neon-edge'
+export const NEON_TEXT_FILTER = 'mm-neon-text'
+export const NEON_ROOT_GRADIENT = 'mm-neon-root'
+
+/**
+ * Halo blur for a circle of this diameter, bucketed to 2px steps. A map shares a
+ * handful of filters instead of carrying one per node, and the glow still scales
+ * with the circle, so a 6px dot glows proportionally to a 96px topic.
+ */
+export function neonBlur(diameter: number): number {
+  return Math.max(2, Math.round((diameter * NEON_HALO_RATIO) / 2) * 2)
+}
+
+/** Filter id for a circle of this diameter (see neonBlur). */
+export function neonFilterId(diameter: number): string {
+  return `mm-neon-${neonBlur(diameter)}`
+}
+
+export interface NeonFilterSpec { id: string; halo: number; core: number }
+
+/** The distinct circle-glow filters a set of diameters needs, defined once per render. */
+export function neonFilterSpecs(diameters: number[]): NeonFilterSpec[] {
+  const out = new Map<string, NeonFilterSpec>()
+  for (const d of diameters) {
+    const halo = neonBlur(d)
+    const id = `mm-neon-${halo}`
+    if (!out.has(id)) out.set(id, { id, halo, core: Math.max(0.8, (halo * NEON_CORE_RATIO) / NEON_HALO_RATIO) })
+  }
+  return [...out.values()].sort((a, b) => a.halo - b.halo)
+}
+
+/**
+ * Base colour of the root orb: its own colour, unless that colour is so dark it
+ * cannot glow at all. The bar is far lower than isDarkBg's text-contrast one - a
+ * saturated cyan or indigo root keeps its own colour and only a near-black one
+ * (the stored default #1a1d2e) falls back to the violet.
+ */
+export const NEON_ROOT_MIN_LUMA = 60
+
+export function neonRootColor(hex: string): string {
+  if (!hex.startsWith('#') || hex.length < 7) return NEON_ROOT_FALLBACK
+  const [r, g, b] = hexToRgb(hex)
+  return 0.299 * r + 0.587 * g + 0.114 * b >= NEON_ROOT_MIN_LUMA ? hex : NEON_ROOT_FALLBACK
+}

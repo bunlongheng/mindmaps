@@ -6,6 +6,10 @@ import { EdgeLayer } from './EdgeLayer'
 import { Node } from './Node'
 import { useKeyboard } from '../../hooks/useKeyboard'
 import { computeBranchColors } from '../../lib/branchColor'
+import {
+  isDarkBg, neonFilterSpecs,
+  NEON_CORE_OPACITY, NEON_HALO_OPACITY, NEON_TEXT_BLUR, NEON_TEXT_FILTER,
+} from '../../lib/color'
 import { computeSubtreeCounts } from '../../lib/nodeCounts'
 import { radialNodeExtent } from '../../lib/layout/mindmap'
 
@@ -36,6 +40,14 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract }: DiagramCan
 
   const paletteColors = useMemo(() => computeBranchColors(activeMindmap?.nodes ?? []), [activeMindmap?.nodes])
   const canvasBg = getTheme(themeId).canvasBg
+  // The radial mind map's neon glow on a dark canvas: one filter per distinct circle
+  // size, defined once here and shared by every orb, so a 200-node map carries a
+  // handful of filters instead of two per node. Empty on light themes.
+  const neonFilters = useMemo(
+    () => (diagramType === 'mindmap' && isDarkBg(canvasBg)
+      ? neonFilterSpecs((activeMindmap?.nodes ?? []).map(n => Math.max(n.width, n.height)))
+      : []),
+    [diagramType, canvasBg, activeMindmap?.nodes])
   const svgRef = useRef<SVGSVGElement>(null!)
   const gRef = useRef<SVGGElement>(null!)
   const [, setPan] = useState({ x: 0, y: 0 })
@@ -459,6 +471,31 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract }: DiagramCan
         onPointerCancel={handleBgPointerUp}
         style={{ userSelect: 'none', touchAction: 'none' }}
       >
+        {neonFilters.length > 0 && (
+          <defs>
+            {neonFilters.map(f => (
+              <filter key={f.id} id={f.id} x="-75%" y="-75%" width="250%" height="250%"
+                colorInterpolationFilters="sRGB">
+                <feGaussianBlur in="SourceGraphic" stdDeviation={f.halo} result="wide" />
+                <feComponentTransfer in="wide" result="halo">
+                  <feFuncA type="linear" slope={NEON_HALO_OPACITY} />
+                </feComponentTransfer>
+                <feGaussianBlur in="SourceGraphic" stdDeviation={f.core} result="tight" />
+                <feComponentTransfer in="tight" result="core">
+                  <feFuncA type="linear" slope={NEON_CORE_OPACITY} />
+                </feComponentTransfer>
+                <feMerge>
+                  <feMergeNode in="halo" />
+                  <feMergeNode in="core" />
+                </feMerge>
+              </filter>
+            ))}
+            <filter id={NEON_TEXT_FILTER} x="-60%" y="-60%" width="220%" height="220%"
+              colorInterpolationFilters="sRGB">
+              <feGaussianBlur stdDeviation={NEON_TEXT_BLUR} />
+            </filter>
+          </defs>
+        )}
         <g ref={gRef}>
           <EdgeLayer nodes={hideDetails ? activeMindmap.nodes.filter(n => n.depth <= 2) : activeMindmap.nodes} lineStyle={lineStyle} diagramType={diagramType} paletteColors={paletteColors} />
           {(hideDetails ? activeMindmap.nodes.filter(n => n.depth <= 2) : activeMindmap.nodes).map(node => (

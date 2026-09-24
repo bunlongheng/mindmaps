@@ -4,7 +4,12 @@ import { useMindmapStore } from '../../store/mindmapStore'
 import { NodeIcon, getLucideIcon } from './NodeIcon'
 import { wrapText, initialFontSize, nodeInitial, radialLabelFor, LABEL_FONT, RADIAL_ROOT_FONT } from '../../lib/layout/mindmap'
 import { rootPillWidth, rootPillFontSize, rootTitleNeedsPill, rootCircleDiameter, rootDrawnWidth, ROOT_FONT } from '../../lib/rootPill'
-import { hexToRgb, darken, depthFill } from '../../lib/color'
+import { getTheme } from '../../lib/themes'
+import {
+  hexToRgb, darken, depthFill, isDarkBg, lighten, neonFilterId, neonRootColor,
+  NEON_ROOT_GRADIENT, NEON_ROOT_LIGHTEN, NEON_TEXT, NEON_TEXT_FILTER,
+  NEON_TEXT_MUTED, NEON_TEXT_MUTED_OPACITY,
+} from '../../lib/color'
 import { shapeRx } from '../../lib/nodeShape'
 import { nodeMetrics, ICON_GAP } from '../../lib/nodeMetrics'
 import { parseLinkedTitle, sliceSegments, lineRanges, type LinkSegment } from '../../lib/links'
@@ -116,7 +121,13 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   const inputRef = useRef<HTMLInputElement>(null)
   const resizePreview = useMindmapStore(s => s.resizePreview)
   const diagramType = useMindmapStore(s => s.diagramType)
+  const themeId = useMindmapStore(s => s.themeId)
   const showChildCount = useMindmapStore(s => s.showChildCount)
+  // On a dark canvas the radial mind map is painted as a living circuit: every circle
+  // is a glowing orb, the root a violet-to-blue one, and the labels are white or light
+  // grey. Only paint changes - sizes, positions and hit areas are identical. Light
+  // themes read none of this and keep today's subtle look.
+  const neon = diagramType === 'mindmap' && isDarkBg(getTheme(themeId).canvasBg)
   const canDrag = (isRoot && diagramType !== 'mindmap') || diagramType === 'logic-chart'
   // Root shape: in mindmap mode always circle; otherwise user-set or auto from title length
   const isRootPill = isRoot && diagramType !== 'mindmap' && (
@@ -167,6 +178,13 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
     strokeW = 2
   }
 
+
+  // Neon: the glyph inside an orb is white whatever colour the orb is, and the root
+  // orb is a radial gradient (its own colour lightened at the centre) with a rim to
+  // match. Only the paint moves - the geometry above is untouched.
+  const rootNeon = neon && isRoot ? neonRootColor(node.color) : null
+  if (neon && (isRoot || isRadial)) textColor = NEON_TEXT
+  if (rootNeon) strokeColor = lighten(rootNeon, 0.4)
 
   // A dot is 5-8px across, so the 2px L2+ ring would swallow it whole.
   if (isRadialDot) strokeW = 1
@@ -358,7 +376,10 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   // Only the root and the two labelled rings carry it; the dots are too small to
   // show a blur and one filter per dot would be pure cost.
   const glowId = `glow-${node.id}`
-  const showGlow = diagramType === 'mindmap' && (isRoot || (isRadial && node.depth <= 2))
+  const showGlow = diagramType === 'mindmap' && !neon && (isRoot || (isRadial && node.depth <= 2))
+  // Neon halo: one shared, diameter-bucketed filter per render (defined in
+  // DiagramCanvas), so a 200-node map carries a handful of filters, not 400.
+  const neonGlow = neon && (isRoot || isRadial)
   const hasBadge = (hasEmoji || hasIcon) && !isRoot && !isRadial && !drawCircle
   const editX = isRoot ? cx - r * 0.75 : hasBadge ? node.height : (align === 'left' ? 8 : 2)
   const editW = isRoot ? r * 1.5 : hasBadge ? displayW - node.height - 4 : displayW - editX - 2
@@ -373,7 +394,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
       transition: isDragging ? 'none' : 'transform 0.22s cubic-bezier(0.4,0,0.2,1)',
       pointerEvents: noInteract ? 'none' : undefined,
     }}>
-    {(!isRoot && !isRadial) || showGlow ? (
+    {(!isRoot && !isRadial) || showGlow || rootNeon ? (
       <defs>
         {!isRoot && !isRadial && (
           <clipPath id={clipId}>
@@ -384,6 +405,13 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
           <filter id={glowId} x="-70%" y="-70%" width="240%" height="240%">
             <feGaussianBlur stdDeviation={Math.max(3, displayW * 0.11)} />
           </filter>
+        )}
+        {/* One root per map, so its gradient costs nothing to define here. */}
+        {rootNeon && (
+          <radialGradient id={NEON_ROOT_GRADIENT}>
+            <stop offset="0%" stopColor={lighten(rootNeon, NEON_ROOT_LIGHTEN)} />
+            <stop offset="100%" stopColor={rootNeon} />
+          </radialGradient>
         )}
       </defs>
     ) : null}
@@ -406,6 +434,10 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
           {showGlow && (
             <circle cx={cx} cy={cy} r={r * 1.08} fill={col.startsWith('#') ? col : bg}
               opacity={0.22} filter={`url(#${glowId})`} style={{ pointerEvents: 'none' }} />
+          )}
+          {rootNeon && (
+            <circle cx={cx} cy={cy} r={r} fill={rootNeon}
+              filter={`url(#${neonFilterId(displayW)})`} style={{ pointerEvents: 'none' }} />
           )}
 
           {/* Siri glow + spinning rings — circle root only, never on the mind map */}
@@ -441,7 +473,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
               rx={node.height / 2} ry={node.height / 2}
               fill={bg} fillOpacity={1} stroke={strokeColor} strokeWidth={strokeW} />
           ) : (
-            <circle cx={cx} cy={cy} r={r} fill={bg} fillOpacity={1}
+            <circle cx={cx} cy={cy} r={r} fill={rootNeon ? `url(#${NEON_ROOT_GRADIENT})` : bg} fillOpacity={1}
               stroke={strokeColor} strokeWidth={strokeW} />
           )}
 
@@ -478,6 +510,9 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
         <g style={{ pointerEvents: 'none' }}>
           {showGlow && (
             <circle cx={cx} cy={cy} r={r * 1.1} fill={col} opacity={0.3} filter={`url(#${glowId})`} />
+          )}
+          {neonGlow && (
+            <circle cx={cx} cy={cy} r={r} fill={col} filter={`url(#${neonFilterId(displayW)})`} />
           )}
           <circle cx={cx} cy={cy} r={r} fill={nodeFill} fillOpacity={bgOpacity} />
           <circle cx={cx} cy={cy} r={r} fill="none" stroke={strokeColor} strokeWidth={strokeW} />
@@ -596,9 +631,18 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
               <NodeIcon icon={resolvedIcon} x={cx - glyph / 2} y={cy - glyph / 2}
                 size={glyph} color={textColor} strokeWidth={2} />
             ) : (
-              <text x={cx} y={cy + glyph * 0.36} textAnchor="middle"
-                fontSize={glyph} fontWeight="600" fontStyle={fontStyle}
-                fontFamily="Inter, system-ui, sans-serif" fill={textColor}>{nodeInitial(node.title)}</text>
+              <>
+                {/* Faint glow under the white initial, from the one shared text filter */}
+                {neon && (
+                  <text x={cx} y={cy + glyph * 0.36} textAnchor="middle"
+                    fontSize={glyph} fontWeight="600" fontStyle={fontStyle}
+                    fontFamily="Inter, system-ui, sans-serif" fill={NEON_TEXT}
+                    filter={`url(#${NEON_TEXT_FILTER})`}>{nodeInitial(node.title)}</text>
+                )}
+                <text x={cx} y={cy + glyph * 0.36} textAnchor="middle"
+                  fontSize={glyph} fontWeight="600" fontStyle={fontStyle}
+                  fontFamily="Inter, system-ui, sans-serif" fill={textColor}>{nodeInitial(node.title)}</text>
+              </>
             )
           )}
           {/* Depth 1 carries the map: its name and its subtree size sit under the circle.
@@ -609,11 +653,16 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
                 fontSize={node.depth === 1 ? LABEL_FONT.title1 : LABEL_FONT.title2}
                 fontWeight={node.depth === 1 ? '600' : '400'}
                 fontFamily="Inter, system-ui, sans-serif"
-                fill={node.depth === 1 ? '#1a1d2e' : '#475569'}>{titleBody}</text>
+                fillOpacity={neon && node.depth !== 1 ? NEON_TEXT_MUTED_OPACITY : 1}
+                fill={neon
+                  ? (node.depth === 1 ? NEON_TEXT : NEON_TEXT_MUTED)
+                  : (node.depth === 1 ? '#1a1d2e' : '#475569')}>{titleBody}</text>
               {label.countY !== null && descendantCount > 0 && (
                 <text x={label.tx} y={label.countY} textAnchor={label.anchor}
                   fontSize={LABEL_FONT.count1} fontWeight="600"
-                  fontFamily="Inter, system-ui, sans-serif" fill={col}>{descendantCount}</text>
+                  fontFamily="Inter, system-ui, sans-serif"
+                  fillOpacity={neon ? NEON_TEXT_MUTED_OPACITY : 1}
+                  fill={neon ? NEON_TEXT_MUTED : col}>{descendantCount}</text>
               )}
             </>
           )}
