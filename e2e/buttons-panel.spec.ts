@@ -184,6 +184,21 @@ test.describe('SidePanel — Map tab', () => {
     expect(hasCount).toBe(true)
   })
 
+  test('Gloss toggle is off by default and adds the overlay to root, L1 and L2 boxes', async ({ page }) => {
+    await openEditorWithPanel(page)
+    const glossCount = () => page.evaluate(() =>
+      document.querySelectorAll('.diagram-canvas-root svg [fill="url(#node-gloss-linear)"], .diagram-canvas-root svg [fill="url(#node-gloss-radial)"]').length
+    )
+    expect(await glossCount()).toBe(0)
+    await page.screenshot({ path: 'test-results/gloss-off.png' })
+    const toggle = page.getByText('Gloss', { exact: true }).locator('..').locator('button')
+    await toggle.click()
+    await expect.poll(glossCount, { timeout: 5_000 }).toBeGreaterThan(0)
+    await page.screenshot({ path: 'test-results/gloss-on.png' })
+    await toggle.click()
+    await expect.poll(glossCount, { timeout: 5_000 }).toBe(0)
+  })
+
   test('Auto Icons (AI) button runs and assigns icons to nodes', async ({ page }) => {
     await openEditorWithPanel(page)
     const iconCount = () => page.evaluate(() =>
@@ -380,6 +395,10 @@ test.describe('SidePanel — Style tab', () => {
 
     const slider = page.locator('input[type="range"]').first()
     await expect(slider).toBeVisible({ timeout: 3_000 })
+    // Auto width is on by default and keeps the slider inert; click Auto to go manual.
+    await expect(slider).toBeDisabled()
+    await page.getByRole('button', { name: 'Auto', exact: true }).click()
+    await expect(slider).toBeEnabled({ timeout: 3_000 })
 
     const widthOf = () => page.evaluate(() => {
       const t = [...document.querySelectorAll('.diagram-canvas-root svg text')]

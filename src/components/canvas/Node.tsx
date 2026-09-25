@@ -5,7 +5,7 @@ import { NodeIcon, getLucideIcon } from './NodeIcon'
 import { wrapText, initialFontSize, nodeInitial, radialLabelFor, LABEL_FONT, RADIAL_ROOT_FONT } from '../../lib/layout/mindmap'
 import { rootPillWidth, rootPillFontSize, rootTitleNeedsPill, rootCircleDiameter, rootDrawnWidth, ROOT_FONT } from '../../lib/rootPill'
 import { getTheme } from '../../lib/themes'
-import {
+import { LABEL_TEXT,
   hexToRgb, darken, depthFill, isDarkBg, lighten, neonFilterId, neonRootColor,
   NEON_ROOT_GRADIENT, NEON_ROOT_LIGHTEN, NEON_TEXT, NEON_TEXT_FILTER,
   NEON_TEXT_MUTED, NEON_TEXT_MUTED_OPACITY,
@@ -124,6 +124,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   const diagramType = useMindmapStore(s => s.diagramType)
   const themeId = useMindmapStore(s => s.themeId)
   const showChildCount = useMindmapStore(s => s.showChildCount)
+  const mapGloss = useMindmapStore(s => s.activeMindmap?.nodes.find(n => n.parentId === null)?.gloss === true)
   // On a dark canvas the radial mind map is painted as a living circuit: every circle
   // is a glowing orb, the root a violet-to-blue one, and the labels are white or light
   // grey. Only paint changes - sizes, positions and hit areas are identical. Light
@@ -168,13 +169,13 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
     // One shared depth ladder (src/lib/color depthFill) so the canvas and the
     // server renderer that draws the home-grid card previews never drift.
     bg = col.startsWith('#') ? depthFill(col, node.depth) : '#f8fafc'
-    textColor = isLight(bg) ? '#1a1d2e' : '#ffffff'
+    textColor = LABEL_TEXT
     strokeColor = col
     strokeW = 2
   } else {
     // L1 all other diagrams: solid color fill, darker border so white badge is framed
     bg = col
-    textColor = isLight(col) ? '#1a1d2e' : '#ffffff'
+    textColor = LABEL_TEXT
     strokeColor = col.startsWith('#') ? darken(col, 0.25) : col
     strokeW = 2
   }
@@ -187,11 +188,12 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   if (neon && (isRoot || isRadial)) textColor = NEON_TEXT
   if (rootNeon) strokeColor = lighten(rootNeon, 0.4)
 
-  // Root, L1 and L2 boxes carry a soft top-of-box gloss; L3+ are already pale, so
+  // Gloss is opt-in per map (Settings > Display, stored on the root node). When on,
+  // root, L1 and L2 boxes carry a soft top-of-box gloss; L3+ are already pale, so
   // it would be lost. Dark-background boxes get the stronger gradient stops (via
   // glossOpacity), light-background ones the softer scaled-down version. Read from
   // the base fill, so a neon orb keeps the strong stops its dark canvas calls for.
-  const showGloss = glossApplies(node.depth)
+  const showGloss = mapGloss && glossApplies(node.depth)
   const glossFillOpacity = glossOpacity(isLight(bg))
 
   // A dot is 5-8px across, so the 2px L2+ ring would swallow it whole.
@@ -460,32 +462,8 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
               filter={`url(#${neonFilterId(displayW)})`} style={{ pointerEvents: 'none' }} />
           )}
 
-          {/* Siri glow + spinning rings — circle root only, never on the mind map */}
-          {!isRootPill && diagramType !== 'mindmap' && (() => { const ar = r; return (
-          <>
-          {showDecor && <SiriWave cx={cx} cy={cy} r={ar} colors={l1Colors} />}
-
-          {/* Back ring — horizontal orbit, spinning */}
-          <ellipse cx={cx} cy={cy} rx={ar * 2.0} ry={ar * 0.32}
-            stroke="#6b7280" strokeWidth={2} fill="none" opacity={0.25}
-            style={{ pointerEvents: 'none' }}>
-            <animateTransform attributeName="transform" type="rotate"
-              from={`0 ${cx} ${cy}`} to={`360 ${cx} ${cy}`} dur="12s" repeatCount="indefinite" />
-          </ellipse>
-          {/* Second ring — vertical spine (90° to first), counter-spinning */}
-          <ellipse cx={cx} cy={cy} rx={ar * 0.32} ry={ar * 2.0}
-            stroke="#6b7280" strokeWidth={2} fill="none" opacity={0.25}
-            style={{ pointerEvents: 'none' }}>
-            <animateTransform attributeName="transform" type="rotate"
-              from={`0 ${cx} ${cy}`} to={`-360 ${cx} ${cy}`} dur="12s" repeatCount="indefinite" />
-          </ellipse>
-          <ellipse cx={cx} cy={cy} rx={ar * 2.4} ry={ar * 0.38}
-            stroke="#9ca3af" strokeWidth={1.2} fill="none" opacity={0.14}
-            style={{ pointerEvents: 'none' }}>
-            <animateTransform attributeName="transform" type="rotate"
-              from={`0 ${cx} ${cy}`} to={`-360 ${cx} ${cy}`} dur="18s" repeatCount="indefinite" />
-          </ellipse>
-          </>)})()}
+          {/* Siri glow - circle root only, never on the mind map */}
+          {!isRootPill && diagramType !== 'mindmap' && showDecor && <SiriWave cx={cx} cy={cy} r={r} colors={l1Colors} />}
 
           {/* Root shape: pill rect for long titles, circle for short */}
           {isRootPill ? (
@@ -497,7 +475,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
               stroke={strokeColor} strokeWidth={strokeW} />
           )}
 
-          {/* Gloss — soft top-of-box highlight, root pill or root circle */}
+          {/* Gloss - soft top-of-box highlight, root pill or root circle */}
           {showGloss && (isRootPill ? (
             <rect x={0} y={0} width={displayW} height={node.height} rx={node.height / 2} ry={node.height / 2}
               fill={`url(#${GLOSS_LINEAR_ID})`} fillOpacity={glossFillOpacity} style={{ pointerEvents: 'none' }} />
@@ -506,26 +484,6 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
               style={{ pointerEvents: 'none' }} />
           ))}
 
-          {/* Front ring glints — circle root only, never on the mind map */}
-          {!isRootPill && diagramType !== 'mindmap' && (() => { const ar = r; return (
-          <>
-          <ellipse cx={cx} cy={cy} rx={ar * 2.0} ry={ar * 0.32}
-            stroke="#d1d5db" strokeWidth={2} fill="none" opacity={0.55}
-            strokeDasharray={`${ar * 3.14} ${ar * 9.42}`}
-            strokeDashoffset={`${ar * 1.57}`}
-            style={{ pointerEvents: 'none' }}>
-            <animateTransform attributeName="transform" type="rotate"
-              from={`0 ${cx} ${cy}`} to={`360 ${cx} ${cy}`} dur="12s" repeatCount="indefinite" />
-          </ellipse>
-          <ellipse cx={cx} cy={cy} rx={ar * 0.32} ry={ar * 2.0}
-            stroke="#d1d5db" strokeWidth={2} fill="none" opacity={0.55}
-            strokeDasharray={`${ar * 3.14} ${ar * 9.42}`}
-            strokeDashoffset={`${ar * 1.57}`}
-            style={{ pointerEvents: 'none' }}>
-            <animateTransform attributeName="transform" type="rotate"
-              from={`0 ${cx} ${cy}`} to={`-360 ${cx} ${cy}`} dur="12s" repeatCount="indefinite" />
-          </ellipse>
-          </>)})()}
 
           {/* Roaming fireflies in the L1 colours — twinkle around the root */}
           {showDecor && diagramType !== 'mindmap' && l1Colors.length > 0 && (
@@ -601,7 +559,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
         <g clipPath={`url(#${clipId})`} style={{ pointerEvents: 'none' }}
           filter={previewW !== null ? 'drop-shadow(0 0 8px rgba(59,130,246,0.7))' : 'drop-shadow(0 1px 4px rgba(0,0,0,0.1))'}>
           <rect x={0} y={0} width={displayW} height={node.height} fill={nodeFill} fillOpacity={bgOpacity} />
-          {/* Gloss — soft top-of-box highlight, root/L1/L2 boxes only */}
+          {/* Gloss - soft top-of-box highlight, root/L1/L2 boxes only */}
           {showGloss && (
             <rect x={0} y={0} width={displayW} height={node.height} rx={effectiveRx} ry={effectiveRx}
               fill={`url(#${GLOSS_LINEAR_ID})`} fillOpacity={glossFillOpacity} />
@@ -701,7 +659,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
                 fill={neon
                   ? (node.depth === 1 ? NEON_TEXT : NEON_TEXT_MUTED)
                   : (node.depth === 1 ? '#1a1d2e' : '#475569')}>{titleBody}</text>
-              {label.countY !== null && descendantCount > 0 && (
+              {showChildCount && label.countY !== null && descendantCount > 0 && (
                 <text x={label.tx} y={label.countY} textAnchor={label.anchor}
                   fontSize={LABEL_FONT.count1} fontWeight="600"
                   fontFamily="Inter, system-ui, sans-serif"

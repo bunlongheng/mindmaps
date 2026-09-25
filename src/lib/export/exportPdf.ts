@@ -36,8 +36,10 @@ export async function exportDiagramAsPdf(diagramName: string) {
   document.body.appendChild(wrapper)
 
   try {
+    // HD: 3x the CSS pixels, capped so a huge map cannot exhaust the canvas limit.
+    const scale = Math.min(3, Math.sqrt(24_000_000 / (vw * vh)))
     const canvas = await html2canvas(wrapper, {
-      scale: 1.2,
+      scale,
       useCORS: true,
       allowTaint: true,
       backgroundColor: bg,
@@ -47,19 +49,17 @@ export async function exportDiagramAsPdf(diagramName: string) {
       logging: false,
     })
 
-    // JPEG at 85% quality — far smaller than PNG for diagram content
-    const imgData = canvas.toDataURL('image/jpeg', 0.72)
-    const landscape = vw > vh
-    const pdfW = landscape ? 297 : 210
-    const pdfH = landscape ? 210 : 297
-    const ratio = Math.min((pdfW - 10) / vw, (pdfH - 10) / vh)
-    const drawW = vw * ratio
-    const drawH = vh * ratio
-    const dx = (pdfW - drawW) / 2
-    const dy = (pdfH - drawH) / 2
-
-    const pdf = new jsPDF({ orientation: landscape ? 'landscape' : 'portrait', unit: 'mm', format: 'a4', compress: true })
-    pdf.addImage(imgData, 'JPEG', dx, dy, drawW, drawH, undefined, 'FAST')
+    // Lossless PNG (flat diagram colours compress well) on a page cut to the map's own
+    // size, so nothing is shrunk onto A4 and the text stays crisp when zoomed.
+    const imgData = canvas.toDataURL('image/png')
+    const margin = 8
+    const pdfW = vw * 0.2646 + margin * 2   // CSS px -> mm at 96 dpi
+    const pdfH = vh * 0.2646 + margin * 2
+    const pdf = new jsPDF({ orientation: pdfW > pdfH ? 'landscape' : 'portrait', unit: 'mm', format: [pdfW, pdfH], compress: true })
+    // Paint the page in the canvas colour first, so the margin is not left transparent.
+    const rgb = bg.match(/\d+/g)?.slice(0, 3).map(Number)
+    if (rgb && rgb.length === 3) { pdf.setFillColor(rgb[0], rgb[1], rgb[2]); pdf.rect(0, 0, pdfW, pdfH, 'F') }
+    pdf.addImage(imgData, 'PNG', margin, margin, vw * 0.2646, vh * 0.2646, undefined, 'FAST')
     pdf.save(`${diagramName || 'diagram'}.pdf`)
     showToast('PDF exported!', { color: '#22c55e', confetti: true })
   } catch (err) {

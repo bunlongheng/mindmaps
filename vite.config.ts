@@ -19,6 +19,18 @@ function devSessionToken(): string | null {
 
 export default defineConfig({
   plugins: [
+    {
+      name: 'dev-share-link',
+      configureServer(server) {
+        server.middlewares.use((req, res, next) => {
+          const m = /^\/s\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:[/?#]|$)/i.exec(req.url ?? '')
+          if (!m) return next()
+          res.statusCode = 302
+          res.setHeader('Location', `/?share=${m[1]}`)
+          res.end()
+        })
+      },
+    },
     react(),
     VitePWA({
       registerType: 'autoUpdate',

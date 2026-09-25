@@ -123,7 +123,6 @@ export const L1_PALETTE = [
   '#D9843A', // orange
   '#3AAAD9', // sky
   '#D93A7C', // pink
-  '#3AD955', // green
   '#7C3AD9', // violet
   '#D9AA3A', // amber
   '#3A74D9', // blue
@@ -139,7 +138,7 @@ export function l1PaletteColor(node: MinNode, allNodes: MinNode[]): string | nul
   let cur: MinNode | null = node
   let guard = 0
   while (cur && cur.depth > 1 && guard++ < 30) cur = allNodes.find(n => n.id === cur!.parentId) ?? null
-  if (cur && cur.depth === 1) return L1_PALETTE[(((cur.sortOrder ?? 0) % 12) + 12) % 12]
+  if (cur && cur.depth === 1) return L1_PALETTE[(((cur.sortOrder ?? 0) % L1_PALETTE.length) + L1_PALETTE.length) % L1_PALETTE.length]
   return null
 }
 
@@ -190,6 +189,9 @@ export const NEON_EDGE_CORE_OPACITY = 0.95
 export const NEON_EDGE_LIGHTEN = 0.25
 /** Label paint: names white, counts and depth-2 labels light grey at 80%. */
 export const NEON_TEXT = '#ffffff'
+
+/** Label colour for every box below the root: always black, whatever the fill (owner rule 2026-09-24). */
+export const LABEL_TEXT = '#000000'
 export const NEON_TEXT_MUTED = '#cbd5e1'
 export const NEON_TEXT_MUTED_OPACITY = 0.8
 /** Blur under the white initial inside a circle. */

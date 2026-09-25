@@ -26,6 +26,7 @@ export interface MindmapNode {
   emoji?: string
   branchGap?: number
   shape?: 'rect' | 'rounded' | 'pill' | 'circle'   // box shape; absent keeps the diagram's default look
+  gloss?: boolean      // root node only: opt-in top-of-box gloss for root, L1 and L2 across the whole map
   url?: string         // optional hyperlink — clicking the node opens it
 }
 

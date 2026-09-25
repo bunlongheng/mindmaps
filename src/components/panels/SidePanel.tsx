@@ -112,6 +112,7 @@ export function SidePanel({ nodeId, onClose, onDelete, onUpdateTags }: SidePanel
     activeMindmap, updateNode, batchUpdateNodes, selectedNodeIds, diagrams,
     lineStyle, setLineStyle, diagramType, setDiagramType, setShareEnabled, rerunLayout,
     themeId, setTheme, showOrderNumbers, setShowOrderNumbers, showChildCount, setShowChildCount, autoAssignIcons,
+    rootNode,
   } = useMindmapStore(
     useShallow(s => ({
       activeMindmap: s.activeMindmap, updateNode: s.updateNode, batchUpdateNodes: s.batchUpdateNodes, selectedNodeIds: s.selectedNodeIds,
@@ -120,6 +121,7 @@ export function SidePanel({ nodeId, onClose, onDelete, onUpdateTags }: SidePanel
       setShareEnabled: s.setShareEnabled, rerunLayout: s.rerunLayout,
       themeId: s.themeId, setTheme: s.setTheme, showOrderNumbers: s.showOrderNumbers, setShowOrderNumbers: s.setShowOrderNumbers,
       showChildCount: s.showChildCount, setShowChildCount: s.setShowChildCount, autoAssignIcons: s.autoAssignIcons,
+      rootNode: s.activeMindmap?.nodes.find(n => n.parentId === null) ?? null,
     })),
   )
   const mapInfo = useMemo(() => levelCounts(activeMindmap?.nodes ?? []), [activeMindmap?.nodes])
@@ -394,8 +396,15 @@ export function SidePanel({ nodeId, onClose, onDelete, onUpdateTags }: SidePanel
                     swatches={themeColors}
                   />
                 </PRow>
-                {node.depth >= 1 && (
-                  <PRow label="Box">
+                {/* Box shape. On the root it is the master shape: 1 click restyles every child box. */}
+                {(() => {
+                  const isRoot = node.depth === 0
+                  const children = isRoot ? (activeMindmap?.nodes.filter(n => n.depth >= 1) ?? []) : []
+                  const activeShape = isRoot
+                    ? (children.length > 0 && children.every(n => (n.shape ?? 'rounded') === (children[0].shape ?? 'rounded')) ? (children[0].shape ?? 'rounded') : null)
+                    : node.shape
+                  return (
+                  <PRow label={isRoot ? 'Boxes' : 'Box'}>
                     <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                       {([
                         { v: 'rect' as const,    label: 'Rectangle', icon: <Square size={12}/> },
@@ -403,15 +412,20 @@ export function SidePanel({ nodeId, onClose, onDelete, onUpdateTags }: SidePanel
                         { v: 'pill' as const,    label: 'Pill',      icon: <svg width="14" height="12" viewBox="0 0 14 12" fill="none" aria-hidden="true"><rect x="1" y="2.5" width="12" height="7" rx="3.5" stroke="currentColor" strokeWidth="1.5" /></svg> },
                         { v: 'circle' as const,  label: 'Circle',    icon: <Circle size={12}/> },
                       ] as const).map(({ v, label, icon }) => (
-                        <button key={v} title={label} aria-label={label}
-                          onClick={() => { save({ shape: v as NodeShape }); setTimeout(() => rerunLayout(), 0) }}
-                          style={{ ...chip(node.shape === v), flex: 1, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <button key={v} title={isRoot ? `${label} for every box` : label} aria-label={isRoot ? `${label} for every box` : label}
+                          onClick={() => {
+                            if (isRoot) batchUpdateNodes(children.map(n => n.id), { shape: v as NodeShape })
+                            else save({ shape: v as NodeShape })
+                            setTimeout(() => rerunLayout(), 0)
+                          }}
+                          style={{ ...chip(activeShape === v), flex: 1, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                           {icon}
                         </button>
                       ))}
                     </div>
                   </PRow>
-                )}
+                  )
+                })()}
                 {node.depth >= 1 && !(diagramType === 'mindmap' && node.depth <= 2) && (
                   <PRow label="Width">
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -419,15 +433,17 @@ export function SidePanel({ nodeId, onClose, onDelete, onUpdateTags }: SidePanel
                         const isAuto = (node.widthMode ?? 'auto') === 'auto'
                         return (
                           <>
-                            <button onClick={() => { save({ widthMode: 'auto' }); setTimeout(() => rerunLayout(), 0) }}
+                            <button onClick={() => { save({ widthMode: isAuto ? 'manual' : 'auto' }); setTimeout(() => rerunLayout(), 0) }}
+                              title={isAuto ? 'Auto width on: fits the longest label at this depth. Click to set a width by hand' : 'Click for auto width'}
                               style={{ ...chip(isAuto), flexShrink: 0 }}>
                               Auto
                             </button>
-                            <input type="range" min={80} max={500} step={4}
+                            <input type="range" min={80} max={1200} step={4}
                               value={node.width}
                               aria-label="Width"
+                              disabled={isAuto}
                               onChange={e => { save({ width: parseInt(e.target.value), widthMode: 'manual' }); setTimeout(() => rerunLayout(), 0) }}
-                              style={{ flex: 1, accentColor: '#3b82f6', opacity: isAuto ? 0.5 : 1 }}
+                              style={{ flex: 1, accentColor: '#3b82f6', opacity: isAuto ? 0.35 : 1, cursor: isAuto ? 'default' : 'pointer' }}
                             />
                           </>
                         )
@@ -570,6 +586,24 @@ export function SidePanel({ nodeId, onClose, onDelete, onUpdateTags }: SidePanel
               >
                 <span style={{
                   position: 'absolute', top: 3, left: showChildCount ? 20 : 3,
+                  width: 16, height: 16, borderRadius: '50%', background: '#fff',
+                  transition: 'left 0.2s', display: 'block',
+                }} />
+              </button>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <span style={{ fontSize: 12, color: '#374151' }}>Gloss</span>
+              <button
+                onClick={() => rootNode && updateNode(rootNode.id, { gloss: !rootNode.gloss })}
+                disabled={!rootNode}
+                style={{
+                  width: 40, height: 22, borderRadius: 11, border: 'none', cursor: 'pointer', padding: 0,
+                  background: rootNode?.gloss ? '#1a1d2e' : '#d1d5db',
+                  position: 'relative', transition: 'background 0.2s', flexShrink: 0,
+                }}
+              >
+                <span style={{
+                  position: 'absolute', top: 3, left: rootNode?.gloss ? 20 : 3,
                   width: 16, height: 16, borderRadius: '50%', background: '#fff',
                   transition: 'left 0.2s', display: 'block',
                 }} />
@@ -891,16 +925,7 @@ function ColorField({ color, colorMode, onChange, onAuto, allowNone, swatches }:
           transform: isAuto ? 'scale(1.1)' : 'scale(1)', transition: 'all 0.1s',
         }} />
       )}
-      {(swatches ?? []).slice(0, 11).map(c => (
-        <button key={c} onClick={() => onChange(c)} style={{
-          width: '100%', aspectRatio: '1', borderRadius: 5, border: 'none',
-          background: c, cursor: 'pointer', padding: 0,
-          outline: isManual && color === c ? `2.5px solid ${c === '#ffffff' ? '#94a3b8' : c}` : 'none', outlineOffset: 1.5,
-          boxShadow: isManual && color === c ? '0 0 0 1.5px #fff inset' : (c === '#ffffff' || c === '#f1f5f9' ? '0 0 0 1px #d1d5db inset' : '0 1px 2px rgba(0,0,0,0.15)'),
-          transform: isManual && color === c ? 'scale(1.1)' : 'scale(1)', transition: 'all 0.1s',
-        }} />
-      ))}
-      {/* Custom color picker as last tile */}
+      {/* Custom color tile sits beside the wheel; 10 presets follow so the grid stays 2 rows */}
       <label title="Custom color" style={{
         width: '100%', aspectRatio: '1', borderRadius: 5, cursor: 'pointer',
         border: '1.5px dashed #d1d5db', display: 'flex', alignItems: 'center',
@@ -914,6 +939,15 @@ function ColorField({ color, colorMode, onChange, onAuto, allowNone, swatches }:
           style={{ opacity: 0, position: 'absolute', width: '100%', height: '100%', cursor: 'pointer', padding: 0, border: 'none' }}
         />
       </label>
+      {(swatches ?? []).slice(0, 10).map(c => (
+        <button key={c} onClick={() => onChange(c)} style={{
+          width: '100%', aspectRatio: '1', borderRadius: 5, border: 'none',
+          background: c, cursor: 'pointer', padding: 0,
+          outline: isManual && color === c ? `2.5px solid ${c === '#ffffff' ? '#94a3b8' : c}` : 'none', outlineOffset: 1.5,
+          boxShadow: isManual && color === c ? '0 0 0 1.5px #fff inset' : (c === '#ffffff' || c === '#f1f5f9' ? '0 0 0 1px #d1d5db inset' : '0 1px 2px rgba(0,0,0,0.15)'),
+          transform: isManual && color === c ? 'scale(1.1)' : 'scale(1)', transition: 'all 0.1s',
+        }} />
+      ))}
       {allowNone && (
         <button onClick={() => onChange('none')} style={{
           width: '100%', aspectRatio: '1', borderRadius: 5, cursor: 'pointer',

@@ -31,7 +31,7 @@ export function computeBranchColors(nodes: BranchColorNode[]): Map<string, strin
     } else if (n.depth > 0) {
       const parent = n.parentId ? byId.get(n.parentId) : undefined
       const parentBase = parent ? resolve(parent) : null
-      c = parentBase ?? (n.depth === 1 ? L1_PALETTE[(((n.sortOrder ?? 0) % 12) + 12) % 12] : null)
+      c = parentBase ?? (n.depth === 1 ? L1_PALETTE[(((n.sortOrder ?? 0) % L1_PALETTE.length) + L1_PALETTE.length) % L1_PALETTE.length] : null)
     }
     colors.set(n.id, c)
     return c

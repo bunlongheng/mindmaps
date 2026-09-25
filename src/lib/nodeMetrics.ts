@@ -75,9 +75,32 @@ export function nodePadX(depth: number): number {
   return nodeMetrics(depth).padX
 }
 
-/** Estimated rendered width of a title, for callers with no canvas to measure with. */
+// Inter Regular advance widths in em for ASCII 32..126, measured from the bundled
+// api/_fonts/Inter-Regular.ttf (the face the server renderer draws with). Both the
+// canvas and the server size a box from this same table, so a card preview, a share
+// image and the opened map agree to the pixel. Anything outside ASCII falls back to
+// CHAR_W_RATIO, and CJK / emoji ranges to a full em.
+const INTER_ADVANCE = [
+  0.281, 0.288, 0.466, 0.633, 0.642, 0.982, 0.644, 0.300, 0.365, 0.365, 0.501, 0.662,
+  0.288, 0.460, 0.288, 0.360, 0.631, 0.407, 0.610, 0.618, 0.646, 0.593, 0.620, 0.566,
+  0.619, 0.620, 0.288, 0.302, 0.662, 0.662, 0.662, 0.511, 0.966, 0.690, 0.654, 0.730,
+  0.722, 0.601, 0.590, 0.746, 0.743, 0.269, 0.571, 0.672, 0.565, 0.903, 0.753, 0.765,
+  0.639, 0.765, 0.644, 0.642, 0.646, 0.744, 0.690, 0.985, 0.682, 0.679, 0.629, 0.365,
+  0.360, 0.365, 0.471, 0.456, 0.323, 0.562, 0.612, 0.571, 0.612, 0.583, 0.370, 0.613,
+  0.591, 0.242, 0.242, 0.549, 0.242, 0.876, 0.591, 0.600, 0.612, 0.612, 0.376, 0.528,
+  0.327, 0.591, 0.562, 0.818, 0.546, 0.562, 0.552, 0.426, 0.333, 0.426, 0.662,
+]
+
+/** Rendered width of a title in Inter Regular, from the glyph table (no canvas needed). */
 export function estimateTextWidth(title: string, fontSize: number): number {
-  return displayTitle(title).length * fontSize * CHAR_W_RATIO
+  let em = 0
+  for (const ch of displayTitle(title)) {
+    const code = ch.codePointAt(0) ?? 0
+    if (code >= 32 && code < 127) em += INTER_ADVANCE[code - 32]
+    else if (code >= 0x2e80) em += 1        // CJK, emoji and other full-width glyphs
+    else em += CHAR_W_RATIO
+  }
+  return em * fontSize
 }
 
 /** Width an icon or emoji badge reserves: a box-height square plus the gap. */

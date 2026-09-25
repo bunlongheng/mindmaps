@@ -99,8 +99,8 @@ describe('l1PaletteColor', () => {
     expect(l1PaletteColor(l3, all)).toBe(L1_PALETTE[3])
   })
 
-  it('wraps sortOrder past 12 around the palette', () => {
-    const l1far = { id: 'e', parentId: 'root', depth: 1, sortOrder: 13 }
+  it('wraps sortOrder past the palette length around to the start', () => {
+    const l1far = { id: 'e', parentId: 'root', depth: 1, sortOrder: L1_PALETTE.length + 1 }
     expect(l1PaletteColor(l1far, [root, l1far])).toBe(L1_PALETTE[1])
   })
 
@@ -213,8 +213,8 @@ describe('L1_PALETTE spacing and legibility', () => {
     return 0.2126 * r + 0.7152 * g + 0.0722 * b > 140
   }
 
-  it('has exactly 12 colours', () => {
-    expect(L1_PALETTE).toHaveLength(12)
+  it('has exactly 11 colours (the wheel plus 10 preset tiles plus the custom tile fill 2 rows of 6)', () => {
+    expect(L1_PALETTE).toHaveLength(11)
   })
 
   it('keeps every neighbouring pair at least 60 degrees apart in hue, wrapping around', () => {
