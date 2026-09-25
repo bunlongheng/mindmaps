@@ -4,6 +4,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { useMindmapStore } from '../../store/mindmapStore'
 import { renderMindmapSvg } from '../render-svg'
+import { L1_PALETTE } from '../color'
 import type { Diagram, MindmapNode } from '../../types'
 
 const r2 = (v: number) => Math.round(v * 100) / 100
@@ -69,4 +70,24 @@ describe('render-svg / store width parity', () => {
     expect(c1.width).toBe(c2.width)
     expect(c3.width).toBe(260)
   })
+})
+
+describe('render-svg - edge colour parity with the canvas', () => {
+  // The canvas colours a connector from the resolved branch colour (EdgeLayer colorOf),
+  // so an auto L1 whose stored colour is stale still draws in its palette hue. The share
+  // renderer must read the same resolver, or a share image shows a cyan edge into a red box.
+  const nodes = [
+    { id: 'root', title: 'Root', color: '#6366f1', parentId: null, depth: 0, x: 0, y: 0, width: 200, height: 64 },
+    { id: 'a', title: 'Alpha', color: '#3AAAD9', parentId: 'root', depth: 1, sortOrder: 0, x: 300, y: 0, width: 160, height: 44 },
+    { id: 'a1', title: 'Alpha child', color: '#3AAAD9', parentId: 'a', depth: 2, sortOrder: 0, x: 520, y: 0, width: 160, height: 40 },
+  ]
+  for (const line_style of ['curved', 'orthogonal', 'straight'] as const) {
+    it(`${line_style}: every edge is stroked with the branch colour, never the stale stored colour`, () => {
+      const svg = renderMindmapSvg({ id: 'x', name: 'Edges', type: 'logic-chart', line_style, theme_id: 'default', nodes: nodes as never })
+      const strokes = [...svg.matchAll(/<(?:path|line)[^>]*stroke="([^"]+)"/g)].map(m => m[1].toLowerCase())
+      expect(strokes.length).toBeGreaterThanOrEqual(2)
+      expect(strokes.some(s => s.startsWith(L1_PALETTE[0].toLowerCase()))).toBe(true)
+      expect(strokes.some(s => s.startsWith('#3aaad9'))).toBe(false)
+    })
+  }
 })

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { THEMES, getTheme } from '../themes'
+import { L1_PALETTE } from '../color'
 
 describe('THEMES', () => {
   it('has at least 4 themes', () => {
@@ -11,7 +12,8 @@ describe('THEMES', () => {
       expect(t.id).toBeTruthy()
       expect(t.label).toBeTruthy()
       expect(t.canvasBg).toMatch(/^#[0-9a-f]{6}$/i)
-      expect(t.colors.length).toBe(20)
+      // The default theme is the branch wheel plus 8 neutrals; the others carry a flat 20.
+      expect(t.colors.length).toBe(t.id === 'default' ? L1_PALETTE.length + 8 : 20)
     }
   })
 

@@ -249,6 +249,14 @@ describe('Node — rendering by depth / type', () => {
 })
 
 describe('Node — gloss overlay', () => {
+  // Gloss is opt-in per map: the root node carries the flag, so every fixture here turns it on.
+  const glossRoot = (over: Partial<MindmapNode> = {}) => makeRoot({ gloss: true, ...over })
+
+  it('renders no gloss overlay by default (the map has not opted in)', () => {
+    loadStore([makeRoot(), makeNode()])
+    const { container } = renderNode(makeNode())
+    expect(container.querySelectorAll(`rect[fill="url(#${GLOSS_LINEAR_ID})"]`).length).toBe(0)
+  })
   // The overlay references a shared gradient id (defined once, by DiagramCanvas) rather
   // than an inline per-node gradient, so a standalone Node still emits the referencing
   // element even without that outer <defs> present.
@@ -256,27 +264,27 @@ describe('Node — gloss overlay', () => {
   const glossCircles = (c: HTMLElement) => Array.from(c.querySelectorAll(`circle[fill="url(#${GLOSS_RADIAL_ID})"]`))
 
   it('an L1 box renders a gloss overlay referencing the shared linear gradient', () => {
-    loadStore([makeRoot(), makeNode()])
+    loadStore([glossRoot(), makeNode()])
     const { container } = renderNode(makeNode())
     expect(glossRects(container).length).toBe(1)
   })
 
   it('an L2 box also renders the gloss overlay', () => {
     const l2 = makeNode({ id: 'n2', depth: 2, parentId: 'n1' })
-    loadStore([makeRoot(), makeNode(), l2])
+    loadStore([glossRoot(), makeNode(), l2])
     const { container } = renderNode(l2)
     expect(glossRects(container).length).toBe(1)
   })
 
   it('an L3 box renders no gloss overlay (too pale for it to show)', () => {
     const l3 = makeNode({ id: 'n3', depth: 3, parentId: 'n2' })
-    loadStore([makeRoot(), makeNode(), makeNode({ id: 'n2', depth: 2, parentId: 'n1' }), l3])
+    loadStore([glossRoot(), makeNode(), makeNode({ id: 'n2', depth: 2, parentId: 'n1' }), l3])
     const { container } = renderNode(l3)
     expect(glossRects(container).length).toBe(0)
   })
 
   it('a root pill renders a linear gloss overlay matching its own corner radius', () => {
-    const root = makeRoot({ title: 'A very very long root title here', width: 400, height: 90 })
+    const root = glossRoot({ title: 'A very very long root title here', width: 400, height: 90 })
     loadStore([root, makeNode()])
     const { container } = renderNode(root)
     const rects = glossRects(container)
@@ -285,7 +293,7 @@ describe('Node — gloss overlay', () => {
   })
 
   it('a root circle renders a radial gloss overlay', () => {
-    const root = makeRoot({ title: 'Hi', shape: 'circle' })
+    const root = glossRoot({ title: 'Hi', shape: 'circle' })
     loadStore([root, makeNode()])
     const { container } = renderNode(root)
     expect(glossCircles(container).length).toBe(1)
@@ -293,7 +301,7 @@ describe('Node — gloss overlay', () => {
 
   it('a mindmap L1 circle renders a radial gloss overlay', () => {
     const n = makeNode({ depth: 1 })
-    loadStore([makeRoot(), n], 'mindmap')
+    loadStore([glossRoot(), n], 'mindmap')
     const { container } = renderNode(n)
     expect(glossCircles(container).length).toBe(1)
   })
@@ -302,14 +310,14 @@ describe('Node — gloss overlay', () => {
     const l1 = makeNode({ depth: 1 })
     const l2 = makeNode({ id: 'n2', depth: 2, parentId: 'n1', width: 30, height: 30 })
     const l3 = makeNode({ id: 'n3', depth: 3, parentId: 'n2', width: 7, height: 7 })
-    loadStore([makeRoot(), l1, l2, l3], 'mindmap')
+    loadStore([glossRoot(), l1, l2, l3], 'mindmap')
     const { container } = renderNode(l3)
     expect(glossCircles(container).length).toBe(0)
   })
 
   it('a fishbone L1 parallelogram renders a gloss overlay clipped to the polygon', () => {
     const n = makeNode({ depth: 1, y: 100 }) // above spine
-    loadStore([makeRoot(), n], 'fishbone')
+    loadStore([glossRoot(), n], 'fishbone')
     const { container } = renderNode(n)
     const rects = glossRects(container)
     expect(rects.length).toBe(1)
@@ -319,7 +327,7 @@ describe('Node — gloss overlay', () => {
   it('a light L1 box scales the gloss down (fill-opacity < 1); a dark one keeps it at 1', () => {
     const light = makeNode({ id: 'nl', color: '#fefefe' })
     const dark = makeNode({ id: 'nd', color: '#101010' })
-    loadStore([makeRoot(), light, dark])
+    loadStore([glossRoot(), light, dark])
     const { container: cl } = renderNode(light)
     const { container: cd } = renderNode(dark)
     const opL = Number(glossRects(cl)[0].getAttribute('fill-opacity'))
@@ -453,12 +461,19 @@ describe('Node — mindmap type', () => {
     const root = makeRoot({ title: 'Center' })
     const n = makeNode({ depth: 1, title: 'Supervised', width: 72, height: 72 })
     loadStore([root, n], 'mindmap')
+    useMindmapStore.setState({ showChildCount: true })
     const { container } = renderNode(n, { descendantCount: 29 })
     expect(container.querySelector('circle')).toBeTruthy()
     expect(container.querySelector('rect')).toBeNull()      // a circle, never a box
     const texts = Array.from(container.querySelectorAll('text')).map(t => t.textContent)
     expect(texts).toContain('Supervised')                    // the name, on one line
     expect(texts).toContain('29')                            // the subtree size under it
+    // Show count off (the default): the number under the circle goes away, the name stays.
+    useMindmapStore.setState({ showChildCount: false })
+    const { container: quiet } = renderNode(n, { descendantCount: 29 })
+    const quietTexts = Array.from(quiet.querySelectorAll('text')).map(t => t.textContent)
+    expect(quietTexts).toContain('Supervised')
+    expect(quietTexts).not.toContain('29')
     expect(texts).toContain('S')                             // the initial inside the circle
     expect(container.querySelector('tspan')).toBeNull()      // never wrapped into a column
   })
@@ -470,7 +485,7 @@ describe('Node — mindmap type', () => {
     const root = makeRoot({ title: 'Center' })
     const n = makeNode({ depth: 1, title: 'Supervised', width: 72, height: 72 })
     loadStore([root, n], 'mindmap')
-    useMindmapStore.setState({ themeId: 'cyberpunk' })
+    useMindmapStore.setState({ themeId: 'cyberpunk', showChildCount: true })
     const { container } = renderNode(n, { descendantCount: 29, paletteColor: L1_PALETTE[0] })
 
     const glow = container.querySelector(`circle[filter="url(#${neonFilterId(72)})"]`)
@@ -1253,11 +1268,21 @@ describe('Node — links inside node text', () => {
 })
 
 describe('render-svg — gloss overlay', () => {
+  const glossRoot = (over: Partial<MindmapNode> = {}) => makeRoot({ gloss: true, ...over })
+
+  it('emits no gloss gradient or overlay when the map has not opted in', () => {
+    const svg = renderMindmapSvg({
+      id: 'x', name: 'No gloss', type: 'logic-chart', line_style: 'orthogonal',
+      theme_id: 'default', nodes: [makeRoot(), makeNode({ depth: 1 })] as never,
+    })
+    expect(svg).not.toContain(GLOSS_LINEAR_ID)
+    expect(svg).not.toContain(GLOSS_RADIAL_ID)
+  })
   it('defines the gloss gradients exactly once and overlays root, L1 and L2 only', () => {
     const nodes = [
       // A long title forces the pill shape (rect), so root, L1 and L2 all get the
       // same rect-shaped linear overlay and the count below is unambiguous.
-      makeRoot({ title: 'A very very long root title here', width: 400, height: 90 }),
+      glossRoot({ title: 'A very very long root title here', width: 400, height: 90 }),
       makeNode({ id: 'd1', title: 'L1', depth: 1, parentId: 'root' }),
       makeNode({ id: 'd2', title: 'L2', depth: 2, parentId: 'd1' }),
       makeNode({ id: 'd3', title: 'L3', depth: 3, parentId: 'd2' }),
@@ -1274,7 +1299,7 @@ describe('render-svg — gloss overlay', () => {
   })
 
   it('a fishbone L1 parallelogram overlay clips to the polygon, not a plain rect', () => {
-    const nodes = [makeRoot(), makeNode({ depth: 1, y: 100 })]
+    const nodes = [glossRoot(), makeNode({ depth: 1, y: 100 })]
     const svg = renderMindmapSvg({
       id: 'x', name: 'Fishbone gloss', type: 'fishbone', line_style: 'orthogonal',
       theme_id: 'default', nodes: nodes as never,
@@ -1283,7 +1308,7 @@ describe('render-svg — gloss overlay', () => {
   })
 
   it('a mindmap L1 circle overlays the radial gradient, offset toward the top-left', () => {
-    const nodes = [makeRoot(), makeNode({ depth: 1 })]
+    const nodes = [glossRoot(), makeNode({ depth: 1 })]
     const svg = renderMindmapSvg({
       id: 'x', name: 'Mindmap gloss', type: 'mindmap', line_style: 'orthogonal',
       theme_id: 'default', nodes: nodes as never,

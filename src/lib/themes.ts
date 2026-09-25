@@ -12,7 +12,7 @@ export const THEMES: Theme[] = [
     id: 'default',
     label: 'Rainbow Light',
     canvasBg: '#ffffff',
-    // First 12 are the branch wheel (rebalanceColors uses colors.slice(0, 12)) - kept
+    // First 12 are the branch wheel (rebalanceColors uses colors.slice(0, L1_PALETTE.length)) - kept
     // identical to L1_PALETTE in color.ts so this theme's swatches and initial branch
     // assignment match what the canvas actually renders (the canvas always resolves L1
     // colour from L1_PALETTE by sortOrder, regardless of theme). The trailing 8 are

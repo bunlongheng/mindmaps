@@ -287,7 +287,7 @@ describe('SidePanel — Style tab', () => {
     const swatches = (Array.from(container.querySelectorAll('button')) as HTMLElement[]).filter(
       b => b.style.borderRadius === '5px' && b.style.background.startsWith('rgb')
     )
-    expect(swatches.length).toBe(11)
+    expect(swatches.length).toBe(10)
     fireEvent.click(swatches[1])
     const node = useMindmapStore.getState().activeMindmap!.nodes.find(n => n.id === 'c1')!
     expect(node.color).toBe(getTheme('default').colors[1])
@@ -366,6 +366,18 @@ describe('SidePanel — Style tab', () => {
     expect(screen.getByText('Brace')).toBeInTheDocument()
     expect(screen.getByText('Straight')).toBeInTheDocument()
     expect(screen.getByText('Square')).toBeInTheDocument()
+  })
+
+  it('root Boxes row is the master shape: 1 click restyles every child box, not the root', () => {
+    loadDiagram()
+    render(<SidePanel nodeId="root" onClose={vi.fn()} />)
+    expect(screen.getByText('Boxes')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Pill for every box' }))
+    const nodes = useMindmapStore.getState().activeMindmap!.nodes
+    expect(nodes.filter(n => n.depth >= 1).every(n => n.shape === 'pill')).toBe(true)
+    expect(nodes.find(n => n.id === 'root')!.shape).toBeUndefined()
+    // The row now shows Pill as the shared active shape.
+    expect(screen.getByRole('button', { name: 'Circle for every box' })).toBeInTheDocument()
   })
 
   it('clicking shape Pill saves shape and dimensions', () => {

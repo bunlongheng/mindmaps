@@ -1,3 +1,4 @@
+import { L1_PALETTE } from '../lib/color'
 // Polyfill crypto.randomUUID for non-secure contexts (HTTP on LAN)
 function uuid(): string {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID()
@@ -52,8 +53,8 @@ function isTooLight(hex: string): boolean {
 /** Spread L1 colors evenly across the 12-color palette, propagate to descendants */
 function rebalanceColors(nodes: MindmapNode[], palette: string[]): MindmapNode[] {
   // Only use first 12 — the vibrant wheel colors; the rest are utility (darks, grays, whites)
-  const vibrant = palette.slice(0, 12).filter(c => !isTooLight(c))
-  const effectivePalette = vibrant.length >= 2 ? vibrant : palette.slice(0, 12)
+  const vibrant = palette.slice(0, L1_PALETTE.length).filter(c => !isTooLight(c))
+  const effectivePalette = vibrant.length >= 2 ? vibrant : palette.slice(0, L1_PALETTE.length)
   const l1 = nodes.filter(n => n.depth === 1).sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
   if (l1.length === 0) return nodes
 

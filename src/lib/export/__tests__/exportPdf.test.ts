@@ -5,7 +5,7 @@ const { addImage, save, jsPDFCtor, html2canvas, showToast } = vi.hoisted(() => {
   const addImage = vi.fn()
   const save = vi.fn()
   // jsPDF is invoked with `new`, so the mock must be constructable.
-  const jsPDFCtor = vi.fn(function () { return { addImage, save } })
+  const jsPDFCtor = vi.fn(function () { return { addImage, save, setFillColor: vi.fn(), rect: vi.fn() } })
   const html2canvas = vi.fn(async () => ({
     toDataURL: vi.fn(() => 'data:image/jpeg;base64,AAAA'),
   }))

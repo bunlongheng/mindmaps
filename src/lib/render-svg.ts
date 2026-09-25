@@ -15,7 +15,7 @@ import { computeMindmapLayout, wrapText, initialFontSize, nodeInitial, radialLab
 import { computeFishboneLayout, FISHBONE_SLANT } from './layout/fishbone.js'
 import { computeTimelineLayout } from './layout/timeline.js'
 import { getTheme } from './themes.js'
-import {
+import { LABEL_TEXT,
   hexToRgb, darken, depthFill, applyDepthTransparency, edgeWidthForDepth,
   radialEdgeWidth, RADIAL_EDGE_OPACITY, isDarkBg, lighten, neonFilterId, neonFilterSpecs,
   neonRootColor, NEON_CORE_OPACITY, NEON_EDGE_CORE_OPACITY, NEON_EDGE_FILTER,
@@ -94,20 +94,20 @@ function edgeStroke(color: string, depth: number): string {
 }
 
 /** Curved bezier parent right-edge -> child left-edge (EdgeLayer CurvedEdge). */
-function curvedEdge(parent: MindmapNode, child: MindmapNode): string {
+function curvedEdge(parent: MindmapNode, child: MindmapNode, color: string): string {
   const x1 = parent.x + parent.width
   const y1 = parent.y + parent.height / 2
   const x2 = child.x
   const y2 = child.y + child.height / 2
   const cx = (x1 + x2) / 2
-  return `<path d="M ${r2(x1)} ${r2(y1)} C ${r2(cx)} ${r2(y1)} ${r2(cx)} ${r2(y2)} ${r2(x2)} ${r2(y2)}" stroke="${esc(child.color)}" stroke-width="${edgeWidthForDepth(child.depth)}" fill="none" stroke-linecap="round"/>`
+  return `<path d="M ${r2(x1)} ${r2(y1)} C ${r2(cx)} ${r2(y1)} ${r2(cx)} ${r2(y2)} ${r2(x2)} ${r2(y2)}" stroke="${esc(color)}" stroke-width="${edgeWidthForDepth(child.depth)}" fill="none" stroke-linecap="round"/>`
 }
 
 /** Fan of beziers from a parent to its children (EdgeLayer BracketConnector). */
-function bracketConnector(parent: MindmapNode, children: MindmapNode[]): string {
+function bracketConnector(parent: MindmapNode, children: MindmapNode[], pc: (n: MindmapNode) => string): string {
   if (children.length === 0) return ''
   const sorted = [...children].sort((a, b) => a.y - b.y)
-  if (children.length === 1) return curvedEdge(parent, sorted[0])
+  if (children.length === 1) return curvedEdge(parent, sorted[0], pc(sorted[0]))
   const px = parent.x + parent.width
   const py = parent.y + parent.height / 2
   return sorted.map(child => {
@@ -115,12 +115,12 @@ function bracketConnector(parent: MindmapNode, children: MindmapNode[]): string 
     const cx2 = child.x
     const gap = Math.abs(cx2 - px)
     const c1x = px + gap * 0.5
-    return `<path d="M ${r2(px)} ${r2(py)} C ${r2(c1x)} ${r2(py)}, ${r2(c1x)} ${r2(cy)}, ${r2(cx2)} ${r2(cy)}" stroke="${esc(child.color)}" stroke-width="${edgeWidthForDepth(child.depth)}" fill="none" stroke-linecap="round"/>`
+    return `<path d="M ${r2(px)} ${r2(py)} C ${r2(c1x)} ${r2(py)}, ${r2(c1x)} ${r2(cy)}, ${r2(cx2)} ${r2(cy)}" stroke="${esc(pc(child))}" stroke-width="${edgeWidthForDepth(child.depth)}" fill="none" stroke-linecap="round"/>`
   }).join('')
 }
 
 /** Deeper logic-chart edge path (Edge.tsx, side-aware). */
-function deepEdge(parent: MindmapNode, child: MindmapNode, lineStyle: LineStyle): string {
+function deepEdge(parent: MindmapNode, child: MindmapNode, lineStyle: LineStyle, colorOf: (n: MindmapNode) => string): string {
   const pc = nodeCenter(parent)
   const cc = nodeCenter(child)
   const src = cc.x > pc.x ? nodeCenterRight(parent) : nodeCenterLeft(parent)
@@ -128,7 +128,7 @@ function deepEdge(parent: MindmapNode, child: MindmapNode, lineStyle: LineStyle)
   const d = lineStyle === 'straight' ? buildStraightPath(src, tgt)
     : lineStyle === 'orthogonal' ? buildOrthogonalPath(src, tgt)
     : buildCurvedPath(src, tgt)
-  return `<path d="${d}" stroke="${esc(edgeStroke(child.color, child.depth))}" stroke-width="${edgeWidthForDepth(child.depth)}" fill="none" stroke-linecap="round"/>`
+  return `<path d="${d}" stroke="${esc(edgeStroke(colorOf(child), child.depth))}" stroke-width="${edgeWidthForDepth(child.depth)}" fill="none" stroke-linecap="round"/>`
 }
 
 function renderEdges(nodes: MindmapNode[], type: DiagramType, lineStyle: LineStyle, pc: (n: MindmapNode) => string, neon = false): string {
@@ -240,7 +240,7 @@ function renderEdges(nodes: MindmapNode[], type: DiagramType, lineStyle: LineSty
     // Brace look: bracket connectors from root down through every level
     return nodes
       .filter(n => nodes.some(c => c.parentId === n.id))
-      .map(parent => bracketConnector(parent, nodes.filter(n => n.parentId === parent.id)))
+      .map(parent => bracketConnector(parent, nodes.filter(n => n.parentId === parent.id), pc))
       .join('')
   }
 
@@ -267,7 +267,7 @@ function renderEdges(nodes: MindmapNode[], type: DiagramType, lineStyle: LineSty
   for (const n of nodes) {
     if (!n.parentId || n.parentId === root.id) continue
     const parent = nodeMap.get(n.parentId)
-    if (parent) parts.push(deepEdge(parent, n, lineStyle))
+    if (parent) parts.push(deepEdge(parent, n, lineStyle, pc))
   }
   return parts.join('')
 }
@@ -295,7 +295,7 @@ function centeredWrappedText(label: string, segments: LinkSegment[], cx: number,
   return `<text text-anchor="middle" font-size="${fontSize}" font-weight="${fontWeight}" fill="${esc(fill)}">${tspans}</text>`
 }
 
-function renderNode(node: MindmapNode, type: DiagramType, paletteColor: string | null, descendants = 0, rootCenter: { x: number; y: number } | null = null, neon = false): string {
+function renderNode(node: MindmapNode, type: DiagramType, paletteColor: string | null, descendants = 0, rootCenter: { x: number; y: number } | null = null, neon = false, gloss = false): string {
   const isRoot = node.depth === 0
   const isL2Plus = node.depth >= 2
   const isFishboneNode = type === 'fishbone' && node.depth >= 1
@@ -326,12 +326,12 @@ function renderNode(node: MindmapNode, type: DiagramType, paletteColor: string |
   } else if (isL2Plus) {
     // Same shared depth ladder as the canvas (src/lib/color depthFill).
     bg = col.startsWith('#') ? depthFill(col, node.depth) : '#f8fafc'
-    textColor = isLight(bg) ? '#1a1d2e' : '#ffffff'
+    textColor = LABEL_TEXT
     strokeColor = col
     strokeW = isRadialDot ? 1 : 2
   } else {
     bg = col
-    textColor = isLight(col) ? '#1a1d2e' : '#ffffff'
+    textColor = LABEL_TEXT
     strokeColor = col.startsWith('#') ? darken(col, 0.25) : col
     strokeW = 2
   }
@@ -343,10 +343,11 @@ function renderNode(node: MindmapNode, type: DiagramType, paletteColor: string |
   if (rootNeon) strokeColor = lighten(rootNeon, 0.4)
   if (node.borderColor) { strokeColor = node.borderColor; strokeW = Math.max(strokeW, node.borderWidth ?? 1.5) }
 
-  // Root, L1 and L2 boxes carry a soft top-of-box gloss; L3+ are already pale, so
-  // it would be lost. Dark-background boxes get the stronger gradient stops, light
+  // Gloss is opt-in per map (root node flag). When on, root, L1 and L2 boxes carry a
+  // soft top-of-box gloss; L3+ are already pale, so it would be lost. Dark-background
+  // boxes get the stronger gradient stops, light
   // ones the softer scaled-down version (mirrors Node.tsx).
-  const showGloss = glossApplies(node.depth)
+  const showGloss = gloss && glossApplies(node.depth)
   const glossFillOpacity = glossOpacity(isLight(bg))
 
   // Same shared box table the canvas reads (src/lib/nodeMetrics), so a card preview
@@ -548,8 +549,9 @@ export function renderMindmapSvg(row: MindmapRow): string {
   const edges = renderEdges(nodes, type, lineStyle, pc, neon)
   const rootNode = nodes.find(n => n.parentId === null)
   const rootCenter = rootNode ? { x: rootNode.x + rootNode.width / 2, y: rootNode.y + rootNode.height / 2 } : null
+  const gloss = rootNode?.gloss === true
   const nodeMarkup = nodes.map(n =>
-    renderNode(n, type, paletteColors.get(n.id) ?? null, descendantCounts.get(n.id) ?? 0, rootCenter, neon)).join('')
+    renderNode(n, type, paletteColors.get(n.id) ?? null, descendantCounts.get(n.id) ?? 0, rootCenter, neon, gloss)).join('')
   // One blur filter for every glow in the map: the radial mind map's soft coloured
   // halo. Defined once so a 200-node map carries one filter, not 200. On a dark
   // canvas that becomes one two-layer neon filter per distinct circle size, plus the
@@ -571,7 +573,7 @@ export function renderMindmapSvg(row: MindmapRow): string {
             ? `<radialGradient id="${NEON_ROOT_GRADIENT}"><stop offset="0%" stop-color="${lighten(neonRootColor(rootNode.color), NEON_ROOT_LIGHTEN)}"/><stop offset="100%" stop-color="${neonRootColor(rootNode.color)}"/></radialGradient>`
             : '')
   // Gloss gradients live in the same <defs>, referenced by every root/L1/L2 box below.
-  const defs = `<defs>${glossDefsSvg()}${mmDefs}</defs>`
+  const defs = `<defs>${gloss ? glossDefsSvg() : ''}${mmDefs}</defs>`
 
   // viewBox from laid-out bounds (+ slack for spines that extend past the nodes)
   const pad = 60
