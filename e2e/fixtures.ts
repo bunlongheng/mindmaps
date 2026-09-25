@@ -25,7 +25,9 @@ export const test = base.extend<{ _consoleCheck: void; _mapCleanup: void; _seedV
       } catch { /* ignore non-JSON bodies */ }
     })
     await use()
-    // Best-effort teardown: delete each map this test created.
+    // Let the debounced autosave land first, or the delete races it and the map comes
+    // back. The global teardown (e2e/global-teardown.ts) catches anything that slips.
+    await page.waitForTimeout(1500).catch(() => {})
     for (const id of createdIds) {
       await page.request.delete(`/api/mindmaps?id=${id}`).catch(() => {})
     }
