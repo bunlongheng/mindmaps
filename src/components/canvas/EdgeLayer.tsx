@@ -3,6 +3,7 @@ import type { LineStyle, DiagramType } from '../../types'
 import { Edge } from './Edge'
 import { FISHBONE_SLANT } from '../../lib/layout/fishbone'
 import { useMindmapStore } from '../../store/mindmapStore'
+import { combStyleOf } from '../../lib/hex'
 import { rootDrawnWidth } from '../../lib/rootPill'
 import { buildRadialBranchPath, radialBranchPoints } from '../../lib/geometry'
 import { getTheme } from '../../lib/themes'
@@ -101,6 +102,30 @@ export function EdgeLayer({ nodes, lineStyle, diagramType, paletteColors }: Edge
   // width can be stale and the trunk would start inside the translucent pill.
   const rootRight = (r: MindmapNode) => r.x + rootDrawnWidth(r, diagramType)
 
+  // ── Honeycomb ─────────────────────────────────────────────────────────────
+  // A straight centre-to-centre line per parent/child pair, drawn under the cells,
+  // in the branch colour. No order badges - the cluster arrangement itself already
+  // reads as a sequence around its parent.
+  if (diagramType === 'honeycomb') {
+    // A mesh reads its hierarchy from touching cells; only the web draws connectors.
+    if (combStyleOf(nodes) === 'mesh') return null
+    const edges = nodes.filter(n => n.parentId && nodeMap.has(n.parentId))
+    return (
+      <g>
+        {edges.map(n => {
+          const parent = nodeMap.get(n.parentId!)!
+          const x1 = parent.x + parent.width / 2, y1 = parent.y + parent.height / 2
+          const x2 = n.x + n.width / 2, y2 = n.y + n.height / 2
+          const strokeWidth = n.depth === 1 ? 6 : n.depth === 2 ? 4 : 3
+          return (
+            <line key={n.id} x1={x1} y1={y1} x2={x2} y2={y2}
+              stroke={pc(n)} strokeWidth={strokeWidth} strokeLinecap="round" opacity={0.9} />
+          )
+        })}
+      </g>
+    )
+  }
+
   // ── Logic Chart ───────────────────────────────────────────────────────────
   if (diagramType === 'logic-chart') {
     const root = nodes.find(n => n.parentId === null)
@@ -116,27 +141,42 @@ export function EdgeLayer({ nodes, lineStyle, diagramType, paletteColors }: Edge
     const l1MidY = sortedL1.length > 0
       ? ((sortedL1[0].y + sortedL1[0].height / 2) + (sortedL1[sortedL1.length - 1].y + sortedL1[sortedL1.length - 1].height / 2)) / 2
       : rootCY
+    // One flush shape: every piece is the same width with butt ends, the trunk stops
+    // at the bar's left face, each stub starts at its right face, and the bar runs
+    // half a width past the first and last stub (in that stub's colour) so the
+    // corners are solid. No round or square caps, so nothing pokes past an edge.
+    const w = edgeWidthForDepth(1)
+    const half = w / 2
+    const firstL1 = sortedL1[0], lastL1 = sortedL1[sortedL1.length - 1]
     const trunk = l1Nodes.length > 0 && (
       <>
-        <line x1={rootRightX} y1={l1MidY} x2={barX} y2={l1MidY}
-          stroke="#1a1d2e" strokeWidth={edgeWidthForDepth(1)} strokeLinecap="round" />
-        {l1Nodes.length > 1 && l1Nodes.map((l1, i) => {
-          if (i === l1Nodes.length - 1) return null
-          const nextL1 = l1Nodes[i + 1]
-          return (
-            <line key={`vbar-${l1.id}`}
-              x1={barX} y1={l1.y + l1.height / 2}
-              x2={barX} y2={nextL1.y + nextL1.height / 2}
-              stroke={pc(l1)} strokeWidth={4} strokeLinecap="square" />
-          )
-        })}
+        <line x1={rootRightX} y1={l1MidY} x2={barX - half} y2={l1MidY}
+          stroke="#1a1d2e" strokeWidth={w} strokeLinecap="butt" />
+        {l1Nodes.length > 1 && (
+          <>
+            <line x1={barX} y1={firstL1.y + firstL1.height / 2 - half} x2={barX} y2={firstL1.y + firstL1.height / 2 + 0.5}
+              stroke={pc(firstL1)} strokeWidth={w} strokeLinecap="butt" />
+            {sortedL1.map((l1, i) => {
+              if (i === sortedL1.length - 1) return null
+              const nextL1 = sortedL1[i + 1]
+              return (
+                <line key={`vbar-${l1.id}`}
+                  x1={barX} y1={l1.y + l1.height / 2}
+                  x2={barX} y2={nextL1.y + nextL1.height / 2 + 0.5}
+                  stroke={pc(l1)} strokeWidth={w} strokeLinecap="butt" />
+              )
+            })}
+            <line x1={barX} y1={lastL1.y + lastL1.height / 2} x2={barX} y2={lastL1.y + lastL1.height / 2 + half}
+              stroke={pc(lastL1)} strokeWidth={w} strokeLinecap="butt" />
+          </>
+        )}
         {l1Nodes.map(l1 => {
           const stubY = l1.y + l1.height / 2
           const midX = (barX + l1.x) / 2
           return (
             <g key={l1.id}>
-              <line x1={barX} y1={stubY} x2={l1.x} y2={stubY}
-                stroke={pc(l1)} strokeWidth={edgeWidthForDepth(1)} strokeLinecap="round" />
+              <line x1={l1Nodes.length > 1 ? barX + half - 0.5 : barX - half} y1={stubY} x2={l1.x} y2={stubY}
+                stroke={pc(l1)} strokeWidth={w} strokeLinecap="butt" />
               {showOrderNumbers && (
                 <>
                   <circle cx={midX} cy={stubY} r={10} fill="#ffffff" stroke={pc(l1)} strokeWidth={2} />
@@ -339,21 +379,18 @@ export function EdgeLayer({ nodes, lineStyle, diagramType, paletteColors }: Edge
             return false
           })
 
-          const above = descendants.length > 0 && descendants.some(n => n.y + n.height < spineY)
-          const l1SpineEdge = above ? l1.y : l1.y + l1.height
-
-          // Use node centers so branch ends flush with the outermost connector, not beyond it
-          const farY = descendants.length > 0
-            ? above
-              ? Math.min(...descendants.map(n => n.y + n.height / 2))
-              : Math.max(...descendants.map(n => n.y + n.height / 2))
-            : l1SpineEdge
+          // Descendants may sit on either side of the spine, so the branch runs from the
+          // topmost connector to the bottommost, behind the L1 box. Node centres, so it
+          // ends flush with the outermost connector, not beyond it.
+          const centres = descendants.map(n => n.y + n.height / 2)
+          const topY = Math.min(l1.y, ...centres)
+          const bottomY = Math.max(l1.y + l1.height, ...centres)
 
           return (
             <g key={`branch-${l1.id}`}>
-              {/* Vertical branch from L1 edge through all descendants */}
+              {/* Vertical branch through the L1 and every descendant */}
               {descendants.length > 0 && (
-                <line x1={branchX} y1={l1SpineEdge} x2={branchX} y2={farY}
+                <line x1={branchX} y1={topY} x2={branchX} y2={bottomY}
                   stroke={pc(l1)} strokeWidth={edgeWidthForDepth(2)} strokeLinecap="round" />
               )}
               {/* Orthogonal horizontal connector from branch line to each node's left-center */}

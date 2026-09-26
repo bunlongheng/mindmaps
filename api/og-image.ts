@@ -33,6 +33,7 @@ const TYPE_LABEL: Record<string, string> = {
   'mindmap': 'Mind Map',
   'fishbone': 'Fishbone',
   'timeline': 'Timeline',
+  'honeycomb': 'Honeycomb',
 }
 
 interface ShareRow extends MindmapRow {

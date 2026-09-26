@@ -20,7 +20,7 @@ function autoWidthFor(n: MindmapNode): number {
 export function normalizeWidthsPerDepth(nodes: MindmapNode[], type?: DiagramType): MindmapNode[] {
   // The mind map is a radial constellation: every circle's diameter IS its subtree's
   // weight, so sharing one width per depth would erase the thing it says.
-  if (type === 'mindmap') return nodes
+  if (type === 'mindmap' || type === 'honeycomb') return nodes
   const maxByDepth = new Map<number, number>()
   for (const n of nodes) {
     if (n.depth > 0 && n.shape !== 'circle' && n.widthMode !== 'manual') {

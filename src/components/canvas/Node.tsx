@@ -14,6 +14,7 @@ import { shapeRx } from '../../lib/nodeShape'
 import { nodeMetrics, ICON_GAP } from '../../lib/nodeMetrics'
 import { parseLinkedTitle, sliceSegments, lineRanges, type LinkSegment } from '../../lib/links'
 import { GLOSS_LINEAR_ID, GLOSS_RADIAL_ID, glossApplies, glossOpacity } from '../../lib/gloss'
+import { hexCellLayout, hexPoints, hexFontSize, hexFill, hexTextColor } from '../../lib/hex'
 
 interface NodeProps {
   node: MindmapNode
@@ -30,6 +31,7 @@ interface NodeProps {
   paletteColor?: string | null  // 12-colour-wheel colour, precomputed once by DiagramCanvas (was an O(n) l1PaletteColor walk per node per render)
   childCount?: number       // direct children, precomputed once by DiagramCanvas (was an O(n) per-node selector)
   descendantCount?: number  // total subtree size, precomputed once (was an O(n^2) per-node selector)
+  cellRadius?: number       // honeycomb: the radius this cell is drawn with, resolved once by DiagramCanvas
   nodeCount?: number        // total nodes in the map, used to gate decorative animations on large maps
   rootCenter?: { x: number; y: number } | null  // the radial mind map measures "outward" from here; precomputed once by DiagramCanvas
 }
@@ -107,7 +109,7 @@ function isLight(hex: string): boolean {
   return lum > 140
 }
 
-export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onDragMove, onRootDragOffset, svgRef, readOnly, noInteract = false, l1Colors = [], paletteColor = null, childCount = 0, descendantCount = 0, nodeCount = 0, rootCenter = null }: NodeProps) {
+export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onDragMove, onRootDragOffset, svgRef, readOnly, noInteract = false, l1Colors = [], paletteColor = null, childCount = 0, descendantCount = 0, nodeCount = 0, rootCenter = null, cellRadius }: NodeProps) {
   const isRoot = node.depth === 0
   const isL2Plus = node.depth >= 2
   // Brighter/more-vivid version of the node colour, used for all coloured fills.
@@ -125,6 +127,8 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   const themeId = useMindmapStore(s => s.themeId)
   const showChildCount = useMindmapStore(s => s.showChildCount)
   const mapGloss = useMindmapStore(s => s.activeMindmap?.nodes.find(n => n.parentId === null)?.gloss === true)
+  const combSize = useMindmapStore(s => s.activeMindmap?.nodes.find(n => n.parentId === null)?.combSize ?? 'outward')
+  const combStyle = useMindmapStore(s => s.activeMindmap?.nodes.find(n => n.parentId === null)?.combStyle ?? 'mesh')
   // On a dark canvas the radial mind map is painted as a living circuit: every circle
   // is a glowing orb, the root a violet-to-blue one, and the labels are white or light
   // grey. Only paint changes - sizes, positions and hit areas are identical. Light
@@ -132,7 +136,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   const neon = diagramType === 'mindmap' && isDarkBg(getTheme(themeId).canvasBg)
   const canDrag = (isRoot && diagramType !== 'mindmap') || diagramType === 'logic-chart'
   // Root shape: in mindmap mode always circle; otherwise user-set or auto from title length
-  const isRootPill = isRoot && diagramType !== 'mindmap' && (
+  const isRootPill = isRoot && diagramType !== 'mindmap' && diagramType !== 'honeycomb' && (
     node.shape === 'pill' ? true :
     node.shape === 'circle' ? false :
     rootTitleNeedsPill(node.title, node.fontSize ?? ROOT_FONT)
@@ -145,10 +149,15 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   // node out of the scheme and keeps its own box, as it does in every other type.
   const isRadial = diagramType === 'mindmap' && !isRoot && !node.shape
   const isRadialDot = isRadial && node.depth >= 3
+  // Honeycomb: every node (root included) is a pointy-top hexagon; node.shape is
+  // ignored for this type (src/lib/hex has the shared geometry both this canvas and
+  // the server renderer draw from).
+  const isHex = diagramType === 'honeycomb'
+  const isMesh = isHex && combStyle === 'mesh'
   // An explicit per-node shape overrides the diagram's own default geometry
   // (fishbone parallelogram, mindmap L2 box). Absence keeps today's look.
   const nodeShape = isRoot ? undefined : node.shape
-  const drawCircle = nodeShape === 'circle'
+  const drawCircle = !isHex && nodeShape === 'circle'
   const isFishboneNode = isFishbone && node.depth >= 1
   // Fishbone: detect if node is above or below the spine (Y=400) for parallelogram direction
   const fishboneAbove = isFishboneNode ? (node.y + node.height / 2) < 400 : false
@@ -160,7 +169,16 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   // Styling per depth
   let bg: string, textColor: string, strokeColor: string, strokeW: number
 
-  if (isRoot) {
+  if (isHex) {
+    // Honeycomb: one shared depth ladder (src/lib/hex) for every depth including
+    // the root, so the canvas and the server renderer never drift.
+    bg = hexFill(col, node.depth)
+    textColor = hexTextColor(node.depth)
+    // A mesh has no lines: the only stroke is a thin wall in the canvas colour between
+    // touching cells. A web outlines each cell in its own darker hue.
+    strokeColor = isMesh ? getTheme(themeId).canvasBg : isRoot ? '#1a1d2e' : darken(col, 0.25)
+    strokeW = isMesh ? 3 : isRoot ? 4 : 2
+  } else if (isRoot) {
     bg = '#1a1d2e'
     textColor = '#ffffff'
     strokeColor = '#1a1d2e'
@@ -316,7 +334,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
     else onDoubleClick(node)
   }
 
-  const resolvedEmoji = isRoot ? undefined : node.emoji
+  const resolvedEmoji = (isRoot && !isHex) ? undefined : node.emoji
   const hasEmoji = !!resolvedEmoji
   const resolvedIcon = isRoot ? undefined : (!hasEmoji ? node.icon : undefined)
   const hasIcon = !!resolvedIcon && !!getLucideIcon(resolvedIcon)
@@ -447,10 +465,26 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
     >
       {/* Fireflies around nodes with children — count = all descendants */}
       {showDecor && diagramType !== 'mindmap' && node.depth >= 1 && descendantCount > 0 && (
-        <Fireflies cx={displayW / 2} cy={node.height / 2} r={Math.max(displayW, node.height) * 0.45} color={col} count={descendantCount} />
+        <Fireflies cx={displayW / 2} cy={node.height / 2} r={Math.max(displayW, node.height) * 0.45} color={col} count={descendantCount} shape={isHex ? 'hex' : 'dot'} />
       )}
 
-      {isRoot ? (
+      {isHex ? (() => {
+        const hexR = cellRadius ?? hexCellLayout(node, combSize).r
+        const pts = hexPoints(cx, cy, hexR)
+        return (
+        <>
+        <polygon points={pts} fill="transparent" />
+        {/* Roaming comb-shaped fireflies in the L1 colours around the root cell */}
+        {showDecor && isRoot && l1Colors.length > 0 && (
+          <Fireflies cx={cx} cy={cy} r={hexR} colors={l1Colors} count={Math.min(20, Math.max(10, l1Colors.length))} color={l1Colors[0]} shape="hex" />
+        )}
+        <g style={{ pointerEvents: 'none' }}
+          filter={isMesh ? undefined : 'drop-shadow(0 1px 4px rgba(0,0,0,0.1))'}>
+          <polygon points={pts} fill={nodeFill} fillOpacity={bgOpacity}
+            stroke={strokeColor} strokeWidth={strokeW} strokeLinejoin="round" />
+        </g>
+        </>)
+      })() : isRoot ? (
         <>
           {/* Soft coloured glow under the mind map root */}
           {showGlow && (
@@ -607,7 +641,43 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
             }}
           />
         </foreignObject>
-      ) : isRadial ? (() => {
+      ) : isHex ? (() => {
+        // Honeycomb: the label lives INSIDE the cell (no external label box like the
+        // mind map's circles), so the emoji/icon sits near the top and the wrapped
+        // title under it, both centred - no markdown link anchors for this type.
+        const cell = hexCellLayout(node, combSize)
+        const iconSize = cell.glyph
+        const iconCY = cy + cell.glyphDy
+        const titleFontSize = cell.font
+        const titleLines = cell.lines
+        const titleWeight = isRoot ? '700' : node.depth === 1 ? '600' : '500'
+        const lineH = cell.lineH
+        const firstLineY = cy + cell.firstLineDy
+        const showCount = node.depth === 1 && showChildCount && descendantCount > 0
+        const countFontSize = hexFontSize(1, combSize) - 2
+        return (
+        <g style={{ pointerEvents: 'none' }}>
+          <title>{plainLabel}</title>
+          {hasEmoji && resolvedEmoji ? (
+            <text x={cx} y={iconCY + iconSize * 0.36} textAnchor="middle" fontSize={iconSize}>{resolvedEmoji}</text>
+          ) : hasIcon && resolvedIcon ? (
+            <NodeIcon icon={resolvedIcon} x={cx - iconSize / 2} y={iconCY - iconSize / 2}
+              size={iconSize} color={textColor} strokeWidth={2} />
+          ) : null}
+          <text x={cx} textAnchor="middle" fontSize={titleFontSize} fontWeight={titleWeight}
+            fontFamily="Inter, system-ui, sans-serif" fill={textColor}>
+            {titleLines.map((line, i) => (
+              <tspan key={i} x={cx} y={i === 0 ? firstLineY : undefined} dy={i === 0 ? undefined : lineH}>{line}</tspan>
+            ))}
+          </text>
+          {showCount && (
+            <text x={cx} y={cy + cell.countDy}
+              textAnchor="middle" fontSize={countFontSize} fontWeight="600"
+              fontFamily="Inter, system-ui, sans-serif" fill={textColor}>{descendantCount}</text>
+          )}
+        </g>
+        )
+      })() : isRadial ? (() => {
         // Labels live OUTSIDE the circle, so this group is never clipped to the box.
         // Where each one sits, and how far it is cut, comes from the same helper the
         // layout used to reserve room for it (src/lib/layout/mindmap radialLabelFor),
@@ -935,7 +1005,7 @@ function colorShades(hex: string, count: number): string[] {
   })
 }
 
-function Fireflies({ cx, cy, r, color, colors, count = 10 }: { cx: number; cy: number; r: number; color: string; colors?: string[]; count?: number }) {
+function Fireflies({ cx, cy, r, color, colors, count = 10, shape = 'dot' }: { cx: number; cy: number; r: number; color: string; colors?: string[]; count?: number; shape?: 'dot' | 'hex' }) {
   const n = Math.min(count, 20) // cap at 20 to avoid perf issues
   const [flies] = useState(() => {
     const shades = colors && colors.length
@@ -961,7 +1031,29 @@ function Fireflies({ cx, cy, r, color, colors, count = 10 }: { cx: number; cy: n
   })
   return (
     <g style={{ pointerEvents: 'none' }}>
-      {flies.map(f => (
+      {flies.map(f => shape === 'hex' ? (
+        <g key={f.key}>
+          {/* Comb-shaped fly: a faint big hex glow under a crisp small hex core */}
+          <polygon points={hexPoints(f.x, f.y, f.size * 3.5)} fill={f.color}>
+            <animate attributeName="opacity" values="0.04;0.25;0.04"
+              dur={`${f.blinkDur}s`} repeatCount="indefinite" begin={`${f.blinkBegin}s`} />
+            <animateTransform attributeName="transform" type="translate"
+              values={`0 0; ${f.d1.dx} ${f.d1.dy}; ${f.d2.dx} ${f.d2.dy}; 0 0`}
+              dur={`${f.dur}s`} repeatCount="indefinite"
+              calcMode="spline" keyTimes="0;0.33;0.67;1"
+              keySplines="0.45 0 0.55 1;0.45 0 0.55 1;0.45 0 0.55 1" />
+          </polygon>
+          <polygon points={hexPoints(f.x, f.y, f.size * 1.3)} fill={f.color}>
+            <animate attributeName="opacity" values="0.3;0.9;0.3"
+              dur={`${f.blinkDur}s`} repeatCount="indefinite" begin={`${f.blinkBegin}s`} />
+            <animateTransform attributeName="transform" type="translate"
+              values={`0 0; ${f.d1.dx} ${f.d1.dy}; ${f.d2.dx} ${f.d2.dy}; 0 0`}
+              dur={`${f.dur}s`} repeatCount="indefinite"
+              calcMode="spline" keyTimes="0;0.33;0.67;1"
+              keySplines="0.45 0 0.55 1;0.45 0 0.55 1;0.45 0 0.55 1" />
+          </polygon>
+        </g>
+      ) : (
         <g key={f.key}>
           {/* Glow */}
           <circle cx={f.x} cy={f.y} r={f.size * 3.5} fill={f.color}>

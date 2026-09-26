@@ -4,10 +4,11 @@ import { createRef } from 'react'
 import { Node } from '../Node'
 import { useMindmapStore } from '../../../store/mindmapStore'
 import type { Diagram, DiagramType, MindmapNode } from '../../../types'
-import { depthFill, hexToRgb, neonFilterId, L1_PALETTE, NEON_ROOT_GRADIENT, NEON_TEXT, NEON_TEXT_MUTED, NEON_TEXT_MUTED_OPACITY } from '../../../lib/color'
+import { depthFill, hexToRgb, neonFilterId, L1_PALETTE, LABEL_TEXT, NEON_ROOT_GRADIENT, NEON_TEXT, NEON_TEXT_MUTED, NEON_TEXT_MUTED_OPACITY } from '../../../lib/color'
 import { computeBranchColors } from '../../../lib/branchColor'
 import { renderMindmapSvg } from '../../../lib/render-svg'
 import { nodeFontSize } from '../../../lib/nodeMetrics'
+import { hexRadius } from '../../../lib/hex'
 import { GLOSS_LINEAR_ID, GLOSS_RADIAL_ID } from '../../../lib/gloss'
 
 vi.mock('../../../components/CuteToast', () => ({ showToast: vi.fn() }))
@@ -663,6 +664,47 @@ describe('Node — fishbone type', () => {
     loadStore([makeRoot(), n], 'fishbone')
     const { container } = renderNode(n)
     expect(container.querySelector('foreignObject')).toBeTruthy()
+  })
+})
+
+describe('Node - honeycomb type', () => {
+  it('renders an L1 hex cell as a 6-point polygon with its emoji, title and subtree count', () => {
+    const root = makeRoot()
+    const n = makeNode({ depth: 1, title: 'Topic', emoji: '🐝', width: 2 * hexRadius(1), height: 2 * hexRadius(1) })
+    loadStore([root, n], 'honeycomb')
+    useMindmapStore.setState({ showChildCount: true })
+    const { container } = renderNode(n, { descendantCount: 5 })
+
+    const polygons = container.querySelectorAll('polygon')
+    // One hit-area polygon (no stroke) + one drawn cell polygon, both 6-point hexagons.
+    expect(polygons.length).toBeGreaterThanOrEqual(1)
+    for (const p of polygons) {
+      expect(p.getAttribute('points')!.trim().split(/\s+/)).toHaveLength(6)
+    }
+
+    const texts = Array.from(container.querySelectorAll('text')).map(t => t.textContent)
+    expect(texts).toContain('🐝')
+    expect(texts).toContain('Topic')
+    expect(texts).toContain('5')
+  })
+
+  it('wraps a long depth-2 title to at most 5 lines, in black', () => {
+    const root = makeRoot()
+    const l1 = makeNode({ depth: 1, width: 2 * hexRadius(1), height: 2 * hexRadius(1) })
+    const long = 'A very long depth two honeycomb cell title that will not fit on one line'
+    const l2 = makeNode({
+      id: 'n2', depth: 2, parentId: 'n1', title: long,
+      width: 2 * hexRadius(2), height: 2 * hexRadius(2),
+    })
+    loadStore([root, l1, l2], 'honeycomb')
+    const { container } = renderNode(l2)
+
+    const titleTspans = container.querySelectorAll('text tspan')
+    expect(titleTspans.length).toBeGreaterThan(0)
+    expect(titleTspans.length).toBeLessThanOrEqual(5)
+
+    const titleText = Array.from(container.querySelectorAll('text')).find(t => t.querySelector('tspan'))!
+    expect(titleText.getAttribute('fill')).toBe(LABEL_TEXT)
   })
 })
 
