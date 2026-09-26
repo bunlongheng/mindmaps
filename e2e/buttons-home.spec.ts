@@ -422,7 +422,7 @@ async function mountSingleCard(page: Page, name: string, tags: string[] = []) {
 }
 
 test.describe('Home — tag-edit modal', () => {
-  test('adding a preset tag shows it as a badge on the card', async ({ page }) => {
+  test('adding a preset tag lists it in the filter bar (cards carry no badges)', async ({ page }) => {
     const name = 'TagCard Preset'
     await mountSingleCard(page, name)
     await openTagModal(page, name)
@@ -430,12 +430,14 @@ test.describe('Home — tag-edit modal', () => {
     // Click the preset "Work" chip inside the modal panel.
     await tagModalPanel(page, name).getByRole('button', { name: /^Work$/ }).first().click()
 
-    // Modal closes (addTag → setTagModalId(null)); the card now shows a Work badge.
+    // Modal closes (addTag → setTagModalId(null)); the tag now has a chip in the filter
+    // bar. Cards themselves show no tag badges, by design.
     await expect(page.getByPlaceholder('Type a new tag…')).toBeHidden()
-    await expect(cardByName(page, name).first().locator('span', { hasText: 'Work' }).first()).toBeVisible({ timeout: 5_000 })
+    await expect(page.locator('[data-tag="Work"]')).toBeVisible({ timeout: 5_000 })
+    await expect(cardByName(page, name).first().locator('span', { hasText: /^Work$/ })).toHaveCount(0)
   })
 
-  test('adding a custom tag via the form shows it on the card', async ({ page }) => {
+  test('adding a custom tag via the form lists it in the filter bar', async ({ page }) => {
     const name = 'TagCard Custom'
     await mountSingleCard(page, name)
     await openTagModal(page, name)
@@ -445,20 +447,20 @@ test.describe('Home — tag-edit modal', () => {
     await tagModalPanel(page, name).getByRole('button', { name: 'Add' }).click()
 
     await expect(input).toBeHidden()
-    await expect(cardByName(page, name).first().locator('span', { hasText: 'E2ECustom' }).first()).toBeVisible({ timeout: 5_000 })
+    await expect(page.locator('[data-tag="E2ECustom"]')).toBeVisible({ timeout: 5_000 })
   })
 
-  test('removing a current tag clears it from the card', async ({ page }) => {
+  test('removing a current tag drops it from the filter bar', async ({ page }) => {
     const name = 'TagCard Remove'
     // Start with the tag already present (served by the stub).
     await mountSingleCard(page, name, ['RemoveMe'])
-    await expect(cardByName(page, name).first().locator('span', { hasText: 'RemoveMe' }).first()).toBeVisible({ timeout: 5_000 })
+    await expect(page.locator('[data-tag="RemoveMe"]')).toBeVisible({ timeout: 5_000 })
 
     await openTagModal(page, name)
     await tagModalPanel(page, name).getByRole('button', { name: /RemoveMe/ }).click()
     await expect(page.getByPlaceholder('Type a new tag…')).toBeHidden()
 
-    await expect(cardByName(page, name).first().locator('span', { hasText: 'RemoveMe' })).toHaveCount(0)
+    await expect(page.locator('[data-tag="RemoveMe"]')).toHaveCount(0)
   })
 
   test('tag modal close (X) button dismisses without changes', async ({ page }) => {
@@ -555,27 +557,26 @@ test('index: card blinks red twice then scatters', async ({ page }) => {
 
 // ── A filtered view does not repeat the tag that filtered it ────────────────
 
-test('selecting a tag hides that tag on every card, and keeps the others', async ({ page }) => {
+test('selecting a tag narrows the library to that tag, and clearing it brings every map back', async ({ page }) => {
   await page.goto('/')
   await page.waitForSelector('[data-map-id]', { timeout: 15_000 })
+  const all = await page.locator('[data-map-id]').count()
 
   // whichever tag this library happens to have
   const pill = page.locator('[data-tag]:not([data-tag="__all__"]):not([data-tag="__no_tag__"])').first()
   test.skip(await pill.count() === 0, 'no tags in this library')
-  const tag = (await pill.getAttribute('data-tag'))!
 
   await pill.click()
   await page.waitForTimeout(600)
-  test.skip(await page.locator('[data-map-id]').count() === 0, 'tag has no maps')
+  const filtered = await page.locator('[data-map-id]').count()
+  test.skip(filtered === 0, 'tag has no maps')
+  expect(filtered).toBeLessThanOrEqual(all)
 
-  const countShowing = () => page.evaluate(t => Array.from(document.querySelectorAll('[data-map-id]'))
-    .filter(c => Array.from(c.querySelectorAll('span')).some(s => s.textContent?.trim() === t)).length, tag)
+  // cards never carry tag badges, filtered or not
+  expect(await page.locator('[data-map-id] span[style*="letter-spacing"]').count()).toBe(0)
 
-  // the tag that filtered the view says nothing on each card, so it is gone
-  expect(await countShowing()).toBe(0)
-
-  // and it is back once the filter is cleared
+  // and the whole library is back once the filter is cleared
   await page.locator('[data-tag="__all__"]').click()
   await page.waitForTimeout(600)
-  expect(await countShowing()).toBeGreaterThan(0)
+  expect(await page.locator('[data-map-id]').count()).toBe(all)
 })
