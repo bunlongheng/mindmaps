@@ -1140,7 +1140,7 @@ function DiagramMinimap({ id, name, type, eager }: { id: string; name: string; t
 
 // ── DiagramCard ────────────────────────────────────────────────────────────
 
-function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isPublic, tags, tagColorMap, onTagEdit, onToggleLock, flash, hideTag, eager }: {
+function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isPublic, onTagEdit, onToggleLock, flash, eager }: {
   diagram: DiagramMeta; timeAgo: string; onOpen: () => void; onDelete: () => void
   isPublic?: boolean; tags?: string[]
   tagColorMap: Map<string, string>; onTagEdit: () => void; onToggleLock: () => void; flash?: boolean
@@ -1150,7 +1150,6 @@ function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isPublic, tags, tagCo
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   // Every card in a filtered view carries the tag that filtered it - showing it
   // again on each one says nothing, so it is dropped while that filter is on.
-  const currentTags = (tags ?? []).filter(t => t !== hideTag)
 
   return (
     <div
@@ -1189,16 +1188,6 @@ function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isPublic, tags, tagCo
           <CachedNodeCount id={diagram.id} />
           <div style={{ fontSize: 10, color: '#94a3b8', flexShrink: 0 }}>{timeAgo}</div>
         </div>
-        {currentTags.length > 0 && (
-          <div style={{ display: 'flex', gap: 4, marginTop: 5, flexWrap: 'wrap' }}>
-            {currentTags.slice(0, 4).map(t => (
-              <span key={t} style={{
-                fontSize: 10, fontWeight: 700, padding: '1px 5px', borderRadius: 6,
-                background: tagBg(t, tagColorMap), color: '#fff', letterSpacing: '0.03em',
-              }}>{t}</span>
-            ))}
-          </div>
-        )}
       </div>
 
       {/* Thumbnail */}
@@ -1227,7 +1216,7 @@ function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isPublic, tags, tagCo
 
 // ── DiagramRow (list view) ───────────────────────────────────────────────────
 
-function DiagramRow({ diagram, timeAgo, onOpen, onDelete, isPublic, tags, tagColorMap, onTagEdit, onToggleLock, flash, hideTag, eager }: {
+function DiagramRow({ diagram, timeAgo, onOpen, onDelete, isPublic, onTagEdit, onToggleLock, flash, eager }: {
   diagram: DiagramMeta; timeAgo: string; onOpen: () => void; onDelete: () => void
   isPublic?: boolean; tags?: string[]
   tagColorMap: Map<string, string>; onTagEdit: () => void; onToggleLock: () => void; flash?: boolean
@@ -1236,7 +1225,6 @@ function DiagramRow({ diagram, timeAgo, onOpen, onDelete, isPublic, tags, tagCol
   const [hovered, setHovered] = useState(false)
   // Every card in a filtered view carries the tag that filtered it - showing it
   // again on each one says nothing, so it is dropped while that filter is on.
-  const currentTags = (tags ?? []).filter(t => t !== hideTag)
 
   return (
     <div
@@ -1265,22 +1253,12 @@ function DiagramRow({ diagram, timeAgo, onOpen, onDelete, isPublic, tags, tagCol
         <DiagramMinimap id={diagram.id} name={diagram.name} type={diagram.type} eager={eager} />
       </div>
 
-      {/* Name + tags */}
+      {/* Name only: the list stays clean, tags live on the grid cards and in the tag editor */}
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <span style={{ fontSize: 13, fontWeight: 600, color: '#334155', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{diagram.name}</span>
           {isPublic && <Globe size={11} color="#6366f1" style={{ flexShrink: 0 }} />}
         </div>
-        {currentTags.length > 0 && (
-          <div style={{ display: 'flex', gap: 4, marginTop: 4, flexWrap: 'wrap' }}>
-            {currentTags.slice(0, 5).map(t => (
-              <span key={t} style={{
-                fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 6,
-                background: tagBg(t, tagColorMap), color: '#fff', letterSpacing: '0.03em',
-              }}>{t}</span>
-            ))}
-          </div>
-        )}
       </div>
 
       {/* Date */}

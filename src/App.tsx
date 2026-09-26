@@ -442,6 +442,7 @@ export default function App() {
           onDelete={activeMindmap ? () => setShowDeleteConfirm(true) : undefined}
           readOnly={isTouch}
           noInteract={isTouch}
+          rightInset={showPanel ? Math.round(256 * 1.2) : 0}
         />
 
         {/* Back button — top left */}

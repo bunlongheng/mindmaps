@@ -24,7 +24,7 @@ interface SidePanelProps {
   onUpdateTags?: (id: string, tags: string[]) => void
 }
 
-// 8 cohesive colors — all Tailwind-500 level, same saturation family
+// 8 cohesive colors - all Tailwind-500 level, same saturation family
 const TAG_PALETTE = [
   '#6366f1', '#14b8a6', '#ec4899', '#f59e0b',
   '#22c55e', '#3b82f6', '#f97316', '#8b5cf6',
@@ -44,6 +44,7 @@ const DIAGRAM_TYPES: { value: DiagramType; label: string }[] = [
   { value: 'mindmap',         label: 'Mind Map' },
   { value: 'fishbone',        label: 'Fishbone' },
   { value: 'timeline',        label: 'Timeline' },
+  { value: 'honeycomb',       label: 'Honeycomb' },
 ]
 
 function DiagramTypeIcon({ value, color }: { value: string; color: string }) {
@@ -86,6 +87,13 @@ function DiagramTypeIcon({ value, color }: { value: string; color: string }) {
       <rect x="28" y="9" width="7" height="8" rx="2" fill={color} opacity="0.9"/>
       <line x1="15" y1="7"  x2="22" y2="7"  stroke={color} strokeWidth="1.4" strokeLinecap="round" opacity="0.45"/>
       <line x1="15" y1="19" x2="22" y2="19" stroke={color} strokeWidth="1.4" strokeLinecap="round" opacity="0.45"/>
+    </svg>
+  )
+  if (value === 'honeycomb') return (
+    <svg width="36" height="26" viewBox="0 0 36 26" fill="none">
+      <polygon points="14,6 20.1,9.5 20.1,16.5 14,20 7.9,16.5 7.9,9.5" stroke={color} strokeWidth="1.6" strokeLinejoin="round"/>
+      <polygon points="27,2 31.3,4.5 31.3,9.5 27,12 22.7,9.5 22.7,4.5" stroke={color} strokeWidth="1.6" strokeLinejoin="round"/>
+      <polygon points="27,14 31.3,16.5 31.3,21.5 27,24 22.7,21.5 22.7,16.5" stroke={color} strokeWidth="1.6" strokeLinejoin="round"/>
     </svg>
   )
   return (
@@ -182,7 +190,7 @@ export function SidePanel({ nodeId, onClose, onDelete, onUpdateTags }: SidePanel
     let tokenCount = 0
     try {
       const nodeList = nodesWithoutIcons.map(n => ({ id: n.id, title: n.title, depth: n.depth }))
-      const prompt = `You are an icon assignment expert. For each mindmap node, pick the single best icon name.\n\nYou may use ANY icon from Lucide (lucide.dev) or Heroicons (heroicons.com) — use kebab-case names like: academic-cap, adjustments-horizontal, arrow-trending-up, banknotes, beaker, bolt, book-open, briefcase, building-office, calendar-days, chart-bar, chat-bubble-left, check-circle, chip, clock, cloud, code-bracket, cog, command-line, cpu-chip, credit-card, cube, currency-dollar, device-phone-mobile, document, eye, fire, flag, folder, gift, globe-alt, heart, home, key, light-bulb, link, lock-closed, magnifying-glass, map, map-pin, microphone, moon, musical-note, paint-brush, paper-airplane, photo, puzzle-piece, rocket-launch, server, shield-check, shopping-cart, signal, sparkles, star, sun, tag, trophy, user, video-camera, wifi, wrench, or any other valid lucide/heroicons icon name.\n\nRules:\n- You MUST assign an icon to EVERY node in the list. No exceptions.\n- Pick the most contextually relevant icon.\n- Respond ONLY with a valid JSON array, no explanation: [{"id":"...","icon":"..."}, ...]\n\nNodes:\n${JSON.stringify(nodeList)}`
+      const prompt = `You are an icon assignment expert. For each mindmap node, pick the single best icon name.\n\nYou may use ANY icon from Lucide (lucide.dev) or Heroicons (heroicons.com) - use kebab-case names like: academic-cap, adjustments-horizontal, arrow-trending-up, banknotes, beaker, bolt, book-open, briefcase, building-office, calendar-days, chart-bar, chat-bubble-left, check-circle, chip, clock, cloud, code-bracket, cog, command-line, cpu-chip, credit-card, cube, currency-dollar, device-phone-mobile, document, eye, fire, flag, folder, gift, globe-alt, heart, home, key, light-bulb, link, lock-closed, magnifying-glass, map, map-pin, microphone, moon, musical-note, paint-brush, paper-airplane, photo, puzzle-piece, rocket-launch, server, shield-check, shopping-cart, signal, sparkles, star, sun, tag, trophy, user, video-camera, wifi, wrench, or any other valid lucide/heroicons icon name.\n\nRules:\n- You MUST assign an icon to EVERY node in the list. No exceptions.\n- Pick the most contextually relevant icon.\n- Respond ONLY with a valid JSON array, no explanation: [{"id":"...","icon":"..."}, ...]\n\nNodes:\n${JSON.stringify(nodeList)}`
       const res = await fetch('/api/ai/generate-mindmap', {
         method: 'POST',
         headers: authHeaders(), // admin-only endpoint: must send the owner session token
@@ -396,8 +404,9 @@ export function SidePanel({ nodeId, onClose, onDelete, onUpdateTags }: SidePanel
                     swatches={themeColors}
                   />
                 </PRow>
-                {/* Box shape. On the root it is the master shape: 1 click restyles every child box. */}
-                {(() => {
+                {/* Box shape. On the root it is the master shape: 1 click restyles every child box.
+                    Hidden for honeycomb - every cell is a hexagon, node.shape is ignored. */}
+                {diagramType !== 'honeycomb' && (() => {
                   const isRoot = node.depth === 0
                   const children = isRoot ? (activeMindmap?.nodes.filter(n => n.depth >= 1) ?? []) : []
                   const activeShape = isRoot
@@ -426,7 +435,7 @@ export function SidePanel({ nodeId, onClose, onDelete, onUpdateTags }: SidePanel
                   </PRow>
                   )
                 })()}
-                {node.depth >= 1 && !(diagramType === 'mindmap' && node.depth <= 2) && (
+                {node.depth >= 1 && diagramType !== 'honeycomb' && !(diagramType === 'mindmap' && node.depth <= 2) && (
                   <PRow label="Width">
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       {(() => {
@@ -467,9 +476,10 @@ export function SidePanel({ nodeId, onClose, onDelete, onUpdateTags }: SidePanel
                 </>
               )}
 
-              {/* Branch — root only; Shape+Line hidden in mindmap mode (root always circle, lines always straight) */}
+              {/* Branch - root only; Shape+Line hidden in mindmap and honeycomb mode (root always
+                  circle/hex, lines always straight/centre-to-centre) */}
               {node.depth === 0 && <SBlock title="Branch">
-                {diagramType !== 'mindmap' && <PRow label="Shape">
+                {diagramType !== 'mindmap' && diagramType !== 'honeycomb' && <PRow label="Shape">
                   <div style={{ display: 'flex', gap: 6 }}>
                     {([
                       { value: 'circle' as const, label: 'Circle', icon: (c: string) => (
@@ -507,7 +517,7 @@ export function SidePanel({ nodeId, onClose, onDelete, onUpdateTags }: SidePanel
                     })}
                   </div>
                 </PRow>}
-                {diagramType !== 'mindmap' && <PRow label="Line">
+                {diagramType !== 'mindmap' && diagramType !== 'honeycomb' && <PRow label="Line">
                   <LinePicker value={lineStyle} onChange={setLineStyle} />
                 </PRow>}
 
@@ -547,7 +557,39 @@ export function SidePanel({ nodeId, onClose, onDelete, onUpdateTags }: SidePanel
               })}
             </div>
           </SBlock>
-          {diagramType !== 'fishbone' && diagramType !== 'timeline' && (
+          {diagramType === 'honeycomb' && (
+            <>
+              <HR />
+              <SBlock title="Cells">
+                {/* Comb style and sizing live on the root node, so previews and share images follow them. */}
+                <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+                  {([
+                    { v: 'mesh' as const, label: 'Mesh', hint: 'Equal cells tiled edge to edge, no lines: the hierarchy reads from touching cells and colour' },
+                    { v: 'web' as const,  label: 'Web',  hint: 'Cells on rings around the root, joined by connector lines' },
+                  ]).map(({ v, label, hint }) => (
+                    <button key={v} title={hint} aria-label={label}
+                      onClick={() => { if (rootNode) { updateNode(rootNode.id, { combStyle: v }); setTimeout(() => rerunLayout(), 0) } }}
+                      style={{ ...chip((rootNode?.combStyle ?? 'mesh') === v), flex: 1, height: 30 }}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                {(rootNode?.combStyle ?? 'mesh') === 'web' && <div style={{ display: 'flex', gap: 6 }}>
+                  {([
+                    { v: 'outward' as const, label: 'Small to big', hint: 'Root smallest, every ring outward bigger, like a web' },
+                    { v: 'inward' as const,  label: 'Big to small', hint: 'Root biggest, every ring outward smaller' },
+                  ]).map(({ v, label, hint }) => (
+                    <button key={v} title={hint} aria-label={label}
+                      onClick={() => { if (rootNode) { updateNode(rootNode.id, { combSize: v }); setTimeout(() => rerunLayout(), 0) } }}
+                      style={{ ...chip((rootNode?.combSize ?? 'outward') === v), flex: 1, height: 30 }}>
+                      {label}
+                    </button>
+                  ))}
+                </div>}
+              </SBlock>
+            </>
+          )}
+          {diagramType !== 'fishbone' && diagramType !== 'timeline' && diagramType !== 'honeycomb' && (
             <>
               <HR />
               <SBlock title="Line">
@@ -687,7 +729,7 @@ export function SidePanel({ nodeId, onClose, onDelete, onUpdateTags }: SidePanel
               </button>
             </div>
 
-            {/* QR + copy — always visible */}
+            {/* QR + copy - always visible */}
             <div style={{ display: 'flex', justifyContent: 'center', margin: '10px 0 8px' }}>
               <QRCodeSVG value={shareUrl} size={160} bgColor="#ffffff" fgColor="#1a1d2e" level="M" />
             </div>
@@ -1085,7 +1127,7 @@ function VisualPickerBlock({ icon, emoji, onSave }: {
       {tab === 'text' && (
         <>
           <p style={{ fontSize: 11, color: '#9ca3af', margin: '0 0 8px', lineHeight: 1.4 }}>
-            Enter 1–3 characters to use as a label icon (e.g. L, A1, ✓)
+            Enter 1-3 characters to use as a label icon (e.g. L, A1, ✓)
           </p>
           <input
             value={textDraft}

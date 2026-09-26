@@ -16,6 +16,7 @@ import { computeMindmapLayout } from '../lib/layout/mindmap'
 import { computeFishboneLayout } from '../lib/layout/fishbone'
 import { parseIndentedOutline, normalizeOutlineRoots, assembleOutlineTree, computeNodeWidth, OUTLINE_META_KEYS } from '../lib/outline'
 import { computeTimelineLayout } from '../lib/layout/timeline'
+import { computeHoneycombLayout } from '../lib/layout/honeycomb'
 import { getTheme } from '../lib/themes'
 import { rootPillWidth, ROOT_FONT } from '../lib/rootPill'
 import { nodeHeight } from '../lib/nodeMetrics'
@@ -95,6 +96,7 @@ function runLayout(nodes: MindmapNode[], type: DiagramType): MindmapNode[] {
     case 'mindmap':     return computeMindmapLayout(nodes)
     case 'fishbone':    return computeFishboneLayout(nodes)
     case 'timeline':    return computeTimelineLayout(nodes)
+    case 'honeycomb':   return computeHoneycombLayout(nodes)
     // 'logic-chart' and any unknown/legacy type (e.g. older 'logic' rows) fall back
     // to the logic-chart layout — never return undefined, which crashed map opening.
     default:            return computeMindmapsLayout(nodes)
@@ -318,6 +320,7 @@ export const useMindmapStore = create<MindmapStore>()(
       const labels: Record<string, string> = {
         'logic-chart': 'Logic Chart', 'mindmap': 'Mind Map',
         'fishbone': 'Fishbone', 'timeline': 'Timeline',
+        'honeycomb': 'Honeycomb',
       }
       showToast(`✦ Switched to ${labels[t] ?? t}`, { color: '#1a1d2e' })
     },

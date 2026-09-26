@@ -1,3 +1,4 @@
+import type { DiagramType } from '../../types'
 import { useRef, useState, useCallback, useEffect, useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { useMindmapStore } from '../../store/mindmapStore'
@@ -11,6 +12,8 @@ import {
   NEON_CORE_OPACITY, NEON_HALO_OPACITY, NEON_TEXT_BLUR, NEON_TEXT_FILTER,
 } from '../../lib/color'
 import { computeSubtreeCounts } from '../../lib/nodeCounts'
+import { combSizeOf, combStyleOf, drawnCellRadius, hexDoorEdge, meshGroupOutlines, meshCellRadius } from '../../lib/hex'
+import { darken } from '../../lib/color'
 import { radialNodeExtent } from '../../lib/layout/mindmap'
 import { GLOSS_LINEAR_ID, GLOSS_RADIAL_ID, GLOSS_RADIAL_CX, GLOSS_RADIAL_CY, GLOSS_RADIAL_R, GLOSS_STOPS } from '../../lib/gloss'
 
@@ -18,10 +21,11 @@ interface DiagramCanvasProps {
   onNodeSelect: (nodeId: string | null) => void
   readOnly?: boolean
   noInteract?: boolean
+  rightInset?: number   // width of an overlay panel on the right, so a fit centres in what is actually visible
   onDelete?: () => void
 }
 
-export function DiagramCanvas({ onNodeSelect, readOnly, noInteract }: DiagramCanvasProps) {
+export function DiagramCanvas({ onNodeSelect, readOnly, noInteract, rightInset = 0 }: DiagramCanvasProps) {
   // Shallow-selected slice so the canvas only re-renders when one of these actually changes,
   // not on unrelated store writes (resizePreview, HUD flags, showChildCount, etc.).
   const { activeMindmap, selectedNodeIds, setSelectedNodeIds, diagramType, lineStyle, themeId, addNode, reorderNode, isImporting, hideDetails } = useMindmapStore(
@@ -35,6 +39,14 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract }: DiagramCan
   // read-only the same way a touch device is: reuse the existing readOnly wiring.
   const effectiveReadOnly = readOnly || (activeMindmap?.locked ?? false)
   const counts = useMemo(() => computeSubtreeCounts(activeMindmap?.nodes ?? []), [activeMindmap?.nodes])
+  // Honeycomb cells: 1 shared radius in a mesh, a text-fit radius each in a web; resolved
+  // once per node set instead of inside every Node (a mesh radius scans the whole map).
+  const cellRadii = useMemo(() => {
+    const ns = activeMindmap?.nodes ?? []
+    if (diagramType !== 'honeycomb' || !ns.length) return null
+    const style = combStyleOf(ns), size = combSizeOf(ns)
+    return new Map(ns.map(n => [n.id, drawnCellRadius(n, ns, style, size)]))
+  }, [activeMindmap?.nodes, diagramType])
   // "Outward" in a radial mind map is measured from the root, so every Node needs the
   // root's centre. Resolved once here rather than by an O(n) find inside each node.
   const rootCenter = useMemo(() => {
@@ -43,6 +55,33 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract }: DiagramCan
   }, [activeMindmap?.nodes])
 
   const paletteColors = useMemo(() => computeBranchColors(activeMindmap?.nodes ?? []), [activeMindmap?.nodes])
+  // Mesh doorways: the wall a cell shares with its parent, painted in the branch colour.
+  // Drawn as 1 layer above every cell, so no parent's own wall can paint over a door.
+  const meshDoors = useMemo(() => {
+    const ns = activeMindmap?.nodes ?? []
+    if (diagramType !== 'honeycomb' || combStyleOf(ns) !== 'mesh' || !cellRadii) return null
+    const byId = new Map(ns.map(n => [n.id, n]))
+    return ns.flatMap(n => {
+      const p = n.parentId ? byId.get(n.parentId) : undefined
+      const r = cellRadii.get(n.id)
+      if (!p || !r) return []
+      const door = hexDoorEdge(n.x + n.width / 2, n.y + n.height / 2, r, p.x + p.width / 2, p.y + p.height / 2)
+      // A shade darker than the branch, so the door reads against the solid parent and the pale child alike.
+      const base = paletteColors.get(n.id) ?? n.color
+      return door ? [{ id: n.id, door, color: base.startsWith('#') ? darken(base, 0.35) : base }] : []
+    })
+  }, [activeMindmap?.nodes, diagramType, cellRadii, paletteColors])
+  // Mesh group outlines: a parent and its direct children, bounded by 1 line, so the eye
+  // can tell where 1 comb group stops and the next begins. Topics thick, families thin.
+  const meshGroups = useMemo(() => {
+    const ns = activeMindmap?.nodes ?? []
+    if (diagramType !== 'honeycomb' || combStyleOf(ns) !== 'mesh' || !ns.length) return null
+    const R = meshCellRadius(ns, combSizeOf(ns))
+    return meshGroupOutlines(ns, R).map(g => {
+      const base = paletteColors.get(g.parentId) ?? ns.find(n => n.id === g.parentId)?.color ?? '#1a1d2e'
+      return { ...g, color: g.depth === 0 ? '#1a1d2e' : base.startsWith('#') ? darken(base, 0.45) : base }
+    })
+  }, [activeMindmap?.nodes, diagramType, paletteColors])
   const canvasBg = getTheme(themeId).canvasBg
   // The radial mind map's neon glow on a dark canvas: one filter per distinct circle
   // size, defined once here and shared by every orb, so a 200-node map carries a
@@ -111,16 +150,17 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract }: DiagramCan
     const maxX = Math.max(...ext.map(e => e.right))
     const maxY = Math.max(...ext.map(e => e.bottom))
     const pad = 80
-    const newZoom = Math.max(0.05, Math.min((svgW - pad * 2) / Math.max(1, maxX - minX), (svgH - pad * 2) / Math.max(1, maxY - minY), 1))
+    const visW = Math.max(200, svgW - rightInset)
+    const newZoom = Math.max(0.05, Math.min((visW - pad * 2) / Math.max(1, maxX - minX), (svgH - pad * 2) / Math.max(1, maxY - minY), 1))
     const cx = (minX + maxX) / 2
     const cy = (minY + maxY) / 2
     zoomCurrentRef.current = newZoom
     setZoom(newZoom)  // badge only
-    const p = { x: svgW / 2 - cx * newZoom, y: svgH / 2 - cy * newZoom }
+    const p = { x: visW / 2 - cx * newZoom, y: svgH / 2 - cy * newZoom }
     panRef.current = p
     setPan(p)         // keep pan state in sync for selBox coords
     applyTransform(p, newZoom)
-  }, [activeMindmap, diagramType, applyTransform])
+  }, [activeMindmap, diagramType, applyTransform, rightInset])
 
   // Editor load: 100% so the text is readable, anchored on the root instead of shrinking
   // the whole map. Mind maps grow in every direction, so the root sits at the centre;
@@ -136,7 +176,7 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract }: DiagramCan
     const newZoom = 1
     const cx = root.x + root.width / 2
     const cy = root.y + root.height / 2
-    const anchorX = diagramType === 'mindmap' ? svgW / 2 : Math.min(svgW / 2, Math.max(root.width / 2 + 40, svgW * 0.18))
+    const anchorX = (diagramType === 'mindmap' || diagramType === 'honeycomb') ? svgW / 2 : Math.min(svgW / 2, Math.max(root.width / 2 + 40, svgW * 0.18))
     zoomCurrentRef.current = newZoom
     setZoom(newZoom)  // badge only
     const p = { x: anchorX - cx * newZoom, y: svgH / 2 - cy * newZoom }
@@ -157,10 +197,14 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract }: DiagramCan
     return () => window.removeEventListener('keydown', onKey)
   }, [fitToContent])
 
-  // Auto-fit on initial diagram load or diagram type switch
+  // Opening a map anchors the root at 100%; switching its type fits the whole new
+  // layout into view, since a re-laid-out map is otherwise mostly off screen.
+  const prevFit = useRef<{ id: string | undefined; type: DiagramType }>({ id: undefined, type: diagramType })
   useEffect(() => {
     if (!activeMindmap) return
-    const raf = requestAnimationFrame(fitView)
+    const typeSwitched = prevFit.current.id === activeMindmap.id && prevFit.current.type !== diagramType
+    prevFit.current = { id: activeMindmap.id, type: diagramType }
+    const raf = requestAnimationFrame(typeSwitched ? fitToContent : fitView)
     return () => cancelAnimationFrame(raf)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeMindmap?.id, diagramType])
@@ -530,9 +574,24 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract }: DiagramCan
               rootCenter={rootCenter}
               childCount={counts.childCounts.get(node.id) ?? 0}
               descendantCount={counts.descendantCounts.get(node.id) ?? 0}
+              cellRadius={cellRadii?.get(node.id)}
               nodeCount={activeMindmap.nodes.length}
             />
           ))}
+          {meshDoors && meshDoors.length > 0 && (
+            <g style={{ pointerEvents: 'none' }}>
+              {meshDoors.map(d => <polyline key={`door-${d.id}`} points={d.door} fill="none" stroke={d.color} strokeWidth={5} strokeLinecap="butt" />)}
+            </g>
+          )}
+          {meshGroups && meshGroups.length > 0 && (
+            <g style={{ pointerEvents: 'none' }}>
+              {/* Deeper groups first, topics last, so the thick topic line stays on top */}
+              {[...meshGroups].sort((a, b) => b.depth - a.depth).map(g => (
+                <path key={`group-${g.parentId}`} d={g.d} fill="none" stroke={g.color}
+                  strokeWidth={g.depth <= 1 ? 7 : 3.5} strokeLinecap="round" strokeLinejoin="round" />
+              ))}
+            </g>
+          )}
           {/* Rubber-band selection box */}
           {selBox && selBox.w > 4 && (
             <rect

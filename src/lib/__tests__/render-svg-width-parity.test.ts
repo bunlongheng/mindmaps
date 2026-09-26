@@ -91,3 +91,41 @@ describe('render-svg - edge colour parity with the canvas', () => {
     })
   }
 })
+
+describe('render-svg - honeycomb', () => {
+  it('web: draws every cell as a hexagon polygon, one straight line per edge, and no selection rect', () => {
+    const nodes = [
+      { id: 'root', title: 'Root Topic', color: '#6366f1', parentId: null, depth: 0, x: 0, y: 0, width: 0, height: 0, combStyle: 'web' as const },
+      { id: 'l1a', title: 'Branch A', color: '#ef4444', parentId: 'root', depth: 1, sortOrder: 0, x: 0, y: 0, width: 0, height: 0 },
+      { id: 'l1b', title: 'Branch B', color: '#22c55e', parentId: 'root', depth: 1, sortOrder: 1, x: 0, y: 0, width: 0, height: 0 },
+      { id: 'l2a', title: 'Leaf A', color: '#ef4444', parentId: 'l1a', depth: 2, sortOrder: 0, x: 0, y: 0, width: 0, height: 0 },
+      { id: 'l2b', title: 'Leaf B', color: '#22c55e', parentId: 'l1b', depth: 2, sortOrder: 0, x: 0, y: 0, width: 0, height: 0 },
+      { id: 'l2c', title: 'Leaf C', color: '#22c55e', parentId: 'l1b', depth: 2, sortOrder: 1, x: 0, y: 0, width: 0, height: 0 },
+    ]
+    const svg = renderMindmapSvg({ id: 'x', name: 'Honeycomb test', type: 'honeycomb', line_style: 'straight', theme_id: 'default', nodes: nodes as never })
+
+    expect((svg.match(/<polygon/g) ?? []).length).toBe(6)
+    expect((svg.match(/<line/g) ?? []).length).toBe(5)
+    expect(svg).toContain('Root Topic')
+    // The only <rect> in the whole document is the canvas background - no cell is
+    // ever drawn as a rect, and no selection rect is emitted server-side.
+    expect((svg.match(/<rect/g) ?? []).length).toBe(1)
+  })
+
+  it('mesh (the default): cells only, no connector lines, every polygon the same size', () => {
+    const nodes = [
+      { id: 'root', title: 'Root Topic', color: '#6366f1', parentId: null, depth: 0, x: 0, y: 0, width: 0, height: 0 },
+      { id: 'a', title: 'Alpha', color: '#D94F3A', parentId: 'root', depth: 1, sortOrder: 0, x: 0, y: 0, width: 0, height: 0 },
+      { id: 'b', title: 'Beta with a longer label here', color: '#3AD9BF', parentId: 'root', depth: 1, sortOrder: 1, x: 0, y: 0, width: 0, height: 0 },
+      { id: 'a1', title: 'Alpha child', color: '#D94F3A', parentId: 'a', depth: 2, sortOrder: 0, x: 0, y: 0, width: 0, height: 0 },
+    ]
+    const svg = renderMindmapSvg({ id: 'x', name: 'Mesh', type: 'honeycomb', line_style: 'curved', theme_id: 'default', nodes: nodes as never })
+    expect((svg.match(/<polygon/g) ?? []).length).toBe(4)
+    expect((svg.match(/<line/g) ?? []).length).toBe(0)
+    const widths = new Set([...svg.matchAll(/<polygon points="([^"]+)"/g)].map(m => {
+      const xs = m[1].split(' ').map(p => parseFloat(p.split(',')[0]))
+      return Math.round(Math.max(...xs) - Math.min(...xs))
+    }))
+    expect(widths.size).toBe(1)
+  })
+})

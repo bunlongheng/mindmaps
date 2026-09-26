@@ -184,23 +184,23 @@ describe('HomePage — search & tag filtering', () => {
     expect(screen.getByText('Project Plan')).toBeInTheDocument()
   })
 
-  it('stops repeating the filtered tag on every card, but keeps the others', () => {
+  it('list rows carry no tag badges (the list stays clean; tags live on the grid cards)', () => {
     seedDiagrams(SAMPLE)
     const { container } = render(<HomePage onOpen={vi.fn()} user={USER} onSignOut={vi.fn()} />)
-    const badges = () => Array.from(container.querySelectorAll('[data-map-id] span')).map(n => n.textContent?.trim())
+    expect(container.querySelector('.home-list')).toBeTruthy()
+    const badges = Array.from(container.querySelectorAll('[data-map-id] span')).map(n => n.textContent?.trim())
+    expect(badges).not.toContain('Work')
+    expect(badges).not.toContain('AI')
+  })
 
-    // unfiltered: "Project Plan" wears both of its tags
-    expect(badges()).toContain('Work')
-    expect(badges()).toContain('AI')
-
-    fireEvent.click(container.querySelector('[data-tag="Work"]')!)
-
-    // every card left has Work, so saying so on each of them adds nothing
-    expect(badges()).not.toContain('Work')
-    expect(badges()).toContain('AI')
-
-    fireEvent.click(container.querySelector('[data-tag="__all__"]')!)
-    expect(badges()).toContain('Work')
+  it('grid cards carry no tag badges either (tags live in the chips and the tag editor)', () => {
+    localStorage.setItem('mindmaps:viewMode', 'grid')
+    seedDiagrams(SAMPLE)
+    const { container } = render(<HomePage onOpen={vi.fn()} user={USER} onSignOut={vi.fn()} />)
+    expect(container.querySelector('.home-grid')).toBeTruthy()
+    const badges = Array.from(container.querySelectorAll('[data-map-id] span')).map(n => n.textContent?.trim())
+    expect(badges).not.toContain('Work')
+    expect(badges).not.toContain('AI')
   })
 
   it('initializes activeTag from the URL ?tag= param', () => {

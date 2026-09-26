@@ -69,7 +69,7 @@ export function lsDeleteDiagram(id: string) {
 // Some legacy/AI-generated rows were saved with type 'logic' (not a valid
 // DiagramType). Map anything unrecognized to 'logic-chart' so layout + rendering
 // never break. Resaving the map heals the stored value.
-const VALID_TYPES: Diagram['type'][] = ['logic-chart', 'mindmap', 'fishbone', 'timeline']
+const VALID_TYPES: Diagram['type'][] = ['logic-chart', 'mindmap', 'fishbone', 'timeline', 'honeycomb']
 function normalizeType(t: unknown): Diagram['type'] {
   return VALID_TYPES.includes(t as Diagram['type']) ? (t as Diagram['type']) : 'logic-chart'
 }

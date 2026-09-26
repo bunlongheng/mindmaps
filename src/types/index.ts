@@ -1,4 +1,4 @@
-export type DiagramType = 'logic-chart' | 'mindmap' | 'fishbone' | 'timeline'
+export type DiagramType = 'logic-chart' | 'mindmap' | 'fishbone' | 'timeline' | 'honeycomb'
 export type LineStyle = 'straight' | 'curved' | 'orthogonal'
 
 export interface MindmapNode {
@@ -27,6 +27,8 @@ export interface MindmapNode {
   branchGap?: number
   shape?: 'rect' | 'rounded' | 'pill' | 'circle'   // box shape; absent keeps the diagram's default look
   gloss?: boolean      // root node only: opt-in top-of-box gloss for root, L1 and L2 across the whole map
+  combSize?: 'outward' | 'inward'  // root node only, honeycomb web style: cells grow outward (default) or shrink outward
+  combStyle?: 'mesh' | 'web'       // root node only, honeycomb: 'mesh' tiles equal cells edge to edge with no lines (default); 'web' rings cells around the root with connectors
   url?: string         // optional hyperlink — clicking the node opens it
 }
 
