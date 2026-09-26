@@ -91,7 +91,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       fields: {
         title: 'required string',
         outline: 'optional; indented text OR a JSON string (auto-detected); omit for an empty root',
-        type: 'logic-chart | mindmap | fishbone | timeline (default logic-chart)',
+        type: 'logic-chart | mindmap | fishbone | timeline | honeycomb (default logic-chart; omit unless the person explicitly asked for another layout by name)',
         themeId: 'optional (default "default")',
         lineStyle: 'optional (default "curved")',
         userId: 'optional; omit it - the map is always filed under the configured owner. If sent, it must equal that owner id or the call is rejected with 403.',
@@ -104,7 +104,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const { title, outline, type: rawType = 'logic-chart', themeId = 'default', lineStyle = 'curved', userId = null, sharing = false, colors } = body
   // Coerce unknown diagram types to the safe default (matches the documented behavior + client legacy-type healing).
-  const VALID_TYPES = new Set(['logic-chart', 'mindmap', 'fishbone', 'timeline'])
+  const VALID_TYPES = new Set(['logic-chart', 'mindmap', 'fishbone', 'timeline', 'honeycomb'])
   const type = VALID_TYPES.has(rawType) ? rawType : 'logic-chart'
 
   // Every API map belongs to the configured owner. The static key already proves the caller

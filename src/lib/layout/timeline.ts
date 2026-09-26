@@ -4,8 +4,8 @@ import { nodeFontSize, nodeHeight, nodeWidth, estimateTextWidth } from '../nodeM
 
 const SPINE_Y = 400
 const ROOT_X = 80
-const V_GAP = 12      // vertical gap between stacked L2/L3 nodes
-const BRANCH_GAP = 20 // vertical gap between L1 edge and nearest L2
+const V_GAP = 14      // vertical gap between stacked L2/L3 nodes
+const BRANCH_GAP = 24 // vertical gap between L1 edge and nearest L2
 const L1_SEG = 64     // horizontal gap between L1 nodes
 const BRANCH_INDENT = 48 // horizontal offset from branch line to node left edge
 
@@ -70,29 +70,38 @@ export function computeTimelineLayout(nodes: MindmapNode[]): MindmapNode[] {
 
     // Stack each L2's block (its own box, then its L3 run) one after another away from
     // the spine, so an L2 with several L3 children never collides with the next L2.
-    let offset = 0
+    // A topic with 2 or more blocks puts the first half above the spine and the rest
+    // below, so a deep map spreads across the spine instead of towering over it.
+    const twoSided = blocks.length >= 2
+    const aboveCount = Math.ceil(blocks.length / 2)
+    let offsetAbove = 0
+    let offsetBelow = 0
     l2s.forEach((l2, j) => {
       const { l2w, l2h, l3s, l3Sizes, blockH } = blocks[j]
+      const blockAbove = twoSided ? j < aboveCount : above
+      const offset = blockAbove ? offsetAbove : offsetBelow
       // Offset L2 right from the branch line
       const l2X = l1X + BRANCH_INDENT
-      const l2Y = above
+      const l2Y = blockAbove
         ? SPINE_Y - l1h / 2 - BRANCH_GAP - offset - l2h
         : SPINE_Y + l1h / 2 + BRANCH_GAP + offset
 
       maxW = Math.max(maxW, l2w)
       result.push({ ...l2, x: l2X, y: l2Y, width: l2w, height: l2h, manuallyPositioned: false })
 
-      let l3Cursor = above ? l2Y - V_GAP : l2Y + l2h + V_GAP
+      let l3Cursor = blockAbove ? l2Y - V_GAP : l2Y + l2h + V_GAP
       l3s.forEach((l3, k) => {
         const { w: l3w, h: l3h } = l3Sizes[k]
-        const l3X = l1X + BRANCH_INDENT
-        const l3Y = above ? l3Cursor - l3h : l3Cursor
-        maxW = Math.max(maxW, l3w)
+        // L3s step in once more than their L2, so a branch reads as an outline, not 1 flat column.
+        const l3X = l1X + BRANCH_INDENT * 2
+        const l3Y = blockAbove ? l3Cursor - l3h : l3Cursor
+        maxW = Math.max(maxW, BRANCH_INDENT + l3w)
         result.push({ ...l3, x: l3X, y: l3Y, width: l3w, height: l3h, manuallyPositioned: false })
-        l3Cursor = above ? l3Y - V_GAP : l3Cursor + l3h + V_GAP
+        l3Cursor = blockAbove ? l3Y - V_GAP : l3Cursor + l3h + V_GAP
       })
 
-      offset += blockH + V_GAP
+      if (blockAbove) offsetAbove += blockH + V_GAP
+      else offsetBelow += blockH + V_GAP
     })
 
     curX += maxW + L1_SEG

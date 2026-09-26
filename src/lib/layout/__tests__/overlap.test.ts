@@ -78,7 +78,7 @@ describe('fishbone and timeline layouts reserve room for L3 subtrees', () => {
     })
   })
 
-  it('still alternates timeline L1 events above and below the spine on the fixture', () => {
+  it('timeline: a topic with 1 block alternates sides by index; 2 or more blocks span both sides', () => {
     const nodes = loadFixture()
     const out = computeTimelineLayout(nodes)
     const rootId = nodes.find(n => n.parentId === null)!.id
@@ -90,8 +90,12 @@ describe('fishbone and timeline layouts reserve room for L3 subtrees', () => {
       const l2s = nodes.filter(n => n.parentId === l1.id)
       if (l2s.length === 0) return // nothing to check direction against
       const firstL2 = out.find(n => n.id === l2s[0].id)!
+      const lastL2 = out.find(n => n.id === l2s[l2s.length - 1].id)!
       const cy = firstL2.y + firstL2.height / 2
-      if (i % 2 === 0) expect(cy).toBeLessThan(SPINE_Y)
+      if (l2s.length >= 2) {
+        expect(cy).toBeLessThan(SPINE_Y)
+        expect(lastL2.y + lastL2.height / 2).toBeGreaterThan(SPINE_Y)
+      } else if (i % 2 === 0) expect(cy).toBeLessThan(SPINE_Y)
       else expect(cy).toBeGreaterThan(SPINE_Y)
     })
   })

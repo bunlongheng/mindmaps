@@ -14,6 +14,7 @@ import { computeMindmapsLayout } from './layout/mindmaps-layout.js'
 import { computeMindmapLayout, wrapText, initialFontSize, nodeInitial, radialLabelFor, radialNodeExtent, LABEL_FONT, RADIAL_ROOT_FONT } from './layout/mindmap.js'
 import { computeFishboneLayout, FISHBONE_SLANT } from './layout/fishbone.js'
 import { computeTimelineLayout } from './layout/timeline.js'
+import { computeHoneycombLayout } from './layout/honeycomb.js'
 import { getTheme } from './themes.js'
 import { LABEL_TEXT,
   hexToRgb, darken, depthFill, applyDepthTransparency, edgeWidthForDepth,
@@ -32,6 +33,8 @@ import { parseLinkedTitle, sliceSegments, lineRanges, type LinkSegment } from '.
 import { nodeCenter, nodeCenterLeft, nodeCenterRight, buildStraightPath, buildCurvedPath, buildOrthogonalPath, buildRadialBranchPath } from './geometry.js'
 import { computeSubtreeCounts } from './nodeCounts.js'
 import { GLOSS_LINEAR_ID, GLOSS_RADIAL_ID, glossApplies, glossOpacity, glossDefsSvg } from './gloss.js'
+import { hexCellLayout, hexPoints, hexFontSize, hexFill, hexTextColor, combSizeOf, combStyleOf, drawnCellRadius, hexDoorEdge, meshGroupOutlines, meshCellRadius } from './hex.js'
+import type { CombSize, CombStyle } from './hex.js'
 
 // The stored DB row shape (SELECT in api/mindmaps.ts / INSERT in api/ai/mindmaps.ts).
 export interface MindmapRow {
@@ -44,7 +47,7 @@ export interface MindmapRow {
 }
 
 const FONT = 'Inter, system-ui, -apple-system, sans-serif'
-const VALID_TYPES = new Set<string>(['logic-chart', 'mindmap', 'fishbone', 'timeline'])
+const VALID_TYPES = new Set<string>(['logic-chart', 'mindmap', 'fishbone', 'timeline', 'honeycomb'])
 const VALID_LINE_STYLES = new Set<string>(['straight', 'curved', 'orthogonal'])
 
 const esc = (s: unknown): string => String(s ?? '')
@@ -63,10 +66,11 @@ function isLight(hex: string): boolean {
 /** Layout dispatch (mindmapStore runLayout). */
 function runLayout(nodes: MindmapNode[], type: DiagramType): MindmapNode[] {
   switch (type) {
-    case 'mindmap':  return computeMindmapLayout(nodes)
-    case 'fishbone': return computeFishboneLayout(nodes)
-    case 'timeline': return computeTimelineLayout(nodes)
-    default:         return computeMindmapsLayout(nodes)
+    case 'mindmap':   return computeMindmapLayout(nodes)
+    case 'fishbone':  return computeFishboneLayout(nodes)
+    case 'timeline':  return computeTimelineLayout(nodes)
+    case 'honeycomb': return computeHoneycombLayout(nodes)
+    default:          return computeMindmapsLayout(nodes)
   }
 }
 
@@ -133,6 +137,20 @@ function deepEdge(parent: MindmapNode, child: MindmapNode, lineStyle: LineStyle,
 
 function renderEdges(nodes: MindmapNode[], type: DiagramType, lineStyle: LineStyle, pc: (n: MindmapNode) => string, neon = false): string {
   const nodeMap = new Map(nodes.map(n => [n.id, n]))
+
+  // Honeycomb: a straight centre-to-centre line per parent/child pair, in the branch
+  // colour, no order badges - identical to the canvas (EdgeLayer.tsx).
+  if (type === 'honeycomb') {
+    if (combStyleOf(nodes) === 'mesh') return ''   // a mesh has no connector lines
+    const edges = nodes.filter(n => n.parentId && nodeMap.has(n.parentId))
+    return edges.map(n => {
+      const parent = nodeMap.get(n.parentId!)!
+      const x1 = parent.x + parent.width / 2, y1 = parent.y + parent.height / 2
+      const x2 = n.x + n.width / 2, y2 = n.y + n.height / 2
+      const strokeWidth = n.depth === 1 ? 6 : n.depth === 2 ? 4 : 3
+      return `<line x1="${r2(x1)}" y1="${r2(y1)}" x2="${r2(x2)}" y2="${r2(y2)}" stroke="${esc(pc(n))}" stroke-width="${strokeWidth}" stroke-linecap="round" opacity="0.9"/>`
+    }).join('')
+  }
 
   // Radial constellation: thin, same-handed curves from circle edge to circle edge,
   // identical to the canvas (EdgeLayer.tsx) so a card preview matches the opened map.
@@ -214,15 +232,12 @@ function renderEdges(nodes: MindmapNode[], type: DiagramType, lineStyle: LineSty
         }
         return false
       })
-      const above = descendants.length > 0 && descendants.some(n => n.y + n.height < spineY)
-      const l1SpineEdge = above ? l1.y : l1.y + l1.height
-      const farY = descendants.length > 0
-        ? above
-          ? Math.min(...descendants.map(n => n.y + n.height / 2))
-          : Math.max(...descendants.map(n => n.y + n.height / 2))
-        : l1SpineEdge
+      // Same as the canvas: the branch spans the topmost to the bottommost descendant.
+      const centres = descendants.map(n => n.y + n.height / 2)
+      const topY = Math.min(l1.y, ...centres)
+      const bottomY = Math.max(l1.y + l1.height, ...centres)
       if (descendants.length > 0) {
-        parts.push(`<line x1="${r2(branchX)}" y1="${r2(l1SpineEdge)}" x2="${r2(branchX)}" y2="${r2(farY)}" stroke="${esc(pc(l1))}" stroke-width="${edgeWidthForDepth(2)}" stroke-linecap="round"/>`)
+        parts.push(`<line x1="${r2(branchX)}" y1="${r2(topY)}" x2="${r2(branchX)}" y2="${r2(bottomY)}" stroke="${esc(pc(l1))}" stroke-width="${edgeWidthForDepth(2)}" stroke-linecap="round"/>`)
       }
       for (const n of descendants) {
         const nodeCY = n.y + n.height / 2
@@ -253,15 +268,26 @@ function renderEdges(nodes: MindmapNode[], type: DiagramType, lineStyle: LineSty
     const barX = l1LeftX - 60
     const sortedL1 = [...l1Nodes].sort((a, b) => a.y - b.y)
     const l1MidY = ((sortedL1[0].y + sortedL1[0].height / 2) + (sortedL1[sortedL1.length - 1].y + sortedL1[sortedL1.length - 1].height / 2)) / 2
-    parts.push(`<line x1="${r2(rootRightX)}" y1="${r2(l1MidY)}" x2="${r2(barX)}" y2="${r2(l1MidY)}" stroke="#1a1d2e" stroke-width="${edgeWidthForDepth(1)}" stroke-linecap="round"/>`)
-    l1Nodes.forEach((l1, i) => {
-      if (i === l1Nodes.length - 1) return
-      const nextL1 = l1Nodes[i + 1]
-      parts.push(`<line x1="${r2(barX)}" y1="${r2(l1.y + l1.height / 2)}" x2="${r2(barX)}" y2="${r2(nextL1.y + nextL1.height / 2)}" stroke="${esc(pc(l1))}" stroke-width="4" stroke-linecap="square"/>`)
-    })
+    // Same flush joinery as the canvas (EdgeLayer.tsx): one width, butt ends, the bar
+    // overruns the first and last stub by half a width in that stub's colour.
+    const w = edgeWidthForDepth(1)
+    const half = w / 2
+    const seg = (x1: number, y1: number, x2: number, y2: number, stroke: string) =>
+      `<line x1="${r2(x1)}" y1="${r2(y1)}" x2="${r2(x2)}" y2="${r2(y2)}" stroke="${esc(stroke)}" stroke-width="${w}" stroke-linecap="butt"/>`
+    parts.push(seg(rootRightX, l1MidY, barX - half, l1MidY, '#1a1d2e'))
+    if (sortedL1.length > 1) {
+      const firstL1 = sortedL1[0], lastL1 = sortedL1[sortedL1.length - 1]
+      parts.push(seg(barX, firstL1.y + firstL1.height / 2 - half, barX, firstL1.y + firstL1.height / 2 + 0.5, pc(firstL1)))
+      sortedL1.forEach((l1, i) => {
+        if (i === sortedL1.length - 1) return
+        const nextL1 = sortedL1[i + 1]
+        parts.push(seg(barX, l1.y + l1.height / 2, barX, nextL1.y + nextL1.height / 2 + 0.5, pc(l1)))
+      })
+      parts.push(seg(barX, lastL1.y + lastL1.height / 2, barX, lastL1.y + lastL1.height / 2 + half, pc(lastL1)))
+    }
     for (const l1 of l1Nodes) {
       const stubY = l1.y + l1.height / 2
-      parts.push(`<line x1="${r2(barX)}" y1="${r2(stubY)}" x2="${r2(l1.x)}" y2="${r2(stubY)}" stroke="${esc(pc(l1))}" stroke-width="${edgeWidthForDepth(1)}" stroke-linecap="round"/>`)
+      parts.push(seg(sortedL1.length > 1 ? barX + half - 0.5 : barX - half, stubY, l1.x, stubY, pc(l1)))
     }
   }
   for (const n of nodes) {
@@ -295,7 +321,7 @@ function centeredWrappedText(label: string, segments: LinkSegment[], cx: number,
   return `<text text-anchor="middle" font-size="${fontSize}" font-weight="${fontWeight}" fill="${esc(fill)}">${tspans}</text>`
 }
 
-function renderNode(node: MindmapNode, type: DiagramType, paletteColor: string | null, descendants = 0, rootCenter: { x: number; y: number } | null = null, neon = false, gloss = false): string {
+function renderNode(node: MindmapNode, type: DiagramType, paletteColor: string | null, descendants = 0, rootCenter: { x: number; y: number } | null = null, neon = false, gloss = false, combSize: CombSize = 'outward', hex: { style: CombStyle; radius: number; wall: string } | null = null): string {
   const isRoot = node.depth === 0
   const isL2Plus = node.depth >= 2
   const isFishboneNode = type === 'fishbone' && node.depth >= 1
@@ -303,17 +329,19 @@ function renderNode(node: MindmapNode, type: DiagramType, paletteColor: string |
   // with the label drawn outside it. An explicit per-node shape opts out.
   const isRadial = type === 'mindmap' && !isRoot && !node.shape
   const isRadialDot = isRadial && node.depth >= 3
+  // Honeycomb: every node (root included) is a pointy-top hexagon, node.shape ignored.
+  const isHex = type === 'honeycomb'
   const col = (isRoot ? null : paletteColor) ?? node.color
   const rx = isRoot ? 4 : 3
   // An explicit per-node shape overrides the diagram's own default geometry, exactly
   // as it does on the canvas (Node.tsx), so a card preview matches the opened map.
   const nodeShape = isRoot ? undefined : node.shape
-  const drawCircle = nodeShape === 'circle'
+  const drawCircle = !isHex && nodeShape === 'circle'
   const effectiveRx = isRoot ? rx
     : nodeShape ? shapeRx(nodeShape, node.height, rx)
     : isFishboneNode ? 0 : rx
 
-  const isRootPill = isRoot && type !== 'mindmap' && (
+  const isRootPill = isRoot && type !== 'mindmap' && type !== 'honeycomb' && (
     node.shape === 'pill' ? true :
     node.shape === 'circle' ? false :
     rootTitleNeedsPill(node.title, node.fontSize ?? ROOT_FONT)
@@ -321,7 +349,15 @@ function renderNode(node: MindmapNode, type: DiagramType, paletteColor: string |
 
   // Styling per depth (Node.tsx)
   let bg: string, textColor: string, strokeColor: string, strokeW: number
-  if (isRoot) {
+  if (isHex) {
+    // Same shared depth ladder as the canvas (src/lib/hex), for every depth
+    // including the root.
+    bg = hexFill(col, node.depth)
+    textColor = hexTextColor(node.depth)
+    const isMesh = hex?.style === 'mesh'
+    strokeColor = isMesh ? hex!.wall : isRoot ? '#1a1d2e' : darken(col, 0.25)
+    strokeW = isMesh ? 3 : isRoot ? 4 : 2
+  } else if (isRoot) {
     bg = '#1a1d2e'; textColor = '#ffffff'; strokeColor = '#1a1d2e'; strokeW = 5
   } else if (isL2Plus) {
     // Same shared depth ladder as the canvas (src/lib/color depthFill).
@@ -360,7 +396,7 @@ function renderNode(node: MindmapNode, type: DiagramType, paletteColor: string |
   const fontSize = isRootPill ? rootPillFontSize(node.title, baseFontSize) : baseFontSize
   const fontWeight = node.bold ? '700' : (isRoot ? '500' : node.depth === 1 ? '500' : '400')
 
-  const hasEmoji = !isRoot && !!node.emoji
+  const hasEmoji = (!isRoot || isHex) && !!node.emoji
   const hasIcon = !isRoot && !hasEmoji && !!node.icon
   const displayW = isRootPill ? rootPillWidth(node.title, baseFontSize)
     : (isRadial || drawCircle) ? Math.max(node.width, node.height)
@@ -377,7 +413,11 @@ function renderNode(node: MindmapNode, type: DiagramType, paletteColor: string |
   const parts: string[] = []
 
   // ── Shape ──
-  if (isRoot) {
+  if (isHex) {
+    const hexR = hex?.radius ?? hexCellLayout(node, combSize).r
+    const pts = hexPoints(cx, cy, hexR)
+    parts.push(`<polygon points="${pts}" fill="${esc(bg)}" stroke="${esc(strokeColor)}" stroke-width="${strokeW}" stroke-linejoin="round"/>`)
+  } else if (isRoot) {
     if (isRootPill) {
       parts.push(`<rect x="0" y="0" width="${r2(displayW)}" height="${r2(h)}" rx="${r2(h / 2)}" ry="${r2(h / 2)}" fill="${esc(bg)}" stroke="${esc(strokeColor)}" stroke-width="${strokeW}"/>`)
     } else {
@@ -451,7 +491,34 @@ function renderNode(node: MindmapNode, type: DiagramType, paletteColor: string |
 
   // ── Label + badge ──
   const skOff = isFishboneNode ? (h * 0.35) / 2 : 0
-  if (isRadial) {
+  if (isHex) {
+    // The label lives INSIDE the cell, same as the canvas (Node.tsx) - no external
+    // label box, no markdown link anchors. The server always draws the subtree
+    // count for depth 1 (it has no showChildCount toggle).
+    parts.push(`<title>${esc(label)}</title>`)
+    const cell = hexCellLayout(node, combSize)
+    const iconSize = cell.glyph
+    const iconCY = cy + cell.glyphDy
+    const titleFontSize = cell.font
+    const titleLines = cell.lines
+    const titleWeight = isRoot ? '700' : node.depth === 1 ? '600' : '500'
+    const lineH = cell.lineH
+    const firstLineY = cy + cell.firstLineDy
+    if (hasEmoji) {
+      parts.push(`<text x="${r2(cx)}" y="${r2(iconCY + iconSize * 0.36)}" text-anchor="middle" font-size="${r2(iconSize)}">${esc(node.emoji)}</text>`)
+    } else if (hasIcon) {
+      // No icon library server-side: a neutral ring stands in for the lucide glyph.
+      parts.push(`<circle cx="${r2(cx)}" cy="${r2(iconCY)}" r="${r2(iconSize / 2.4)}" fill="none" stroke="${esc(textColor)}" stroke-width="2"/>`)
+    }
+    const titleTspans = titleLines.map((line, i) =>
+      `<tspan x="${r2(cx)}" y="${r2(firstLineY + i * lineH)}">${esc(line)}</tspan>`).join('')
+    parts.push(`<text text-anchor="middle" font-size="${titleFontSize}" font-weight="${titleWeight}" fill="${esc(textColor)}">${titleTspans}</text>`)
+    if (node.depth === 1 && descendants > 0) {
+      const countFontSize = hexFontSize(1, combSize) - 2
+      const countY = cy + cell.countDy
+      parts.push(`<text x="${r2(cx)}" y="${r2(countY)}" text-anchor="middle" font-size="${countFontSize}" font-weight="600" fill="${esc(textColor)}">${descendants}</text>`)
+    }
+  } else if (isRadial) {
     // Same three bands the canvas draws, from the same helper the layout reserved
     // room with: the initial inside the circle, the name and subtree size under a
     // depth-1 circle, the name pointing OUTWARD from a depth-2 one, and nothing
@@ -550,8 +617,31 @@ export function renderMindmapSvg(row: MindmapRow): string {
   const rootNode = nodes.find(n => n.parentId === null)
   const rootCenter = rootNode ? { x: rootNode.x + rootNode.width / 2, y: rootNode.y + rootNode.height / 2 } : null
   const gloss = rootNode?.gloss === true
+  const combSize = combSizeOf(nodes)
+  const combStyle = combStyleOf(nodes)
+  const parentsById = new Map(nodes.map(n => [n.id, n]))
   const nodeMarkup = nodes.map(n =>
-    renderNode(n, type, paletteColors.get(n.id) ?? null, descendantCounts.get(n.id) ?? 0, rootCenter, neon, gloss)).join('')
+    renderNode(n, type, paletteColors.get(n.id) ?? null, descendantCounts.get(n.id) ?? 0, rootCenter, neon, gloss, combSize,
+      type === 'honeycomb' ? { style: combStyle, radius: drawnCellRadius(n, nodes, combStyle, combSize), wall: theme.canvasBg } : null)).join('')
+  // Mesh doorways above every cell, exactly as DiagramCanvas layers them.
+  const doorMarkup = type === 'honeycomb' && combStyle === 'mesh' ? nodes.map(n => {
+    const p = n.parentId ? parentsById.get(n.parentId) : undefined
+    if (!p) return ''
+    const r = drawnCellRadius(n, nodes, combStyle, combSize)
+    const door = hexDoorEdge(n.x + n.width / 2, n.y + n.height / 2, r, p.x + p.width / 2, p.y + p.height / 2)
+    const base = pc(n)
+    const doorColor = base.startsWith('#') ? darken(base, 0.35) : base
+    return door ? `<polyline points="${door}" fill="none" stroke="${esc(doorColor)}" stroke-width="5" stroke-linecap="butt"/>` : ''
+  }).join('') : ''
+  // Mesh group outlines above the doors, deeper groups first so the topic line stays on top.
+  const groupMarkup = type === 'honeycomb' && combStyle === 'mesh'
+    ? meshGroupOutlines(nodes, meshCellRadius(nodes, combSize)).sort((a, b) => b.depth - a.depth).map(g => {
+        const parent = parentsById.get(g.parentId)
+        const base = parent ? pc(parent) : '#1a1d2e'
+        const color = g.depth === 0 ? '#1a1d2e' : base.startsWith('#') ? darken(base, 0.45) : base
+        return `<path d="${g.d}" fill="none" stroke="${esc(color)}" stroke-width="${g.depth <= 1 ? 7 : 3.5}" stroke-linecap="round" stroke-linejoin="round"/>`
+      }).join('')
+    : ''
   // One blur filter for every glow in the map: the radial mind map's soft coloured
   // halo. Defined once so a 200-node map carries one filter, not 200. On a dark
   // canvas that becomes one two-layer neon filter per distinct circle size, plus the
@@ -589,5 +679,5 @@ export function renderMindmapSvg(row: MindmapRow): string {
     `<title>${esc(row.name)}</title>` +
     defs +
     `<rect x="${r2(minX)}" y="${r2(minY)}" width="${w}" height="${hgt}" fill="${theme.canvasBg}"/>` +
-    `<g>${edges}</g><g>${nodeMarkup}</g></svg>`
+    `<g>${edges}</g><g>${nodeMarkup}</g><g>${doorMarkup}</g><g>${groupMarkup}</g></svg>`
 }

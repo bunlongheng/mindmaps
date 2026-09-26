@@ -28,7 +28,7 @@ import { z } from 'zod'
 const APP_URL = (process.env.MINDMAP_APP_URL || 'https://mindmaps-bheng.vercel.app').replace(/\/$/, '')
 const SECRET = process.env.MINDMAPS_API_SECRET || process.env.MINDMAP_AI_API_KEY
 const OWNER_ID = process.env.MINDMAP_USER_ID || '731ace87-64e5-44db-bf2a-82265f06f4d9'
-const VALID_TYPES = ['logic-chart', 'mindmap', 'fishbone', 'timeline']
+const VALID_TYPES = ['logic-chart', 'mindmap', 'fishbone', 'timeline', 'honeycomb']
 
 const ok = obj => ({ content: [{ type: 'text', text: JSON.stringify(obj, null, 2) }] })
 const fail = msg => ({ isError: true, content: [{ type: 'text', text: msg }] })
@@ -62,7 +62,7 @@ server.registerTool(
     inputSchema: {
       title: z.string().describe('The map title / root label, e.g. "Machine Learning"'),
       outline: z.string().describe('JSON-string outline (categories with items, optional per-category "icon") OR indented text. Omit for an empty root.').optional(),
-      type: z.enum(VALID_TYPES).optional().describe('Layout (default logic-chart). "top 10"-style flat lists read well as logic-chart/mindmap.'),
+      type: z.enum(VALID_TYPES).optional().describe('Layout. Leave it out for logic-chart, the default for every map. Only pass mindmap, honeycomb, fishbone or timeline when the person explicitly asked for that layout by name.'),
       sharing: z.boolean().optional().describe('Make the map readable by URL without auth (default true so the link opens for anyone).'),
       colors: z.array(z.string()).optional().describe('Optional hex colors to override the branch palette.'),
       format: z.enum(['svg']).optional().describe('Pass "svg" to also return the rendered map as an inline self-contained SVG string.'),
@@ -98,7 +98,8 @@ server.registerTool(
       'outline is a JSON string OR indented text (2 spaces per level), auto-detected.',
       'JSON form: { "Root": [ { "icon": "brain", "Category A": ["item 1","item 2"] }, { "Category B": ["item 3"] } ] }. "icon" is optional per category.',
       'Indented form: the first line is the root; each 2-space indent is one level deeper.',
-      `type is one of: ${VALID_TYPES.join(', ')} (default logic-chart). Unknown types fall back to logic-chart.`,
+      `type is one of: ${VALID_TYPES.join(', ')}. Default logic-chart: omit type unless the person explicitly asked for another layout by name. Never choose mindmap, honeycomb, fishbone or timeline on your own. Unknown types fall back to logic-chart.`,
+      'honeycomb: hexagon cells clustered around their parent.',
       '"top 10 X" / "5 best Y" phrasing → a flat list of items; "break down X by category" → categorized branches.',
       'A node may carry "shape": one of rect, rounded, pill, circle. Omit it to keep the diagram\'s default box.',
       'Node text may carry links: markdown [label](https://...) or a bare https:// url renders as a clickable anchor. Only http/https is linked; bare ticket keys are not.',

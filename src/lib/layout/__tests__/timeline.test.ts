@@ -78,17 +78,22 @@ describe('computeTimelineLayout', () => {
     expect(c.x).toBeGreaterThan(b.x)
   })
 
-  it('stacks L2 nodes away from the spine (above column goes up)', () => {
+  it('splits a topic with 2 or more blocks across the spine: first half stacks up, the rest stack down', () => {
     const out = computeTimelineLayout([
       node({ id: 'root', depth: 0 }),
-      node({ id: 'l1', parentId: 'root', depth: 1, sortOrder: 0 }), // even -> above
+      node({ id: 'l1', parentId: 'root', depth: 1, sortOrder: 0 }),
       node({ id: 'l2a', parentId: 'l1', depth: 2, sortOrder: 0 }),
       node({ id: 'l2b', parentId: 'l1', depth: 2, sortOrder: 1 }),
+      node({ id: 'l2c', parentId: 'l1', depth: 2, sortOrder: 2 }),
     ])
     const a = byId(out, 'l2a')
     const b = byId(out, 'l2b')
-    // farther stacked node (j=1) is higher up (smaller y) when above
+    const c = byId(out, 'l2c')
+    const SPINE_Y = 400
+    // a and b above the spine, b further up; c below it
+    expect(a.y + a.height / 2).toBeLessThan(SPINE_Y)
     expect(b.y).toBeLessThan(a.y)
+    expect(c.y + c.height / 2).toBeGreaterThan(SPINE_Y)
   })
 
   it('stacks L2 nodes downward when below the spine', () => {
@@ -123,8 +128,8 @@ describe('computeTimelineLayout', () => {
     // above: L3 goes further up than its L2
     expect(a3a.y).toBeLessThan(a2.y)
     expect(a3b.y).toBeLessThan(a3a.y)
-    // share the same x column as their L2 sibling chain
-    expect(a3a.x).toBe(a2.x)
+    // L3s step in once more than their L2
+    expect(a3a.x).toBe(a2.x + 48)
 
     const b2 = byId(out, 'b2')
     const b3a = byId(out, 'b3a')
