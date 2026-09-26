@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { Lock } from 'lucide-react'
 import { renderMindmapSvg } from '../../lib/render-svg'
 import type { Diagram } from '../../types'
 import { SocialFooter } from './SocialFooter'
@@ -48,9 +49,20 @@ export function ViewerPage({ diagram, id }: { diagram: Diagram | null; id: strin
         padding: '0 20px', background: '#fff', borderBottom: '1px solid #e5e7eb',
         position: 'sticky', top: 0, zIndex: 10,
       }}>
-        <a href="/" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none' }}>
-          <Wordmark size={28} />
-        </a>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <a href="/" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none' }}>
+            <Wordmark size={28} />
+          </a>
+          {diagram.locked && (
+            <span style={{
+              display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 700,
+              color: '#92400e', background: '#fef3c7', border: '1px solid #f59e0b',
+              borderRadius: 999, padding: '3px 9px',
+            }}>
+              <Lock size={11} /> Locked
+            </span>
+          )}
+        </div>
         {id && (
           <a href={`/api/mindmaps?id=${id}&format=svg`} style={{ fontSize: 13, fontWeight: 600, color: '#4b5563', textDecoration: 'none' }}>
             Download SVG

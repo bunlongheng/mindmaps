@@ -44,6 +44,7 @@ export interface Diagram {
   showOrderNumbers?: boolean
   themeId?: string
   tags?: string[]
+  locked?: boolean
 }
 
 export interface DiagramMeta {
@@ -53,4 +54,5 @@ export interface DiagramMeta {
   updatedAt: string
   isPublic?: boolean
   tags?: string[]
+  locked?: boolean
 }

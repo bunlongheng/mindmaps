@@ -152,6 +152,7 @@ interface MindmapStore {
   rerunLayout: () => void
   setShareEnabled: (enabled: boolean) => void
   setMapTags: (tags: string[]) => void
+  setMapLocked: (id: string, locked: boolean) => void
   setShowOrderNumbers: (v: boolean) => void
   setShowChildCount: (v: boolean) => void
   setHideDetails: (v: boolean) => void
@@ -635,6 +636,17 @@ export const useMindmapStore = create<MindmapStore>()(
         activeMindmap: { ...state.activeMindmap, tags },
         diagrams: state.diagrams.map(d => d.id === state.activeMindmap!.id ? { ...d, tags } : d),
         isDirty: true,
+      })
+    },
+
+    // Reflects a lock/unlock already confirmed by the PATCH /api/mindmaps response - not
+    // undo-tracked content, so no snapshotHistory/isDirty (that would re-trigger the
+    // content autosave for a field the server already has).
+    setMapLocked: (id, locked) => {
+      const state = get()
+      set({
+        diagrams: state.diagrams.map(d => d.id === id ? { ...d, locked } : d),
+        activeMindmap: state.activeMindmap?.id === id ? { ...state.activeMindmap, locked } : state.activeMindmap,
       })
     },
 

@@ -438,6 +438,16 @@ describe('DiagramCanvas — readOnly', () => {
     // no resize handle in readonly
     expect(container.querySelector('g[style*="ew-resize"]')).toBeFalsy()
   })
+
+  it('disables editing controls on a locked map even when readOnly is not passed', () => {
+    loadStore([makeRoot(), makeNode()])
+    act(() => { useMindmapStore.setState({ activeMindmap: { ...useMindmapStore.getState().activeMindmap!, locked: true } }) })
+    const { container } = renderCanvas({ readOnly: false })
+    expect(container.querySelector('[data-node-id="n1"]')).toBeTruthy()
+    // Same effect as readOnly: the resize handle is gone because locked forces
+    // effectiveReadOnly, same as the app's own editing-disabled state.
+    expect(container.querySelector('g[style*="ew-resize"]')).toBeFalsy()
+  })
 })
 
 describe('DiagramCanvas — fit view', () => {

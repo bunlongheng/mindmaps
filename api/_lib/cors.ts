@@ -5,7 +5,7 @@ const ALLOWED = new Set(
 )
 const DEFAULT_ORIGIN = 'https://mindmaps-bheng.vercel.app'
 
-export function corsHeaders(origin: string | null | undefined, methods = 'GET, POST, PUT, DELETE, OPTIONS') {
+export function corsHeaders(origin: string | null | undefined, methods = 'GET, POST, PUT, PATCH, DELETE, OPTIONS') {
   const allow = origin && ALLOWED.has(origin) ? origin : DEFAULT_ORIGIN
   return {
     'Access-Control-Allow-Origin': allow,

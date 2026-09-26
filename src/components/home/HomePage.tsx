@@ -7,6 +7,7 @@ import { showToast } from '../CuteToast'
 import type { DiagramMeta, MindmapNode } from '../../types'
 import { Plus, Search, Trash2, LayoutGrid, List, Globe, Sparkles, Loader2, Tag, X, Bot, Briefcase, User, BookOpen, Zap, GraduationCap, FlaskConical, Beaker, FileInput, type LucideIcon } from 'lucide-react'
 import { ImportModal } from '../modals/ImportModal'
+import { LockToggle } from '../LockToggle'
 import { MindmapsLogo } from '../MindmapsLogo'
 import { getTheme } from '../../lib/themes'
 import { renderMindmapSvg } from '../../lib/render-svg'
@@ -60,7 +61,7 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
   // Shallow-selected slice so the home page only re-renders when the list changes,
   // not on every store write (canvas drags, resizePreview, HUD flags, etc.).
   const { diagrams } = useMindmapStore(useShallow(s => ({ diagrams: s.diagrams })))
-  const { loadDiagramList, createDiagram, createDiagramFromNodes, deleteDiagram, updateTags } = useDiagram(user?.userId ?? null)
+  const { loadDiagramList, createDiagram, createDiagramFromNodes, deleteDiagram, updateTags, toggleLock } = useDiagram(user?.userId ?? null)
   const isMobile = useIsMobile()
 
   // Compute a unique color per tag (sorted alphabetically → palette index)
@@ -526,6 +527,7 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
                     onOpen={() => onOpen(d.id)} onDelete={() => setDeleteTarget(d)}
                     isPublic={d.isPublic} tags={d.tags} tagColorMap={tagColorMap}
                     onTagEdit={() => { setTagModalId(d.id) }}
+                    onToggleLock={() => { toggleLock(d.id, !d.locked) }}
                     flash={flashId === d.id}
                     hideTag={activeTag}
                     eager={i < EAGER_PREVIEWS}
@@ -540,6 +542,7 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
                     onOpen={() => onOpen(d.id)} onDelete={() => setDeleteTarget(d)}
                     isPublic={d.isPublic} tags={d.tags} tagColorMap={tagColorMap}
                     onTagEdit={() => { setTagModalId(d.id) }}
+                    onToggleLock={() => { toggleLock(d.id, !d.locked) }}
                     flash={flashId === d.id}
                     hideTag={activeTag}
                     eager={i < EAGER_PREVIEWS}
@@ -710,16 +713,21 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
             background: '#fff', borderRadius: 16, padding: 24, width: 320,
             boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
           }} onClick={e => e.stopPropagation()}>
-            <h3 id="delete-confirm-title" style={{ fontSize: 15, fontWeight: 700, color: '#1e293b', marginBottom: 8 }}>Delete map?</h3>
+            <h3 id="delete-confirm-title" style={{ fontSize: 15, fontWeight: 700, color: '#1e293b', marginBottom: 8 }}>
+              {deleteTarget.locked ? 'Map is locked' : 'Delete map?'}
+            </h3>
             <p style={{ fontSize: 13, color: '#64748b', marginBottom: 20 }}>
-              "<strong>{deleteTarget.name}</strong>" will be permanently deleted.
+              {deleteTarget.locked
+                ? <>"<strong>{deleteTarget.name}</strong>" is linked from a README or Confluence page. Unlock it first to delete it.</>
+                : <>"<strong>{deleteTarget.name}</strong>" will be permanently deleted.</>}
             </p>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button onClick={() => setDeleteTarget(null)} style={{
                 padding: '8px 16px', border: '1px solid #e2e8f0', borderRadius: 9,
                 background: '#fff', cursor: 'pointer', fontSize: 13, fontFamily: 'inherit', color: '#64748b',
-              }}>Cancel</button>
-              <button onClick={() => {
+              }}>{deleteTarget.locked ? 'OK' : 'Cancel'}</button>
+              <button disabled={deleteTarget.locked} onClick={() => {
+                if (deleteTarget.locked) return
                 // Two red blinks on the card, then it comes apart where it sits.
                 const { id, name } = deleteTarget
                 const card = document.querySelector(`[data-map-id="${id}"]`)
@@ -732,8 +740,8 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
                 if (wait) setTimeout(go, wait); else go()
                 setDeleteTarget(null)
               }} style={{
-                padding: '8px 18px', background: '#ef4444', color: '#fff',
-                border: 'none', borderRadius: 9, cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
+                padding: '8px 18px', background: deleteTarget.locked ? '#fca5a5' : '#ef4444', color: '#fff',
+                border: 'none', borderRadius: 9, cursor: deleteTarget.locked ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
               }}>Delete</button>
             </div>
           </div>
@@ -1132,10 +1140,10 @@ function DiagramMinimap({ id, name, type, eager }: { id: string; name: string; t
 
 // ── DiagramCard ────────────────────────────────────────────────────────────
 
-function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isPublic, onTagEdit, flash, eager }: {
+function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isPublic, onTagEdit, onToggleLock, flash, eager }: {
   diagram: DiagramMeta; timeAgo: string; onOpen: () => void; onDelete: () => void
   isPublic?: boolean; tags?: string[]
-  tagColorMap: Map<string, string>; onTagEdit: () => void; flash?: boolean
+  tagColorMap: Map<string, string>; onTagEdit: () => void; onToggleLock: () => void; flash?: boolean
   hideTag?: string | null; eager: boolean
 }) {
   const [hovered, setHovered] = useState(false)
@@ -1197,6 +1205,10 @@ function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isPublic, onTagEdit, 
             </button>
           </>
         )}
+        {/* A locked map wears its padlock at all times, so anyone can tell without hovering. */}
+        {(hovered || diagram.locked) && (
+          <LockToggle locked={diagram.locked} onToggle={onToggleLock} name={diagram.name} />
+        )}
       </div>
     </div>
   )
@@ -1204,10 +1216,10 @@ function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isPublic, onTagEdit, 
 
 // ── DiagramRow (list view) ───────────────────────────────────────────────────
 
-function DiagramRow({ diagram, timeAgo, onOpen, onDelete, isPublic, onTagEdit, flash, eager }: {
+function DiagramRow({ diagram, timeAgo, onOpen, onDelete, isPublic, onTagEdit, onToggleLock, flash, eager }: {
   diagram: DiagramMeta; timeAgo: string; onOpen: () => void; onDelete: () => void
   isPublic?: boolean; tags?: string[]
-  tagColorMap: Map<string, string>; onTagEdit: () => void; flash?: boolean
+  tagColorMap: Map<string, string>; onTagEdit: () => void; onToggleLock: () => void; flash?: boolean
   hideTag?: string | null; eager: boolean
 }) {
   const [hovered, setHovered] = useState(false)
@@ -1253,7 +1265,7 @@ function DiagramRow({ diagram, timeAgo, onOpen, onDelete, isPublic, onTagEdit, f
       <div style={{ fontSize: 11, color: '#94a3b8', flexShrink: 0, whiteSpace: 'nowrap' }}>{timeAgo}</div>
 
       {/* Actions (reserve width so the row doesn't shift on hover) */}
-      <div style={{ display: 'flex', gap: 6, flexShrink: 0, width: 62, justifyContent: 'flex-end' }}>
+      <div style={{ display: 'flex', gap: 6, flexShrink: 0, width: 96, justifyContent: 'flex-end' }}>
         {hovered && (
           <>
             <button onClick={e => { e.stopPropagation(); onTagEdit() }} title="Edit tags" aria-label={`Edit tags for ${diagram.name}`}
@@ -1265,6 +1277,9 @@ function DiagramRow({ diagram, timeAgo, onOpen, onDelete, isPublic, onTagEdit, f
               <Trash2 size={13} />
             </button>
           </>
+        )}
+        {(hovered || diagram.locked) && (
+          <LockToggle locked={diagram.locked} onToggle={onToggleLock} name={diagram.name} style={{ position: 'static' }} />
         )}
       </div>
     </div>
