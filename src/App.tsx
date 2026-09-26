@@ -15,6 +15,7 @@ import { readSession, saveSession, clearSession, SESSION_EXPIRED } from './lib/s
 import { emberVanish, damageFlash } from './lib/emberVanish'
 import { ArrowLeft, SlidersHorizontal, Tag, FileDown, Network, Share2, Sparkles, GitBranch, Lightbulb, Workflow, ListTree, Waypoints, Image as ImageIcon } from 'lucide-react'
 import { Confetti } from './components/Confetti'
+import { LockedBanner } from './components/LockedBanner'
 import { MindmapsLogo } from './components/MindmapsLogo'
 import { ViewerPage } from './components/viewer/ViewerPage'
 
@@ -216,7 +217,10 @@ export default function App() {
 
 
   useEffect(() => {
-    if (!isDirty || !activeMindmap) return
+    // Belt-and-suspenders: the canvas already disables editing when locked (see
+    // DiagramCanvas's effectiveReadOnly), so isDirty shouldn't go true, but never
+    // autosave a locked map's content regardless - the server would 423 it anyway.
+    if (!isDirty || !activeMindmap || activeMindmap.locked) return
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
     saveTimerRef.current = setTimeout(() => saveDiagram(activeMindmap), 1500)
     return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current) }
@@ -415,6 +419,7 @@ export default function App() {
   return (
     <div style={{ display: 'flex', height: '100vh', width: '100vw', overflow: 'hidden', fontFamily: 'Inter, system-ui, sans-serif', touchAction: 'pan-x pan-y' }}>
       <CuteToast />
+      {activeMindmap?.locked && <LockedBanner />}
       {/* Confetti on first load after AI generation */}
       {showConfetti && (
         <Confetti count={confettiCount} onDone={() => {

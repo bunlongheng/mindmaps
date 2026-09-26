@@ -109,6 +109,7 @@ function rowToDiagram(row: Record<string, unknown>): Diagram {
     sharingEnabled: (row.sharing_enabled ?? false) as boolean,
     themeId:        (row.theme_id as string | undefined) ?? 'default',
     tags:           (row.tags as string[] | undefined) ?? [],
+    locked:         (row.locked ?? false) as boolean,
     nodes,
   }
 }
@@ -138,6 +139,7 @@ export function useDiagram(userId: string | null = null) {
         updatedAt: d.updated_at as string,
         isPublic: (d.sharing_enabled ?? false) as boolean,
         tags: (d.tags as string[]) ?? [],
+        locked: (d.locked ?? false) as boolean,
       }))
       setDiagrams(list)
     } catch {
@@ -323,5 +325,34 @@ export function useDiagram(userId: string | null = null) {
     }
   }, [setDiagrams, userId])
 
-  return { loadDiagramList, loadDiagram, saveDiagram, createDiagram, createDiagramFromNodes, deleteDiagram, updateTags }
+  // Owner-session only in practice: authHeaders() sends the signed session token set at
+  // login, never the static AI/agent Bearer key, so a locked-embedded diagram can only be
+  // unlocked from this app while signed in as the owner. Unlike deleteDiagram, this does
+  // NOT update local state until the server confirms - a locked toggle that silently
+  // failed must not appear to have worked.
+  const toggleLock = useCallback(async (id: string, locked: boolean): Promise<boolean> => {
+    if (!userId) return false
+    try {
+      const res = await fetch(`${API_BASE}?id=${id}`, {
+        method: 'PATCH',
+        headers: authHeaders(),
+        body: JSON.stringify({ locked }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        showToast(data?.detail ?? data?.error ?? `Could not ${locked ? 'lock' : 'unlock'} the map`, { color: '#f59e0b' })
+        return false
+      }
+      useMindmapStore.getState().setMapLocked(id, locked)
+      const cached = lsGetDiagram(id)
+      if (cached) lsSaveDiagram({ ...cached, locked })
+      showToast(locked ? 'Map locked' : 'Map unlocked', { color: '#1a1d2e' })
+      return true
+    } catch {
+      showToast('Network error - lock not changed', { color: '#f59e0b' })
+      return false
+    }
+  }, [userId])
+
+  return { loadDiagramList, loadDiagram, saveDiagram, createDiagram, createDiagramFromNodes, deleteDiagram, updateTags, toggleLock }
 }

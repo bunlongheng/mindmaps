@@ -31,6 +31,9 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract }: DiagramCan
       reorderNode: s.reorderNode, isImporting: s.isImporting, hideDetails: s.hideDetails,
     })),
   )
+  // A locked map (embedded outside the app - README, Confluence, the demo wall) is
+  // read-only the same way a touch device is: reuse the existing readOnly wiring.
+  const effectiveReadOnly = readOnly || (activeMindmap?.locked ?? false)
   const counts = useMemo(() => computeSubtreeCounts(activeMindmap?.nodes ?? []), [activeMindmap?.nodes])
   // "Outward" in a radial mind map is measured from the root, so every Node needs the
   // root's centre. Resolved once here rather than by an O(n) find inside each node.
@@ -143,7 +146,7 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract }: DiagramCan
   }, [activeMindmap, diagramType, applyTransform])
 
   // The shared view-only page fits the whole map; the editor opens at 100% on the root.
-  const fitView = readOnly ? fitToContent : anchorRoot
+  const fitView = effectiveReadOnly ? fitToContent : anchorRoot
 
   // Cmd+0 / Ctrl+0 fits the whole map, in the editor and on the shared page alike.
   useEffect(() => {
@@ -520,7 +523,7 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract }: DiagramCan
               onRootDragOffset={handleRootDragOffset}
               onDoubleClick={n => { setSelectedNodeIds([n.id]); onNodeSelect(n.id) }}
               svgRef={svgRef}
-              readOnly={readOnly}
+              readOnly={effectiveReadOnly}
               noInteract={noInteract}
               l1Colors={node.depth === 0 ? activeMindmap.nodes.filter(n => n.depth === 1).map(n => n.color) : undefined}
               paletteColor={paletteColors.get(node.id) ?? null}
