@@ -446,7 +446,7 @@ export default function App() {
 
         {/* Back button — top left */}
         <button onClick={handleBack} title="All maps" style={{
-          position: 'fixed', top: 14, left: 14, zIndex: 20,
+          position: 'fixed', top: activeMindmap?.locked ? 58 : 14, left: 14, zIndex: 20,
           width: isMobile ? 48 : 36, height: isMobile ? 48 : 36, borderRadius: isMobile ? 14 : 10,
           background: '#fff', border: '1px solid #e2e8f0',
           boxShadow: '0 2px 10px rgba(0,0,0,0.07)',
@@ -464,7 +464,7 @@ export default function App() {
           onClick={() => setShowPanel(p => !p)}
           title="Settings"
           style={{
-            position: 'fixed', top: 14, right: 14, zIndex: 20,
+            position: 'fixed', top: activeMindmap?.locked ? 58 : 14, right: 14, zIndex: 20,
             width: isMobile ? 48 : undefined,
             height: isMobile ? 48 : 36,
             padding: isMobile ? 0 : '0 14px',

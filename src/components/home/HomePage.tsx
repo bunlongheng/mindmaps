@@ -1214,8 +1214,11 @@ function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isPublic, tags, tagCo
               style={{ position: 'absolute', top: 8, right: 8, width: 28, height: 28, borderRadius: 8, border: '1px solid #fecaca', background: 'rgba(255,255,255,0.92)', cursor: 'pointer', color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(8px)' }}>
               <Trash2 size={13} />
             </button>
-            <LockToggle locked={diagram.locked} onToggle={onToggleLock} name={diagram.name} />
           </>
+        )}
+        {/* A locked map wears its padlock at all times, so anyone can tell without hovering. */}
+        {(hovered || diagram.locked) && (
+          <LockToggle locked={diagram.locked} onToggle={onToggleLock} name={diagram.name} />
         )}
       </div>
     </div>
@@ -1295,8 +1298,10 @@ function DiagramRow({ diagram, timeAgo, onOpen, onDelete, isPublic, tags, tagCol
               style={{ width: 28, height: 28, borderRadius: 8, border: '1px solid #fecaca', background: '#fff', cursor: 'pointer', color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Trash2 size={13} />
             </button>
-            <LockToggle locked={diagram.locked} onToggle={onToggleLock} name={diagram.name} style={{ position: 'static' }} />
           </>
+        )}
+        {(hovered || diagram.locked) && (
+          <LockToggle locked={diagram.locked} onToggle={onToggleLock} name={diagram.name} style={{ position: 'static' }} />
         )}
       </div>
     </div>
