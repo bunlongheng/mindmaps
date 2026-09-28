@@ -729,6 +729,24 @@ export function SidePanel({ nodeId, onClose, onDelete, onUpdateTags }: SidePanel
               </button>
             </div>
 
+            {/* Link preview, same as Flows: the exact 1200x630 card Slack, iMessage
+                and X render for this link, with the URL under it. Keyed on the
+                toggle: the card fetched while the map was private is the generic
+                one, and it must reload the instant the link goes active. */}
+            {activeMindmap && (
+              <div style={{ margin: '12px 0 4px' }}>
+                <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#6b7280', marginBottom: 6 }}>Link preview</div>
+                <img
+                  src={`/api/og-image?id=${encodeURIComponent(activeMindmap.id)}&v=${activeMindmap.sharingEnabled ? 'public' : 'private'}`}
+                  alt="Share card preview"
+                  width={208} height={109}
+                  style={{ width: '100%', height: 'auto', display: 'block', borderRadius: 8, border: '1px solid #e0e2e7', background: '#fff' }}
+                  onError={e => { e.currentTarget.style.display = 'none' }}
+                />
+                <div data-testid="share-url" style={{ fontSize: 10, color: '#6b7280', marginTop: 6, wordBreak: 'break-all', lineHeight: 1.4 }}>{shareUrl}</div>
+              </div>
+            )}
+
             {/* QR + copy - always visible */}
             <div style={{ display: 'flex', justifyContent: 'center', margin: '10px 0 8px' }}>
               <QRCodeSVG value={shareUrl} size={160} bgColor="#ffffff" fgColor="#1a1d2e" level="M" />
