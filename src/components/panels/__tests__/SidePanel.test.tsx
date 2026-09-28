@@ -788,6 +788,18 @@ describe('SidePanel — Share tab', () => {
     expect(screen.getByText('Link disabled')).toBeInTheDocument()
   })
 
+  it('shows the link preview card and the share URL, keyed on the toggle so it reloads once public', () => {
+    loadDiagram()
+    render(<SidePanel nodeId={null} onClose={vi.fn()} />)
+    fireEvent.click(screen.getByText('Share'))
+    expect(screen.getByText('Link preview')).toBeInTheDocument()
+    expect(screen.getByTestId('share-url')).toHaveTextContent(`${window.location.origin}/s/d1`)
+    const img = screen.getByAltText('Share card preview') as HTMLImageElement
+    expect(img.getAttribute('src')).toBe('/api/og-image?id=d1&v=private')
+    fireEvent.click(screen.getByText('Link disabled').parentElement!.querySelector('button')!)
+    expect(img.getAttribute('src')).toBe('/api/og-image?id=d1&v=public')
+  })
+
   it('copies the share link', async () => {
     loadDiagram()
     render(<SidePanel nodeId={null} onClose={vi.fn()} />)
