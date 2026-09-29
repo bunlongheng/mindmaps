@@ -15,6 +15,7 @@ import { authHeaders } from '../../hooks/useDiagram'
 import { levelCounts } from '../../lib/nodeCounts'
 import type { DiagramType, Diagram, DiagramMeta } from '../../types'
 import type { NodeShape } from '../../lib/nodeShape'
+import { rootIsPill } from '../../lib/rootPill'
 import { QRCodeSVG } from 'qrcode.react'
 import { LinePicker } from './LinePicker'
 
@@ -481,7 +482,9 @@ export function SidePanel({ nodeId, onClose, onDelete, onUpdateTags }: SidePanel
                         </svg>
                       )},
                     ]).map(({ value, label, icon }) => {
-                      const currentShape = node.shape ?? (node.title.length >= 15 || node.width !== node.height ? 'pill' : 'circle')
+                      // Same predicate the canvas and both renderers use, so the
+                      // picker shows the shape actually drawn (src/lib/rootPill).
+                      const currentShape = rootIsPill(node, diagramType) ? 'pill' : 'circle'
                       const active = currentShape === value
                       const c = active ? '#3b82f6' : '#64748b'
                       return (

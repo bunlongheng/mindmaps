@@ -25,7 +25,7 @@ import { LABEL_TEXT, timelineSubFill, timelineSubText,
   NEON_TEXT_FILTER, NEON_TEXT_MUTED, NEON_TEXT_MUTED_OPACITY,
 } from './color.js'
 import { computeBranchColors } from './branchColor.js'
-import { rootPillWidth, rootPillFontSize, rootTitleNeedsPill, ROOT_FONT } from './rootPill.js'
+import { rootPillWidth, rootPillFontSize, rootIsPill, ROOT_FONT } from './rootPill.js'
 import { nodeMetrics, ICON_GAP } from './nodeMetrics.js'
 import { normalizeWidthsPerDepth } from './widthNormalize.js'
 import { shapeRx } from './nodeShape.js'
@@ -82,8 +82,7 @@ function layoutForRender(raw: MindmapNode[], type: DiagramType): MindmapNode[] {
         ? { ...n, height: 0, manuallyPositioned: false }
         : { ...n, width: 0, height: 0, manuallyPositioned: false }
     }
-    const isPill = parseLinkedTitle(n.title).text.length >= 15 || n.width !== n.height
-    if (isPill) return { ...n, width: rootPillWidth(n.title, n.fontSize ?? ROOT_FONT), height: nodeMetrics(0).height, manuallyPositioned: false }
+    if (rootIsPill(n, type)) return { ...n, width: rootPillWidth(n.title, n.fontSize ?? ROOT_FONT), height: nodeMetrics(0).height, manuallyPositioned: false }
     return { ...n, manuallyPositioned: false }
   })
   const withWidths = runLayout(fresh, type)
@@ -381,11 +380,7 @@ function renderNode(node: MindmapNode, type: DiagramType, paletteColor: string |
     : isFishboneNode ? 0
     : type === 'timeline' ? 6 : rx
 
-  const isRootPill = isRoot && type !== 'mindmap' && type !== 'honeycomb' && (
-    node.shape === 'pill' ? true :
-    node.shape === 'circle' ? false :
-    rootTitleNeedsPill(node.title, node.fontSize ?? ROOT_FONT)
-  )
+  const isRootPill = isRoot && rootIsPill(node, type)
 
   // Styling per depth (Node.tsx)
   let bg: string, textColor: string, strokeColor: string, strokeW: number

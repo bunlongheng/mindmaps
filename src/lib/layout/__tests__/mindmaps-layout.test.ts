@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { computeMindmapsLayout } from '../mindmaps-layout'
 import { nodeHeight, nodeMinWidth } from '../../nodeMetrics'
-import { ROOT_PILL_MAX, ROOT_CIRCLE_MAX } from '../../rootPill'
+import { ROOT_PILL_MAX, ROOT_CIRCLE_MAX, rootPillWidth } from '../../rootPill'
 import type { MindmapNode } from '../../../types'
 
 function node(overrides: Partial<MindmapNode> & { id: string }): MindmapNode {
@@ -28,17 +28,17 @@ describe('computeMindmapsLayout', () => {
     expect(computeMindmapsLayout(input)).toBe(input)
   })
 
-  it('places a lone short-title root as a min-size circle', () => {
+  it('places a lone short-title root as a pill, not a circle', () => {
     const out = computeMindmapsLayout([node({ id: 'root', depth: 0, title: 'Hi' })])
     expect(out).toHaveLength(1)
     const root = byId(out, 'root')
-    // short title, no shape -> circle sized to fit, clamped to the 180px minimum
-    expect(root.width).toBe(180)
-    expect(root.height).toBe(180)
+    // Short title, no shape -> still a pill: only the radial mindmap keeps a circle.
+    expect(root.height).toBe(nodeHeight(0))
+    expect(root.width).toBe(rootPillWidth('Hi'))
   })
 
-  it('grows a circle root to fit a medium title', () => {
-    const out = computeMindmapsLayout([node({ id: 'root', depth: 0, title: 'Deploy Captain' })])
+  it('grows an explicit circle root to fit a medium title', () => {
+    const out = computeMindmapsLayout([node({ id: 'root', depth: 0, title: 'Deploy Captain', shape: 'circle' })])
     const root = byId(out, 'root')
     expect(root.width).toBe(root.height) // square
     expect(root.width).toBeGreaterThan(180) // grew past the minimum
@@ -46,7 +46,7 @@ describe('computeMindmapsLayout', () => {
   })
 
   it('uses a stored square size for circle roots when width > 0', () => {
-    const out = computeMindmapsLayout([node({ id: 'root', depth: 0, title: 'Hi', width: 260 })])
+    const out = computeMindmapsLayout([node({ id: 'root', depth: 0, title: 'Hi', shape: 'circle', width: 260 })])
     const root = byId(out, 'root')
     expect(root.width).toBe(260)
     expect(root.height).toBe(260) // square

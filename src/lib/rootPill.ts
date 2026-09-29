@@ -58,6 +58,23 @@ export function rootPillWidth(title: string, baseFontSize = ROOT_FONT): number {
 }
 
 /**
+ * Is this root drawn as a pill rather than a circle?
+ *
+ * Only the radial `mindmap` keeps a round root (its whole language is circles),
+ * and the honeycomb root is a hex cell, so neither takes a pill. Every other
+ * diagram draws the pill whatever the title length - a circle root there grew
+ * with the title and swallowed the canvas on a long one. A node that explicitly
+ * asks for `circle` still gets its circle.
+ */
+export function rootIsPill(
+  node: { title?: string; shape?: string },
+  diagramType: string,
+): boolean {
+  if (diagramType === 'mindmap' || diagramType === 'honeycomb') return false
+  return node.shape !== 'circle'
+}
+
+/**
  * Width the canvas actually DRAWS a node at. The root pill auto-sizes from its
  * title, so a stored width computed at a different font size leaves the trunk
  * starting inside the pill - and the pill is translucent, so the line shows
@@ -68,10 +85,7 @@ export function rootDrawnWidth(
   diagramType: string,
 ): number {
   if (node.depth !== 0) return node.width
-  const isPill = diagramType !== 'mindmap' && (
-    node.shape === 'pill' ? true :
-    node.shape === 'circle' ? false :
-    rootTitleNeedsPill(node.title, node.fontSize ?? ROOT_FONT)
-  )
-  return isPill ? rootPillWidth(node.title, node.fontSize ?? ROOT_FONT) : node.width
+  return rootIsPill(node, diagramType)
+    ? rootPillWidth(node.title, node.fontSize ?? ROOT_FONT)
+    : node.width
 }
