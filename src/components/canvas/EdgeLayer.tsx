@@ -2,8 +2,9 @@ import type { MindmapNode } from '../../types'
 import type { LineStyle, DiagramType } from '../../types'
 import { Edge } from './Edge'
 import { FISHBONE_SLANT } from '../../lib/layout/fishbone'
+import { TIMELINE_ELBOW_R as ELBOW_R } from '../../lib/layout/timeline'
 import { useMindmapStore } from '../../store/mindmapStore'
-import { combStyleOf } from '../../lib/hex'
+import { combStyleOf, meshTopicLinks, MESH_WALL_WIDTH } from '../../lib/hex'
 import { rootDrawnWidth } from '../../lib/rootPill'
 import { buildRadialBranchPath, radialBranchPoints } from '../../lib/geometry'
 import { getTheme } from '../../lib/themes'
@@ -107,8 +108,19 @@ export function EdgeLayer({ nodes, lineStyle, diagramType, paletteColors }: Edge
   // in the branch colour. No order badges - the cluster arrangement itself already
   // reads as a sequence around its parent.
   if (diagramType === 'honeycomb') {
-    // A mesh reads its hierarchy from touching cells; only the web draws connectors.
-    if (combStyleOf(nodes) === 'mesh') return null
+    // In a mesh the root and every topic already touch, and so does everything inside
+    // an island - the only link the empty comb broke is topic to its own cluster.
+    if (combStyleOf(nodes) === 'mesh') {
+      return (
+        <g>
+          {meshTopicLinks(nodes).map(({ from, points }) => (
+            <polyline key={from.id} className="mesh-link" points={points.map(p => `${p.x},${p.y}`).join(' ')}
+              fill="none" stroke={pc(from)} strokeWidth={MESH_WALL_WIDTH}
+              strokeLinecap="round" strokeLinejoin="round" opacity={0.9} />
+          ))}
+        </g>
+      )
+    }
     const edges = nodes.filter(n => n.parentId && nodeMap.has(n.parentId))
     return (
       <g>
@@ -360,15 +372,30 @@ export function EdgeLayer({ nodes, lineStyle, diagramType, paletteColors }: Edge
       ? l1s[l1s.length - 1].x + l1s[l1s.length - 1].width + 24
       : rootRight(root) + 400
 
+    // Xmind paints the spine in segments: the run leading INTO a topic carries that
+    // topic's own colour, so the timeline reads as a coloured chain rather than a grey
+    // rail with colour hung off it. Segments are drawn in the gaps between boxes, so
+    // nothing runs behind an opaque box.
+    const segs: { x1: number; x2: number; color: string }[] = []
+    let cursorX = rootRight(root)
+    for (const l1 of l1s) {
+      segs.push({ x1: cursorX, x2: l1.x, color: pc(l1) })
+      cursorX = l1.x + l1.width
+    }
+    if (l1s.length > 0) segs.push({ x1: cursorX, x2: spineEndX, color: pc(l1s[l1s.length - 1]) })
+    else segs.push({ x1: cursorX, x2: spineEndX, color: '#94a3b8' })
+
     return (
       <g>
-        {/* Horizontal spine */}
-        <line x1={rootRight(root)} y1={spineY} x2={spineEndX} y2={spineY}
-          stroke="#94a3b8" strokeWidth={2.5} strokeLinecap="round" />
+        {segs.map((seg, i) => (
+          <line key={`spine-${i}`} x1={seg.x1} y1={spineY} x2={seg.x2} y2={spineY}
+            stroke={seg.color} strokeWidth={edgeWidthForDepth(1)} strokeLinecap="round" />
+        ))}
 
-        {/* Per L1: spine tick + vertical branch through all descendants (L2+L3 centered at l1CX) */}
         {l1s.map(l1 => {
-          const branchX = l1.x  // vertical branch runs at left edge of L1
+          // The trunk drops from the middle of the L1 box, matching the layout's own
+          // child indent (src/lib/layout/timeline), not from the box's left edge.
+          const branchX = l1.x + l1.width / 2
 
           const descendants = nodes.filter(n => {
             let cur = nodeMap.get(n.parentId ?? '')
@@ -378,27 +405,38 @@ export function EdgeLayer({ nodes, lineStyle, diagramType, paletteColors }: Edge
             }
             return false
           })
+          // Only the L2s hang off the trunk; an L3 chains off its own L2 instead.
+          const onTrunk = descendants.filter(n => n.parentId === l1.id)
+          if (onTrunk.length === 0) return null
 
-          // Descendants may sit on either side of the spine, so the branch runs from the
-          // topmost connector to the bottommost, behind the L1 box. Node centres, so it
-          // ends flush with the outermost connector, not beyond it.
-          const centres = descendants.map(n => n.y + n.height / 2)
-          const topY = Math.min(l1.y, ...centres)
-          const bottomY = Math.max(l1.y + l1.height, ...centres)
+          const centres = onTrunk.map(n => n.y + n.height / 2)
+          const above = centres[0] < spineY
+          const dir = above ? -1 : 1
+          const nearEdgeY = above ? l1.y : l1.y + l1.height
+          const farCY = above ? Math.min(...centres) : Math.max(...centres)
 
           return (
             <g key={`branch-${l1.id}`}>
-              {/* Vertical branch through the L1 and every descendant */}
-              {descendants.length > 0 && (
-                <line x1={branchX} y1={topY} x2={branchX} y2={bottomY}
-                  stroke={pc(l1)} strokeWidth={edgeWidthForDepth(2)} strokeLinecap="round" />
-              )}
-              {/* Orthogonal horizontal connector from branch line to each node's left-center */}
-              {descendants.map(n => {
-                const nodeCY = n.y + n.height / 2
+              {/* Trunk, stopping where the last elbow's curve begins */}
+              <line x1={branchX} y1={nearEdgeY} x2={branchX} y2={farCY - dir * ELBOW_R}
+                stroke={pc(l1)} strokeWidth={edgeWidthForDepth(2)} strokeLinecap="round" fill="none" />
+              {/* Rounded elbow off the trunk into each child's left-centre */}
+              {onTrunk.map(n => {
+                const cy = n.y + n.height / 2
                 return (
-                  <line key={`h-${n.id}`}
-                    x1={branchX} y1={nodeCY} x2={n.x} y2={nodeCY}
+                  <path key={`e-${n.id}`}
+                    d={`M ${branchX} ${cy - dir * ELBOW_R} Q ${branchX} ${cy} ${branchX + ELBOW_R} ${cy} L ${n.x} ${cy}`}
+                    stroke={pc(l1)} strokeWidth={edgeWidthForDepth(2)} strokeLinecap="round" fill="none" />
+                )
+              })}
+              {/* L3 and deeper chain straight out of their own parent's right edge */}
+              {descendants.filter(n => n.parentId !== l1.id).map(n => {
+                const parent = nodeMap.get(n.parentId!)
+                if (!parent) return null
+                const cy = n.y + n.height / 2
+                return (
+                  <line key={`c-${n.id}`} x1={parent.x + parent.width} y1={parent.y + parent.height / 2}
+                    x2={n.x} y2={cy}
                     stroke={pc(l1)} strokeWidth={edgeWidthForDepth(n.depth)} strokeLinecap="round" />
                 )
               })}

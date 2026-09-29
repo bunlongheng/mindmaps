@@ -4,6 +4,7 @@ import type { ComponentProps } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import {
   ICON_MAP,
+  ICON_SYNONYMS,
   LUCIDE_FALLBACK_STEMS,
   LUCIDE_FALLBACK_ALIASES,
   HERO_FALLBACK_NAMES,
@@ -67,8 +68,10 @@ function lazyFallbackIcon(ref: FallbackRef): LucideIcon {
 }
 
 /** Resolve any icon by name — tries our map, then any Lucide icon, then any Heroicons outline icon */
-export function getLucideIcon(name: string): LucideIcon | undefined {
-  if (!name) return undefined
+export function getLucideIcon(rawName: string): LucideIcon | undefined {
+  if (!rawName) return undefined
+  // 0. Plain-English name no icon set ships (e.g. 'gear') -> the closest one it does
+  const name = ICON_SYNONYMS[rawName] ?? rawName
   // 1. Curated ICON_MAP (fastest, statically bundled)
   if (ICON_MAP[name]) return ICON_MAP[name]
   // 2. Any Lucide icon, then any Heroicons outline icon (lazy async chunk)

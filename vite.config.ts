@@ -1,14 +1,19 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 import { createHmac } from 'node:crypto'
 
+// Unprefixed vars (secrets) never reach process.env through Vite, so load the
+// .env file explicitly for the dev proxy below. Server-side only, never bundled.
+const env = loadEnv(process.env.NODE_ENV === 'production' ? 'production' : 'development', process.cwd(), '')
+
 // Sign a long-lived dev session token from the machine's env, so local dev stays
 // authenticated against the (now token-gated) API without shipping any secret to the client.
-function devSessionToken(): string | null {
-  const secret = process.env.MINDMAP_JWT_SECRET
-  const sub = process.env.MINDMAP_USER_ID
-  const email = process.env.MINDMAP_AUTH_EMAIL || 'dev@localhost'
+// `env` is the loaded .env.local - Vite does not put unprefixed vars on process.env.
+function devSessionToken(env: Record<string, string>): string | null {
+  const secret = env.MINDMAP_JWT_SECRET
+  const sub = env.MINDMAP_USER_ID
+  const email = env.MINDMAP_AUTH_EMAIL || 'dev@localhost'
   if (!secret || !sub) return null
   const b64 = (o: object) => Buffer.from(JSON.stringify(o)).toString('base64url')
   const head = b64({ alg: 'HS256', typ: 'JWT' })
@@ -85,7 +90,9 @@ export default defineConfig({
         // Inject a dev session token (signed from the machine's env) so local dev is
         // authenticated against the token-gated API. Never bundled into client source.
         configure: (proxy) => {
-          const token = devSessionToken()
+          // A signed owner JWT when the JWT secret is on this machine, else the
+          // static service key - the API accepts either as the owner.
+          const token = devSessionToken(env) ?? env.MINDMAPS_API_SECRET ?? env.MINDMAP_AI_API_KEY
           if (token) proxy.on('proxyReq', (proxyReq) => proxyReq.setHeader('Authorization', `Bearer ${token}`))
         },
       },

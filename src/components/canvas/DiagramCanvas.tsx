@@ -12,7 +12,7 @@ import {
   NEON_CORE_OPACITY, NEON_HALO_OPACITY, NEON_TEXT_BLUR, NEON_TEXT_FILTER,
 } from '../../lib/color'
 import { computeSubtreeCounts } from '../../lib/nodeCounts'
-import { combSizeOf, combStyleOf, drawnCellRadius, hexDoorEdge, meshGroupOutlines, meshCellRadius } from '../../lib/hex'
+import { combSizeOf, combStyleOf, drawnCellRadius, hexDoorEdge, hexPoints, meshFillerCells, meshGroupOutlines, meshCellRadius, MESH_WALL_WIDTH } from '../../lib/hex'
 import { darken } from '../../lib/color'
 import { radialNodeExtent } from '../../lib/layout/mindmap'
 import { GLOSS_LINEAR_ID, GLOSS_RADIAL_ID, GLOSS_RADIAL_CX, GLOSS_RADIAL_CY, GLOSS_RADIAL_R, GLOSS_STOPS } from '../../lib/gloss'
@@ -68,6 +68,15 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract, rightInset =
       return door ? [{ id: n.id, door, color: base.startsWith('#') ? darken(base, 0.35) : base }] : []
     })
   }, [activeMindmap?.nodes, diagramType, cellRadii, paletteColors])
+  // One ring of empty comb around the filled cells, so the mesh ends on a honeycomb
+  // edge instead of the ragged outline the data happens to make. Decoration only: not
+  // nodes, not selectable, not exported.
+  const meshFiller = useMemo(() => {
+    const ns = activeMindmap?.nodes ?? []
+    if (diagramType !== 'honeycomb' || combStyleOf(ns) !== 'mesh' || !ns.length) return null
+    const R = meshCellRadius(ns, combSizeOf(ns))
+    return { r: R, cells: meshFillerCells(ns, R, 2) }
+  }, [activeMindmap?.nodes, diagramType])
   // Mesh group outlines: a parent and its direct children, bounded by 1 line, so the eye
   // can tell where 1 comb group stops and the next begins. Topics thick, families thin.
   const meshGroups = useMemo(() => {
@@ -552,6 +561,15 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract, rightInset =
           )}
         </defs>
         <g ref={gRef}>
+          {meshFiller && meshFiller.cells.length > 0 && (
+            <g style={{ pointerEvents: 'none' }}>
+              {meshFiller.cells.map((c, i) => (
+                <polygon key={`fill-${i}`} points={hexPoints(c.x, c.y, meshFiller.r)}
+                  fill={isDarkBg(canvasBg) ? 'rgba(255,255,255,0.045)' : 'rgba(15,23,42,0.035)'}
+                  stroke={canvasBg} strokeWidth={MESH_WALL_WIDTH} strokeLinejoin="round" />
+              ))}
+            </g>
+          )}
           <EdgeLayer nodes={hideDetails ? activeMindmap.nodes.filter(n => n.depth <= 2) : activeMindmap.nodes} lineStyle={lineStyle} diagramType={diagramType} paletteColors={paletteColors} />
           {(hideDetails ? activeMindmap.nodes.filter(n => n.depth <= 2) : activeMindmap.nodes).map(node => (
             <Node

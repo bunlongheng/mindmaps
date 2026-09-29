@@ -12,8 +12,9 @@ const ROOT_X = 120
 const ROOT_H = 80
 
 // Fishbone L1/L2/L3 boxes render as slanted parallelograms (Node.tsx: sk = height * 0.35).
-// Raised from the old 500px clamp so a long title grows the box instead of getting clipped.
-const MAX_AUTO_W = 1200
+// There is deliberately no maximum: the label is drawn as a single unclipped <text>, so any
+// cap let a long title render past its own box and over the neighbouring bone. The box always
+// contains its text now, and the spine grows along x to fit.
 
 let measureCtx: CanvasRenderingContext2D | null | undefined
 function getMeasureCtx(): CanvasRenderingContext2D | null {
@@ -81,7 +82,7 @@ export function autoW(title: string, depth: number, hasIcon: boolean, bold = fal
   // the same skew amount as extra width to keep the last glyph clear of the diagonal edge.
   const slant = depth === 0 ? 0 : height * 0.35
   const w = nodeWidth(measured, depth, { hasIcon, height, extra: slant })
-  return Math.max(nodeMinWidth(depth), Math.min(MAX_AUTO_W, w))
+  return Math.max(nodeMinWidth(depth), w)
 }
 
 /** A manual node keeps the width the user dragged; everyone else auto-sizes from title. */
@@ -89,7 +90,8 @@ function boxW(node: MindmapNode, depth: number, hasIcon: boolean, bold: boolean)
   if (node.widthMode === 'manual' && node.width > 0) return node.width
   return autoW(node.title, depth, hasIcon, bold)
 }
-const SPINE_SEG = 340         // horizontal gap between L1 attachment points
+const SPINE_SEG = 340         // minimum horizontal gap between L1 attachment points
+const BONE_GAP = 56           // horizontal clearance from a bone's widest box to the next bone on its side
 const BONE_HEIGHT_BASE = 260  // minimum vertical distance from spine to L1 tip
 const L2_GAP = 24             // minimum vertical gap between reserved L2 slots on the diagonal
 const L3_GAP = 12             // vertical gap between stacked L3 boxes
@@ -122,9 +124,19 @@ export function computeFishboneLayout(nodes: MindmapNode[]): MindmapNode[] {
 
   const spineOriginX = ROOT_X + rootW
 
+  // Bones alternate above/below the spine, so only bones 2 apart share vertical space
+  // and can actually collide. SPINE_SEG alone is a fixed pitch that ignores label width,
+  // which is what let a wide bone run into the next one on its side. Track the rightmost
+  // painted edge per side and push the next attachment point clear of it - the diagram
+  // grows along x rather than overlapping.
+  let attachX = spineOriginX
+  const sideRight = [0, 0] // rightmost box edge for [above, below]
+
   l1s.forEach((l1, i) => {
     const above = i % 2 === 0
-    const attachX = spineOriginX + (i + 1) * SPINE_SEG
+    const side = above ? 0 : 1
+    attachX = Math.max(attachX + SPINE_SEG, sideRight[side] + BONE_GAP)
+    let boneRight = attachX
 
     const l2s = nodes.filter(n => n.parentId === l1.id)
       .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
@@ -150,6 +162,7 @@ export function computeFishboneLayout(nodes: MindmapNode[]): MindmapNode[] {
       x: l1CX - l1w / 2, y: l1CY - l1h / 2,
       width: l1w, height: l1h, manuallyPositioned: false,
     })
+    boneRight = Math.max(boneRight, l1CX + l1w / 2)
 
     // Offset of each L2's diagonal anchor measured from the L1 tip end of the bone,
     // stacked so reserved slots never touch.
@@ -172,6 +185,7 @@ export function computeFishboneLayout(nodes: MindmapNode[]): MindmapNode[] {
       const l2Y = diagY - l2h / 2
 
       result.push({ ...l2, x: l2X, y: l2Y, width: l2w, height: l2h, manuallyPositioned: false })
+      boneRight = Math.max(boneRight, l2X + l2w)
 
       // L3 nodes stack vertically to the right of L2, centred on its own diagonal
       // anchor so the block clears L2's own box and never lands in a neighbour's slot.
@@ -186,8 +200,11 @@ export function computeFishboneLayout(nodes: MindmapNode[]): MindmapNode[] {
           width: size.w, height: size.h, manuallyPositioned: false,
         })
         l3Top += size.h + L3_GAP
+        boneRight = Math.max(boneRight, l2X + l2w + 16 + size.w)
       }
     })
+
+    sideRight[side] = boneRight
   })
 
   return result

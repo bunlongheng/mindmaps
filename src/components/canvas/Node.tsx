@@ -5,7 +5,7 @@ import { NodeIcon, getLucideIcon } from './NodeIcon'
 import { wrapText, initialFontSize, nodeInitial, radialLabelFor, LABEL_FONT, RADIAL_ROOT_FONT } from '../../lib/layout/mindmap'
 import { rootPillWidth, rootPillFontSize, rootTitleNeedsPill, rootCircleDiameter, rootDrawnWidth, ROOT_FONT } from '../../lib/rootPill'
 import { getTheme } from '../../lib/themes'
-import { LABEL_TEXT,
+import { LABEL_TEXT, timelineSubFill, timelineSubText,
   hexToRgb, darken, depthFill, isDarkBg, lighten, neonFilterId, neonRootColor,
   NEON_ROOT_GRADIENT, NEON_ROOT_LIGHTEN, NEON_TEXT, NEON_TEXT_FILTER,
   NEON_TEXT_MUTED, NEON_TEXT_MUTED_OPACITY,
@@ -14,7 +14,7 @@ import { shapeRx } from '../../lib/nodeShape'
 import { nodeMetrics, ICON_GAP } from '../../lib/nodeMetrics'
 import { parseLinkedTitle, sliceSegments, lineRanges, type LinkSegment } from '../../lib/links'
 import { GLOSS_LINEAR_ID, GLOSS_RADIAL_ID, glossApplies, glossOpacity } from '../../lib/gloss'
-import { hexCellLayout, hexPoints, hexFontSize, hexFill, hexTextColor } from '../../lib/hex'
+import { hexCellLayout, hexPoints, hexFontSize, hexFill, hexTextColor, meshWallColor } from '../../lib/hex'
 
 interface NodeProps {
   node: MindmapNode
@@ -104,9 +104,11 @@ function renderRuns(segments: LinkSegment[], keyPrefix: string) {
 function isLight(hex: string): boolean {
   if (!hex.startsWith('#')) return true
   const [r,g,b] = hexToRgb(hex)
-  // Perceived luminance (WCAG formula)
+  // Perceived luminance (WCAG formula). The cutoff is 130, not 140: mid-luminance
+  // fills like the palette's orange (136.8) read at 2.8:1 under white text but
+  // 5.9:1 under dark, so 130 is where dark text starts winning.
   const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b
-  return lum > 140
+  return lum > 130
 }
 
 export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onDragMove, onRootDragOffset, svgRef, readOnly, noInteract = false, l1Colors = [], paletteColor = null, childCount = 0, descendantCount = 0, nodeCount = 0, rootCenter = null, cellRadius }: NodeProps) {
@@ -161,9 +163,11 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   const isFishboneNode = isFishbone && node.depth >= 1
   // Fishbone: detect if node is above or below the spine (Y=400) for parallelogram direction
   const fishboneAbove = isFishboneNode ? (node.y + node.height / 2) < 400 : false
+  // Timeline boxes are softer-cornered than the 3px house default, matching Xmind.
   const effectiveRx = isRoot ? rx
     : nodeShape ? shapeRx(nodeShape, node.height, rx)
-    : isFishboneNode ? 0 : rx
+    : isFishboneNode ? 0
+    : diagramType === 'timeline' ? 6 : rx
   const previewW = (!isRoot && resizePreview?.depth === node.depth) ? resizePreview.width : null
 
   // Styling per depth
@@ -174,9 +178,10 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
     // the root, so the canvas and the server renderer never drift.
     bg = hexFill(col, node.depth)
     textColor = hexTextColor(node.depth)
-    // A mesh has no lines: the only stroke is a thin wall in the canvas colour between
-    // touching cells. A web outlines each cell in its own darker hue.
-    strokeColor = isMesh ? getTheme(themeId).canvasBg : isRoot ? '#1a1d2e' : darken(col, 0.25)
+    // A mesh has no lines: the only stroke is a thin wall between touching cells, in
+    // the same darkened branch colour the island's outline uses (meshWallColor), so a
+    // shared wall reads as the border it is. A web outlines each cell in its own darker hue.
+    strokeColor = isMesh ? meshWallColor(col, node.depth) : isRoot ? '#1a1d2e' : darken(col, 0.25)
     strokeW = isMesh ? 3 : isRoot ? 4 : 2
   } else if (isRoot) {
     bg = '#1a1d2e'
@@ -185,9 +190,18 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
     strokeW = 5
   } else if (isL2Plus) {
     // One shared depth ladder (src/lib/color depthFill) so the canvas and the
-    // server renderer that draws the home-grid card previews never drift.
-    bg = col.startsWith('#') ? depthFill(col, node.depth) : '#f8fafc'
-    textColor = LABEL_TEXT
+    // server renderer that draws the home-grid card previews never drift. The
+    // timeline is the exception: its sub-nodes are pale chips (timelineSubFill)
+    // so the L1 boxes on the spine stay the layer that reads first.
+    const timelineSub = diagramType === 'timeline' && col.startsWith('#')
+    bg = col.startsWith('#')
+      ? (timelineSub ? timelineSubFill(col) : depthFill(col, node.depth))
+      : '#f8fafc'
+    // Timeline chips carry no border and write in a deep shade of their own branch
+    // colour (Xmind); every other box keeps the black label LABEL_TEXT gives it.
+    textColor = timelineSub ? timelineSubText(col) : LABEL_TEXT
+    // Every box below the root carries its branch colour in the border, the timeline's
+    // pale chips included - the fill is the wash, the border is what names the branch.
     strokeColor = col
     strokeW = 2
   } else {
@@ -359,6 +373,8 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   const boxH = (isRadial || drawCircle) ? Math.max(displayW, node.height) : node.height
   const cx = displayW / 2
   const cy = boxH / 2
+  // Honeycomb cell radius, hoisted so the cell and its selection ring share one value.
+  const hexR = isHex ? (cellRadius ?? hexCellLayout(node, combSize).r) : 0
   const r = displayW / 2
 
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
@@ -469,7 +485,6 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
       )}
 
       {isHex ? (() => {
-        const hexR = cellRadius ?? hexCellLayout(node, combSize).r
         const pts = hexPoints(cx, cy, hexR)
         return (
         <>
@@ -895,7 +910,18 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
       {/* Selection ring — always on top. Hidden on touch devices (noInteract), not merely on
           read-only maps (readOnly) — a desktop-mouse read-only/locked map should still show
           what's selected; only a touch device should never show the blue ring. */}
-      {isSelected && !noInteract && (isRoot ? (
+      {isSelected && !noInteract && (isHex ? (
+        /* A comb selects in its own comb shape, not in a box around it. */
+        <>
+          <polygon points={hexPoints(cx, cy, hexR + 5)}
+            fill="none" stroke="rgba(59,130,246,0.18)" strokeWidth={6} strokeLinejoin="round"
+            style={{ pointerEvents: 'none' }} />
+          <polygon points={hexPoints(cx, cy, hexR + 3)}
+            fill="none" stroke="#3b82f6" strokeWidth={3.5} strokeLinejoin="round"
+            filter="drop-shadow(0 0 8px rgba(59,130,246,0.7))"
+            style={{ pointerEvents: 'none' }} />
+        </>
+      ) : isRoot ? (
         isRootPill ? (
           <>
             <rect x={-5} y={-5} width={displayW + 10} height={node.height + 10}

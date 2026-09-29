@@ -17,6 +17,8 @@ import { hexRadius, hexCellRadius, combSizeOf, combStyleOf, meshCellRadius, axia
 
 const TAU = Math.PI * 2
 const START_ANGLE = -Math.PI / 2
+/** Owner tag for the core - the root cell plus every topic cell - which touches as 1 piece. */
+const CORE = '\u0000core'
 /** Narrowest slice a deeper node may get; its ring grows instead of squeezing cells together. */
 const CHILD_MIN_SECTOR = 0.12
 /** Radial breathing room: root to the first ring, then between rings, and between neighbours on a ring. */
@@ -52,9 +54,12 @@ function computeMeshLayout(nodes: MindmapNode[]): MindmapNode[] {
 
   const occupied = new Set<string>()
   const cellOf = new Map<string, readonly [number, number]>()
+  const ownerAt = new Map<string, string>()
   const key = (q: number, r: number) => `${q},${r}`
-  const take = (id: string, q: number, r: number) => { occupied.add(key(q, r)); cellOf.set(id, [q, r]) }
-  take(root.id, 0, 0)
+  const take = (id: string, branch: string, q: number, r: number) => {
+    occupied.add(key(q, r)); cellOf.set(id, [q, r]); ownerAt.set(key(q, r), branch)
+  }
+  take(root.id, CORE, 0, 0)
 
   // Each depth-1 topic owns a compass angle; its whole branch leans that way.
   const l1s = childrenOf.get(root.id) ?? []
@@ -66,49 +71,96 @@ function computeMeshLayout(nodes: MindmapNode[]): MindmapNode[] {
 
   const angleDiff = (a: number, b: number) => { const d = Math.abs(((a - b) % TAU + TAU) % TAU); return Math.min(d, TAU - d) }
   const cellAngle = (q: number, r: number) => { const c = axialToCenter(q, r, 1); return Math.atan2(c.y, c.x) }
-  const freeNeighbours = (q: number, r: number) => HEX_DIRS.map(([dq, dr]) => [q + dq, r + dr] as const).filter(([a, b]) => !occupied.has(key(a, b)))
+  // A cell this branch may take: free, and touching no cell of any other branch or the
+  // root - so every topic reads as its own island with 1 empty line of comb around it.
+  const canTake = (branch: string, q: number, r: number) => {
+    if (occupied.has(key(q, r))) return false
+    for (const [dq, dr] of HEX_DIRS) {
+      const o = ownerAt.get(key(q + dq, r + dr))
+      if (o !== undefined && o !== branch) return false
+    }
+    return true
+  }
+  const freeNeighbours = (branch: string, q: number, r: number) =>
+    HEX_DIRS.map(([dq, dr]) => [q + dq, r + dr] as const).filter(([a, b]) => canTake(branch, a, b))
+  const ringCells = (ring: number) => {
+    const out: [number, number][] = []
+    for (let q = -ring; q <= ring; q++) for (let r = -ring; r <= ring; r++) {
+      if (hexDistance(0, 0, q, r) === ring) out.push([q, r])
+    }
+    return out
+  }
+
+  // The core: the root and every topic cell, all touching, so the black cell and the
+  // solid colours read as 1 piece. Each topic takes the free core cell nearest its own
+  // angle, innermost ring first.
+  const coreCells = [...ringCells(1), ...ringCells(2), ...ringCells(3)]
+  for (const l1 of l1s) {
+    const want = angleOf.get(l1.id) ?? 0
+    let best: [number, number] | null = null, bestScore = Infinity
+    for (const [q, r] of coreCells) {
+      if (occupied.has(key(q, r))) continue
+      if (!HEX_DIRS.some(([dq, dr]) => ownerAt.get(key(q + dq, r + dr)) === CORE)) continue
+      const score = hexDistance(0, 0, q, r) * 10 + angleDiff(cellAngle(q, r), want)
+      if (score < bestScore) { bestScore = score; best = [q, r] }
+    }
+    if (best) take(l1.id, CORE, best[0], best[1])
+  }
+
+  // Each topic's own subtree is an island out past the core, on a ring wide enough that
+  // the cluster plus the empty line around it still fits between its neighbours.
+  const subtreeSize = (id: string): number => 1 + (childrenOf.get(id) ?? []).reduce((sum, c) => sum + subtreeSize(c.id), 0)
+  const clusterRadius = (m: number) => { let k = 0; while (1 + 3 * k * (k + 1) < m) k++; return k }
+  const coreR = Math.max(1, ...l1s.map(l1 => { const c = cellOf.get(l1.id); return c ? hexDistance(0, 0, c[0], c[1]) : 1 }))
+  const pitch = 2 * Math.max(1, ...l1s.map(l1 => clusterRadius(subtreeSize(l1.id) - 1))) + 1
+  const seedRing = Math.max(coreR + 2, Math.ceil((l1s.length * pitch) / 6))
+  const seedOf = new Map<string, readonly [number, number]>()
+  for (const l1 of l1s) {
+    if (!(childrenOf.get(l1.id) ?? []).length) continue
+    const want = angleOf.get(l1.id) ?? 0
+    for (let ring = seedRing; ring <= seedRing + 8 && !seedOf.has(l1.id); ring++) {
+      let best: [number, number] | null = null, bestScore = Infinity
+      for (const [q, r] of ringCells(ring)) {
+        if (!canTake(l1.id, q, r)) continue
+        const score = angleDiff(cellAngle(q, r), want)
+        if (score < bestScore) { bestScore = score; best = [q, r] }
+      }
+      if (best) seedOf.set(l1.id, best)
+    }
+  }
 
   const place = (n: MindmapNode) => {
     const parent = n.parentId ? byId.get(n.parentId) : undefined
-    const pc = parent ? cellOf.get(parent.id) : undefined
+    const parentCell = parent ? cellOf.get(parent.id) : undefined
+    const branch = branchOf.get(n.id) ?? ''
+    // A topic's own cell lives in the core, so its children grow from the island's seed
+    // instead; deeper nodes grow from their own parent, as they always have.
+    const inBranch = parentCell !== undefined && ownerAt.get(key(parentCell[0], parentCell[1])) === branch
+    const pc = inBranch ? parentCell : seedOf.get(branch)
     if (!pc) return
-    const angle = angleOf.get(branchOf.get(n.id) ?? '') ?? 0
+    if (!inBranch && canTake(branch, pc[0], pc[1])) { take(n.id, branch, pc[0], pc[1]); return }
+    const angle = angleOf.get(branch) ?? 0
     const parentRing = hexDistance(0, 0, pc[0], pc[1])
     // Behind the parent first: free cells touching it that sit 1 ring further out, so a
     // node's children line up on its far side and the wedge behind it is its subtree.
-    let candidates = freeNeighbours(pc[0], pc[1]).filter(([a, b]) => hexDistance(0, 0, a, b) > parentRing)
+    let candidates = freeNeighbours(branch, pc[0], pc[1]).filter(([a, b]) => hexDistance(0, 0, a, b) > parentRing)
     // Its far side is full: any free wall of the parent still keeps the child touching it.
-    if (!candidates.length) candidates = freeNeighbours(pc[0], pc[1]).filter(([a, b]) => hexDistance(0, 0, a, b) >= parentRing)
+    if (!candidates.length) candidates = freeNeighbours(branch, pc[0], pc[1])
     if (!candidates.length) {
-      // Every wall of the parent is taken: beside a sibling already placed behind it, still outward.
-      const seen = new Set<string>()
-      for (const sib of childrenOf.get(parent!.id) ?? []) {
-        const sc = cellOf.get(sib.id)
-        if (!sc) continue
-        for (const f of freeNeighbours(sc[0], sc[1])) {
-          if (hexDistance(0, 0, f[0], f[1]) <= parentRing) continue
-          const k = key(f[0], f[1]); if (!seen.has(k)) { seen.add(k); candidates.push(f) }
-        }
-      }
-    }
-    if (!candidates.length) candidates = freeNeighbours(pc[0], pc[1])
-    if (!candidates.length) {
-      // Parent boxed in: grow from any cell of the same branch, nearest the parent first.
-      const branch = branchOf.get(n.id)
+      // Parent boxed in: grow from any cell of the same cluster, nearest the parent first.
       const seen = new Set<string>()
       for (const [id, c] of cellOf) {
         if (branchOf.get(id) !== branch) continue
-        for (const f of freeNeighbours(c[0], c[1])) { const k = key(f[0], f[1]); if (!seen.has(k)) { seen.add(k); candidates.push(f) } }
+        for (const f of freeNeighbours(branch, c[0], c[1])) { const k = key(f[0], f[1]); if (!seen.has(k)) { seen.add(k); candidates.push(f) } }
       }
     }
     if (!candidates.length) {
-      // Nothing free touches the branch (only when the branch is walled in by others):
-      // the closest free cell to the parent, searching ring by ring.
+      // The cluster is walled in on every side: the closest cell to the parent that no
+      // other cluster is touching, searching ring by ring.
       for (let ring = 1; ring < 64 && !candidates.length; ring++) {
-        for (let q = -ring; q <= ring; q++) for (let r = -ring; r <= ring; r++) {
-          if (hexDistance(0, 0, q, r) !== ring) continue
+        for (const [q, r] of ringCells(ring)) {
           const a = pc[0] + q, b = pc[1] + r
-          if (!occupied.has(key(a, b))) candidates.push([a, b] as const)
+          if (canTake(branch, a, b)) candidates.push([a, b] as const)
         }
       }
     }
@@ -119,12 +171,12 @@ function computeMeshLayout(nodes: MindmapNode[]): MindmapNode[] {
       const score = hexDistance(c[0], c[1], pc[0], pc[1]) * 1000 + angleDiff(cellAngle(c[0], c[1]), angle) * 100 - hexDistance(0, 0, c[0], c[1]) * 10
       if (score < bestScore) { bestScore = score; best = c }
     }
-    take(n.id, best[0], best[1])
+    take(n.id, branch, best[0], best[1])
   }
 
   // Depth by depth, so every topic has its first cell before any branch starts to sprawl.
   const maxDepth = nodes.reduce((m, n) => Math.max(m, n.depth), 0)
-  for (let d = 1; d <= maxDepth; d++) {
+  for (let d = 2; d <= maxDepth; d++) {
     const level = nodes.filter(n => n.depth === d)
     // Siblings in sortOrder, branches in topic order, so growth interleaves fairly.
     level.sort((a, b) => (l1s.findIndex(l => l.id === branchOf.get(a.id)) - l1s.findIndex(l => l.id === branchOf.get(b.id))) || ((a.sortOrder ?? 0) - (b.sortOrder ?? 0)))

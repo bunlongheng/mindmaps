@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { hexToRgb, applyDepthTransparency, applyDepthBackground, darken, l1PaletteColor, L1_PALETTE, depthFill, depthStrength, DEPTH_STRENGTH, DEPTH_STRENGTH_FLOOR, edgeWidthForDepth, EDGE_WIDTH_BY_DEPTH, isDarkBg, lighten, neonBlur, neonFilterId, neonFilterSpecs, neonRootColor, NEON_ROOT_FALLBACK } from '../color'
+import { hexToRgb, applyDepthTransparency, applyDepthBackground, darken, l1PaletteColor, L1_PALETTE, depthFill, depthStrength, timelineSubFill, timelineSubText, TIMELINE_SUB_TINT, tint, DEPTH_STRENGTH, DEPTH_STRENGTH_FLOOR, edgeWidthForDepth, EDGE_WIDTH_BY_DEPTH, isDarkBg, lighten, neonBlur, neonFilterId, neonFilterSpecs, neonRootColor, NEON_ROOT_FALLBACK } from '../color'
 import { THEMES } from '../themes'
 
 describe('hexToRgb', () => {
@@ -117,12 +117,12 @@ describe('l1PaletteColor', () => {
 
 describe('depth ladder (DEPTH_STRENGTH / depthStrength / depthFill)', () => {
   it('matches the documented table', () => {
-    expect(DEPTH_STRENGTH).toEqual({ 1: 1, 2: 0.8, 3: 0.3, 4: 0.22 })
-    expect(DEPTH_STRENGTH_FLOOR).toBe(0.18)
+    expect(DEPTH_STRENGTH).toEqual({ 1: 1, 2: 0.15, 3: 0.11, 4: 0.07 })
+    expect(DEPTH_STRENGTH_FLOOR).toBe(0.05)
     expect(depthStrength(1)).toBe(1)
-    expect(depthStrength(2)).toBe(0.8)
-    expect(depthStrength(3)).toBe(0.3)
-    expect(depthStrength(4)).toBe(0.22)
+    expect(depthStrength(2)).toBe(0.15)
+    expect(depthStrength(3)).toBe(0.11)
+    expect(depthStrength(4)).toBe(0.07)
   })
 
   it('floors at depth 5 and deeper', () => {
@@ -152,17 +152,52 @@ describe('depth ladder (DEPTH_STRENGTH / depthStrength / depthFill)', () => {
     const d2 = chan(depthFill('#ed1c24', 2))
     const d3 = chan(depthFill('#ed1c24', 3))
     const d4 = chan(depthFill('#ed1c24', 4))
-    // Green channel is the one with room to move on red; the L2 to L3 step is the big
-    // one (80 to 30 percent), the deeper steps are gentler but still visible
-    expect(d3[1] - d2[1]).toBeGreaterThanOrEqual(60)
-    expect(d4[1] - d3[1]).toBeGreaterThanOrEqual(12)
+    // Green channel is the one with room to move on red. Below depth 1 every level is
+    // a pale wash, so the steps are small but each one still moves toward white.
+    expect(d3[1] - d2[1]).toBeGreaterThanOrEqual(5)
+    expect(d4[1] - d3[1]).toBeGreaterThanOrEqual(5)
     expect(d3[2] - d2[2]).toBeGreaterThan(0)
   })
 
   it('mixes exactly (1 - strength) toward white', () => {
-    // #000000 at 30% strength -> 70% of the way to white -> 179
-    expect(depthFill('#000000', 3)).toBe('#b3b3b3')
+    // #000000 at 11% strength -> 89% of the way to white -> 227
+    expect(depthFill('#000000', 3)).toBe('#e3e3e3')
     expect(depthFill('#ffffff', 5)).toBe('#ffffff')
+  })
+})
+
+describe('timelineSubFill', () => {
+  it('is a pale chip, never louder than the depth ladder at L2', () => {
+    const [, g] = hexToRgb(timelineSubFill('#ef4444'))
+    const [, gLadder] = hexToRgb(depthFill('#ef4444', 2))
+    // The ladder keeps 15% of the colour at depth 2, the chip 13%, so the chip is
+    // never the louder of the 2 and both sit close to white.
+    expect(g).toBeGreaterThanOrEqual(gLadder)
+    expect(g).toBeGreaterThan(215)
+  })
+
+  it('keeps the branch hue rather than going grey', () => {
+    const [r, g, b] = hexToRgb(timelineSubFill('#22c55e'))
+    expect(g).toBeGreaterThan(r)
+    expect(g).toBeGreaterThan(b)
+  })
+
+  it('is exactly tint() at TIMELINE_SUB_TINT, for every palette colour', () => {
+    for (const c of L1_PALETTE) expect(timelineSubFill(c)).toBe(tint(c, TIMELINE_SUB_TINT))
+  })
+
+  it('clears 4.5:1 against timelineSubText for every palette colour', () => {
+    const lum = ([r, g, b]: number[]) => {
+      const ch = (v: number) => { const x = v / 255; return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4 }
+      return 0.2126 * ch(r) + 0.7152 * ch(g) + 0.0722 * ch(b)
+    }
+    const rgb = (c: string) => c.startsWith('#') ? hexToRgb(c) : c.match(/\d+/g)!.map(Number)
+    for (const c of L1_PALETTE) {
+      const a = lum(rgb(timelineSubFill(c)))
+      const b = lum(rgb(timelineSubText(c)))
+      const ratio = (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05)
+      expect(ratio, `${c} chip`).toBeGreaterThanOrEqual(4.5)
+    }
   })
 })
 
@@ -210,18 +245,33 @@ describe('L1_PALETTE spacing and legibility', () => {
   // Same threshold Node.tsx / render-svg.ts isLight() use to choose text colour.
   function isLight(hex: string): boolean {
     const [r, g, b] = hexToRgb(hex)
-    return 0.2126 * r + 0.7152 * g + 0.0722 * b > 140
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b > 130
   }
 
-  it('has exactly 11 colours (the wheel plus 10 preset tiles plus the custom tile fill 2 rows of 6)', () => {
-    expect(L1_PALETTE).toHaveLength(11)
+  // The palette is now inherited verbatim from the Sequences participant palette
+  // (its lib/svg-renderer.ts PAL), so a branch here reads like a lane there. That
+  // order walks the colour wheel, which replaced the old "every neighbour >= 60
+  // degrees apart" rule - adjacent entries are deliberately close in hue now.
+  it('matches the Sequences participant palette, in order', () => {
+    expect(L1_PALETTE).toEqual([
+      '#ef4444', '#f97316', '#eab308', '#22c55e',
+      '#14b8a6', '#06b6d4', '#3b82f6', '#8b5cf6',
+      '#ec4899', '#f43f5e', '#84cc16', '#0891b2',
+    ])
   })
 
-  it('keeps every neighbouring pair at least 60 degrees apart in hue, wrapping around', () => {
-    for (let i = 0; i < L1_PALETTE.length; i++) {
+  it('has no duplicate entries', () => {
+    expect(new Set(L1_PALETTE).size).toBe(L1_PALETTE.length)
+  })
+
+  // The first 8 are what Sequences' own editor exposes and what a normal map uses;
+  // they must stay tellable apart at a glance. (The 12-colour tail repeats cyan's
+  // hue at a darker lightness, which is why the bound only covers the head.)
+  it('keeps the first 8 at least 15 degrees apart in hue from their neighbour', () => {
+    for (let i = 0; i < 7; i++) {
       const [hA] = hexToHsl(L1_PALETTE[i])
-      const [hB] = hexToHsl(L1_PALETTE[(i + 1) % L1_PALETTE.length])
-      expect(hueDistance(hA, hB)).toBeGreaterThanOrEqual(60)
+      const [hB] = hexToHsl(L1_PALETTE[i + 1])
+      expect(hueDistance(hA, hB)).toBeGreaterThanOrEqual(15)
     }
   })
 

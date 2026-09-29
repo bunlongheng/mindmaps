@@ -1,5 +1,6 @@
 import { test, expect } from './fixtures'
 import { createMap } from './helpers'
+import { L1_PALETTE } from '../src/lib/color'
 
 async function createMapAndOpenFormat(page: import('@playwright/test').Page) {
   await createMap(page)
@@ -138,7 +139,7 @@ test.describe('Format Panel — Node Editing', () => {
     // rendered fill is derived from its sortOrder, not its stored custom colour.
     // So the colour feature to verify is: fills match the wheel in order, and an
     // order change (delete reindexes sortOrder) re-derives the colours.
-    const WHEEL = ['#d94f3a', '#3ad9bf', '#d93abf']  // first 3 of L1_PALETTE in src/lib/color.ts
+    const WHEEL = L1_PALETTE.slice(0, 3).map(c => c.toLowerCase())
 
     // The node <g> has several layers (glow, selection outline); read the one shape
     // that carries a concrete colour fill (not none/transparent).

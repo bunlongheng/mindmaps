@@ -113,6 +113,17 @@ export const NODE_ICONS: IconEntry[] = [
 
 export const ICON_MAP = Object.fromEntries(NODE_ICONS.map(e => [e.name, e.Icon]))
 
+/**
+ * Plain-English names maps in the wild carry that no icon set ships, mapped to the
+ * closest one that exists. Without this the name resolves to nothing and the node
+ * renders with an empty badge - "gear" alone is on 4 maps.
+ */
+export const ICON_SYNONYMS: Readonly<Record<string, string>> = {
+  gear: 'cog', snow: 'snowflake', art: 'palette', tree: 'tree-pine', wave: 'waves',
+  'hot-spring': 'droplets', water: 'droplets', blood: 'droplet', shrine: 'landmark',
+  head: 'brain', leg: 'footprints', ingredients: 'utensils',
+}
+
 // ---------------------------------------------------------------------------
 // Fallback icon name registry (generated from the installed packages).
 // Lists every kebab-case name the old namespace lookup could resolve, so
