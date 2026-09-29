@@ -136,3 +136,76 @@ describe('render-svg - honeycomb', () => {
     expect(widths.size).toBe(1)
   })
 })
+
+describe('render-svg - fishbone edge parity with the canvas', () => {
+  // The share image and the home card are this renderer. Its fishbone branch was a copy
+  // of the timeline one, which paints the spine in segments BETWEEN the topic boxes - on
+  // a fishbone the topics sit far off the spine, so it drew stubs and no bone at all and
+  // every branch floated disconnected. These assert the shape the canvas draws
+  // (EdgeLayer's fishbone branch): 1 grey spine, 1 coloured diagonal per topic.
+  const nodes = [
+    { id: 'root', title: 'Root', color: '#6366f1', parentId: null, depth: 0, x: 0, y: 0, width: 0, height: 0 },
+    { id: 'up', title: 'Above the spine', color: '#ef4444', parentId: 'root', depth: 1, sortOrder: 0, x: 0, y: 0, width: 0, height: 0 },
+    { id: 'down', title: 'Below the spine', color: '#f97316', parentId: 'root', depth: 1, sortOrder: 1, x: 0, y: 0, width: 0, height: 0 },
+    { id: 'u1', title: 'Up child', color: '#ef4444', parentId: 'up', depth: 2, sortOrder: 0, x: 0, y: 0, width: 0, height: 0 },
+    { id: 'd1', title: 'Down child', color: '#f97316', parentId: 'down', depth: 2, sortOrder: 0, x: 0, y: 0, width: 0, height: 0 },
+    { id: 'u1a', title: 'Grandchild', color: '#ef4444', parentId: 'u1', depth: 3, sortOrder: 0, x: 0, y: 0, width: 0, height: 0 },
+  ]
+  const svg = renderMindmapSvg({ id: 'x', name: 'Fish', type: 'fishbone', line_style: 'straight', theme_id: 'default', nodes: nodes as never })
+  const lines = [...svg.matchAll(/<line x1="([-\d.]+)" y1="([-\d.]+)" x2="([-\d.]+)" y2="([-\d.]+)"[^>]*stroke="([^"]+)"/g)]
+    .map(m => ({ x1: +m[1], y1: +m[2], x2: +m[3], y2: +m[4], stroke: m[5].toLowerCase() }))
+
+  it('draws exactly 1 grey spine, running horizontally out of the root', () => {
+    const spine = lines.filter(l => l.stroke === '#64748b')
+    expect(spine).toHaveLength(1)
+    expect(spine[0].y1).toBe(spine[0].y2)
+    expect(spine[0].x2).toBeGreaterThan(spine[0].x1)
+  })
+
+  it('draws a slanted coloured bone per topic, 1 above the spine and 1 below', () => {
+    const spineY = lines.find(l => l.stroke === '#64748b')!.y1
+    // A bone is the only edge that is diagonal: both x and y move.
+    const bones = lines.filter(l => l.x1 !== l.x2 && l.y1 !== l.y2)
+    expect(bones).toHaveLength(2)
+    for (const b of bones) expect(b.y1).toBe(spineY)
+    expect(bones.some(b => b.y2 < spineY)).toBe(true)
+    expect(bones.some(b => b.y2 > spineY)).toBe(true)
+    expect(new Set(bones.map(b => b.stroke)).size).toBe(2)
+  })
+
+  it('leaves no node disconnected: every L2 and L3 gets its own horizontal stub', () => {
+    const flat = lines.filter(l => l.y1 === l.y2 && l.stroke !== '#64748b')
+    // 2 L2 stubs off the bones, plus 1 L3 horizontal.
+    expect(flat).toHaveLength(3)
+    for (const l of flat) expect(l.x2).toBeGreaterThan(l.x1)
+  })
+})
+
+describe('render-svg - timeline edge parity with the canvas', () => {
+  // There was no timeline branch at all: its code sat under the 'fishbone' label, so a
+  // timeline map fell through to the logic-chart edges on every share image and card.
+  const nodes = [
+    { id: 'root', title: 'Root', color: '#6366f1', parentId: null, depth: 0, x: 0, y: 0, width: 0, height: 0 },
+    { id: 'a', title: 'Phase A', color: '#ef4444', parentId: 'root', depth: 1, sortOrder: 0, x: 0, y: 0, width: 0, height: 0 },
+    { id: 'b', title: 'Phase B', color: '#f97316', parentId: 'root', depth: 1, sortOrder: 1, x: 0, y: 0, width: 0, height: 0 },
+    { id: 'a1', title: 'Step one', color: '#ef4444', parentId: 'a', depth: 2, sortOrder: 0, x: 0, y: 0, width: 0, height: 0 },
+    { id: 'a2', title: 'Step two', color: '#ef4444', parentId: 'a', depth: 2, sortOrder: 1, x: 0, y: 0, width: 0, height: 0 },
+    { id: 'b1', title: 'Step three', color: '#f97316', parentId: 'b', depth: 2, sortOrder: 0, x: 0, y: 0, width: 0, height: 0 },
+  ]
+  const svg = renderMindmapSvg({ id: 'x', name: 'TL', type: 'timeline', line_style: 'straight', theme_id: 'default', nodes: nodes as never })
+
+  it('paints the spine in coloured segments, never as 1 grey rail', () => {
+    const horiz = [...svg.matchAll(/<line x1="([-\d.]+)" y1="([-\d.]+)" x2="([-\d.]+)" y2="([-\d.]+)"[^>]*stroke="([^"]+)"/g)]
+      .map(m => ({ y1: +m[2], y2: +m[4], stroke: m[5].toLowerCase() }))
+      .filter(l => l.y1 === l.y2)
+    // 1 run into each topic plus the tail, all carrying a branch colour.
+    expect(horiz.length).toBeGreaterThanOrEqual(3)
+    expect(horiz.some(l => l.stroke === '#64748b')).toBe(false)
+    expect(new Set(horiz.map(l => l.stroke)).size).toBeGreaterThanOrEqual(2)
+  })
+
+  it('drops an elbow into every child, which the logic-chart fallback never drew', () => {
+    // 1 quadratic elbow per depth-2 node.
+    expect((svg.match(/ Q /g) ?? []).length).toBe(3)
+  })
+})

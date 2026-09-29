@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeFishboneLayout, FISHBONE_SLANT, autoW, fontWeightFor, boxH } from '../fishbone'
+import { computeFishboneLayout, FISHBONE_SLANT, FISHBONE_SLOPE, fishboneSlant, autoW, fontWeightFor, boxH } from '../fishbone'
 import { nodeFontSize, nodeMinWidth, nodePadX, iconZoneWidth, CHAR_W_RATIO } from '../../nodeMetrics'
 import type { MindmapNode } from '../../../types'
 
@@ -166,7 +166,7 @@ describe('computeFishboneLayout', () => {
     const l1 = byId(out, 'l1')
     // L1 center x = spineOriginX + SPINE_SEG + SLANT; spineOriginX = ROOT_X + rootW
     const spineOriginX = root.x + root.width
-    const expectedL1CX = spineOriginX + 340 + FISHBONE_SLANT
+    const expectedL1CX = spineOriginX + 340 + fishboneSlant(260 - boxH(1) / 2)
     expect(l1.x + l1.width / 2).toBeCloseTo(expectedL1CX, 5)
   })
 
@@ -278,5 +278,44 @@ describe('computeFishboneLayout', () => {
       expect(n.height).toBeGreaterThan(0)
       expect(n.manuallyPositioned).toBe(false)
     }
+  })
+})
+
+describe('computeFishboneLayout - every bone at the same angle', () => {
+  const mk = (id: string, parentId: string | null, depth: number, sortOrder = 0) =>
+    ({ id, title: id, color: '#ef4444', parentId, depth, sortOrder, x: 0, y: 0, width: 0, height: 0 }) as MindmapNode
+
+  // 4 topics of deliberately different weight: 1 bare, 1 with 5 groups of 4 children.
+  // Their bones drop different distances, which is exactly what used to change the angle.
+  const nodes: MindmapNode[] = [mk('root', null, 0)]
+  const shape = [0, 5, 1, 3]
+  shape.forEach((groups, t) => {
+    nodes.push(mk(`t${t}`, 'root', 1, t))
+    for (let g = 0; g < groups; g++) {
+      nodes.push(mk(`t${t}-g${g}`, `t${t}`, 2, g))
+      for (let c = 0; c < 4; c++) nodes.push(mk(`t${t}-g${g}-c${c}`, `t${t}-g${g}`, 3, c))
+    }
+  })
+
+  it('gives every bone the same slope, whatever its branch weighs', () => {
+    const out = computeFishboneLayout(nodes)
+    const root = out.find(n => n.depth === 0)!
+    const spineY = root.y + root.height / 2
+    const slopes = out.filter(n => n.depth === 1).map(l1 => {
+      const above = l1.y + l1.height / 2 < spineY
+      const drop = Math.abs((above ? l1.y + l1.height : l1.y) - spineY)
+      // Horizontal run the bone takes for that drop; parallel means run/drop is constant.
+      return fishboneSlant(drop) / drop
+    })
+    expect(slopes).toHaveLength(4)
+    for (const s of slopes) expect(s).toBeCloseTo(FISHBONE_SLOPE, 9)
+    // And the drops really do differ, or the assertion above proves nothing.
+    const drops = out.filter(n => n.depth === 1).map(l1 => Math.abs((l1.y + l1.height / 2 < spineY ? l1.y + l1.height : l1.y) - spineY))
+    expect(new Set(drops.map(d => Math.round(d))).size).toBeGreaterThan(1)
+  })
+
+  it('keeps the shortest bone at the slant it always had', () => {
+    expect(FISHBONE_SLANT).toBe(90)
+    expect(fishboneSlant(260 - boxH(1) / 2)).toBeCloseTo(FISHBONE_SLANT, 9)
   })
 })
