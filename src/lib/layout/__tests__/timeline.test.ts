@@ -78,7 +78,7 @@ describe('computeTimelineLayout', () => {
     expect(c.x).toBeGreaterThan(b.x)
   })
 
-  it('splits a topic with 2 or more blocks across the spine: first half stacks up, the rest stack down', () => {
+  it('keeps every child of one topic on that topic\'s own side of the spine', () => {
     const out = computeTimelineLayout([
       node({ id: 'root', depth: 0 }),
       node({ id: 'l1', parentId: 'root', depth: 1, sortOrder: 0 }),
@@ -90,10 +90,11 @@ describe('computeTimelineLayout', () => {
     const b = byId(out, 'l2b')
     const c = byId(out, 'l2c')
     const SPINE_Y = 400
-    // a and b above the spine, b further up; c below it
-    expect(a.y + a.height / 2).toBeLessThan(SPINE_Y)
-    expect(b.y).toBeLessThan(a.y)
-    expect(c.y + c.height / 2).toBeGreaterThan(SPINE_Y)
+    // sortOrder 0 is an even topic, so the whole block sits above the spine - and reads
+    // top to bottom in sort order there, same as it would below (Xmind)
+    for (const n of [a, b, c]) expect(n.y + n.height / 2).toBeLessThan(SPINE_Y)
+    expect(a.y).toBeLessThan(b.y)
+    expect(b.y).toBeLessThan(c.y)
   })
 
   it('stacks L2 nodes downward when below the spine', () => {
@@ -125,18 +126,21 @@ describe('computeTimelineLayout', () => {
     const a2 = byId(out, 'a2')
     const a3a = byId(out, 'a3a')
     const a3b = byId(out, 'a3b')
-    // above: L3 goes further up than its L2
-    expect(a3a.y).toBeLessThan(a2.y)
-    expect(a3b.y).toBeLessThan(a3a.y)
-    // L3s step in once more than their L2
-    expect(a3a.x).toBe(a2.x + 48)
+    // L3s chain to the RIGHT of their L2 and stack in sort order, whichever side of
+    // the spine the topic is on
+    expect(a3a.x).toBe(a2.x + a2.width + 40)
+    expect(a3b.x).toBe(a3a.x)
+    expect(a3b.y).toBeGreaterThan(a3a.y)
 
     const b2 = byId(out, 'b2')
     const b3a = byId(out, 'b3a')
     const b3b = byId(out, 'b3b')
-    // below: L3 goes further down than its L2
-    expect(b3a.y).toBeGreaterThan(b2.y)
+    expect(b3a.x).toBe(b2.x + b2.width + 40)
     expect(b3b.y).toBeGreaterThan(b3a.y)
+    // the stack is centred on its L2, so it straddles the L2's own centre line
+    const a2cy = a2.y + a2.height / 2
+    expect(a3a.y).toBeLessThan(a2cy)
+    expect(a3b.y + a3b.height).toBeGreaterThan(a2cy)
   })
 
   it('uses stored L2/L3 heights when greater than zero, defaults otherwise', () => {

@@ -112,7 +112,7 @@ describe('render-svg - honeycomb', () => {
     expect((svg.match(/<rect/g) ?? []).length).toBe(1)
   })
 
-  it('mesh (the default): cells only, no connector lines, every polygon the same size', () => {
+  it('mesh (the default): 1 connector per topic and nothing deeper, every polygon the same size', () => {
     const nodes = [
       { id: 'root', title: 'Root Topic', color: '#6366f1', parentId: null, depth: 0, x: 0, y: 0, width: 0, height: 0 },
       { id: 'a', title: 'Alpha', color: '#D94F3A', parentId: 'root', depth: 1, sortOrder: 0, x: 0, y: 0, width: 0, height: 0 },
@@ -120,9 +120,16 @@ describe('render-svg - honeycomb', () => {
       { id: 'a1', title: 'Alpha child', color: '#D94F3A', parentId: 'a', depth: 2, sortOrder: 0, x: 0, y: 0, width: 0, height: 0 },
     ]
     const svg = renderMindmapSvg({ id: 'x', name: 'Mesh', type: 'honeycomb', line_style: 'curved', theme_id: 'default', nodes: nodes as never })
-    expect((svg.match(/<polygon/g) ?? []).length).toBe(4)
+    // 4 node cells, plus the empty filler ring that finishes the silhouette
+    expect((svg.match(/<polygon points=/g) ?? []).length).toBe(4)
+    expect((svg.match(/<polygon class="mesh-filler"/g) ?? []).length).toBeGreaterThan(0)
+    // The root and both topics touch in the core, and an island's own cells touch each
+    // other, so the only link is the 1 per topic out to its island - drawn along the
+    // lattice, never as a straight diagonal. only 'a' has children, so only 'a' gets one.
     expect((svg.match(/<line/g) ?? []).length).toBe(0)
-    const widths = new Set([...svg.matchAll(/<polygon points="([^"]+)"/g)].map(m => {
+    expect((svg.match(/<polyline class="mesh-link"/g) ?? []).length).toBe(1)
+    // every hexagon, cell or filler, is drawn at the same radius
+    const widths = new Set([...svg.matchAll(/<polygon[^>]*points="([^"]+)"/g)].map(m => {
       const xs = m[1].split(' ').map(p => parseFloat(p.split(',')[0]))
       return Math.round(Math.max(...xs) - Math.min(...xs))
     }))

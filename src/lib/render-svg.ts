@@ -13,10 +13,10 @@ import type { MindmapNode, DiagramType, LineStyle } from '../types/index.js'
 import { computeMindmapsLayout } from './layout/mindmaps-layout.js'
 import { computeMindmapLayout, wrapText, initialFontSize, nodeInitial, radialLabelFor, radialNodeExtent, LABEL_FONT, RADIAL_ROOT_FONT } from './layout/mindmap.js'
 import { computeFishboneLayout, FISHBONE_SLANT } from './layout/fishbone.js'
-import { computeTimelineLayout } from './layout/timeline.js'
+import { computeTimelineLayout, TIMELINE_ELBOW_R } from './layout/timeline.js'
 import { computeHoneycombLayout } from './layout/honeycomb.js'
 import { getTheme } from './themes.js'
-import { LABEL_TEXT,
+import { LABEL_TEXT, timelineSubFill, timelineSubText,
   hexToRgb, darken, depthFill, applyDepthTransparency, edgeWidthForDepth,
   radialEdgeWidth, RADIAL_EDGE_OPACITY, isDarkBg, lighten, neonFilterId, neonFilterSpecs,
   neonRootColor, NEON_CORE_OPACITY, NEON_EDGE_CORE_OPACITY, NEON_EDGE_FILTER,
@@ -33,7 +33,7 @@ import { parseLinkedTitle, sliceSegments, lineRanges, type LinkSegment } from '.
 import { nodeCenter, nodeCenterLeft, nodeCenterRight, buildStraightPath, buildCurvedPath, buildOrthogonalPath, buildRadialBranchPath } from './geometry.js'
 import { computeSubtreeCounts } from './nodeCounts.js'
 import { GLOSS_LINEAR_ID, GLOSS_RADIAL_ID, glossApplies, glossOpacity, glossDefsSvg } from './gloss.js'
-import { hexCellLayout, hexPoints, hexFontSize, hexFill, hexTextColor, combSizeOf, combStyleOf, drawnCellRadius, hexDoorEdge, meshGroupOutlines, meshCellRadius } from './hex.js'
+import { hexCellLayout, hexPoints, hexFontSize, hexFill, hexTextColor, combSizeOf, combStyleOf, drawnCellRadius, hexDoorEdge, meshFillerCells, meshGroupOutlines, meshCellRadius, meshTopicLinks, meshWallColor, MESH_WALL_WIDTH } from './hex.js'
 import type { CombSize, CombStyle } from './hex.js'
 
 // The stored DB row shape (SELECT in api/mindmaps.ts / INSERT in api/ai/mindmaps.ts).
@@ -60,7 +60,7 @@ const r2 = (v: number): number => Math.round(v * 100) / 100
 function isLight(hex: string): boolean {
   if (!hex.startsWith('#')) return true
   const [r, g, b] = hexToRgb(hex)
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b > 140
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b > 130
 }
 
 /** Layout dispatch (mindmapStore runLayout). */
@@ -141,7 +141,13 @@ function renderEdges(nodes: MindmapNode[], type: DiagramType, lineStyle: LineSty
   // Honeycomb: a straight centre-to-centre line per parent/child pair, in the branch
   // colour, no order badges - identical to the canvas (EdgeLayer.tsx).
   if (type === 'honeycomb') {
-    if (combStyleOf(nodes) === 'mesh') return ''   // a mesh has no connector lines
+    // In a mesh the root and every topic already touch, and so does everything inside
+    // an island - the only link the empty comb broke is topic to its own cluster.
+    if (combStyleOf(nodes) === 'mesh') {
+      return meshTopicLinks(nodes).map(({ from, points }) =>
+        `<polyline class="mesh-link" points="${points.map(p => `${r2(p.x)},${r2(p.y)}`).join(' ')}" fill="none" stroke="${esc(pc(from))}" stroke-width="${MESH_WALL_WIDTH}" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>`
+      ).join('')
+    }
     const edges = nodes.filter(n => n.parentId && nodeMap.has(n.parentId))
     return edges.map(n => {
       const parent = nodeMap.get(n.parentId!)!
@@ -180,50 +186,20 @@ function renderEdges(nodes: MindmapNode[], type: DiagramType, lineStyle: LineSty
       ? Math.max(...l1s.map(n => n.x + n.width / 2 - FISHBONE_SLANT)) + FISHBONE_SLANT * 1.3
       : root.x + root.width + 400
     const parts: string[] = []
-    parts.push(`<line x1="${r2(root.x + root.width)}" y1="${r2(spineY)}" x2="${r2(spineEndX)}" y2="${r2(spineY)}" stroke="#64748b" stroke-width="3" stroke-linecap="round"/>`)
+    const w1 = edgeWidthForDepth(1)
+    const w2 = edgeWidthForDepth(2)
+    // Same as the canvas: the spine is drawn in segments, each carrying the colour of
+    // the topic it leads into, in the gaps between the boxes.
+    let cursorX = root.x + root.width
     for (const l1 of l1s) {
-      const l1CX = l1.x + l1.width / 2
-      const l1CY = l1.y + l1.height / 2
-      const attachX = l1CX - FISHBONE_SLANT
-      const above = l1CY < spineY
-      const l1EdgeY = above ? l1.y + l1.height : l1.y
-      parts.push(`<line x1="${r2(attachX)}" y1="${r2(spineY)}" x2="${r2(l1CX)}" y2="${r2(l1EdgeY)}" stroke="${esc(pc(l1))}" stroke-width="${edgeWidthForDepth(1)}" stroke-linecap="round"/>`)
+      parts.push(`<line x1="${r2(cursorX)}" y1="${r2(spineY)}" x2="${r2(l1.x)}" y2="${r2(spineY)}" stroke="${esc(pc(l1))}" stroke-width="${w1}" stroke-linecap="round"/>`)
+      cursorX = l1.x + l1.width
     }
-    for (const l2 of nodes.filter(n => n.depth === 2)) {
-      const l1 = nodeMap.get(l2.parentId ?? '')
-      if (!l1) continue
-      const l1CX = l1.x + l1.width / 2
-      const l1CY = l1.y + l1.height / 2
-      const attachX = l1CX - FISHBONE_SLANT
-      const above = l1CY < spineY
-      const l1EdgeY = above ? l1.y + l1.height : l1.y
-      const boneEdgeH = Math.abs(l1EdgeY - spineY)
-      const l2CY = l2.y + l2.height / 2
-      const t = above ? (spineY - l2CY) / boneEdgeH : (l2CY - spineY) / boneEdgeH
-      const diagX = attachX + FISHBONE_SLANT * t
-      const nodeEdgeX = l2.x + (l2.height * 0.35) / 2
-      parts.push(`<line x1="${r2(diagX)}" y1="${r2(l2CY)}" x2="${r2(nodeEdgeX)}" y2="${r2(l2CY)}" stroke="${esc(pc(l2))}" stroke-width="${edgeWidthForDepth(2)}" stroke-linecap="round"/>`)
-    }
-    for (const n of nodes.filter(n => n.depth >= 3)) {
-      const parent = nodeMap.get(n.parentId ?? '')
-      if (!parent) continue
-      parts.push(`<line x1="${r2(parent.x + parent.width)}" y1="${r2(parent.y + parent.height / 2)}" x2="${r2(n.x)}" y2="${r2(n.y + n.height / 2)}" stroke="${esc(pc(n))}" stroke-width="${edgeWidthForDepth(n.depth)}" stroke-linecap="round"/>`)
-    }
-    return parts.join('')
-  }
+    const tailColor = l1s.length > 0 ? pc(l1s[l1s.length - 1]) : '#94a3b8'
+    parts.push(`<line x1="${r2(cursorX)}" y1="${r2(spineY)}" x2="${r2(spineEndX)}" y2="${r2(spineY)}" stroke="${esc(tailColor)}" stroke-width="${w1}" stroke-linecap="round"/>`)
 
-  if (type === 'timeline') {
-    const root = nodes.find(n => n.parentId === null)
-    if (!root) return ''
-    const l1s = nodes.filter(n => n.depth === 1).sort((a, b) => a.x - b.x)
-    const spineY = root.y + root.height / 2
-    const spineEndX = l1s.length > 0
-      ? l1s[l1s.length - 1].x + l1s[l1s.length - 1].width + 24
-      : root.x + root.width + 400
-    const parts: string[] = []
-    parts.push(`<line x1="${r2(root.x + root.width)}" y1="${r2(spineY)}" x2="${r2(spineEndX)}" y2="${r2(spineY)}" stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round"/>`)
     for (const l1 of l1s) {
-      const branchX = l1.x
+      const branchX = l1.x + l1.width / 2
       const descendants = nodes.filter(n => {
         let cur = nodeMap.get(n.parentId ?? '')
         while (cur) {
@@ -232,16 +208,23 @@ function renderEdges(nodes: MindmapNode[], type: DiagramType, lineStyle: LineSty
         }
         return false
       })
-      // Same as the canvas: the branch spans the topmost to the bottommost descendant.
-      const centres = descendants.map(n => n.y + n.height / 2)
-      const topY = Math.min(l1.y, ...centres)
-      const bottomY = Math.max(l1.y + l1.height, ...centres)
-      if (descendants.length > 0) {
-        parts.push(`<line x1="${r2(branchX)}" y1="${r2(topY)}" x2="${r2(branchX)}" y2="${r2(bottomY)}" stroke="${esc(pc(l1))}" stroke-width="${edgeWidthForDepth(2)}" stroke-linecap="round"/>`)
+      const onTrunk = descendants.filter(n => n.parentId === l1.id)
+      if (onTrunk.length === 0) continue
+      const centres = onTrunk.map(n => n.y + n.height / 2)
+      const above = centres[0] < spineY
+      const dir = above ? -1 : 1
+      const nearEdgeY = above ? l1.y : l1.y + l1.height
+      const farCY = above ? Math.min(...centres) : Math.max(...centres)
+      const col = esc(pc(l1))
+      parts.push(`<line x1="${r2(branchX)}" y1="${r2(nearEdgeY)}" x2="${r2(branchX)}" y2="${r2(farCY - dir * TIMELINE_ELBOW_R)}" stroke="${col}" stroke-width="${w2}" stroke-linecap="round"/>`)
+      for (const n of onTrunk) {
+        const cy = n.y + n.height / 2
+        parts.push(`<path d="M ${r2(branchX)} ${r2(cy - dir * TIMELINE_ELBOW_R)} Q ${r2(branchX)} ${r2(cy)} ${r2(branchX + TIMELINE_ELBOW_R)} ${r2(cy)} L ${r2(n.x)} ${r2(cy)}" fill="none" stroke="${col}" stroke-width="${w2}" stroke-linecap="round"/>`)
       }
-      for (const n of descendants) {
-        const nodeCY = n.y + n.height / 2
-        parts.push(`<line x1="${r2(branchX)}" y1="${r2(nodeCY)}" x2="${r2(n.x)}" y2="${r2(nodeCY)}" stroke="${esc(pc(l1))}" stroke-width="${edgeWidthForDepth(n.depth)}" stroke-linecap="round"/>`)
+      for (const n of descendants.filter(d => d.parentId !== l1.id)) {
+        const parent = nodeMap.get(n.parentId!)
+        if (!parent) continue
+        parts.push(`<line x1="${r2(parent.x + parent.width)}" y1="${r2(parent.y + parent.height / 2)}" x2="${r2(n.x)}" y2="${r2(n.y + n.height / 2)}" stroke="${col}" stroke-width="${edgeWidthForDepth(n.depth)}" stroke-linecap="round"/>`)
       }
     }
     return parts.join('')
@@ -321,7 +304,7 @@ function centeredWrappedText(label: string, segments: LinkSegment[], cx: number,
   return `<text text-anchor="middle" font-size="${fontSize}" font-weight="${fontWeight}" fill="${esc(fill)}">${tspans}</text>`
 }
 
-function renderNode(node: MindmapNode, type: DiagramType, paletteColor: string | null, descendants = 0, rootCenter: { x: number; y: number } | null = null, neon = false, gloss = false, combSize: CombSize = 'outward', hex: { style: CombStyle; radius: number; wall: string } | null = null): string {
+function renderNode(node: MindmapNode, type: DiagramType, paletteColor: string | null, descendants = 0, rootCenter: { x: number; y: number } | null = null, neon = false, gloss = false, combSize: CombSize = 'outward', hex: { style: CombStyle; radius: number } | null = null): string {
   const isRoot = node.depth === 0
   const isL2Plus = node.depth >= 2
   const isFishboneNode = type === 'fishbone' && node.depth >= 1
@@ -339,7 +322,8 @@ function renderNode(node: MindmapNode, type: DiagramType, paletteColor: string |
   const drawCircle = !isHex && nodeShape === 'circle'
   const effectiveRx = isRoot ? rx
     : nodeShape ? shapeRx(nodeShape, node.height, rx)
-    : isFishboneNode ? 0 : rx
+    : isFishboneNode ? 0
+    : type === 'timeline' ? 6 : rx
 
   const isRootPill = isRoot && type !== 'mindmap' && type !== 'honeycomb' && (
     node.shape === 'pill' ? true :
@@ -355,14 +339,20 @@ function renderNode(node: MindmapNode, type: DiagramType, paletteColor: string |
     bg = hexFill(col, node.depth)
     textColor = hexTextColor(node.depth)
     const isMesh = hex?.style === 'mesh'
-    strokeColor = isMesh ? hex!.wall : isRoot ? '#1a1d2e' : darken(col, 0.25)
+    strokeColor = isMesh ? meshWallColor(col, node.depth) : isRoot ? '#1a1d2e' : darken(col, 0.25)
     strokeW = isMesh ? 3 : isRoot ? 4 : 2
   } else if (isRoot) {
     bg = '#1a1d2e'; textColor = '#ffffff'; strokeColor = '#1a1d2e'; strokeW = 5
   } else if (isL2Plus) {
-    // Same shared depth ladder as the canvas (src/lib/color depthFill).
-    bg = col.startsWith('#') ? depthFill(col, node.depth) : '#f8fafc'
-    textColor = LABEL_TEXT
+    // Same shared depth ladder as the canvas (src/lib/color depthFill), and the
+    // same timeline exception: pale chips so the spine's L1 boxes read first.
+    const timelineSub = type === 'timeline' && col.startsWith('#')
+    bg = col.startsWith('#')
+      ? (timelineSub ? timelineSubFill(col) : depthFill(col, node.depth))
+      : '#f8fafc'
+    textColor = timelineSub ? timelineSubText(col) : LABEL_TEXT
+    // Same as the canvas: every box below the root carries its branch colour in the
+    // border, the timeline's pale chips included.
     strokeColor = col
     strokeW = isRadialDot ? 1 : 2
   } else {
@@ -622,7 +612,18 @@ export function renderMindmapSvg(row: MindmapRow): string {
   const parentsById = new Map(nodes.map(n => [n.id, n]))
   const nodeMarkup = nodes.map(n =>
     renderNode(n, type, paletteColors.get(n.id) ?? null, descendantCounts.get(n.id) ?? 0, rootCenter, neon, gloss, combSize,
-      type === 'honeycomb' ? { style: combStyle, radius: drawnCellRadius(n, nodes, combStyle, combSize), wall: theme.canvasBg } : null)).join('')
+      type === 'honeycomb' ? { style: combStyle, radius: drawnCellRadius(n, nodes, combStyle, combSize) } : null)).join('')
+  // One ring of empty comb behind the cells, exactly as DiagramCanvas draws it.
+  const fillerMarkup = type === 'honeycomb' && combStyle === 'mesh'
+    ? (() => {
+        const R = meshCellRadius(nodes, combSize)
+        const dark = isDarkBg(theme.canvasBg)
+        const fill = dark ? 'rgba(255,255,255,0.045)' : 'rgba(15,23,42,0.035)'
+        return meshFillerCells(nodes, R, 2)
+          .map(c => `<polygon class="mesh-filler" points="${hexPoints(c.x, c.y, R)}" fill="${fill}" stroke="${theme.canvasBg}" stroke-width="${MESH_WALL_WIDTH}" stroke-linejoin="round"/>`)
+          .join('')
+      })()
+    : ''
   // Mesh doorways above every cell, exactly as DiagramCanvas layers them.
   const doorMarkup = type === 'honeycomb' && combStyle === 'mesh' ? nodes.map(n => {
     const p = n.parentId ? parentsById.get(n.parentId) : undefined
@@ -666,7 +667,9 @@ export function renderMindmapSvg(row: MindmapRow): string {
   const defs = `<defs>${gloss ? glossDefsSvg() : ''}${mmDefs}</defs>`
 
   // viewBox from laid-out bounds (+ slack for spines that extend past the nodes)
-  const pad = 60
+  // The empty filler ring sits 1 cell outside the outermost node, so the viewport has
+  // to grow by that much or the share image clips it.
+  const pad = 60 + (fillerMarkup ? meshCellRadius(nodes, combSize) * 2 : 0)
   const box = nodes.map(n => nodeBounds(n, type, rootCenter))
   const minX = Math.min(...box.map(b => b.left)) - pad
   const minY = Math.min(...box.map(b => b.top)) - pad
@@ -679,5 +682,5 @@ export function renderMindmapSvg(row: MindmapRow): string {
     `<title>${esc(row.name)}</title>` +
     defs +
     `<rect x="${r2(minX)}" y="${r2(minY)}" width="${w}" height="${hgt}" fill="${theme.canvasBg}"/>` +
-    `<g>${edges}</g><g>${nodeMarkup}</g><g>${doorMarkup}</g><g>${groupMarkup}</g></svg>`
+    `<g>${fillerMarkup}</g><g>${edges}</g><g>${nodeMarkup}</g><g>${doorMarkup}</g><g>${groupMarkup}</g></svg>`
 }

@@ -158,15 +158,21 @@ describe('Node — rendering by depth / type', () => {
       cleanup()
       return rect!
     }
+    const f1 = fillOf(1)
     const f2 = fillOf(2)
     const f3 = fillOf(3)
+    expect(f1).toBe(base)
     expect(f2).toBe(depthFill(base, 2))
     expect(f3).toBe(depthFill(base, 3))
+    const [, g1] = hexToRgb(f1)
     const [r2, g2, b2] = hexToRgb(f2)
     const [r3, g3, b3] = hexToRgb(f3)
-    // Depth 3 is the weaker (whiter) fill by a wide, eye-visible margin
-    expect(g3 - g2).toBeGreaterThanOrEqual(20)
-    expect(b3 - b2).toBeGreaterThanOrEqual(20)
+    // A topic keeps the solid colour and its list is a pale wash, so the 2 layers
+    // never read as 1 block - the whole point of the logic chart's ladder.
+    expect(g2 - g1).toBeGreaterThanOrEqual(100)
+    // Depth 3 is the weaker (whiter) fill again
+    expect(g3 - g2).toBeGreaterThanOrEqual(5)
+    expect(b3 - b2).toBeGreaterThanOrEqual(5)
     expect(r3).toBeGreaterThanOrEqual(r2)
   })
 
@@ -419,7 +425,7 @@ describe('Node — child / descendant counts (fireflies)', () => {
     expect(container.querySelector('rect[fill="#ED1C24"]')).toBeTruthy()
   })
 
-  it('a manual-coloured depth-1 node renders that colour, and its child renders depthFill(that colour, 2)', () => {
+  it('a manual-coloured depth-1 node renders that colour, and its child renders a pale wash of it', () => {
     const manualColor = '#123456'
     const l1 = makeNode({ id: 'a', colorMode: 'manual', color: manualColor })
     const l2 = makeNode({ id: 'b', parentId: 'a', depth: 2, color: manualColor })

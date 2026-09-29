@@ -54,11 +54,13 @@ describe('computeFishboneLayout', () => {
     expect(byId(iconRoot, 'root').width).toBeGreaterThanOrEqual(byId(plain, 'root').width)
   })
 
-  it('caps auto width at 1200 for very long titles', () => {
-    const out = computeFishboneLayout([
-      node({ id: 'root', depth: 0, title: 'x'.repeat(400) }),
-    ])
-    expect(byId(out, 'root').width).toBe(1200)
+  // No width cap: a capped box still drew its full <text>, so a long title spilled past
+  // its own edge and over the next bone. The box must always contain the label.
+  it('grows without a cap so a very long title never renders outside its box', () => {
+    const title = 'x'.repeat(400)
+    const out = computeFishboneLayout([node({ id: 'root', depth: 0, title })])
+    expect(byId(out, 'root').width).toBeGreaterThan(1200)
+    expect(byId(out, 'root').width).toBeGreaterThanOrEqual(title.length * nodeFontSize(0) * CHAR_W_RATIO)
   })
 
   it('alternates L1 bones above and below the spine', () => {
@@ -219,7 +221,6 @@ describe('computeFishboneLayout', () => {
     const fallbackMeasured = title.length * nodeFontSize(1) * CHAR_W_RATIO // jsdom fallback
     const w = autoW(title, 1, false)
     expect(w).toBeGreaterThanOrEqual(fallbackMeasured) // fits the measured text - not silently cut
-    expect(w).toBeLessThanOrEqual(1200) // documented max clamp
   })
 
   it('applies the same measured-width + padding + icon-zone treatment at every fishbone depth', () => {

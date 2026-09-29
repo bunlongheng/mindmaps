@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render, cleanup } from '@testing-library/react'
+import { TIMELINE_ELBOW_R } from '../../../lib/layout/timeline'
 import { EdgeLayer } from '../EdgeLayer'
 import { useMindmapStore } from '../../../store/mindmapStore'
 import type { DiagramType, LineStyle, MindmapNode } from '../../../types'
@@ -292,6 +293,41 @@ describe('EdgeLayer — timeline', () => {
   it('extends spine to default with no L1 nodes', () => {
     const { container } = renderLayer([root], 'straight', 'timeline')
     expect(container.querySelectorAll('line').length).toBe(1)
+  })
+
+  it('drops the trunk from the box centre and stops it at the last elbow', () => {
+    const trunk = (nodes: ReturnType<typeof n>[]) => {
+      const { container } = renderLayer(nodes, 'straight', 'timeline')
+      const l = [...container.querySelectorAll('line')]
+        .find(e => e.getAttribute('x1') === e.getAttribute('x2'))!
+      return { x: Number(l.getAttribute('x1')), y1: Number(l.getAttribute('y1')), y2: Number(l.getAttribute('y2')) }
+    }
+    const branchX = l1.x + l1.width / 2
+    // above: leaves the box's top edge, stops ELBOW_R short of the last child's centre
+    const a = trunk([root, l1, l2above])
+    expect(a.x).toBe(branchX)
+    expect(a.y1).toBe(l1.y)
+    expect(a.y2).toBe(l2above.y + l2above.height / 2 + TIMELINE_ELBOW_R)
+    // below: leaves the box's bottom edge, same rule mirrored
+    const b = trunk([root, l1, l2below])
+    expect(b.y1).toBe(l1.y + l1.height)
+    expect(b.y2).toBe(l2below.y + l2below.height / 2 - TIMELINE_ELBOW_R)
+  })
+
+  it('draws a rounded elbow off the trunk into each child', () => {
+    const { container } = renderLayer([root, l1, l2above], 'straight', 'timeline')
+    const d = container.querySelector('path')!.getAttribute('d')!
+    expect(d).toContain('Q')
+    expect(container.querySelector('path')!.getAttribute('fill')).toBe('none')
+  })
+
+  it('paints each spine segment in the colour of the topic it leads into', () => {
+    const l1b = n({ id: 'l1b', depth: 1, parentId: 'root', x: 700, y: 300, width: 120, height: 40, color: '#f59e0b' })
+    const { container } = renderLayer([root, l1, l1b], 'straight', 'timeline')
+    const horiz = [...container.querySelectorAll('line')]
+      .filter(e => e.getAttribute('y1') === e.getAttribute('y2'))
+    expect(horiz[0].getAttribute('stroke')).toBe(l1.color)
+    expect(horiz[1].getAttribute('stroke')).toBe(l1b.color)
   })
 
   it('sorts multiple L1 nodes by x (sort comparator runs)', () => {

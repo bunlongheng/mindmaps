@@ -1,5 +1,5 @@
 import type { MindmapNode } from '../types/index.js'
-import { hexToRgb, LABEL_TEXT } from './color.js'
+import { hexToRgb, darken, LABEL_TEXT } from './color.js'
 import { wrapText } from './layout/mindmap.js'
 import { estimateTextWidth } from './nodeMetrics.js'
 import { displayTitle } from './links.js'
@@ -51,7 +51,7 @@ export function hexRadius(depth: number, size: CombSize = 'outward'): number {
 export function hexPoints(cx: number, cy: number, r: number): string {
   const pts: string[] = []
   for (let k = 0; k < 6; k++) {
-    const angle = (-90 + 60 * k) * (Math.PI / 180)
+    const angle = (-90 + 60 * k) * Math.PI / 180
     const x = Math.round((cx + r * Math.cos(angle)) * 100) / 100
     const y = Math.round((cy + r * Math.sin(angle)) * 100) / 100
     pts.push(`${x},${y}`)
@@ -216,6 +216,118 @@ export function hexDoorEdge(cx: number, cy: number, r: number, tx: number, ty: n
 const EDGE_NEIGHBOUR: readonly (readonly [number, number])[] = [[1, -1], [1, 0], [0, 1], [-1, 1], [-1, 0], [0, -1]]
 
 export interface MeshGroupOutline { parentId: string; depth: number; d: string }
+
+/**
+ * Free lattice cells within `rings` of any occupied cell: the empty comb that finishes a
+ * mesh's silhouette, so a map ends on a honeycomb edge instead of a ragged one. Returns
+ * each cell's centre, in ring order outward; the caller draws the hexagon at `R`.
+ */
+/** Weight of the wall between 2 touching cells - what a mesh connector matches. */
+export const MESH_WALL_WIDTH = 3
+
+/**
+ * Colour of a mesh cell's wall. The same darkened branch colour the island's own
+ * outline is drawn in (meshGroupOutlines), so the wall a cell shares with a sibling
+ * matches the border around the pair instead of cutting it with a canvas-coloured gap.
+ */
+export function meshWallColor(baseHex: string, depth: number): string {
+  if (depth === 0) return '#1a1d2e'
+  return baseHex.startsWith('#') ? darken(baseHex, 0.45) : baseHex
+}
+
+/**
+ * The 1 connector a mesh still needs per topic: its core cell out to the nearest cell of
+ * its own island, which the line of empty comb between them broke apart. Everything else
+ * in a mesh touches, so nothing else gets a line.
+ *
+ * The run follows the comb grid itself - it walks the lattice VERTEX to VERTEX along real
+ * hexagon edges, so every segment lies on a wall of the empty comb it crosses. A straight
+ * diagonal between 2 cell centres cuts across the grid and reads as a foreign line; this
+ * zigzags exactly where the comb walls already are.
+ */
+export function meshTopicLinks(nodes: readonly MindmapNode[]): { from: MindmapNode; points: { x: number; y: number }[] }[] {
+  const mid = (n: MindmapNode) => ({ x: n.x + n.width / 2, y: n.y + n.height / 2 })
+  const gap = (p: { x: number; y: number }, q: { x: number; y: number }) => Math.hypot(p.x - q.x, p.y - q.y)
+  const out: { from: MindmapNode; points: { x: number; y: number }[] }[] = []
+  for (const l1 of nodes) {
+    if (l1.depth !== 1) continue
+    const a = mid(l1)
+    let best: MindmapNode | null = null, bestD = Infinity
+    for (const k of nodes) {
+      if (k.parentId !== l1.id) continue
+      const d = gap(mid(k), a)
+      if (d < bestD) { bestD = d; best = k }
+    }
+    if (!best) continue
+    const R = l1.width / 2
+    const b = mid(best)
+    // The corner of a cell nearest the other end: where the walk joins the grid.
+    const corner = (c: { x: number; y: number }, to: { x: number; y: number }) => {
+      let pick = { x: 0, y: 0, k: 0 }, pickD = Infinity
+      for (let k = 0; k < 6; k++) {
+        const ang = (-90 + 60 * k) * Math.PI / 180
+        const v = { x: c.x + R * Math.cos(ang), y: c.y + R * Math.sin(ang), k }
+        const d = gap(v, to)
+        if (d < pickD) { pickD = d; pick = v }
+      }
+      return pick
+    }
+    const from = corner(a, b), to = corner(b, a)
+    // A honeycomb's corners alternate: from one the 3 edges run down-left, down-right and
+    // straight up, from the next they run the other way. Stepping flips which it is.
+    const half = (Math.sqrt(3) / 2) * R
+    const steps = (up: boolean): [number, number][] => up
+      ? [[half, R / 2], [-half, R / 2], [0, -R]]
+      : [[half, -R / 2], [-half, -R / 2], [0, R]]
+    const points: { x: number; y: number }[] = [{ x: from.x, y: from.y }]
+    let cur = { x: from.x, y: from.y }
+    let prev: { x: number; y: number } | null = null
+    let up = from.k % 2 === 0
+    for (let i = 0; i < 64 && gap(cur, to) > 1; i++) {
+      let next: { x: number; y: number } | null = null, nextD = Infinity
+      for (const [dx, dy] of steps(up)) {
+        const p = { x: cur.x + dx, y: cur.y + dy }
+        if (prev && gap(p, prev) < 1) continue
+        const d = gap(p, to)
+        if (d < nextD) { nextD = d; next = p }
+      }
+      if (!next) break
+      prev = cur; cur = next; up = !up
+      points.push(cur)
+    }
+    out.push({ from: l1, points })
+  }
+  return out
+}
+
+export function meshFillerCells(nodes: readonly MindmapNode[], R: number, rings = 1): { x: number; y: number }[] {
+  const key = (q: number, r: number) => `${q},${r}`
+  const occupied = new Set<string>()
+  let frontier: [number, number][] = []
+  for (const n of nodes) {
+    const cx = n.x + n.width / 2, cy = n.y + n.height / 2
+    const r = Math.round(cy / (1.5 * R))
+    const q = Math.round(cx / (Math.sqrt(3) * R) - r / 2)
+    if (occupied.has(key(q, r))) continue
+    occupied.add(key(q, r))
+    frontier.push([q, r])
+  }
+  const filler: [number, number][] = []
+  for (let ring = 0; ring < rings; ring++) {
+    const next: [number, number][] = []
+    for (const [q, r] of frontier) {
+      for (const [dq, dr] of HEX_DIRS) {
+        const a = q + dq, b = r + dr, k = key(a, b)
+        if (occupied.has(k)) continue
+        occupied.add(k)
+        filler.push([a, b])
+        next.push([a, b])
+      }
+    }
+    frontier = next
+  }
+  return filler.map(([q, r]) => axialToCenter(q, r, R))
+}
 
 /**
  * Outlines for a mesh: every parent and its direct children form 1 group, and the

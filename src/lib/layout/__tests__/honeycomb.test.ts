@@ -136,13 +136,30 @@ describe('computeHoneycombLayout - mesh (the default)', () => {
       expect(touching.some(o => branch(o) === branch(n))).toBe(true)
     }
   })
-  it('seats every depth-1 topic against the root when there are 6 or fewer', () => {
+  it('seats every depth-1 topic against the root, and every island clear of the core', () => {
     const nodes = [mk('root', null, 0, 0, 'Root'), ...[0, 1, 2, 3, 4, 5].map(i => mk(`t${i}`, 'root', 1, i, `T${i}`))]
     const out = computeHoneycombLayout(nodes)
     const R = out[0].width / 2
     const rc = { x: out[0].x + R, y: out[0].y + R }
+    const touching = Math.sqrt(3) * R
+    // The black root cell and every solid topic cell make 1 connected core.
     for (const n of out.filter(n => n.depth === 1)) {
-      expect(Math.hypot(n.x + R - rc.x, n.y + R - rc.y)).toBeCloseTo(Math.sqrt(3) * R, 3)
+      expect(Math.hypot(n.x + R - rc.x, n.y + R - rc.y)).toBeCloseTo(touching, 3)
+    }
+    // A topic's own children sit out past the core, never touching it or another island.
+    const deep = [mk('root', null, 0, 0, 'Root'),
+      ...[0, 1, 2, 3, 4, 5].map(i => mk(`t${i}`, 'root', 1, i, `T${i}`)),
+      ...[0, 1, 2].flatMap(i => [0, 1].map(j => mk(`c${i}${j}`, `t${i}`, 2, j, `C${i}.${j}`)))]
+    const out2 = computeHoneycombLayout(deep)
+    const byId2 = new Map(out2.map(n => [n.id, n]))
+    const mid = (n: MindmapNode) => ({ x: n.x + n.width / 2, y: n.y + n.height / 2 })
+    for (const n of out2.filter(n => n.depth === 2)) {
+      for (const o of out2) {
+        if (o.depth > 1 && byId2.get(o.parentId!)?.id === n.parentId) continue
+        if (o.id === n.id) continue
+        const a = mid(n), b = mid(o)
+        expect(Math.hypot(a.x - b.x, a.y - b.y)).toBeGreaterThan(touching * 1.5)
+      }
     }
     expect(HEX_DIRS.length).toBe(6)
     expect(axialToCenter(1, 0, 10).x).toBeCloseTo(10 * Math.sqrt(3), 5)

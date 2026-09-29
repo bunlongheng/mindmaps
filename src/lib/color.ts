@@ -29,18 +29,20 @@ export function applyDepthBackground(baseHex: string, depth: number): string {
 /**
  * Visible colour ladder per depth. "Strength" is how much of the branch colour
  * survives; the remainder (1 - strength) is mixed toward white. Depth 1 keeps the
- * full colour, every level below it steps down by a step big enough to read at a
- * glance, and depth 5 and deeper share a floor so very deep maps stay legible.
+ * full colour and owns the loud layer; everything below it is a pale wash of the
+ * same colour, getting lighter with depth, with the colour kept in the border. The
+ * old 80% at depth 2 painted a topic and its children in nearly the same fill, so a
+ * branch with 5 children read as 1 solid block on every diagram type.
  *
- *   depth 1 -> 100%   depth 2 -> 80%   depth 3 -> 60%   depth 4 -> 50%   depth 5+ -> 40%
+ *   depth 1 -> 100%   depth 2 -> 15%   depth 3 -> 11%   depth 4 -> 7%   depth 5+ -> 5%
  *
  * Exported so the canvas (Node.tsx), the server renderer (render-svg.ts) and the
  * tests all read the same numbers.
  */
-export const DEPTH_STRENGTH: Readonly<Record<number, number>> = { 1: 1, 2: 0.8, 3: 0.3, 4: 0.22 }
+export const DEPTH_STRENGTH: Readonly<Record<number, number>> = { 1: 1, 2: 0.15, 3: 0.11, 4: 0.07 }
 
 /** Strength used at depth 5 and deeper. */
-export const DEPTH_STRENGTH_FLOOR = 0.18
+export const DEPTH_STRENGTH_FLOOR = 0.05
 
 /** Strength of the branch colour at a given depth (see DEPTH_STRENGTH). */
 export function depthStrength(depth: number): number {
@@ -91,10 +93,39 @@ export function radialEdgeWidth(childDepth: number): number {
  */
 export function depthFill(baseHex: string, depth: number): string {
   if (depth <= 0) return baseHex
-  const mix = 1 - depthStrength(depth)
+  return tint(baseHex, depthStrength(depth))
+}
+
+/** A branch colour mixed toward white, keeping `strength` of the original. */
+export function tint(baseHex: string, strength: number): string {
+  const mix = 1 - strength
   const [r, g, b] = hexToRgb(baseHex)
   const ch = (v: number) => Math.round(v + (255 - v) * mix).toString(16).padStart(2, '0')
   return `#${ch(r)}${ch(g)}${ch(b)}`
+}
+
+/**
+ * Timeline sub-nodes. On a timeline the L1 boxes sit on the spine and are the layer
+ * that has to read first; the depth ladder's 80% at depth 2 painted the sub-nodes
+ * almost as loud as their own parent, so a branch with 5 children became a wall of
+ * one colour. These are pale chips instead - a light tint of the branch colour with
+ * the colour kept only in the border - so the spine stays the loud layer. Label stays
+ * black (LABEL_TEXT), same as every other box below the root.
+ */
+export const TIMELINE_SUB_TINT = 0.13
+export function timelineSubFill(baseHex: string): string {
+  return tint(baseHex, TIMELINE_SUB_TINT)
+}
+
+/**
+ * Label colour for those chips. Xmind writes a sub-topic in a deep shade of its own
+ * branch colour rather than black, which is what ties a chip to the topic it hangs
+ * off. This is the ONE exception to LABEL_TEXT below - it applies to timeline depth 2
+ * and deeper only, and color.test.ts holds it to 4.5:1 on its own fill.
+ */
+export const TIMELINE_SUB_TEXT_DARKEN = 0.55
+export function timelineSubText(baseHex: string): string {
+  return darken(baseHex, TIMELINE_SUB_TEXT_DARKEN)
 }
 
 export function darken(hex: string, amount = 0.3): string {
@@ -114,18 +145,21 @@ export function darken(hex: string, amount = 0.3): string {
 // a touch below pure saturation, Xmind-like - but visits them in an order where every
 // pair of neighbours (including branch 12 wrapping back to branch 1) is at least 60
 // degrees apart on the wheel, most well past 130. See color.test.ts for the check.
+// The Sequences participant palette, same 12 colors in the same order, so a branch
+// here reads like a lane there: the hue walks the wheel instead of jumping around.
 export const L1_PALETTE = [
-  '#D94F3A', // coral red
-  '#3AD9BF', // teal
-  '#D93ABF', // magenta
-  '#8FD93A', // lime
-  '#473AD9', // indigo
-  '#D9843A', // orange
-  '#3AAAD9', // sky
-  '#D93A7C', // pink
-  '#7C3AD9', // violet
-  '#D9AA3A', // amber
-  '#3A74D9', // blue
+  '#ef4444', // red
+  '#f97316', // orange
+  '#eab308', // yellow
+  '#22c55e', // green
+  '#14b8a6', // teal
+  '#06b6d4', // cyan
+  '#3b82f6', // blue
+  '#8b5cf6', // violet
+  '#ec4899', // pink
+  '#f43f5e', // rose
+  '#84cc16', // lime
+  '#0891b2', // deep cyan
 ]
 
 type MinNode = { id: string; parentId: string | null; depth: number; sortOrder?: number }
