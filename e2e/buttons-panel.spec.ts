@@ -1,6 +1,7 @@
 import { test, expect } from './fixtures'
 import { createMap } from './helpers'
 import type { Page } from '@playwright/test'
+import { L1_PALETTE } from '../src/lib/color'
 
 // ── helpers ─────────────────────────────────────────────────────────────────
 
@@ -238,7 +239,9 @@ test.describe('SidePanel — Map tab', () => {
 // First 5 entries of the 12-colour wheel (L1_PALETTE in src/lib/color.ts).
 // Since the wheel landed, a depth-1 node's rendered fill is derived from its
 // sortOrder (L1_PALETTE[sortOrder]), NOT from its stored custom colour.
-const WHEEL = ['#d94f3a', '#3ad9bf', '#d93abf', '#8fd93a', '#473ad9']  // first 5 of L1_PALETTE in src/lib/color.ts
+// Read the real palette, never a copy of it: the hexes were hardcoded here and went
+// stale the moment L1_PALETTE changed, failing 3 specs for a colour that was correct.
+const WHEEL = L1_PALETTE.slice(0, 5).map(c => c.toLowerCase())
 
 test.describe('SidePanel — Style tab', () => {
   test('Fill swatch + custom color persist to the node; a chosen fill overrides the wheel', async ({ page }) => {
