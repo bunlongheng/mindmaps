@@ -1080,3 +1080,81 @@ describe('HomePage — CachedNodeCount badge (grid card)', () => {
     expect(screen.queryByText(/nodes$/)).toBeNull()
   })
 })
+
+describe('HomePage — Mine / Demos tabs', () => {
+  const WITH_DEMOS: DiagramMeta[] = [
+    ...SAMPLE,
+    { id: 'd1', name: 'Machine Learning', type: 'mindmap', updatedAt: new Date().toISOString(), tags: ['demo'] },
+    { id: 'd2', name: 'Design System', type: 'honeycomb', updatedAt: new Date().toISOString(), tags: ['demo'] },
+  ]
+
+  it('stays hidden until a map is tagged demo', () => {
+    seedDiagrams(SAMPLE)
+    render(<HomePage onOpen={vi.fn()} user={USER} onSignOut={vi.fn()} />)
+    expect(document.querySelector('[data-scope="demo"]')).toBeNull()
+    expect(document.querySelectorAll('[data-map-id]').length).toBe(3)
+  })
+
+  it('opens on Mine, which hides the demo maps, and each tab carries its own count', () => {
+    seedDiagrams(WITH_DEMOS)
+    render(<HomePage onOpen={vi.fn()} user={USER} onSignOut={vi.fn()} />)
+    const mine = document.querySelector('[data-scope="mine"]')!
+    const demo = document.querySelector('[data-scope="demo"]')!
+    expect(mine.textContent).toContain('3')
+    expect(demo.textContent).toContain('2')
+    const names = [...document.querySelectorAll('[data-map-id]')].map(n => n.getAttribute('data-map-id'))
+    expect(names).toEqual(['m1', 'm2', 'm3'])
+  })
+
+  it('switches to the demo maps, remembers the tab in the URL, and switches back', () => {
+    seedDiagrams(WITH_DEMOS)
+    render(<HomePage onOpen={vi.fn()} user={USER} onSignOut={vi.fn()} />)
+    fireEvent.click(document.querySelector('[data-scope="demo"]')!)
+    expect([...document.querySelectorAll('[data-map-id]')].map(n => n.getAttribute('data-map-id')))
+      .toEqual(['d1', 'd2'])
+    expect(window.location.search).toContain('tab=demo')
+    fireEvent.click(document.querySelector('[data-scope="mine"]')!)
+    expect(document.querySelectorAll('[data-map-id]').length).toBe(3)
+    expect(window.location.search).not.toContain('tab=demo')
+  })
+
+  it('opens straight on the demos when the URL asks for that tab', () => {
+    window.history.replaceState({}, '', '/?tab=demo')
+    seedDiagrams(WITH_DEMOS)
+    render(<HomePage onOpen={vi.fn()} user={USER} onSignOut={vi.fn()} />)
+    expect(document.querySelectorAll('[data-map-id]').length).toBe(2)
+  })
+
+  it('never offers `demo` as a tag pill, and scopes the pills to the open tab', () => {
+    seedDiagrams(WITH_DEMOS)
+    render(<HomePage onOpen={vi.fn()} user={USER} onSignOut={vi.fn()} />)
+    expect(document.querySelector('[data-tag="demo"]')).toBeNull()
+    expect(document.querySelector('[data-tag="Work"]')).not.toBeNull()
+    // The demo maps carry no other tag, so their tab shows no pills at all.
+    fireEvent.click(document.querySelector('[data-scope="demo"]')!)
+    expect(document.querySelector('[data-tag="Work"]')).toBeNull()
+    expect(document.querySelector('[data-tag="demo"]')).toBeNull()
+  })
+
+  it('drops an active tag filter when the tab changes, so the other side is never empty', () => {
+    seedDiagrams(WITH_DEMOS)
+    render(<HomePage onOpen={vi.fn()} user={USER} onSignOut={vi.fn()} />)
+    fireEvent.click(document.querySelector('[data-tag="Work"]')!)
+    expect(document.querySelectorAll('[data-map-id]').length).toBe(1)
+    fireEvent.click(document.querySelector('[data-scope="demo"]')!)
+    expect(document.querySelectorAll('[data-map-id]').length).toBe(2)
+    expect(window.location.search).not.toContain('tag=')
+  })
+})
+
+describe('HomePage — the No Tag pill', () => {
+  it('shows while some map is untagged and disappears when none is', () => {
+    seedDiagrams(SAMPLE)  // m3 carries no tag
+    const { container } = render(<HomePage onOpen={vi.fn()} user={USER} onSignOut={vi.fn()} />)
+    expect(within(container).getByText('No Tag')).toBeInTheDocument()
+    cleanup()
+    seedDiagrams(SAMPLE.filter(d => (d.tags ?? []).length > 0))
+    const second = render(<HomePage onOpen={vi.fn()} user={USER} onSignOut={vi.fn()} />)
+    expect(within(second.container).queryByText('No Tag')).toBeNull()
+  })
+})

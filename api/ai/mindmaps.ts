@@ -97,12 +97,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         userId: 'optional; omit it - the map is always filed under the configured owner. If sent, it must equal that owner id or the call is rejected with 403.',
         sharing: 'optional bool, default false; set true to make the map readable by id without auth',
         colors: 'optional hex array to override the branch palette',
+        tags: "optional string array (max 8); defaults to ['API']. Use ['demo'] for a showcase map.",
       },
       note: 'This static key authorizes only the AI/import endpoints. The CRUD API (/api/mindmaps) needs a signed session token.',
     })
   }
 
-  const { title, outline, type: rawType = 'logic-chart', themeId = 'default', lineStyle = 'curved', userId = null, sharing = false, colors } = body
+  const { title, outline, type: rawType = 'logic-chart', themeId = 'default', lineStyle = 'curved', userId = null, sharing = false, colors, tags } = body
+  // Caller-chosen tags, so a showcase map can be filed under `demo` at birth
+  // instead of needing a second CRUD call with a session token. Default stays
+  // ['API'] so every existing caller keeps the tag it has always had.
+  const rowTags: string[] = Array.isArray(tags)
+    ? tags.filter((t: unknown): t is string => typeof t === 'string' && t.trim().length > 0).map((t: string) => t.trim()).slice(0, 8)
+    : ['API']
   // Coerce unknown diagram types to the safe default (matches the documented behavior + client legacy-type healing).
   const VALID_TYPES = new Set(['logic-chart', 'mindmap', 'fishbone', 'timeline', 'honeycomb'])
   const type = VALID_TYPES.has(rawType) ? rawType : 'logic-chart'
@@ -145,7 +152,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       `INSERT INTO mindmaps (id, user_id, name, type, line_style, sharing_enabled, theme_id, nodes, tags, created_at, updated_at)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,now(),now())
        ON CONFLICT (id) DO UPDATE SET name=$3, nodes=$8, updated_at=now()`,
-      [id, ownedUserId, title, type, lineStyle, sharing === true, themeId, JSON.stringify(nodes), ['API']]
+      [id, ownedUserId, title, type, lineStyle, sharing === true, themeId, JSON.stringify(nodes), rowTags]
     )
   } catch (e: unknown) {
     console.error('ai/mindmaps: save failed', e)
