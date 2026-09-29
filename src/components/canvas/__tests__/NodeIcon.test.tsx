@@ -3,7 +3,7 @@ import { render, cleanup, waitFor } from '@testing-library/react'
 import * as Lucide from 'lucide-react'
 import * as HeroOutline from '@heroicons/react/24/outline'
 import { NodeIcon, getLucideIcon } from '../NodeIcon'
-import { LUCIDE_FALLBACK_STEMS, LUCIDE_FALLBACK_ALIASES, HERO_FALLBACK_NAMES } from '../../../lib/icons'
+import { ICON_SYNONYMS, LUCIDE_FALLBACK_STEMS, LUCIDE_FALLBACK_ALIASES, HERO_FALLBACK_NAMES } from '../../../lib/icons'
 import { LUCIDE_LAZY, HERO_LAZY } from '../../../lib/icons.lazy'
 
 /** PascalCase to kebab-case, same shape the app stores icon names in */
@@ -143,6 +143,13 @@ describe('fallback registry stays in sync with the installed packages', () => {
       if (!getLucideIcon(kebab(name.slice(0, -4)))) missing.push(name)
     }
     expect(missing).toEqual([])
+  })
+
+  it('resolves every plain-English synonym to a real icon', () => {
+    for (const [word, target] of Object.entries(ICON_SYNONYMS)) {
+      expect(getLucideIcon(word), `${word} -> ${target}`).toBeTruthy()
+      expect(getLucideIcon(target), `synonym target ${target}`).toBeTruthy()
+    }
   })
 
   it('lazy registry has a component for every registered name', () => {
