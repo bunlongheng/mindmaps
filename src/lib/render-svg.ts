@@ -12,7 +12,7 @@
 import type { MindmapNode, DiagramType, LineStyle } from '../types/index.js'
 import { computeMindmapsLayout } from './layout/mindmaps-layout.js'
 import { computeMindmapLayout, wrapText, initialFontSize, nodeInitial, radialLabelFor, radialNodeExtent, LABEL_FONT, RADIAL_ROOT_FONT } from './layout/mindmap.js'
-import { computeFishboneLayout, FISHBONE_SLANT } from './layout/fishbone.js'
+import { computeFishboneLayout, FISHBONE_SLANT, fishboneSlant } from './layout/fishbone.js'
 import { computeTimelineLayout, TIMELINE_ELBOW_R } from './layout/timeline.js'
 import { computeHoneycombLayout } from './layout/honeycomb.js'
 import { getTheme } from './themes.js'
@@ -178,18 +178,74 @@ function renderEdges(nodes: MindmapNode[], type: DiagramType, lineStyle: LineSty
   }
 
   if (type === 'fishbone') {
+    // Must match EdgeLayer's fishbone branch exactly: a grey spine out of the root, a
+    // coloured diagonal bone from the spine up (or down) to each topic, L2 stubs off
+    // that diagonal and plain horizontals below. This block used to be a copy of the
+    // timeline renderer, which draws the spine in segments BETWEEN the topic boxes - on
+    // a fishbone the topics sit far off the spine, so it drew stubs and no bone at all
+    // and every branch floated disconnected on the share image and the home card.
     const root = nodes.find(n => n.parentId === null)
     if (!root) return ''
     const spineY = root.y + root.height / 2
     const l1s = nodes.filter(n => n.depth === 1)
+    /** Where a topic's bone leaves the spine, and where it lands on the topic box. */
+    const bone = (l1: MindmapNode) => {
+      const cx = l1.x + l1.width / 2
+      const above = l1.y + l1.height / 2 < spineY
+      const edgeY = above ? l1.y + l1.height : l1.y
+      // Every bone leaves the spine at the same angle, so its run follows its own drop.
+      const run = fishboneSlant(Math.abs(edgeY - spineY))
+      return { cx, attachX: cx - run, above, edgeY, run }
+    }
+
     const spineEndX = l1s.length > 0
-      ? Math.max(...l1s.map(n => n.x + n.width / 2 - FISHBONE_SLANT)) + FISHBONE_SLANT * 1.3
+      ? Math.max(...l1s.map(n => n.x + n.width / 2 - bone(n).run)) + FISHBONE_SLANT * 1.3
+      : root.x + root.width + 400
+    const parts: string[] = [
+      `<line x1="${r2(root.x + root.width)}" y1="${r2(spineY)}" x2="${r2(spineEndX)}" y2="${r2(spineY)}" stroke="#64748b" stroke-width="3" stroke-linecap="round"/>`,
+    ]
+
+    for (const l1 of l1s) {
+      const { cx, attachX, edgeY } = bone(l1)
+      parts.push(`<line x1="${r2(attachX)}" y1="${r2(spineY)}" x2="${r2(cx)}" y2="${r2(edgeY)}" stroke="${esc(pc(l1))}" stroke-width="${edgeWidthForDepth(1)}" stroke-linecap="round"/>`)
+    }
+
+    // L2 sits beside the bone, so its stub starts where the bone crosses its own row.
+    for (const l2 of nodes.filter(n => n.depth === 2)) {
+      const l1 = nodeMap.get(l2.parentId ?? '')
+      if (!l1) continue
+      const { attachX, edgeY, run } = bone(l1)
+      const cy = l2.y + l2.height / 2
+      const t = Math.abs(cy - spineY) / Math.abs(edgeY - spineY)
+      const diagX = attachX + run * t
+      // The node is drawn as a parallelogram, so meet its skewed edge, not its box.
+      parts.push(`<line x1="${r2(diagX)}" y1="${r2(cy)}" x2="${r2(l2.x + l2.height * 0.35 / 2)}" y2="${r2(cy)}" stroke="${esc(pc(l2))}" stroke-width="${edgeWidthForDepth(2)}" stroke-linecap="round"/>`)
+    }
+
+    for (const n of nodes.filter(k => k.depth >= 3)) {
+      const parent = nodeMap.get(n.parentId ?? '')
+      if (!parent) continue
+      parts.push(`<line x1="${r2(parent.x + parent.width)}" y1="${r2(parent.y + parent.height / 2)}" x2="${r2(n.x)}" y2="${r2(n.y + n.height / 2)}" stroke="${esc(pc(n))}" stroke-width="${edgeWidthForDepth(n.depth)}" stroke-linecap="round"/>`)
+    }
+    return parts.join('')
+  }
+
+  if (type === 'timeline') {
+    // This block was sitting under the 'fishbone' label, so a timeline map had no branch
+    // of its own and fell through to the logic-chart edges on every share image and home
+    // card. It mirrors EdgeLayer's timeline branch: the spine painted in coloured
+    // segments between the boxes, a trunk down the middle of each topic, elbows into the
+    // children.
+    const root = nodes.find(n => n.parentId === null)
+    if (!root) return ''
+    const spineY = root.y + root.height / 2
+    const l1s = nodes.filter(n => n.depth === 1).sort((a, b) => a.x - b.x)
+    const spineEndX = l1s.length > 0
+      ? l1s[l1s.length - 1].x + l1s[l1s.length - 1].width + 24
       : root.x + root.width + 400
     const parts: string[] = []
     const w1 = edgeWidthForDepth(1)
     const w2 = edgeWidthForDepth(2)
-    // Same as the canvas: the spine is drawn in segments, each carrying the colour of
-    // the topic it leads into, in the gaps between the boxes.
     let cursorX = root.x + root.width
     for (const l1 of l1s) {
       parts.push(`<line x1="${r2(cursorX)}" y1="${r2(spineY)}" x2="${r2(l1.x)}" y2="${r2(spineY)}" stroke="${esc(pc(l1))}" stroke-width="${w1}" stroke-linecap="round"/>`)
