@@ -5,6 +5,8 @@ import { EdgeLayer } from '../EdgeLayer'
 import { useMindmapStore } from '../../../store/mindmapStore'
 import type { DiagramType, LineStyle, MindmapNode } from '../../../types'
 import { lighten, NEON_EDGE_LIGHTEN, RADIAL_EDGE_OPACITY } from '../../../lib/color'
+import { computeHoneycombLayout } from '../../../lib/layout/honeycomb'
+import { MESH_WALL_WIDTH } from '../../../lib/hex'
 
 vi.mock('../../../components/CuteToast', () => ({ showToast: vi.fn() }))
 
@@ -352,5 +354,40 @@ describe('EdgeLayer — tree (default)', () => {
     const orphan = n({ id: 'orphan', depth: 1, parentId: 'ghost', x: 300, y: 0 })
     const { container } = renderLayer([root, a, orphan], 'orthogonal', 'tree' as DiagramType)
     expect(container.querySelectorAll('path').length).toBe(1)
+  })
+})
+
+// ── Honeycomb ───────────────────────────────────────────────────────────────
+describe('EdgeLayer — honeycomb', () => {
+  // 3 topics, 1 of them with children: only that 1 is broken off from its own
+  // island by the empty comb between them, so only that 1 gets a connector.
+  const comb = (combStyle?: 'mesh' | 'web') => computeHoneycombLayout([
+    n({ id: 'root', depth: 0, title: 'Root', ...(combStyle ? { combStyle } : {}) }),
+    n({ id: 'a', depth: 1, parentId: 'root', sortOrder: 0 }),
+    n({ id: 'b', depth: 1, parentId: 'root', sortOrder: 1 }),
+    n({ id: 'c', depth: 1, parentId: 'root', sortOrder: 2 }),
+    n({ id: 'a1', depth: 2, parentId: 'a', sortOrder: 0 }),
+    n({ id: 'a2', depth: 2, parentId: 'a', sortOrder: 1 }),
+  ] as MindmapNode[])
+
+  it('mesh: 1 polyline per topic that has an island, and never a straight line', () => {
+    const { container } = renderLayer(comb(), 'straight', 'honeycomb' as DiagramType)
+    const links = container.querySelectorAll('polyline.mesh-link')
+    // Only 'a' has children, so only 'a' is broken off from something.
+    expect(links.length).toBe(1)
+    expect(container.querySelectorAll('line').length).toBe(0)
+    expect(links[0].getAttribute('stroke-width')).toBe(String(MESH_WALL_WIDTH))
+    // It runs along the comb grid, so it bends: 3 points at the very least.
+    expect(links[0].getAttribute('points')!.trim().split(/\s+/).length).toBeGreaterThanOrEqual(3)
+  })
+
+  it('web: a straight centre-to-centre line per parent/child pair, thickest at depth 1', () => {
+    const { container } = renderLayer(comb('web'), 'straight', 'honeycomb' as DiagramType)
+    const lines = container.querySelectorAll('line')
+    expect(lines.length).toBe(5)
+    expect(container.querySelectorAll('polyline.mesh-link').length).toBe(0)
+    const widths = [...lines].map(l => Number(l.getAttribute('stroke-width')))
+    expect(Math.max(...widths)).toBe(6)
+    expect(widths.filter(w => w === 4).length).toBe(2)
   })
 })
