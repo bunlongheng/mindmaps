@@ -39,19 +39,21 @@ async function clickNode(page: Page, label: string) {
 }
 
 /** Bounding box of the root node — the <g data-node-id> that holds a large circle. */
+/** The root is the biggest node on the canvas, whatever shape it wears - a pill
+ *  everywhere but the radial mindmap, where it stays a circle (src/lib/rootPill). */
 async function rootBoxOf(page: Page) {
   return page.evaluate(() => {
     const gs = [...document.querySelectorAll('.diagram-canvas-root svg g[data-node-id]')]
-    const root = gs.find(g => {
-      const c = g.querySelector('circle')
-      return c && parseFloat(c.getAttribute('r') ?? '0') > 40
-    })
-    const r = root?.getBoundingClientRect()
-    return r ? { x: r.x, y: r.y, w: r.width, h: r.height } : null
+    let best: DOMRect | null = null
+    for (const g of gs) {
+      const r = g.getBoundingClientRect()
+      if (!best || r.width * r.height > best.width * best.height) best = r
+    }
+    return best ? { x: best.x, y: best.y, w: best.width, h: best.height } : null
   })
 }
 
-/** Select the root node by clicking its circle center. */
+/** Select the root node by clicking its center. */
 async function selectRoot(page: Page) {
   const box = await rootBoxOf(page)
   expect(box, 'root node should exist').not.toBeNull()
@@ -658,10 +660,12 @@ test.describe('Canvas — node interactions', () => {
     // so drag it left a large amount where it has room to travel.
     const rootTransform = () => page.evaluate(() => {
       const gs = [...document.querySelectorAll('.diagram-canvas-root svg g[data-node-id]')]
-      const root = gs.find(g => {
-        const c = g.querySelector('circle')
-        return c && parseFloat(c.getAttribute('r') ?? '0') > 40
-      }) as SVGGElement | undefined
+      let root: SVGGElement | undefined
+      let area = 0
+      for (const g of gs) {
+        const r = g.getBoundingClientRect()
+        if (r.width * r.height > area) { area = r.width * r.height; root = g as SVGGElement }
+      }
       return root?.style.transform ?? ''
     })
     const box = await rootBoxOf(page)
