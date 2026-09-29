@@ -3,6 +3,7 @@ import { displayTitle } from '../links.js'
 import { shapedNodeSize } from '../nodeShape.js'
 import { nodeFontSize, nodeHeight, nodeMinWidth, nodeWidth, CHAR_W_RATIO } from '../nodeMetrics.js'
 
+/** Length of the spine's tail past the last bone's attachment point. */
 export const FISHBONE_SLANT = 90
 
 const SPINE_Y = 400
@@ -97,6 +98,21 @@ const L2_GAP = 24             // minimum vertical gap between reserved L2 slots 
 const L3_GAP = 12             // vertical gap between stacked L3 boxes
 
 /**
+ * A bone's horizontal run per unit of its vertical drop, so EVERY bone leaves the spine
+ * at the same angle. The run used to be a flat 90px while the drop grew with the branch's
+ * content, which made a branch of 5 groups far steeper than a branch of 1 - the bones
+ * fanned instead of staying parallel. Pinned so a minimum-height bone keeps exactly the
+ * slant it has always had; taller bones now reach further out rather than standing up.
+ */
+const BONE_EDGE_H_MIN = BONE_HEIGHT_BASE - boxH(1) / 2
+export const FISHBONE_SLOPE = FISHBONE_SLANT / BONE_EDGE_H_MIN
+
+/** Horizontal run of a bone whose near edge is `boneEdgeH` away from the spine. */
+export function fishboneSlant(boneEdgeH: number): number {
+  return boneEdgeH * FISHBONE_SLOPE
+}
+
+/**
  * Reserved vertical slot for an L2 and its L3 stack: at least the L2's own height, or
  * the L3 block's height when that is taller, so neighbouring L2 slots on the same bone
  * never collide (root cause of the old overlap: L2 pitch ignored how many L3 children
@@ -153,7 +169,8 @@ export function computeFishboneLayout(nodes: MindmapNode[]): MindmapNode[] {
     const pad = n2 > 0 ? (boneEdgeH - slotTotal) / (n2 + 1) : boneEdgeH
 
     const boneHeight = boneEdgeH + boxH(1) / 2
-    const l1CX = attachX + FISHBONE_SLANT
+    const slant = fishboneSlant(boneEdgeH)
+    const l1CX = attachX + slant
     const l1CY = above ? SPINE_Y - boneHeight : SPINE_Y + boneHeight
     const { w: l1w, h: l1h } = shapedNodeSize(l1, nodeFontSize(1), boxW(l1, 1, !!(l1.icon || l1.emoji), !!l1.bold), boxH(1))
 
@@ -177,7 +194,7 @@ export function computeFishboneLayout(nodes: MindmapNode[]): MindmapNode[] {
     l2s.forEach((l2, j) => {
       // Furthest from spine first, same order the diagonal always used.
       const t = (boneEdgeH - centerFromTip[j]) / boneEdgeH
-      const diagX = attachX + FISHBONE_SLANT * t
+      const diagX = attachX + slant * t
       const diagY = SPINE_Y + (above ? -1 : 1) * boneEdgeH * t
 
       const { l2w, l2h, l3s, l3Sizes, l3Total } = slots[j]

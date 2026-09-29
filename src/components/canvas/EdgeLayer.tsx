@@ -1,7 +1,7 @@
 import type { MindmapNode } from '../../types'
 import type { LineStyle, DiagramType } from '../../types'
 import { Edge } from './Edge'
-import { FISHBONE_SLANT } from '../../lib/layout/fishbone'
+import { FISHBONE_SLANT, fishboneSlant } from '../../lib/layout/fishbone'
 import { TIMELINE_ELBOW_R as ELBOW_R } from '../../lib/layout/timeline'
 import { useMindmapStore } from '../../store/mindmapStore'
 import { combStyleOf, meshTopicLinks, MESH_WALL_WIDTH } from '../../lib/hex'
@@ -295,9 +295,16 @@ export function EdgeLayer({ nodes, lineStyle, diagramType, paletteColors }: Edge
     const spineY = root.y + root.height / 2
     const l1s = nodes.filter(n => n.depth === 1)
 
+    // Every bone leaves the spine at the same angle, so its horizontal run is set by its
+    // own vertical drop (src/lib/layout/fishbone fishboneSlant), not by a flat constant.
+    const boneRun = (l1: MindmapNode) => {
+      const above = l1.y + l1.height / 2 < spineY
+      return fishboneSlant(Math.abs((above ? l1.y + l1.height : l1.y) - spineY))
+    }
+
     // Spine extends to the rightmost L1 attachment point
     const spineEndX = l1s.length > 0
-      ? Math.max(...l1s.map(n => n.x + n.width / 2 - FISHBONE_SLANT)) + FISHBONE_SLANT * 1.3
+      ? Math.max(...l1s.map(n => n.x + n.width / 2 - boneRun(n))) + FISHBONE_SLANT * 1.3
       : rootRight(root) + 400
 
     return (
@@ -310,7 +317,7 @@ export function EdgeLayer({ nodes, lineStyle, diagramType, paletteColors }: Edge
         {l1s.map(l1 => {
           const l1CX = l1.x + l1.width / 2
           const l1CY = l1.y + l1.height / 2
-          const attachX = l1CX - FISHBONE_SLANT
+          const attachX = l1CX - boneRun(l1)
           const above = l1CY < spineY
           const l1EdgeY = above ? l1.y + l1.height : l1.y
           return (
@@ -327,7 +334,7 @@ export function EdgeLayer({ nodes, lineStyle, diagramType, paletteColors }: Edge
           if (!l1) return null
           const l1CX = l1.x + l1.width / 2
           const l1CY = l1.y + l1.height / 2
-          const attachX = l1CX - FISHBONE_SLANT
+          const attachX = l1CX - boneRun(l1)
           const above = l1CY < spineY
           const l1EdgeY = above ? l1.y + l1.height : l1.y
           const boneEdgeH = Math.abs(l1EdgeY - spineY)
@@ -335,7 +342,7 @@ export function EdgeLayer({ nodes, lineStyle, diagramType, paletteColors }: Edge
           const t = above
             ? (spineY - l2CY) / boneEdgeH
             : (l2CY - spineY) / boneEdgeH
-          const diagX = attachX + FISHBONE_SLANT * t
+          const diagX = attachX + boneRun(l1) * t
           // Extend stub into the parallelogram to meet the visible skewed edge
           const sk = l2.height * 0.35
           const nodeEdgeX = l2.x + sk / 2
