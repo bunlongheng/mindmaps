@@ -14,31 +14,10 @@ import { emberVanish, blinkDoomed } from '../../lib/emberVanish'
 import { hexToRgb, l1PaletteColor, applyDepthBackground } from '../../lib/color'
 import { AIThinkingOverlay } from '../AIThinkingOverlay'
 import { soundHover, soundPaste } from '../../lib/sounds'
+import { buildTagColorMap, tagColor, type TagColor } from '../../lib/tagColors'
 
 const PRESET_TAGS = ['AI', 'Work', 'Personal', 'Research']
 
-// 8 cohesive colors — all Tailwind-500 level, same saturation family
-const TAG_PALETTE = [
-  '#6366f1', // indigo
-  '#14b8a6', // teal
-  '#ec4899', // rose
-  '#f59e0b', // amber
-  '#22c55e', // emerald
-  '#3b82f6', // blue
-  '#f97316', // orange
-  '#8b5cf6', // violet
-]
-
-function buildTagColorMap(allTags: string[]): Map<string, string> {
-  const sorted = [...new Set(allTags)].sort()
-  const map = new Map<string, string>()
-  sorted.forEach((tag, i) => map.set(tag, TAG_PALETTE[i % TAG_PALETTE.length]))
-  return map
-}
-
-function tagBg(tag: string, colorMap: Map<string, string>): string {
-  return colorMap.get(tag) ?? '#64748b'
-}
 
 const TAG_ICONS: Record<string, LucideIcon> = {
   AI: Bot, Work: Briefcase, Personal: User, Research: FlaskConical,
@@ -434,7 +413,7 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
 
         {/* Tag pills */}
         {barTags.map(tag => {
-          const bg = tagBg(tag, tagColorMap)
+          const c = tagColor(tag, tagColorMap)
           const isActive = activeTag === tag
           const count = searchFiltered.filter(d => (d.tags ?? []).includes(tag)).length
           return (
@@ -443,9 +422,10 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
                 display: 'flex', alignItems: 'center', gap: 5,
                 padding: '5px 13px', borderRadius: 999, fontSize: 12, fontWeight: 600,
                 fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
-                border: isActive ? `1.5px solid ${bg}` : `1.5px solid ${bg}55`,
-                background: isActive ? bg : `${bg}12`,
-                color: isActive ? '#fff' : bg,
+                border: `1.5px solid ${c.border}`,
+                background: isActive ? c.border : '#fff',
+                color: c.text,
+                opacity: isActive ? 1 : 0.65,
                 transition: 'all 0.15s',
               }}>
               <TagIcon tag={tag} size={11} />
@@ -787,8 +767,8 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
                         style={{
                           display: 'flex', alignItems: 'center', gap: 5,
                           fontSize: 12, fontWeight: 700, padding: '5px 12px', borderRadius: 999,
-                          background: tagBg(t, tagColorMap), color: '#fff',
-                          border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+                          background: tagColor(t, tagColorMap).bg, color: tagColor(t, tagColorMap).text,
+                          border: `1.5px solid ${tagColor(t, tagColorMap).border}`, cursor: 'pointer', fontFamily: 'inherit',
                         }}>
                         {t} <X size={10} strokeWidth={3} />
                       </button>
@@ -807,8 +787,8 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
                         style={{
                           display: 'flex', alignItems: 'center', gap: 5,
                           fontSize: 12, fontWeight: 600, padding: '5px 12px', borderRadius: 999,
-                          background: `${tagBg(t, tagColorMap)}15`, color: tagBg(t, tagColorMap),
-                          border: `1.5px solid ${tagBg(t, tagColorMap)}55`,
+                          background: '#fff', color: tagColor(t, tagColorMap).text, opacity: 0.8,
+                          border: `1.5px solid ${tagColor(t, tagColorMap).border}`,
                           cursor: 'pointer', fontFamily: 'inherit',
                         }}>
                         <TagIcon tag={t} size={11} /> {t}
@@ -1135,7 +1115,7 @@ function DiagramMinimap({ id, name, type, eager }: { id: string; name: string; t
 function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isPublic, onTagEdit, flash, eager }: {
   diagram: DiagramMeta; timeAgo: string; onOpen: () => void; onDelete: () => void
   isPublic?: boolean; tags?: string[]
-  tagColorMap: Map<string, string>; onTagEdit: () => void; flash?: boolean
+  tagColorMap: Map<string, TagColor>; onTagEdit: () => void; flash?: boolean
   hideTag?: string | null; eager: boolean
 }) {
   const [hovered, setHovered] = useState(false)
@@ -1207,7 +1187,7 @@ function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isPublic, onTagEdit, 
 function DiagramRow({ diagram, timeAgo, onOpen, onDelete, isPublic, onTagEdit, flash, eager }: {
   diagram: DiagramMeta; timeAgo: string; onOpen: () => void; onDelete: () => void
   isPublic?: boolean; tags?: string[]
-  tagColorMap: Map<string, string>; onTagEdit: () => void; flash?: boolean
+  tagColorMap: Map<string, TagColor>; onTagEdit: () => void; flash?: boolean
   hideTag?: string | null; eager: boolean
 }) {
   const [hovered, setHovered] = useState(false)

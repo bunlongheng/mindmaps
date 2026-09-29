@@ -694,9 +694,8 @@ describe('HomePage — DiagramMinimap', () => {
     expect(svg!.getAttribute('preserveAspectRatio')).toBe('xMidYMid meet')
   })
 
-  it('the fallback minimap fills each node with its real resolved colour, never a fixed THUMB_COLORS value', () => {
+  it('the fallback minimap fills each node with its real resolved colour', () => {
     renderCtl.throws = true
-    const THUMB_COLORS = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#8b5cf6']
     const nodes = [
       { id: 'r', title: 'Root', parentId: null, depth: 0, color: '#000', x: 0, y: 0, width: 40, height: 40, sortOrder: 0 },
       { id: 'a', title: 'A', parentId: 'r', depth: 1, color: '#111', x: 100, y: 0, width: 80, height: 30, sortOrder: 0 },
@@ -705,14 +704,13 @@ describe('HomePage — DiagramMinimap', () => {
     localStorage.setItem('mindmaps:diagram:col1', JSON.stringify({ id: 'col1', themeId: 'default', lineStyle: 'orthogonal', nodes }))
     seedDiagrams([{ id: 'col1', name: 'Colours', type: 'logic-chart', updatedAt: new Date().toISOString(), tags: [] }])
     const { container } = render(<HomePage onOpen={vi.fn()} user={USER} onSignOut={vi.fn()} />)
-    // The two L1 node rects (width=80, filled) are 'a' and 'b' — resolved via
-    // l1PaletteColor by sortOrder, not the old fixed 6-colour THUMB_COLORS wireframe
-    // palette. (Their clipPath definition rects share the same width but carry no fill.)
+    // The two L1 node rects (width=80, filled) are 'a' and 'b' - resolved via
+    // l1PaletteColor by sortOrder, not the node's own stored colour ('#111'/'#222').
+    // (Their clipPath definition rects share the same width but carry no fill.)
     const rects = Array.from(container.querySelectorAll('svg rect[fill]')).filter(r => r.getAttribute('width') === '80')
     expect(rects.length).toBe(2)
     expect(rects[0].getAttribute('fill')).toBe(L1_PALETTE[0])
     expect(rects[1].getAttribute('fill')).toBe(L1_PALETTE[1])
-    rects.forEach(r => expect(THUMB_COLORS).not.toContain(r.getAttribute('fill')))
   })
 
   it('still renders the empty-state placeholder for a map with zero cached nodes', () => {

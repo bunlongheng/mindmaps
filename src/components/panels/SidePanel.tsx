@@ -10,6 +10,7 @@ import { X, AlignLeft, AlignCenter, AlignRight, Copy, Check, FileDown, Trash2, S
 import { getLucideIcon } from '../canvas/NodeIcon'
 import { showToast, dismissToast } from '../CuteToast'
 import { soundChaChing } from '../../lib/sounds'
+import { buildTagColorMap, tagColor } from '../../lib/tagColors'
 import { authHeaders } from '../../hooks/useDiagram'
 import { levelCounts } from '../../lib/nodeCounts'
 import type { DiagramType, Diagram, DiagramMeta } from '../../types'
@@ -24,20 +25,7 @@ interface SidePanelProps {
   onUpdateTags?: (id: string, tags: string[]) => void
 }
 
-// 8 cohesive colors - all Tailwind-500 level, same saturation family
-const TAG_PALETTE = [
-  '#6366f1', '#14b8a6', '#ec4899', '#f59e0b',
-  '#22c55e', '#3b82f6', '#f97316', '#8b5cf6',
-]
 const PRESET_TAGS = ['AI', 'Work', 'Personal', 'Research']
-
-function buildTagColorMap(allTags: string[]): Map<string, string> {
-  const sorted = [...new Set(allTags)].sort()
-  return new Map(sorted.map((tag, i) => [tag, TAG_PALETTE[i % TAG_PALETTE.length]]))
-}
-function tagBg(tag: string, colorMap: Map<string, string>): string {
-  return colorMap.get(tag) ?? '#64748b'
-}
 
 const DIAGRAM_TYPES: { value: DiagramType; label: string }[] = [
   { value: 'logic-chart',     label: 'Logic Chart' },
@@ -917,7 +905,8 @@ function TagsBlock({ activeMindmap, diagrams, onUpdateTags }: {
           <span key={t} onClick={() => removeTag(t)} title="Remove tag" style={{
             display: 'inline-flex', alignItems: 'center', gap: 4,
             fontSize: 11, fontWeight: 700, padding: '4px 9px', borderRadius: 10,
-            background: tagBg(t, tagColorMap), color: '#fff',
+            background: tagColor(t, tagColorMap).bg, color: tagColor(t, tagColorMap).text,
+            border: `1px solid ${tagColor(t, tagColorMap).border}`,
             cursor: 'pointer', fontFamily: 'inherit',
           }}>
             {t} <X size={8} strokeWidth={3} />
@@ -941,8 +930,8 @@ function TagsBlock({ activeMindmap, diagrams, onUpdateTags }: {
                 <button key={t} onClick={() => { addTag(t); setShowPicker(false) }}
                   style={{
                     fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 10,
-                    background: `${tagBg(t, tagColorMap)}22`, color: tagBg(t, tagColorMap),
-                    border: `1px solid ${tagBg(t, tagColorMap)}55`,
+                    background: '#fff', color: tagColor(t, tagColorMap).text, opacity: 0.8,
+                    border: `1px solid ${tagColor(t, tagColorMap).border}`,
                     cursor: 'pointer', fontFamily: 'inherit',
                   }}>{t}</button>
               ))}
