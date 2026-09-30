@@ -52,7 +52,12 @@ export default function App() {
   const [user, setUser] = useState<{ email: string; name: string; userId: string } | null>(() => {
     // import.meta.env.DEV is a compile-time constant, so Vite strips this whole branch -
     // including the owner literals below - from the production bundle.
-    if (import.meta.env.DEV && isLocal) {
+    // Local dev signs the owner in automatically, which now also decides share
+    // links - so ?anon=1 opts out for that load and the visitor side of a share
+    // link (read-only page, demo footer) stays checkable locally. Dev only: the
+    // whole branch is compiled out of the production bundle.
+    const wantsAnon = new URLSearchParams(window.location.search).has('anon')
+    if (import.meta.env.DEV && isLocal && !wantsAnon) {
       // Owner identity for local dev, read from env so no personal literal ships in public source.
       // Set VITE_DEV_USER_* in .env.local to match your owner row; the fallbacks are placeholders.
       const DEV_USER = {
@@ -153,7 +158,11 @@ export default function App() {
   const [diagramLoading, setDiagramLoading] = useState(() => !!(getMapParam() || getShareParam()))
   const [view, setView] = useState<View>(() => {
     if (decodeShareURL()) return 'viewer'
-    if (getShareParam()) return 'viewer'
+    // A share link is the read-only page for a visitor - but the owner is not a
+    // visitor. Signed in, their own /s/<id> link opens the real editor (menu,
+    // panel, type tabs), exactly like ?map=<id>, in this tab or a new one. Flows
+    // resolves the owner the same way before it picks a view (lib/handlers/auth-me).
+    if (getShareParam()) return user ? 'editor' : 'viewer'
     if (getMapParam()) return 'editor'
     return 'home'
   })
@@ -180,7 +189,13 @@ export default function App() {
     const shared = decodeShareURL()
     if (shared) { setActiveMindmap(shared); return }
     const shareId = getShareParam()
-    if (shareId) { setDiagramLoading(true); loadDiagram(shareId).finally(() => setDiagramLoading(false)); return }
+    if (shareId) {
+      // Owner: the share id is just one of their map ids, so normalize the URL to
+      // ?map= as well - refresh, Back and a copied address bar then behave like
+      // the editor instead of dropping back into the visitor page.
+      if (user) window.history.replaceState({}, '', `?map=${shareId}`)
+      setDiagramLoading(true); loadDiagram(shareId).finally(() => setDiagramLoading(false)); return
+    }
     const mapId = getMapParam()
     if (mapId) {
       // Normalize ?id= → ?map= in the URL, preserving ?imported
