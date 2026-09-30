@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { hexToRgb, applyDepthTransparency, applyDepthBackground, darken, l1PaletteColor, L1_PALETTE, depthFill, depthStrength, timelineSubFill, timelineSubText, TIMELINE_SUB_TINT, tint, DEPTH_STRENGTH, DEPTH_STRENGTH_FLOOR, edgeWidthForDepth, EDGE_WIDTH_BY_DEPTH, isDarkBg, lighten, neonBlur, neonFilterId, neonFilterSpecs, neonRootColor, NEON_ROOT_FALLBACK } from '../color'
+import { hexToRgb, applyDepthTransparency, applyDepthBackground, darken, l1PaletteColor, L1_PALETTE, depthFill, depthStrength, timelineSubFill, timelineSubText, TIMELINE_SUB_TINT, tint, DEPTH_STRENGTH, DEPTH_STRENGTH_FLOOR, edgeWidthForDepth, EDGE_WIDTH_BY_DEPTH, nodeStrokeWidth, NODE_STROKE_BY_DEPTH, isDarkBg, lighten, neonBlur, neonFilterId, neonFilterSpecs, neonRootColor, NEON_ROOT_FALLBACK } from '../color'
 import { THEMES } from '../themes'
 
 describe('hexToRgb', () => {
@@ -165,6 +165,27 @@ describe('depth ladder (DEPTH_STRENGTH / depthStrength / depthFill)', () => {
     // #000000 at 7% strength -> 93% of the way to white -> 237
     expect(depthFill('#000000', 3)).toBe('#ededed')
     expect(depthFill('#ffffff', 5)).toBe('#ffffff')
+  })
+})
+
+describe('border ladder (NODE_STROKE_BY_DEPTH / nodeStrokeWidth)', () => {
+  it('steps 4, 3, 2, 1 down the layers', () => {
+    expect(NODE_STROKE_BY_DEPTH).toEqual([4, 3, 2, 1])
+    expect(nodeStrokeWidth(1)).toBe(4)
+    expect(nodeStrokeWidth(2)).toBe(3)
+    expect(nodeStrokeWidth(3)).toBe(2)
+    expect(nodeStrokeWidth(4)).toBe(1)
+  })
+
+  it('floors at 1px from depth 4 down, and treats the root like L1', () => {
+    expect(nodeStrokeWidth(5)).toBe(1)
+    expect(nodeStrokeWidth(12)).toBe(1)
+    expect(nodeStrokeWidth(0)).toBe(4)
+  })
+
+  it('never thickens as depth grows', () => {
+    const w = [1, 2, 3, 4, 5, 6].map(nodeStrokeWidth)
+    for (let i = 1; i < w.length; i++) expect(w[i]).toBeLessThanOrEqual(w[i - 1])
   })
 })
 

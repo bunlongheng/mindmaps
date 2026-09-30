@@ -18,7 +18,7 @@ import { computeTimelineLayout, TIMELINE_ELBOW_R } from './layout/timeline.js'
 import { computeHoneycombLayout } from './layout/honeycomb.js'
 import { getTheme } from './themes.js'
 import { LABEL_TEXT, timelineSubFill, timelineSubText,
-  hexToRgb, darken, depthFill, applyDepthTransparency, edgeWidthForDepth,
+  hexToRgb, darken, depthFill, applyDepthTransparency, edgeWidthForDepth, nodeStrokeWidth,
   radialEdgeWidth, RADIAL_EDGE_OPACITY, isDarkBg, lighten, neonFilterId, neonFilterSpecs,
   neonRootColor, NEON_CORE_OPACITY, NEON_EDGE_CORE_OPACITY, NEON_EDGE_FILTER,
   NEON_EDGE_GLOW_BLUR, NEON_EDGE_GLOW_OPACITY, NEON_EDGE_GLOW_WIDTH, NEON_EDGE_LIGHTEN,
@@ -419,12 +419,13 @@ function renderNode(node: MindmapNode, type: DiagramType, paletteColor: string |
     // Same as the canvas: every box below the root carries its branch colour in the
     // border, the timeline's pale chips included.
     strokeColor = col
-    strokeW = isRadialDot ? 1 : 2
+    // Same shared border ladder as the canvas (src/lib/color nodeStrokeWidth).
+    strokeW = isRadialDot ? 1 : nodeStrokeWidth(node.depth)
   } else {
     bg = col
     textColor = LABEL_TEXT
     strokeColor = col.startsWith('#') ? darken(col, 0.25) : col
-    strokeW = 2
+    strokeW = nodeStrokeWidth(node.depth)
   }
   // Neon (dark canvas): white glyphs inside every orb, and a root orb painted with a
   // radial gradient of its own colour lightened at the centre. Paint only - the

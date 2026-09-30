@@ -92,6 +92,24 @@ export function radialEdgeWidth(childDepth: number): number {
 }
 
 /**
+ * Box border width per layer, so the outline carries the hierarchy the way the fill
+ * and the connectors already do. Every box below the root used to be a flat 2px, so
+ * an L3 leaf was outlined exactly as heavily as the L2 it hangs off.
+ *
+ *   depth 1 -> 4px   depth 2 -> 3px   depth 3 -> 2px   depth 4+ -> 1px
+ *
+ * The root keeps its own 5px rim. Exported so the canvas (Node.tsx), the server
+ * renderer (render-svg.ts) and the tests all read the same numbers.
+ */
+export const NODE_STROKE_BY_DEPTH = [4, 3, 2, 1]
+
+/** Border width for a box at the given depth (see NODE_STROKE_BY_DEPTH). */
+export function nodeStrokeWidth(depth: number): number {
+  if (depth <= 1) return NODE_STROKE_BY_DEPTH[0]
+  return NODE_STROKE_BY_DEPTH[Math.min(depth - 1, NODE_STROKE_BY_DEPTH.length - 1)]
+}
+
+/**
  * Node fill for a branch colour at a given depth: the colour mixed toward white by
  * (1 - strength). Depth 0 (the root) is returned untouched. Returns hex so callers
  * can run the same isLight() readability check on the result.
