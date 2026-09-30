@@ -70,7 +70,7 @@ export function rootIsPill(
   node: { title?: string; shape?: string },
   diagramType: string,
 ): boolean {
-  if (diagramType === 'mindmap' || diagramType === 'honeycomb') return false
+  if (diagramType === 'graph' || diagramType === 'honeycomb') return false
   return node.shape !== 'circle'
 }
 

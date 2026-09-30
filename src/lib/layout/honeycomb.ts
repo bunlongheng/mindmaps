@@ -1,5 +1,5 @@
 import type { MindmapNode } from '../../types/index.js'
-import { sectorSpans, MIN_SECTOR } from './mindmap.js'
+import { sectorSpans, MIN_SECTOR } from './graph.js'
 import { computeSubtreeCounts } from '../nodeCounts.js'
 import { hexRadius, hexCellRadius, combSizeOf, combStyleOf, meshCellRadius, axialToCenter, hexDistance, HEX_DIRS } from '../hex.js'
 
@@ -13,7 +13,7 @@ import { hexRadius, hexCellRadius, combSizeOf, combStyleOf, meshCellRadius, axia
 // Every node keeps x, y, width and height, with width === height === 2 * hexCellRadius(node)
 // and x, y the TOP-LEFT of that square (centre = x + width / 2), exactly like every
 // other layout in this app. Manually positioned nodes keep their own x, y, width and
-// height untouched, same as computeMindmapLayout.
+// height untouched, same as computeGraphLayout.
 
 const TAU = Math.PI * 2
 const START_ANGLE = -Math.PI / 2
@@ -306,7 +306,7 @@ const RELAX_ITERATIONS = 60
  * Push overlapping cells apart. A hex cell's footprint IS its bounding circle - the
  * label is drawn inside the cell, not beside it like the mind map's circles - so this
  * separates bounding circles directly along the line between their centres, instead
- * of reusing computeMindmapLayout's box-and-external-label relaxRadial (built for a
+ * of reusing computeGraphLayout's box-and-external-label relaxRadial (built for a
  * shape whose label lives outside it). The root and every manually-positioned node
  * are pinned; everything else shares the push evenly.
  */

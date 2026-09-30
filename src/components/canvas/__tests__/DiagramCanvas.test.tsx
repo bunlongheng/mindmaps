@@ -473,7 +473,7 @@ describe('DiagramCanvas — fit view', () => {
   it('re-fits when the diagram type switches', () => {
     loadStore([makeRoot(), makeNode()])
     const { g } = renderCanvas()
-    act(() => { useMindmapStore.getState().setDiagramType('mindmap') })
+    act(() => { useMindmapStore.getState().setDiagramType('graph') })
     expect(g).toBeTruthy()
   })
 })

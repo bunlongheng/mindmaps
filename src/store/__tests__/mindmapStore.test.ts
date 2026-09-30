@@ -103,7 +103,7 @@ describe('mindmapStore', () => {
 
     it('leaves a mindmap root square', () => {
       const shortRoot = { ...makeRoot(), title: 'Hi' }
-      loadDiagram({ ...makeDiagram([shortRoot, makeChild('c1', 'Child 1', 'root', 1, 0)]), type: 'mindmap' })
+      loadDiagram({ ...makeDiagram([shortRoot, makeChild('c1', 'Child 1', 'root', 1, 0)]), type: 'graph' })
       const root = useMindmapStore.getState().activeMindmap!.nodes.find(n => n.parentId === null)!
       expect(root.width).toBe(root.height)
     })
@@ -382,8 +382,8 @@ describe('mindmapStore', () => {
   describe('setDiagramType', () => {
     it('changes diagram type', () => {
       loadDiagram()
-      useMindmapStore.getState().setDiagramType('mindmap')
-      expect(useMindmapStore.getState().diagramType).toBe('mindmap')
+      useMindmapStore.getState().setDiagramType('graph')
+      expect(useMindmapStore.getState().diagramType).toBe('graph')
     })
 
     it('re-lays out all nodes', () => {
@@ -396,7 +396,7 @@ describe('mindmapStore', () => {
 
     it('does nothing without active diagram', () => {
       const before = useMindmapStore.getState().diagramType
-      useMindmapStore.getState().setDiagramType('mindmap')
+      useMindmapStore.getState().setDiagramType('graph')
       // no active map → guard returns early, type unchanged
       expect(useMindmapStore.getState().diagramType).toBe(before)
       expect(useMindmapStore.getState().activeMindmap).toBeNull()
@@ -755,9 +755,9 @@ describe('mindmapStore', () => {
 
     it('diagram type: 1 entry, undo restores the previous type', () => {
       loadDiagram()
-      useMindmapStore.getState().setDiagramType('mindmap')
+      useMindmapStore.getState().setDiagramType('graph')
       expect(pastLen()).toBe(1)
-      expect(useMindmapStore.getState().diagramType).toBe('mindmap')
+      expect(useMindmapStore.getState().diagramType).toBe('graph')
       useMindmapStore.getState().undo()
       expect(useMindmapStore.getState().diagramType).toBe('logic-chart')
       expect(useMindmapStore.getState().activeMindmap!.type).toBe('logic-chart')
@@ -1232,7 +1232,7 @@ describe('mindmapStore', () => {
       const c1 = makeChild('c1', 'C1', 'root', 1, 0)
       const gc1 = makeChild('gc1', 'GC1', 'c1', 2, 0)
       const gc2 = makeChild('gc2', 'A much longer grandchild title', 'c1', 2, 1)
-      const d = { ...makeDiagram([makeRoot(), c1, gc1, gc2]), type: 'mindmap' as const }
+      const d = { ...makeDiagram([makeRoot(), c1, gc1, gc2]), type: 'graph' as const }
       useMindmapStore.getState().setActiveMindmap(d)
       const nodes = useMindmapStore.getState().activeMindmap!.nodes
       // L2 nodes are circles sized individually for mindmap → widths may differ

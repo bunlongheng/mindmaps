@@ -351,7 +351,7 @@ describe('SidePanel — Style tab', () => {
   })
 
   it('hides width slider for mindmap shallow nodes', () => {
-    loadDiagram(makeDiagram({ type: 'mindmap' }))
+    loadDiagram(makeDiagram({ type: 'graph' }))
     const { container } = render(<SidePanel nodeId="c1" onClose={vi.fn()} />)
     // depth 1 in mindmap → width row hidden
     expect(container.querySelector('input[type="range"]')).toBeNull()
@@ -406,7 +406,7 @@ describe('SidePanel — Style tab', () => {
   })
 
   it('hides Branch shape/line rows in mindmap mode for root', () => {
-    loadDiagram(makeDiagram({ type: 'mindmap' }))
+    loadDiagram(makeDiagram({ type: 'graph' }))
     render(<SidePanel nodeId="root" onClose={vi.fn()} />)
     // In mindmap, shape/line rows hidden — Branch block has no Circle/Pill
     expect(screen.queryByText('Circle')).toBeNull()
@@ -561,6 +561,8 @@ describe('SidePanel — Map tab', () => {
     render(<SidePanel nodeId={null} onClose={vi.fn()} />)
     fireEvent.click(screen.getByText('Mind Map'))
     expect(useMindmapStore.getState().diagramType).toBe('mindmap')
+    fireEvent.click(screen.getByText('Graph'))
+    expect(useMindmapStore.getState().diagramType).toBe('graph')
     fireEvent.click(screen.getByText('Fishbone'))
     expect(useMindmapStore.getState().diagramType).toBe('fishbone')
     fireEvent.click(screen.getByText('Timeline'))

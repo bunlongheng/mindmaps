@@ -14,7 +14,7 @@ import {
 import { computeSubtreeCounts } from '../../lib/nodeCounts'
 import { combSizeOf, combStyleOf, drawnCellRadius, hexDoorEdge, hexPoints, meshFillerCells, meshGroupOutlines, meshCellRadius, MESH_WALL_WIDTH } from '../../lib/hex'
 import { darken } from '../../lib/color'
-import { radialNodeExtent } from '../../lib/layout/mindmap'
+import { radialNodeExtent } from '../../lib/layout/graph'
 import { GLOSS_LINEAR_ID, GLOSS_RADIAL_ID, GLOSS_RADIAL_CX, GLOSS_RADIAL_CY, GLOSS_RADIAL_R, GLOSS_STOPS } from '../../lib/gloss'
 
 interface DiagramCanvasProps {
@@ -93,7 +93,7 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract, rightInset =
   // size, defined once here and shared by every orb, so a 200-node map carries a
   // handful of filters instead of two per node. Empty on light themes.
   const neonFilters = useMemo(
-    () => (diagramType === 'mindmap' && isDarkBg(canvasBg)
+    () => (diagramType === 'graph' && isDarkBg(canvasBg)
       ? neonFilterSpecs((activeMindmap?.nodes ?? []).map(n => Math.max(n.width, n.height)))
       : []),
     [diagramType, canvasBg, activeMindmap?.nodes])
@@ -148,7 +148,7 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract, rightInset =
     // A radial mind map hangs its names outside the circles, so the fit has to cover
     // the label boxes too or the outermost titles are cropped off the viewport.
     const root = nodes.find(n => n.parentId === null)
-    const ext = diagramType === 'mindmap' && root
+    const ext = diagramType === 'graph' && root
       ? nodes.map(n => radialNodeExtent(n, root.x + root.width / 2, root.y + root.height / 2))
       : nodes.map(n => ({ left: n.x, top: n.y, right: n.x + n.width, bottom: n.y + n.height }))
     const minX = Math.min(...ext.map(e => e.left))
@@ -182,7 +182,7 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract, rightInset =
     const newZoom = 1
     const cx = root.x + root.width / 2
     const cy = root.y + root.height / 2
-    const anchorX = (diagramType === 'mindmap' || diagramType === 'honeycomb') ? svgW / 2 : Math.min(svgW / 2, Math.max(root.width / 2 + 40, svgW * 0.18))
+    const anchorX = (diagramType === 'graph' || diagramType === 'mindmap' || diagramType === 'honeycomb') ? svgW / 2 : Math.min(svgW / 2, Math.max(root.width / 2 + 40, svgW * 0.18))
     zoomCurrentRef.current = newZoom
     setZoom(newZoom)  // badge only
     const p = { x: anchorX - cx * newZoom, y: svgH / 2 - cy * newZoom }

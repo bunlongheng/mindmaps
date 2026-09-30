@@ -26,7 +26,7 @@ test.describe('Open map', () => {
       route.fulfill({
         status: 200, contentType: 'application/json',
         body: JSON.stringify({
-          id: 'e2e-open-map', name: 'E2E Open Map', type: 'mindmap',
+          id: 'e2e-open-map', name: 'E2E Open Map', type: 'graph',
           line_style: 'orthogonal', theme_id: 'default', sharing_enabled: false, tags: [],
           nodes: [{ id: 'root', title: 'Root', color: '#6366f1', parentId: null, depth: 0, x: 0, y: 0, width: 140, height: 140, sortOrder: 0 }],
         }),
@@ -85,7 +85,7 @@ test.describe('Open map', () => {
     // instead of the load, and route.continue() would race with parallel specs that
     // delete the clicked card.)
     const validMap = JSON.stringify({
-      id: 'e2e-retry', name: 'E2E Retry', type: 'mindmap',
+      id: 'e2e-retry', name: 'E2E Retry', type: 'graph',
       line_style: 'orthogonal', theme_id: 'default', sharing_enabled: false, tags: [],
       nodes: [{ id: 'root', title: 'Root', color: '#6366f1', parentId: null, depth: 0, x: 0, y: 0, width: 140, height: 140, sortOrder: 0 }],
     })

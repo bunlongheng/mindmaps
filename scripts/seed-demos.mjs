@@ -58,10 +58,10 @@ export const DEMOS = [
     },
   },
 
-  // ── mindmap: radial ───────────────────────────────────────────────────────
+  // ── graph: radial constellation ───────────────────────────────────────────
   {
     title: 'Machine Learning',
-    type: 'mindmap',
+    type: 'graph',
     outline: {
       'Machine Learning': [
         { emoji: '🎯', Supervised: ['Regression', 'Classification', 'Trees'] },
@@ -74,7 +74,7 @@ export const DEMOS = [
   },
   {
     title: 'Personal Finance',
-    type: 'mindmap',
+    type: 'graph',
     outline: {
       'Personal Finance': [
         { emoji: '💼', Earn: ['Salary', 'Side Income', 'Raises'] },
@@ -85,6 +85,7 @@ export const DEMOS = [
       ],
     },
   },
+  // ── mindmap: the balanced left/right spread ───────────────────────────────
   {
     title: 'Learn TypeScript',
     type: 'mindmap',

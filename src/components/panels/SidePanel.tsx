@@ -31,6 +31,7 @@ const PRESET_TAGS = ['AI', 'Work', 'Personal', 'Research']
 const DIAGRAM_TYPES: { value: DiagramType; label: string }[] = [
   { value: 'logic-chart',     label: 'Logic Chart' },
   { value: 'mindmap',         label: 'Mind Map' },
+  { value: 'graph',           label: 'Graph' },
   { value: 'fishbone',        label: 'Fishbone' },
   { value: 'timeline',        label: 'Timeline' },
   { value: 'honeycomb',       label: 'Honeycomb' },
@@ -51,6 +52,20 @@ function DiagramTypeIcon({ value, color }: { value: string; color: string }) {
     </svg>
   )
   if (value === 'mindmap') return (
+    <svg width="36" height="26" viewBox="0 0 36 26" fill="none">
+      {/* central topic with branches spreading both ways */}
+      <rect x="13" y="10" width="10" height="6" rx="2" fill={color} opacity="0.9"/>
+      <path d="M23 13 C 27 13, 27 5, 31 5" stroke={color} strokeWidth="1.5" fill="none" strokeLinecap="round"/>
+      <path d="M23 13 C 27 13, 27 21, 31 21" stroke={color} strokeWidth="1.5" fill="none" strokeLinecap="round"/>
+      <path d="M13 13 C 9 13, 9 5, 5 5" stroke={color} strokeWidth="1.5" fill="none" strokeLinecap="round"/>
+      <path d="M13 13 C 9 13, 9 21, 5 21" stroke={color} strokeWidth="1.5" fill="none" strokeLinecap="round"/>
+      <rect x="29" y="2" width="7" height="5" rx="1.5" fill={color} opacity="0.3"/>
+      <rect x="29" y="18" width="7" height="5" rx="1.5" fill={color} opacity="0.3"/>
+      <rect x="0" y="2" width="7" height="5" rx="1.5" fill={color} opacity="0.3"/>
+      <rect x="0" y="18" width="7" height="5" rx="1.5" fill={color} opacity="0.3"/>
+    </svg>
+  )
+  if (value === 'graph') return (
     <svg width="36" height="26" viewBox="0 0 36 26" fill="none">
       <circle cx="18" cy="13" r="4" fill={color} opacity="0.9"/>
       {/* radial branches: top, right, bottom, left, top-right, bottom-left */}
@@ -424,7 +439,7 @@ export function SidePanel({ nodeId, onClose, onDelete, onUpdateTags }: SidePanel
                   </PRow>
                   )
                 })()}
-                {node.depth >= 1 && diagramType !== 'honeycomb' && !(diagramType === 'mindmap' && node.depth <= 2) && (
+                {node.depth >= 1 && diagramType !== 'honeycomb' && !(diagramType === 'graph' && node.depth <= 2) && (
                   <PRow label="Width">
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       {(() => {
@@ -468,7 +483,7 @@ export function SidePanel({ nodeId, onClose, onDelete, onUpdateTags }: SidePanel
               {/* Branch - root only; Shape+Line hidden in mindmap and honeycomb mode (root always
                   circle/hex, lines always straight/centre-to-centre) */}
               {node.depth === 0 && <SBlock title="Branch">
-                {diagramType !== 'mindmap' && diagramType !== 'honeycomb' && <PRow label="Shape">
+                {diagramType !== 'graph' && diagramType !== 'honeycomb' && <PRow label="Shape">
                   <div style={{ display: 'flex', gap: 6 }}>
                     {([
                       { value: 'circle' as const, label: 'Circle', icon: (c: string) => (
@@ -508,7 +523,7 @@ export function SidePanel({ nodeId, onClose, onDelete, onUpdateTags }: SidePanel
                     })}
                   </div>
                 </PRow>}
-                {diagramType !== 'mindmap' && diagramType !== 'honeycomb' && <PRow label="Line">
+                {diagramType !== 'graph' && diagramType !== 'honeycomb' && <PRow label="Line">
                   <LinePicker value={lineStyle} onChange={setLineStyle} />
                 </PRow>}
 

@@ -60,7 +60,7 @@ describe('GET /api/og', () => {
 
   it('renders the map name and node count for a shared map', async () => {
     queryMock.mockResolvedValue({
-      rows: [{ name: 'My Cool Map', type: 'mindmap', tags: ['AI'], nodes: [{ id: '1' }, { id: '2' }] }],
+      rows: [{ name: 'My Cool Map', type: 'graph', tags: ['AI'], nodes: [{ id: '1' }, { id: '2' }] }],
     })
     const res = mockRes()
     await handler(mockReq(UUID.real), res)

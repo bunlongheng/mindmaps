@@ -37,7 +37,7 @@ function seedDiagrams(list: DiagramMeta[]) {
 
 const SAMPLE: DiagramMeta[] = [
   { id: 'm1', name: 'Project Plan', type: 'logic-chart', updatedAt: new Date(Date.now() - 2 * 60000).toISOString(), isPublic: true, tags: ['Work', 'AI'] },
-  { id: 'm2', name: 'Holiday Ideas', type: 'mindmap', updatedAt: new Date(Date.now() - 3 * 3600000).toISOString(), tags: ['Personal'] },
+  { id: 'm2', name: 'Holiday Ideas', type: 'graph', updatedAt: new Date(Date.now() - 3 * 3600000).toISOString(), tags: ['Personal'] },
   { id: 'm3', name: 'Untagged Map', type: 'fishbone', updatedAt: new Date(Date.now() - 5 * 86400000).toISOString(), tags: [] },
 ]
 
@@ -620,7 +620,7 @@ describe('HomePage — DiagramMinimap', () => {
     })
     seedDiagrams([
       { id: 'm1', name: 'Logic', type: 'logic-chart', updatedAt: new Date().toISOString(), tags: [] },
-      { id: 'm2', name: 'Mindmap', type: 'mindmap', updatedAt: new Date().toISOString(), tags: [] },
+      { id: 'm2', name: 'Mindmap', type: 'graph', updatedAt: new Date().toISOString(), tags: [] },
       { id: 'm3', name: 'Fishbone', type: 'fishbone', updatedAt: new Date().toISOString(), tags: [] },
     ])
     const { container } = render(<HomePage onOpen={vi.fn()} user={USER} onSignOut={vi.fn()} />)
@@ -657,7 +657,7 @@ describe('HomePage — DiagramMinimap', () => {
       { id: 'a', title: 'A', parentId: 'r', depth: 1, color: '#f00', x: 0, y: 0, width: 80, height: 40, sortOrder: 0 },
     ]
     localStorage.setItem('mindmaps:diagram:dk', JSON.stringify({ id: 'dk', themeId: 'cyberpunk', lineStyle: 'orthogonal', nodes }))
-    seedDiagrams([{ id: 'dk', name: 'Dark', type: 'mindmap', updatedAt: new Date().toISOString(), tags: [] }])
+    seedDiagrams([{ id: 'dk', name: 'Dark', type: 'graph', updatedAt: new Date().toISOString(), tags: [] }])
     const { container } = render(<HomePage onOpen={vi.fn()} user={USER} onSignOut={vi.fn()} />)
     expect(container.querySelectorAll('svg').length).toBeGreaterThan(0)
   })
@@ -1084,7 +1084,7 @@ describe('HomePage — CachedNodeCount badge (grid card)', () => {
 describe('HomePage — Mine / Demos tabs', () => {
   const WITH_DEMOS: DiagramMeta[] = [
     ...SAMPLE,
-    { id: 'd1', name: 'Machine Learning', type: 'mindmap', updatedAt: new Date().toISOString(), tags: ['demo'] },
+    { id: 'd1', name: 'Machine Learning', type: 'graph', updatedAt: new Date().toISOString(), tags: ['demo'] },
     { id: 'd2', name: 'Design System', type: 'honeycomb', updatedAt: new Date().toISOString(), tags: ['demo'] },
   ]
 
