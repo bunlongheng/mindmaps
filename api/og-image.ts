@@ -31,6 +31,7 @@ const LOAD_SYSTEM_FONTS = FONT_FILES.length === 0
 const TYPE_LABEL: Record<string, string> = {
   'logic-chart': 'Logic Chart',
   'mindmap': 'Mind Map',
+  'graph': 'Graph',
   'fishbone': 'Fishbone',
   'timeline': 'Timeline',
   'honeycomb': 'Honeycomb',

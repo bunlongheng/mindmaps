@@ -1,6 +1,6 @@
 import type { MindmapNode } from '../types/index.js'
 import { hexToRgb, darken, LABEL_TEXT } from './color.js'
-import { wrapText } from './layout/mindmap.js'
+import { wrapText } from './layout/graph.js'
 import { estimateTextWidth } from './nodeMetrics.js'
 import { displayTitle } from './links.js'
 

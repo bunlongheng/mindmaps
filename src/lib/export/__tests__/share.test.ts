@@ -9,7 +9,7 @@ const root: MindmapNode = {
 
 function makeDiagram(): Diagram {
   return {
-    id: 'share-id', name: 'Shared Map', type: 'mindmap', lineStyle: 'curved',
+    id: 'share-id', name: 'Shared Map', type: 'graph', lineStyle: 'curved',
     nodes: [root], createdAt: '2024-01-01', updatedAt: '2024-01-02',
   }
 }

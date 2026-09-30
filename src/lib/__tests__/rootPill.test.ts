@@ -88,7 +88,7 @@ describe('rootDrawnWidth', () => {
   })
 
   it('never pills the root in mindmap mode', () => {
-    expect(rootDrawnWidth(pillRoot, 'mindmap')).toBe(STALE_W)
+    expect(rootDrawnWidth(pillRoot, 'graph')).toBe(STALE_W)
   })
 
   it('respects a node font size override', () => {
@@ -101,7 +101,7 @@ describe('rootDrawnWidth', () => {
     expect(rootDrawnWidth(shortRoot, 'logic-chart')).toBe(rootPillWidth('Hi', ROOT_FONT))
     expect(rootDrawnWidth(shortRoot, 'timeline')).toBe(rootPillWidth('Hi', ROOT_FONT))
     expect(rootDrawnWidth(shortRoot, 'fishbone')).toBe(rootPillWidth('Hi', ROOT_FONT))
-    expect(rootDrawnWidth(shortRoot, 'mindmap')).toBe(STALE_W)
+    expect(rootDrawnWidth(shortRoot, 'graph')).toBe(STALE_W)
     expect(rootDrawnWidth(shortRoot, 'honeycomb')).toBe(STALE_W)
   })
 })

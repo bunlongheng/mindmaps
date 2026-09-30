@@ -12,6 +12,7 @@ import { create } from 'zustand'
 import { subscribeWithSelector } from 'zustand/middleware'
 import type { Diagram, DiagramMeta, DiagramType, LineStyle, MindmapNode } from '../types'
 import { computeMindmapsLayout } from '../lib/layout/mindmaps-layout'
+import { computeGraphLayout } from '../lib/layout/graph'
 import { computeMindmapLayout } from '../lib/layout/mindmap'
 import { computeFishboneLayout } from '../lib/layout/fishbone'
 import { parseIndentedOutline, normalizeOutlineRoots, assembleOutlineTree, computeNodeWidth, OUTLINE_META_KEYS } from '../lib/outline'
@@ -94,6 +95,7 @@ function rebalanceColors(nodes: MindmapNode[], palette: string[]): MindmapNode[]
 function runLayout(nodes: MindmapNode[], type: DiagramType): MindmapNode[] {
   switch (type) {
     case 'mindmap':     return computeMindmapLayout(nodes)
+    case 'graph':     return computeGraphLayout(nodes)
     case 'fishbone':    return computeFishboneLayout(nodes)
     case 'timeline':    return computeTimelineLayout(nodes)
     case 'honeycomb':   return computeHoneycombLayout(nodes)
@@ -316,7 +318,7 @@ export const useMindmapStore = create<MindmapStore>()(
         isDirty: true,
       })
       const labels: Record<string, string> = {
-        'logic-chart': 'Logic Chart', 'mindmap': 'Mind Map',
+        'logic-chart': 'Logic Chart', 'mindmap': 'Mind Map', 'graph': 'Graph',
         'fishbone': 'Fishbone', 'timeline': 'Timeline',
         'honeycomb': 'Honeycomb',
       }

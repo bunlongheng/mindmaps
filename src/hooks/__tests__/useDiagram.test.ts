@@ -66,7 +66,7 @@ describe('loadDiagramList', () => {
   it('maps rows into diagram metas, normalizing legacy types', async () => {
     fetchMock.mockResolvedValue(jsonResponse([
       { id: 'd1', name: 'One', type: 'logic', updated_at: '2024-06-01', sharing_enabled: true, tags: ['x'] },
-      { id: 'd2', name: 'Two', type: 'mindmap', updated_at: '2024-06-02' },
+      { id: 'd2', name: 'Two', type: 'graph', updated_at: '2024-06-02' },
     ]))
     const { result } = renderHook(() => useDiagram('u1'))
     await act(async () => { await result.current.loadDiagramList() })
@@ -77,7 +77,7 @@ describe('loadDiagramList', () => {
     expect(d1.isPublic).toBe(true)
     expect(d1.tags).toEqual(['x'])
     const d2 = list.find(d => d.id === 'd2')!
-    expect(d2.type).toBe('mindmap')
+    expect(d2.type).toBe('graph')
     expect(d2.tags).toEqual([]) // missing tags → []
   })
 
@@ -188,7 +188,7 @@ describe('loadDiagram', () => {
 
   it('applies row defaults when optional columns are missing', async () => {
     const sparse = {
-      id: 'd1', name: 'Sparse', type: 'mindmap',
+      id: 'd1', name: 'Sparse', type: 'graph',
       nodes: [{ id: 'root', title: 'R', color: '#000', parentId: null, depth: 0, x: 0, y: 0, width: 180, height: 180, sortOrder: 0, fontSize: 13 }],
     }
     fetchMock.mockResolvedValue(jsonResponse(sparse))

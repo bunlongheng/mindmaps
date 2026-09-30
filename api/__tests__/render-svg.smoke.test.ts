@@ -2,7 +2,8 @@
 import { describe, it, expect } from 'vitest'
 import { renderMindmapSvg } from '../_lib/render-svg.js'
 import { depthFill, L1_PALETTE, NEON_ROOT_GRADIENT } from '../../src/lib/color.js'
-import { computeMindmapLayout, radialLabelSide } from '../../src/lib/layout/mindmap.js'
+import { computeGraphLayout, radialLabelSide } from '../../src/lib/layout/graph.js'
+import { computeMindmapLayout } from '../../src/lib/layout/mindmap.js'
 
 const mkNodes = () => {
   const root = { id: 'r', title: 'Machine Learning', parentId: null, depth: 0, x: 0, y: 0, width: 180, height: 180, color: '#6366f1', sortOrder: 0, manuallyPositioned: false }
@@ -18,7 +19,7 @@ const mkNodes = () => {
 const r2 = (v: number) => Math.round(v * 100) / 100
 
 describe('renderMindmapSvg smoke', () => {
-  for (const type of ['logic-chart', 'mindmap', 'fishbone', 'timeline'] as const) {
+  for (const type of ['logic-chart', 'mindmap', 'graph', 'fishbone', 'timeline'] as const) {
     it(`renders ${type}`, () => {
       const svg = renderMindmapSvg({ id: 'x', name: 'Machine Learning', type, line_style: 'orthogonal', theme_id: 'default', nodes: mkNodes() as never })
       expect(svg.startsWith('<svg xmlns="http://www.w3.org/2000/svg"')).toBe(true)
@@ -31,6 +32,15 @@ describe('renderMindmapSvg smoke', () => {
       expect(svg).not.toContain('NaN')
     })
   }
+  it('spreads a mind map both ways, drawing each side off its own face of the root', () => {
+    const svg = renderMindmapSvg({ id: 'x', name: 'M', type: 'mindmap', line_style: 'curved', theme_id: 'default', nodes: mkNodes() as never })
+    // 2 topics: 1 right, 1 left - so 1 path starts at the root's right edge and 1 at its left.
+    const rootX = computeMindmapLayout(mkNodes() as never).find(n => n.depth === 0)!.x
+    const rootW = computeMindmapLayout(mkNodes() as never).find(n => n.depth === 0)!.width
+    expect(svg).toContain(`M ${r2(rootX + rootW)} `)
+    expect(svg).toContain(`M ${r2(rootX)} `)
+  })
+
   it('paints depth fills from the shared ladder, so cards match the canvas', () => {
     // 'a1' (depth 2) and 'b2' (depth 3) inherit their L1 ancestor's wheel colour;
     // the emitted fill must be exactly depthFill(), the same helper Node.tsx uses.
@@ -98,10 +108,10 @@ describe('renderMindmapSvg smoke', () => {
   // The home cards and the share images are drawn by this renderer while the opened
   // map is drawn by the canvas, so the two must agree node for node.
   describe('mindmap radial graph', () => {
-    const svgOf = () => renderMindmapSvg({ id: 'x', name: 'Machine Learning', type: 'mindmap', line_style: 'curved', theme_id: 'default', nodes: mkNodes() as never })
+    const svgOf = () => renderMindmapSvg({ id: 'x', name: 'Machine Learning', type: 'graph', line_style: 'curved', theme_id: 'default', nodes: mkNodes() as never })
 
     it('puts every node exactly where the shared layout puts it', () => {
-      const laid = computeMindmapLayout(mkNodes().map(n => ({ ...n, width: 0, height: 0 })) as never)
+      const laid = computeGraphLayout(mkNodes().map(n => ({ ...n, width: 0, height: 0 })) as never)
       const drawn = new Map<string, string>()
       const svg = svgOf()
       for (const m of svg.matchAll(/<g transform="translate\(([-\d.]+),([-\d.]+)\)">/g)) {
@@ -142,7 +152,7 @@ describe('renderMindmapSvg smoke', () => {
     it('cuts a long depth-2 label but keeps the whole title on hover', () => {
       const long = 'Hook reads the file on each prompt - flips on next message, no restart'
       const nodes = mkNodes().map(n => (n.id === 'a1' ? { ...n, title: long } : n))
-      const svg = renderMindmapSvg({ id: 'x', name: 'M', type: 'mindmap', line_style: 'curved', theme_id: 'default', nodes: nodes as never })
+      const svg = renderMindmapSvg({ id: 'x', name: 'M', type: 'graph', line_style: 'curved', theme_id: 'default', nodes: nodes as never })
       expect(svg).toContain(`<title>${long}</title>`)
       expect(svg).not.toContain(`fill="#475569">${long}<`)
       const drawn = svg.match(/font-weight="400" fill="#475569">([^<]+)</)![1]
@@ -152,7 +162,7 @@ describe('renderMindmapSvg smoke', () => {
 
     it('points every depth-2 label outward, away from the root', () => {
       const svg = svgOf()
-      const laid = computeMindmapLayout(mkNodes().map(n => ({ ...n, width: 0, height: 0 })) as never)
+      const laid = computeGraphLayout(mkNodes().map(n => ({ ...n, width: 0, height: 0 })) as never)
       const root = laid.find(n => n.depth === 0)!
       const rcx = root.x + root.width / 2
       const rcy = root.y + root.height / 2
@@ -170,7 +180,7 @@ describe('renderMindmapSvg smoke', () => {
       const svg = svgOf()
       const vb = svg.match(/viewBox="([-\d.]+) ([-\d.]+) (\d+) (\d+)"/)!
       const minY = Number(vb[2]), h = Number(vb[4])
-      const laid = computeMindmapLayout(mkNodes().map(n => ({ ...n, width: 0, height: 0 })) as never)
+      const laid = computeGraphLayout(mkNodes().map(n => ({ ...n, width: 0, height: 0 })) as never)
       const lowestL1 = Math.max(...laid.filter(n => n.depth === 1).map(n => n.y + n.height))
       // the name + count under the lowest topic still fit inside the viewBox
       expect(minY + h).toBeGreaterThan(lowestL1 + 31)
@@ -190,7 +200,7 @@ describe('renderMindmapSvg smoke', () => {
   // has to glow exactly the way the canvas does - and a light one must not change.
   describe('neon (dark themes)', () => {
     const svgOfTheme = (theme: string) => renderMindmapSvg({
-      id: 'x', name: 'Machine Learning', type: 'mindmap', line_style: 'curved',
+      id: 'x', name: 'Machine Learning', type: 'graph', line_style: 'curved',
       theme_id: theme, nodes: mkNodes() as never,
     })
 

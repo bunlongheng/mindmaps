@@ -248,7 +248,7 @@ test.describe('Home — floating create modal (FAB)', () => {
       route.fulfill({
         status: 200, contentType: 'application/json',
         body: JSON.stringify({
-          id: 'e2e-ai-fake', name: 'E2E AI Map', type: 'mindmap',
+          id: 'e2e-ai-fake', name: 'E2E AI Map', type: 'graph',
           line_style: 'orthogonal', theme_id: 'default', sharing_enabled: false, tags: [],
           nodes: [{ id: 'r', title: 'Root', color: '#6366f1', parentId: null, depth: 0, x: 0, y: 0, width: 140, height: 140, sortOrder: 0 }],
         }),
@@ -301,7 +301,7 @@ test.describe('Home — floating create modal (FAB)', () => {
       route.fulfill({
         status: 200, contentType: 'application/json',
         body: JSON.stringify({
-          id: 'e2e-ai-cmd', name: 'Cmd Map', type: 'mindmap',
+          id: 'e2e-ai-cmd', name: 'Cmd Map', type: 'graph',
           line_style: 'orthogonal', theme_id: 'default', sharing_enabled: false, tags: [],
           nodes: [{ id: 'r', title: 'Root', color: '#6366f1', parentId: null, depth: 0, x: 0, y: 0, width: 140, height: 140, sortOrder: 0 }],
         }),
@@ -325,7 +325,7 @@ test.describe('Home — diagram card hover actions', () => {
       route.fulfill({
         status: 200, contentType: 'application/json',
         body: JSON.stringify({
-          id: 'e2e-card-open', name: 'Card Open', type: 'mindmap',
+          id: 'e2e-card-open', name: 'Card Open', type: 'graph',
           line_style: 'orthogonal', theme_id: 'default', sharing_enabled: false, tags: [],
           nodes: [{ id: 'r', title: 'Root', color: '#6366f1', parentId: null, depth: 0, x: 0, y: 0, width: 140, height: 140, sortOrder: 0 }],
         }),

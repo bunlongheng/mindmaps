@@ -138,50 +138,50 @@ describe('EdgeLayer — logic-chart', () => {
 })
 
 // ── Mindmap ──────────────────────────────────────────────────────────────────
-describe('EdgeLayer — mindmap', () => {
+describe('EdgeLayer — graph', () => {
   const root = n({ id: 'root', depth: 0, x: 400, y: 400, width: 180, height: 180 })
   const l1 = n({ id: 'l1', depth: 1, parentId: 'root', x: 700, y: 400, color: '#3b82f6' })
   const l2 = n({ id: 'l2', depth: 2, parentId: 'l1', x: 900, y: 400 })
   const l3 = n({ id: 'l3', depth: 3, parentId: 'l2', x: 1100, y: 400 })
 
   it('renders radial edges with straight line style', () => {
-    const { container } = renderLayer([root, l1, l2, l3], 'straight', 'mindmap')
+    const { container } = renderLayer([root, l1, l2, l3], 'straight', 'graph')
     expect(container.querySelectorAll('path').length).toBeGreaterThanOrEqual(3)
   })
 
   it('renders quadratic curve edges with curved line style', () => {
-    const { container } = renderLayer([root, l1, l2], 'curved', 'mindmap')
+    const { container } = renderLayer([root, l1, l2], 'curved', 'graph')
     const d = container.querySelector('path')!.getAttribute('d')!
     expect(d).toContain('Q')
   })
 
   it('renders L1 order-number badges in mindmap mode', () => {
-    const { container } = renderLayer([root, l1], 'straight', 'mindmap')
+    const { container } = renderLayer([root, l1], 'straight', 'graph')
     expect(container.querySelector('circle')).toBeTruthy()
   })
 
   it('mindmap L1 badge uses sortOrder ?? 0 fallback', () => {
     const l1nb = n({ id: 'l1', depth: 1, parentId: 'root', x: 700, y: 400, color: '#3b82f6' })
     delete (l1nb as Partial<MindmapNode>).sortOrder
-    const { container } = renderLayer([root, l1nb], 'straight', 'mindmap')
+    const { container } = renderLayer([root, l1nb], 'straight', 'graph')
     expect(container.querySelector('text')?.textContent).toBe('1')
   })
 
   it('hides order numbers when disabled', () => {
     useMindmapStore.setState({ showOrderNumbers: false })
-    const { container } = renderLayer([root, l1], 'straight', 'mindmap')
+    const { container } = renderLayer([root, l1], 'straight', 'graph')
     expect(container.querySelector('circle')).toBeFalsy()
   })
 
   it('handles a node whose center coincides with parent (zero-length edge)', () => {
     const overlap = n({ id: 'ov', depth: 1, parentId: 'root', x: 400, y: 400, width: 180, height: 180 })
-    const { container } = renderLayer([root, overlap], 'straight', 'mindmap')
+    const { container } = renderLayer([root, overlap], 'straight', 'graph')
     expect(container.querySelector('path')).toBeTruthy()
   })
 
   it('ignores edges whose parent is missing from the node map', () => {
     const orphan = n({ id: 'orphan', depth: 2, parentId: 'ghost', x: 900, y: 400 })
-    const { container } = renderLayer([root, l1, orphan], 'straight', 'mindmap')
+    const { container } = renderLayer([root, l1, orphan], 'straight', 'graph')
     // only the valid edge renders
     expect(container.querySelectorAll('path').length).toBe(1)
   })
@@ -191,15 +191,15 @@ describe('EdgeLayer — mindmap', () => {
   it('draws 2 paths per branch on a dark theme and 1 on a light one', () => {
     const nodes = [root, l1, l2, l3]   // 3 branches
     useMindmapStore.setState({ themeId: 'cyberpunk' })
-    expect(renderLayer(nodes, 'straight', 'mindmap').container.querySelectorAll('path').length).toBe(6)
+    expect(renderLayer(nodes, 'straight', 'graph').container.querySelectorAll('path').length).toBe(6)
     cleanup()
     useMindmapStore.setState({ themeId: 'default' })
-    expect(renderLayer(nodes, 'straight', 'mindmap').container.querySelectorAll('path').length).toBe(3)
+    expect(renderLayer(nodes, 'straight', 'graph').container.querySelectorAll('path').length).toBe(3)
   })
 
   it('defines the branch blur once and lightens the core line', () => {
     useMindmapStore.setState({ themeId: 'cyberpunk' })
-    const { container } = renderLayer([root, l1, l2, l3], 'straight', 'mindmap')
+    const { container } = renderLayer([root, l1, l2, l3], 'straight', 'graph')
     expect(container.querySelectorAll('filter#mm-neon-edge').length).toBe(1)
     const strokes = [...container.querySelectorAll('path')].map(p => p.getAttribute('stroke'))
     expect(strokes).toContain(l1.color)                              // the glow line
@@ -208,13 +208,49 @@ describe('EdgeLayer — mindmap', () => {
 
   it('leaves a light theme on the single thin branch it draws today', () => {
     useMindmapStore.setState({ themeId: 'default' })
-    const { container } = renderLayer([root, l1], 'straight', 'mindmap')
+    const { container } = renderLayer([root, l1], 'straight', 'graph')
     expect(container.querySelector('filter#mm-neon-edge')).toBeFalsy()
     expect(container.querySelector('path')!.getAttribute('stroke-opacity')).toBe(String(RADIAL_EDGE_OPACITY))
   })
 })
 
 // ── Fishbone ─────────────────────────────────────────────────────────────────
+describe('EdgeLayer — mindmap (balanced left/right)', () => {
+  const root = n({ id: 'root', depth: 0, x: 400, y: 400, width: 200, height: 130 })
+  const right = n({ id: 'r1', depth: 1, parentId: 'root', x: 800, y: 380, color: '#3b82f6' })
+  const right2 = n({ id: 'r2', depth: 1, parentId: 'root', x: 800, y: 460, color: '#22c55e', sortOrder: 1 })
+  const left = n({ id: 'x1', depth: 1, parentId: 'root', x: 100, y: 380, color: '#ef4444', sortOrder: 2 })
+
+  it('leaves the root from its right face for a topic on the right', () => {
+    const { container } = renderLayer([root, right], 'curved', 'mindmap')
+    const d = container.querySelector('path')!.getAttribute('d')!
+    // starts at the root's RIGHT edge (x = 400 + 200) and lands on the child's left
+    expect(d.startsWith('M 600 465')).toBe(true)
+    expect(d.endsWith('800 400')).toBe(true)
+  })
+
+  it('leaves the root from its LEFT face for a topic on the left', () => {
+    const { container } = renderLayer([root, left], 'curved', 'mindmap')
+    const d = container.querySelector('path')!.getAttribute('d')!
+    expect(d.startsWith('M 400 465')).toBe(true)
+    // lands on the child's RIGHT edge (100 + 100)
+    expect(d.endsWith('200 400')).toBe(true)
+  })
+
+  it('fans both sides at once and numbers the topics it fans', () => {
+    const { container } = renderLayer([root, right, right2, left], 'curved', 'mindmap')
+    expect(container.querySelectorAll('path').length).toBe(3)
+    // A side holding a single topic draws the plain curve, which carries no badge -
+    // the same as the brace style it shares its connector with.
+    expect([...container.querySelectorAll('text')].map(t => t.textContent)).toEqual(['1', '2'])
+  })
+
+  it('draws nothing for a map with no children', () => {
+    const { container } = renderLayer([root], 'curved', 'mindmap')
+    expect(container.querySelectorAll('path').length).toBe(0)
+  })
+})
+
 describe('EdgeLayer — fishbone', () => {
   const root = n({ id: 'root', depth: 0, x: 100, y: 380, width: 180, height: 54 })
   const l1above = n({ id: 'la', depth: 1, parentId: 'root', x: 500, y: 100, width: 160, height: 44, color: '#3b82f6' })

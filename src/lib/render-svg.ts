@@ -11,7 +11,8 @@
 // render as a tiny neutral placeholder instead of pulling the icon library.
 import type { MindmapNode, DiagramType, LineStyle } from '../types/index.js'
 import { computeMindmapsLayout } from './layout/mindmaps-layout.js'
-import { computeMindmapLayout, wrapText, initialFontSize, nodeInitial, radialLabelFor, radialNodeExtent, LABEL_FONT, RADIAL_ROOT_FONT } from './layout/mindmap.js'
+import { computeMindmapLayout } from './layout/mindmap.js'
+import { computeGraphLayout, wrapText, initialFontSize, nodeInitial, radialLabelFor, radialNodeExtent, LABEL_FONT, RADIAL_ROOT_FONT } from './layout/graph.js'
 import { computeFishboneLayout, FISHBONE_SLANT, fishboneSlant } from './layout/fishbone.js'
 import { computeTimelineLayout, TIMELINE_ELBOW_R } from './layout/timeline.js'
 import { computeHoneycombLayout } from './layout/honeycomb.js'
@@ -47,7 +48,7 @@ export interface MindmapRow {
 }
 
 const FONT = 'Inter, system-ui, -apple-system, sans-serif'
-const VALID_TYPES = new Set<string>(['logic-chart', 'mindmap', 'fishbone', 'timeline', 'honeycomb'])
+const VALID_TYPES = new Set<string>(['logic-chart', 'mindmap', 'graph', 'fishbone', 'timeline', 'honeycomb'])
 const VALID_LINE_STYLES = new Set<string>(['straight', 'curved', 'orthogonal'])
 
 const esc = (s: unknown): string => String(s ?? '')
@@ -67,6 +68,7 @@ function isLight(hex: string): boolean {
 function runLayout(nodes: MindmapNode[], type: DiagramType): MindmapNode[] {
   switch (type) {
     case 'mindmap':   return computeMindmapLayout(nodes)
+    case 'graph':   return computeGraphLayout(nodes)
     case 'fishbone':  return computeFishboneLayout(nodes)
     case 'timeline':  return computeTimelineLayout(nodes)
     case 'honeycomb': return computeHoneycombLayout(nodes)
@@ -96,28 +98,28 @@ function edgeStroke(color: string, depth: number): string {
   return color.startsWith('#') ? applyDepthTransparency(color, depth) : color
 }
 
-/** Curved bezier parent right-edge -> child left-edge (EdgeLayer CurvedEdge). */
-function curvedEdge(parent: MindmapNode, child: MindmapNode, color: string): string {
-  const x1 = parent.x + parent.width
+/** Curved bezier parent side-edge -> child facing edge (EdgeLayer CurvedEdge). */
+function curvedEdge(parent: MindmapNode, child: MindmapNode, color: string, goRight = true): string {
+  const x1 = goRight ? parent.x + parent.width : parent.x
   const y1 = parent.y + parent.height / 2
-  const x2 = child.x
+  const x2 = goRight ? child.x : child.x + child.width
   const y2 = child.y + child.height / 2
   const cx = (x1 + x2) / 2
   return `<path d="M ${r2(x1)} ${r2(y1)} C ${r2(cx)} ${r2(y1)} ${r2(cx)} ${r2(y2)} ${r2(x2)} ${r2(y2)}" stroke="${esc(color)}" stroke-width="${edgeWidthForDepth(child.depth)}" fill="none" stroke-linecap="round"/>`
 }
 
 /** Fan of beziers from a parent to its children (EdgeLayer BracketConnector). */
-function bracketConnector(parent: MindmapNode, children: MindmapNode[], pc: (n: MindmapNode) => string): string {
+function bracketConnector(parent: MindmapNode, children: MindmapNode[], pc: (n: MindmapNode) => string, goRight = true): string {
   if (children.length === 0) return ''
   const sorted = [...children].sort((a, b) => a.y - b.y)
-  if (children.length === 1) return curvedEdge(parent, sorted[0], pc(sorted[0]))
-  const px = parent.x + parent.width
+  if (children.length === 1) return curvedEdge(parent, sorted[0], pc(sorted[0]), goRight)
+  const px = goRight ? parent.x + parent.width : parent.x
   const py = parent.y + parent.height / 2
   return sorted.map(child => {
     const cy = child.y + child.height / 2
-    const cx2 = child.x
+    const cx2 = goRight ? child.x : child.x + child.width
     const gap = Math.abs(cx2 - px)
-    const c1x = px + gap * 0.5
+    const c1x = goRight ? px + gap * 0.5 : px - gap * 0.5
     return `<path d="M ${r2(px)} ${r2(py)} C ${r2(c1x)} ${r2(py)}, ${r2(c1x)} ${r2(cy)}, ${r2(cx2)} ${r2(cy)}" stroke="${esc(pc(child))}" stroke-width="${edgeWidthForDepth(child.depth)}" fill="none" stroke-linecap="round"/>`
   }).join('')
 }
@@ -161,7 +163,7 @@ function renderEdges(nodes: MindmapNode[], type: DiagramType, lineStyle: LineSty
   // identical to the canvas (EdgeLayer.tsx) so a card preview matches the opened map.
   // On a dark canvas each branch is drawn twice - a blurred glow line under a crisp
   // lightened core - so it reads as a luminous tube, exactly as the canvas draws it.
-  if (type === 'mindmap') {
+  if (type === 'graph') {
     const branches = nodes.filter(n => n.parentId && nodeMap.has(n.parentId))
       .map(n => ({ n, d: buildRadialBranchPath(nodeMap.get(n.parentId!)!, n) }))
     const core = branches.map(({ n, d }) => {
@@ -174,6 +176,18 @@ function renderEdges(nodes: MindmapNode[], type: DiagramType, lineStyle: LineSty
     const glow = branches.map(({ n, d }) =>
       `<path d="${d}" stroke="${esc(pc(n))}" stroke-width="${NEON_EDGE_GLOW_WIDTH}" fill="none" stroke-linecap="round"/>`).join('')
     return `<g filter="url(#${NEON_EDGE_FILTER})" opacity="${NEON_EDGE_GLOW_OPACITY}">${glow}</g>${core}`
+  }
+
+  // Mind Map: the balanced tree. The same fan of curves the brace style draws, run
+  // once per side, so a topic sitting left of its parent leaves the parent's LEFT
+  // face instead of reaching around it (src/lib/layout/mindmap).
+  if (type === 'mindmap') {
+    return nodes.filter(n => nodes.some(c => c.parentId === n.id)).map(parent => {
+      const kids = nodes.filter(n => n.parentId === parent.id)
+      const cx = parent.x + parent.width / 2
+      return bracketConnector(parent, kids.filter(k => k.x + k.width / 2 >= cx), pc, true)
+        + bracketConnector(parent, kids.filter(k => k.x + k.width / 2 < cx), pc, false)
+    }).join('')
   }
 
   if (type === 'fishbone') {
@@ -365,7 +379,7 @@ function renderNode(node: MindmapNode, type: DiagramType, paletteColor: string |
   const isFishboneNode = type === 'fishbone' && node.depth >= 1
   // Radial constellation node, mirroring Node.tsx: a circle sized by its own subtree,
   // with the label drawn outside it. An explicit per-node shape opts out.
-  const isRadial = type === 'mindmap' && !isRoot && !node.shape
+  const isRadial = type === 'graph' && !isRoot && !node.shape
   const isRadialDot = isRadial && node.depth >= 3
   // Honeycomb: every node (root included) is a pointy-top hexagon, node.shape ignored.
   const isHex = type === 'honeycomb'
@@ -415,7 +429,7 @@ function renderNode(node: MindmapNode, type: DiagramType, paletteColor: string |
   // Neon (dark canvas): white glyphs inside every orb, and a root orb painted with a
   // radial gradient of its own colour lightened at the centre. Paint only - the
   // geometry above is untouched, exactly as on the canvas (Node.tsx).
-  const rootNeon = neon && isRoot && type === 'mindmap' ? neonRootColor(node.color) : null
+  const rootNeon = neon && isRoot && type === 'graph' ? neonRootColor(node.color) : null
   if (neon && (isRadial || rootNeon)) textColor = NEON_TEXT
   if (rootNeon) strokeColor = lighten(rootNeon, 0.4)
   if (node.borderColor) { strokeColor = node.borderColor; strokeW = Math.max(strokeW, node.borderWidth ?? 1.5) }
@@ -433,7 +447,7 @@ function renderNode(node: MindmapNode, type: DiagramType, paletteColor: string |
   // Coerced: fontSize is typed number but arrives as unvalidated stored JSON, and it
   // lands in an SVG attribute that the home grid injects with dangerouslySetInnerHTML.
   const baseFontSize = Number(node.fontSize)
-    || (isRoot && type === 'mindmap' ? RADIAL_ROOT_FONT : metric.fontSize)
+    || (isRoot && type === 'graph' ? RADIAL_ROOT_FONT : metric.fontSize)
   const fontSize = isRootPill ? rootPillFontSize(node.title, baseFontSize) : baseFontSize
   const fontWeight = node.bold ? '700' : (isRoot ? '500' : node.depth === 1 ? '500' : '400')
 
@@ -462,7 +476,7 @@ function renderNode(node: MindmapNode, type: DiagramType, paletteColor: string |
     if (isRootPill) {
       parts.push(`<rect x="0" y="0" width="${r2(displayW)}" height="${r2(h)}" rx="${r2(h / 2)}" ry="${r2(h / 2)}" fill="${esc(bg)}" stroke="${esc(strokeColor)}" stroke-width="${strokeW}"/>`)
     } else {
-      if (type === 'mindmap' && !rootNeon) {
+      if (type === 'graph' && !rootNeon) {
         parts.push(`<circle cx="${r2(cx)}" cy="${r2(cy)}" r="${r2(displayW / 2 * 1.08)}" fill="${esc(bg)}" opacity="0.22" filter="url(#mm-glow)"/>`)
       }
       if (rootNeon) {
@@ -594,7 +608,7 @@ function renderNode(node: MindmapNode, type: DiagramType, paletteColor: string |
         parts.push(`<text x="${r2(lbl.tx)}" y="${r2(lbl.countY)}" text-anchor="${lbl.anchor}" font-size="${LABEL_FONT.count1}" font-weight="600" fill="${countFill}">${descendants}</text>`)
       }
     }
-  } else if (drawCircle || (isRoot && type === 'mindmap')) {
+  } else if (drawCircle || (isRoot && type === 'graph')) {
     parts.push(centeredWrappedText(label, parsedTitle.segments, cx, cy, fontSize, fontWeight, textColor))
   } else if (hasEmoji) {
     const emojiSize = Math.round(h * 0.52)
@@ -622,10 +636,10 @@ function renderNode(node: MindmapNode, type: DiagramType, paletteColor: string |
  * outside the circles, so the home card and the share image have to reserve room for
  * text that lives beyond the node's own box - otherwise the outermost labels are
  * cropped off the preview. The extent comes from the same helper the layout reserved
- * the space with (src/lib/layout/mindmap radialNodeExtent).
+ * the space with (src/lib/layout/graph radialNodeExtent).
  */
 function nodeBounds(n: MindmapNode, type: DiagramType, rootCenter: { x: number; y: number } | null): { left: number; right: number; top: number; bottom: number } {
-  if (type === 'mindmap' && rootCenter) return radialNodeExtent(n, rootCenter.x, rootCenter.y)
+  if (type === 'graph' && rootCenter) return radialNodeExtent(n, rootCenter.x, rootCenter.y)
   return { left: n.x, right: n.x + n.width, top: n.y, bottom: n.y + n.height }
 }
 
@@ -651,7 +665,7 @@ export function renderMindmapSvg(row: MindmapRow): string {
 
   // The radial mind map glows on a dark canvas, exactly as it does on the canvas
   // renderer, so a home card and a share image match the opened map.
-  const neon = type === 'mindmap' && isDarkBg(theme.canvasBg)
+  const neon = type === 'graph' && isDarkBg(theme.canvasBg)
 
   // Draw order: edges under nodes (DiagramCanvas)
   const edges = renderEdges(nodes, type, lineStyle, pc, neon)
@@ -699,7 +713,7 @@ export function renderMindmapSvg(row: MindmapRow): string {
   // canvas that becomes one two-layer neon filter per distinct circle size, plus the
   // branch and text blurs and the root orb's gradient - filter primitives only, so
   // the resvg rasterizer behind the share image draws what the browser draws.
-  const mmDefs = type !== 'mindmap' ? ''
+  const mmDefs = type !== 'graph' ? ''
     : !neon
       ? '<filter id="mm-glow" x="-70%" y="-70%" width="240%" height="240%"><feGaussianBlur stdDeviation="6"/></filter>'
       : neonFilterSpecs(nodes.map(n => Math.max(n.width, n.height))).map(f =>

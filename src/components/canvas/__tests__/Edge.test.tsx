@@ -23,7 +23,7 @@ describe('Edge', () => {
   it('renders a path with curved style (default branch) for mindmap, child to the right', () => {
     const parent = makeNode({ id: 'p', x: 0, y: 0 })
     const child = makeNode({ id: 'c', x: 300, y: 0, depth: 1, color: '#ef4444' })
-    const { container } = renderEdge(parent, child, 'curved', 'mindmap')
+    const { container } = renderEdge(parent, child, 'curved', 'graph')
     const path = container.querySelector('path')
     expect(path).toBeTruthy()
     // curved path uses cubic bezier "C"
@@ -37,7 +37,7 @@ describe('Edge', () => {
   it('renders a straight path', () => {
     const parent = makeNode({ id: 'p', x: 0, y: 0 })
     const child = makeNode({ id: 'c', x: 300, y: 0 })
-    const { container } = renderEdge(parent, child, 'straight', 'mindmap')
+    const { container } = renderEdge(parent, child, 'straight', 'graph')
     const d = container.querySelector('path')?.getAttribute('d') ?? ''
     expect(d).toContain('L')
     expect(d).not.toContain('C')
@@ -46,7 +46,7 @@ describe('Edge', () => {
   it('renders an orthogonal path', () => {
     const parent = makeNode({ id: 'p', x: 0, y: 0 })
     const child = makeNode({ id: 'c', x: 300, y: 0 })
-    const { container } = renderEdge(parent, child, 'orthogonal', 'mindmap')
+    const { container } = renderEdge(parent, child, 'orthogonal', 'graph')
     const d = container.querySelector('path')?.getAttribute('d') ?? ''
     expect(d).toContain('H')
     expect(d).toContain('V')
@@ -55,7 +55,7 @@ describe('Edge', () => {
   it('handles a child positioned to the LEFT of the parent (else branch)', () => {
     const parent = makeNode({ id: 'p', x: 300, y: 0 })
     const child = makeNode({ id: 'c', x: 0, y: 0 })
-    const { container } = renderEdge(parent, child, 'curved', 'mindmap')
+    const { container } = renderEdge(parent, child, 'curved', 'graph')
     expect(container.querySelector('path')).toBeTruthy()
   })
 
@@ -71,7 +71,7 @@ describe('Edge', () => {
   it('applies depth-based transparency to the stroke color', () => {
     const parent = makeNode({ id: 'p', x: 0, y: 0 })
     const child = makeNode({ id: 'c', x: 300, y: 0, depth: 2, color: '#ff0000' })
-    const { container } = renderEdge(parent, child, 'curved', 'mindmap')
+    const { container } = renderEdge(parent, child, 'curved', 'graph')
     const stroke = container.querySelector('path')?.getAttribute('stroke') ?? ''
     // depth 2 => alpha = 0.8^2 (float) -> matches applyDepthTransparency output
     expect(stroke).toMatch(/^rgba\(255,0,0,0\.64/)

@@ -173,7 +173,7 @@ test.describe('Viewer — decoded share (?d=) document page', () => {
     const diagram = {
       id: 'e2e-shared',
       name: 'Shared View Map',
-      type: 'mindmap',
+      type: 'graph',
       lineStyle: 'orthogonal',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -217,7 +217,7 @@ test.describe('Viewer — ?share= id document page', () => {
       route.fulfill({
         status: 200, contentType: 'application/json',
         body: JSON.stringify({
-          id: 'e2e-share-id', name: 'Share Id Map', type: 'mindmap',
+          id: 'e2e-share-id', name: 'Share Id Map', type: 'graph',
           line_style: 'orthogonal', theme_id: 'default', sharing_enabled: true, tags: [],
           nodes: [
             { id: 'root', title: 'Share Root', color: '#6366f1', parentId: null, depth: 0, x: 0, y: 0, width: 140, height: 140, sortOrder: 0 },

@@ -2,7 +2,7 @@ import { useRef, useState, useCallback } from 'react'
 import type { MindmapNode } from '../../types'
 import { useMindmapStore } from '../../store/mindmapStore'
 import { NodeIcon, getLucideIcon } from './NodeIcon'
-import { wrapText, initialFontSize, nodeInitial, radialLabelFor, LABEL_FONT, RADIAL_ROOT_FONT } from '../../lib/layout/mindmap'
+import { wrapText, initialFontSize, nodeInitial, radialLabelFor, LABEL_FONT, RADIAL_ROOT_FONT } from '../../lib/layout/graph'
 import { rootPillWidth, rootPillFontSize, rootIsPill, rootCircleDiameter, rootDrawnWidth } from '../../lib/rootPill'
 import { getTheme } from '../../lib/themes'
 import { LABEL_TEXT, timelineSubFill, timelineSubText,
@@ -135,18 +135,18 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   // is a glowing orb, the root a violet-to-blue one, and the labels are white or light
   // grey. Only paint changes - sizes, positions and hit areas are identical. Light
   // themes read none of this and keep today's subtle look.
-  const neon = diagramType === 'mindmap' && isDarkBg(getTheme(themeId).canvasBg)
-  const canDrag = (isRoot && diagramType !== 'mindmap') || diagramType === 'logic-chart'
-  // Root shape: a circle only in mindmap mode (or on an explicit per-node shape),
+  const neon = diagramType === 'graph' && isDarkBg(getTheme(themeId).canvasBg)
+  const canDrag = (isRoot && diagramType !== 'graph') || diagramType === 'logic-chart'
+  // Root shape: a circle only in graph mode (or on an explicit per-node shape),
   // a pill everywhere else - see src/lib/rootPill rootIsPill.
   const isRootPill = isRoot && rootIsPill(node, diagramType)
   const isFishbone = diagramType === 'fishbone'
-  // The Mind Map type draws a radial constellation (src/lib/layout/mindmap): every
+  // The Graph type draws a radial constellation (src/lib/layout/graph): every
   // node is a circle sized by the weight of its own subtree, with the label drawn
   // OUTSIDE the circle - under it at depth 1, beside it at depth 2, and only on
   // selection for the dots at depth 3 and deeper. An explicit per-node shape opts a
   // node out of the scheme and keeps its own box, as it does in every other type.
-  const isRadial = diagramType === 'mindmap' && !isRoot && !node.shape
+  const isRadial = diagramType === 'graph' && !isRoot && !node.shape
   const isRadialDot = isRadial && node.depth >= 3
   // Honeycomb: every node (root included) is a pointy-top hexagon; node.shape is
   // ignored for this type (src/lib/hex has the shared geometry both this canvas and
@@ -236,7 +236,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   const metric = nodeMetrics(node.depth)
   // The mind map root is a centre circle, not a pill, so it takes its own size.
   const baseFontSize = node.fontSize
-    ?? (isRoot && diagramType === 'mindmap' ? RADIAL_ROOT_FONT : metric.fontSize)
+    ?? (isRoot && diagramType === 'graph' ? RADIAL_ROOT_FONT : metric.fontSize)
   const padX = metric.padX
   // Root pill grows to fit the title up to a max width; past that the font shrinks
   // so long titles never overflow. Shared with the layout (src/lib/rootPill) so
@@ -417,7 +417,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   // Only the root and the two labelled rings carry it; the dots are too small to
   // show a blur and one filter per dot would be pure cost.
   const glowId = `glow-${node.id}`
-  const showGlow = diagramType === 'mindmap' && !neon && (isRoot || (isRadial && node.depth <= 2))
+  const showGlow = diagramType === 'graph' && !neon && (isRoot || (isRadial && node.depth <= 2))
   // Neon halo: one shared, diameter-bucketed filter per render (defined in
   // DiagramCanvas), so a 200-node map carries a handful of filters, not 400.
   const neonGlow = neon && (isRoot || isRadial)
@@ -477,7 +477,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
       style={{ cursor: editing ? 'default' : canDrag ? 'grab' : 'pointer', userSelect: 'none' }}
     >
       {/* Fireflies around nodes with children — count = all descendants */}
-      {showDecor && diagramType !== 'mindmap' && node.depth >= 1 && descendantCount > 0 && (
+      {showDecor && diagramType !== 'graph' && node.depth >= 1 && descendantCount > 0 && (
         <Fireflies cx={displayW / 2} cy={node.height / 2} r={Math.max(displayW, node.height) * 0.45} color={col} count={descendantCount} shape={isHex ? 'hex' : 'dot'} />
       )}
 
@@ -509,7 +509,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
           )}
 
           {/* Siri glow - circle root only, never on the mind map */}
-          {!isRootPill && diagramType !== 'mindmap' && showDecor && <SiriWave cx={cx} cy={cy} r={r} colors={l1Colors} />}
+          {!isRootPill && diagramType !== 'graph' && showDecor && <SiriWave cx={cx} cy={cy} r={r} colors={l1Colors} />}
 
           {/* Root shape: pill rect for long titles, circle for short */}
           {isRootPill ? (
@@ -532,7 +532,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
 
 
           {/* Roaming fireflies in the L1 colours — twinkle around the root */}
-          {showDecor && diagramType !== 'mindmap' && l1Colors.length > 0 && (
+          {showDecor && diagramType !== 'graph' && l1Colors.length > 0 && (
             <Fireflies cx={cx} cy={cy} r={Math.max(displayW, node.height) / 2}
               colors={l1Colors} count={Math.min(20, Math.max(10, l1Colors.length))} color={l1Colors[0]} />
           )}
@@ -692,7 +692,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
       })() : isRadial ? (() => {
         // Labels live OUTSIDE the circle, so this group is never clipped to the box.
         // Where each one sits, and how far it is cut, comes from the same helper the
-        // layout used to reserve room for it (src/lib/layout/mindmap radialLabelFor),
+        // layout used to reserve room for it (src/lib/layout/graph radialLabelFor),
         // so a label can never land where nothing was kept clear for it.
         const glyph = node.fontSize ?? initialFontSize(node.depth, displayW)
         // Selecting a node shows its whole title, however long; otherwise it is cut.
@@ -850,7 +850,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
                 </g>
               )
             }
-            if (isRoot && diagramType === 'mindmap') {
+            if (isRoot && diagramType === 'graph') {
               const maxChars = Math.max(8, Math.ceil(Math.sqrt(label.length * 1.8)))
               const lines = wrapText(label, maxChars)
               const ranges = lineRanges(label, lines)

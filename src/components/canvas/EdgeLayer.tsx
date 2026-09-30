@@ -95,7 +95,7 @@ export function EdgeLayer({ nodes, lineStyle, diagramType, paletteColors }: Edge
   const themeId = useMindmapStore(s => s.themeId)
   // On a dark canvas the radial branches are luminous tubes, not hairlines: a blurred
   // glow line under a crisp lightened core. Light themes keep the single thin line.
-  const neon = diagramType === 'mindmap' && isDarkBg(getTheme(themeId).canvasBg)
+  const neon = diagramType === 'graph' && isDarkBg(getTheme(themeId).canvasBg)
   const nodeMap = new Map(nodes.map(n => [n.id, n]))
   // Connector/badge colour from the 12-colour wheel, matching the node fills.
   const pc = (n: MindmapNode) => paletteColors?.get(n.id) ?? n.color
@@ -234,7 +234,7 @@ export function EdgeLayer({ nodes, lineStyle, diagramType, paletteColors }: Edge
   // Thin, same-handed curves from circle edge to circle edge in the branch's own
   // colour - never a straight spoke through the centre. The width still comes from
   // the shared table (src/lib/color edgeWidthForDepth), scaled down for this type.
-  if (diagramType === 'mindmap') {
+  if (diagramType === 'graph') {
     const edges = nodes.filter(n => n.parentId && nodeMap.has(n.parentId)).map(n => {
       const parent = nodeMap.get(n.parentId!)!
       // The root circle auto-sizes from its title, so measure what is drawn.
@@ -281,6 +281,30 @@ export function EdgeLayer({ nodes, lineStyle, diagramType, paletteColors }: Edge
                   >{(n.sortOrder ?? 0) + 1}</text>
                 </g>
               )}
+            </g>
+          )
+        })}
+      </g>
+    )
+  }
+
+  // ── Mind Map (balanced left/right tree) ───────────────────────────────────
+  // The same fan of curves the brace style draws, run once per side, so a topic
+  // sitting left of its parent leaves the parent's LEFT face instead of reaching
+  // around it (src/lib/layout/mindmap).
+  if (diagramType === 'mindmap') {
+    const parents = nodes.filter(n => nodes.some(c => c.parentId === n.id))
+    return (
+      <g>
+        {parents.map(parent => {
+          const kids = nodes.filter(n => n.parentId === parent.id)
+          const cx = parent.x + (parent.depth === 0 ? rootDrawnWidth(parent, diagramType) : parent.width) / 2
+          const onRight = kids.filter(k => k.x + k.width / 2 >= cx)
+          const onLeft = kids.filter(k => k.x + k.width / 2 < cx)
+          return (
+            <g key={parent.id}>
+              <BracketConnector parent={parent} children={onRight} goRight showOrderNumbers={showOrderNumbers} colorOf={pc} />
+              <BracketConnector parent={parent} children={onLeft} goRight={false} showOrderNumbers={showOrderNumbers} colorOf={pc} />
             </g>
           )
         })}

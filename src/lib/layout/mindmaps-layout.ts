@@ -5,12 +5,13 @@ import { nodeFontSize, nodeHeight, nodeMinWidth, nodeWidth, estimateTextWidth } 
 
 const H_GAPS: Record<number, number> = { 0: 120, 1: 60 }
 const DEFAULT_H_GAP = 50
-const V_GAP = 22
+export const V_GAP = 22
+export { H_GAPS }
 
 function getHGap(depth: number) { return H_GAPS[depth] ?? DEFAULT_H_GAP }
 
 /** Auto-compute width from title text so every node fits its content */
-function autoWidth(node: MindmapNode, depth: number): number {
+export function autoWidth(node: MindmapNode, depth: number): number {
   const hasVisual = !!(node.icon || node.emoji)
   // Only L1 draws the white icon badge, so only L1 reserves the zone for it.
   return nodeWidth(estimateTextWidth(node.title, nodeFontSize(depth)), depth, {
@@ -20,7 +21,7 @@ function autoWidth(node: MindmapNode, depth: number): number {
 }
 
 /** Effective size: root pill always auto-sizes from title; circle uses stored or default */
-function nodeSize(node: MindmapNode, depth: number) {
+export function nodeSize(node: MindmapNode, depth: number) {
   if (depth === 0) {
     const fs = node.fontSize ?? ROOT_FONT
     // This layout only ever serves the box diagrams, never the radial mindmap.
@@ -42,7 +43,7 @@ function nodeSize(node: MindmapNode, depth: number) {
   return shapedNodeSize(node, nodeFontSize(depth), w, h)
 }
 
-function subtreeH(nodeId: string, depth: number, nodes: MindmapNode[]): number {
+export function subtreeH(nodeId: string, depth: number, nodes: MindmapNode[]): number {
   const node = nodes.find(n => n.id === nodeId)
   const children = nodes.filter(n => n.parentId === nodeId)
   const fallbackH = nodeHeight(depth)
@@ -58,7 +59,7 @@ function subtreeH(nodeId: string, depth: number, nodes: MindmapNode[]): number {
  * goRight=true:  x is the LEFT edge;  children go to the right.
  * goRight=false: x is the RIGHT edge; children go to the left.
  */
-function place(
+export function place(
   nodeId: string,
   depth: number,
   x: number,

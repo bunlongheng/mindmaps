@@ -46,7 +46,7 @@ const sharedRow = {
   id: 'map-1',
   user_id: OWNER_ID,
   name: 'Shared Map',
-  type: 'mindmap',
+  type: 'graph',
   line_style: 'orthogonal',
   sharing_enabled: true,
   theme_id: 'default',

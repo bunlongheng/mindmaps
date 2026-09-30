@@ -1,4 +1,4 @@
-export type DiagramType = 'logic-chart' | 'mindmap' | 'fishbone' | 'timeline' | 'honeycomb'
+export type DiagramType = 'logic-chart' | 'mindmap' | 'graph' | 'fishbone' | 'timeline' | 'honeycomb'
 export type LineStyle = 'straight' | 'curved' | 'orthogonal'
 
 export interface MindmapNode {

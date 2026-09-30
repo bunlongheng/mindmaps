@@ -2,7 +2,7 @@
 // server SVG renderer (render-svg.ts) and the layouts, so a home-grid card preview
 // can never draw a different shape than the map it opens.
 import type { MindmapNode } from '../types/index.js'
-import { circleForText } from './layout/mindmap.js'
+import { circleForText } from './layout/graph.js'
 
 /** Per-node box shape. Absent keeps the diagram type's own default look. */
 export type NodeShape = NonNullable<MindmapNode['shape']>
