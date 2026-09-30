@@ -153,7 +153,11 @@ export default function App() {
   const [diagramLoading, setDiagramLoading] = useState(() => !!(getMapParam() || getShareParam()))
   const [view, setView] = useState<View>(() => {
     if (decodeShareURL()) return 'viewer'
-    if (getShareParam()) return 'viewer'
+    // A share link is the read-only page for a visitor - but the owner is not a
+    // visitor. Signed in, their own /s/<id> link opens the real editor (menu,
+    // panel, type tabs), exactly like ?map=<id>, in this tab or a new one. Flows
+    // resolves the owner the same way before it picks a view (lib/handlers/auth-me).
+    if (getShareParam()) return user ? 'editor' : 'viewer'
     if (getMapParam()) return 'editor'
     return 'home'
   })
@@ -180,7 +184,13 @@ export default function App() {
     const shared = decodeShareURL()
     if (shared) { setActiveMindmap(shared); return }
     const shareId = getShareParam()
-    if (shareId) { setDiagramLoading(true); loadDiagram(shareId).finally(() => setDiagramLoading(false)); return }
+    if (shareId) {
+      // Owner: the share id is just one of their map ids, so normalize the URL to
+      // ?map= as well - refresh, Back and a copied address bar then behave like
+      // the editor instead of dropping back into the visitor page.
+      if (user) window.history.replaceState({}, '', `?map=${shareId}`)
+      setDiagramLoading(true); loadDiagram(shareId).finally(() => setDiagramLoading(false)); return
+    }
     const mapId = getMapParam()
     if (mapId) {
       // Normalize ?id= → ?map= in the URL, preserving ?imported
