@@ -226,12 +226,36 @@ test.describe('Viewer — ?share= id document page', () => {
         }),
       }),
     )
-    await page.goto('/?share=e2e-share-id')
+    // ?anon=1 turns off the local dev auto-login, so this is the VISITOR view -
+    // signed in, the owner gets the editor instead (the test below).
+    await page.goto('/?share=e2e-share-id&anon=1')
     await expect(page.getByText('Mindmaps')).toBeVisible({ timeout: 10_000 })
     await expect(page.locator('.mm-viewer-card svg')).toBeVisible()
     // Assert on the single-line child node (root titles wrap across tspans).
     await expect(page.locator('.mm-viewer-card svg text').filter({ hasText: 'Child' }).first()).toBeVisible({ timeout: 5_000 })
     await expect(page.locator('.diagram-canvas-root')).toHaveCount(0)
     await expect(page.getByText('Download SVG')).toBeVisible()
+  })
+
+  test('the signed-in owner gets the editor on the same link, not the viewer', async ({ page }) => {
+    await page.route(/\/api\/mindmaps\?.*\bid=e2e-share-id/, route =>
+      route.fulfill({
+        status: 200, contentType: 'application/json',
+        body: JSON.stringify({
+          id: 'e2e-share-id', name: 'Share Id Map', type: 'graph',
+          line_style: 'orthogonal', theme_id: 'default', sharing_enabled: true, tags: [],
+          nodes: [
+            { id: 'root', title: 'Share Root', color: '#6366f1', parentId: null, depth: 0, x: 0, y: 0, width: 140, height: 140, sortOrder: 0 },
+            { id: 'c1', title: 'Child', color: '#22c55e', parentId: 'root', depth: 1, x: 200, y: 0, width: 120, height: 40, sortOrder: 0 },
+          ],
+        }),
+      }),
+    )
+    // No ?anon=1: localhost is the signed-in owner, so the share id opens the editor.
+    await page.goto('/?share=e2e-share-id')
+    await expect(page.locator('.diagram-canvas-root')).toBeVisible({ timeout: 10_000 })
+    await expect(page.locator('[title="Settings"]')).toBeVisible()
+    await expect(page.getByText('Download SVG')).toHaveCount(0)
+    expect(new URL(page.url()).search).toContain('map=e2e-share-id')
   })
 })

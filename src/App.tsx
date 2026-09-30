@@ -52,7 +52,12 @@ export default function App() {
   const [user, setUser] = useState<{ email: string; name: string; userId: string } | null>(() => {
     // import.meta.env.DEV is a compile-time constant, so Vite strips this whole branch -
     // including the owner literals below - from the production bundle.
-    if (import.meta.env.DEV && isLocal) {
+    // Local dev signs the owner in automatically, which now also decides share
+    // links - so ?anon=1 opts out for that load and the visitor side of a share
+    // link (read-only page, demo footer) stays checkable locally. Dev only: the
+    // whole branch is compiled out of the production bundle.
+    const wantsAnon = new URLSearchParams(window.location.search).has('anon')
+    if (import.meta.env.DEV && isLocal && !wantsAnon) {
       // Owner identity for local dev, read from env so no personal literal ships in public source.
       // Set VITE_DEV_USER_* in .env.local to match your owner row; the fallbacks are placeholders.
       const DEV_USER = {
