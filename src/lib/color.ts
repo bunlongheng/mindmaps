@@ -34,15 +34,20 @@ export function applyDepthBackground(baseHex: string, depth: number): string {
  * old 80% at depth 2 painted a topic and its children in nearly the same fill, so a
  * branch with 5 children read as 1 solid block on every diagram type.
  *
- *   depth 1 -> 100%   depth 2 -> 15%   depth 3 -> 11%   depth 4 -> 7%   depth 5+ -> 5%
+ *   depth 1 -> 100%   depth 2 -> 15%   depth 3 -> 7%   depth 4 -> 4%   depth 5+ -> 3%
+ *
+ * The old 11% at depth 3 was 4 points off depth 2, which on an already 85%-white
+ * wash is a handful of channel levels - the leaf boxes read as the same colour as
+ * the layer above them. Each step below depth 2 now roughly halves what is left, so
+ * a leaf is visibly paler than its parent.
  *
  * Exported so the canvas (Node.tsx), the server renderer (render-svg.ts) and the
  * tests all read the same numbers.
  */
-export const DEPTH_STRENGTH: Readonly<Record<number, number>> = { 1: 1, 2: 0.15, 3: 0.11, 4: 0.07 }
+export const DEPTH_STRENGTH: Readonly<Record<number, number>> = { 1: 1, 2: 0.15, 3: 0.07, 4: 0.04 }
 
 /** Strength used at depth 5 and deeper. */
-export const DEPTH_STRENGTH_FLOOR = 0.05
+export const DEPTH_STRENGTH_FLOOR = 0.03
 
 /** Strength of the branch colour at a given depth (see DEPTH_STRENGTH). */
 export function depthStrength(depth: number): number {
@@ -84,6 +89,42 @@ export const RADIAL_EDGE_OPACITY = 0.55
 /** Branch width for a child at the given depth in the radial mind map. */
 export function radialEdgeWidth(childDepth: number): number {
   return Math.max(1, edgeWidthForDepth(childDepth) * RADIAL_EDGE_SCALE)
+}
+
+/**
+ * Box border width per layer, so the outline carries the hierarchy the way the fill
+ * and the connectors already do. Every box below the root used to be a flat 2px, so
+ * an L3 leaf was outlined exactly as heavily as the L2 it hangs off.
+ *
+ *   depth 1 -> 4px   depth 2 -> 3px   depth 3 -> 2px   depth 4+ -> 1px
+ *
+ * The root keeps its own 5px rim. Exported so the canvas (Node.tsx), the server
+ * renderer (render-svg.ts) and the tests all read the same numbers.
+ */
+export const NODE_STROKE_BY_DEPTH = [4, 3, 2, 1]
+
+/** Border width for a box at the given depth (see NODE_STROKE_BY_DEPTH). */
+export function nodeStrokeWidth(depth: number): number {
+  if (depth <= 1) return NODE_STROKE_BY_DEPTH[0]
+  return NODE_STROKE_BY_DEPTH[Math.min(depth - 1, NODE_STROKE_BY_DEPTH.length - 1)]
+}
+
+/**
+ * Box fill opacity per layer, so each layer sits back a little further into the
+ * canvas than the one above it. Every box used to paint at a flat 1.0.
+ *
+ *   depth 0/1 -> 1     depth 2 -> 0.92   depth 3 -> 0.84   depth 4+ -> 0.76
+ *
+ * Gentle on purpose: the fill is already a pale wash below L1, so this is the last
+ * nudge of recession, not the main signal. Text, borders and the emoji badge stay
+ * fully opaque. Exported so both renderers read the same numbers.
+ */
+export const NODE_FILL_OPACITY_BY_DEPTH = [1, 0.92, 0.84, 0.76]
+
+/** Fill opacity for a box at the given depth (see NODE_FILL_OPACITY_BY_DEPTH). */
+export function nodeFillOpacity(depth: number): number {
+  if (depth <= 1) return NODE_FILL_OPACITY_BY_DEPTH[0]
+  return NODE_FILL_OPACITY_BY_DEPTH[Math.min(depth - 1, NODE_FILL_OPACITY_BY_DEPTH.length - 1)]
 }
 
 /**
