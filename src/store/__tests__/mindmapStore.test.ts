@@ -94,9 +94,16 @@ describe('mindmapStore', () => {
       expect(root.width).not.toBe(root.height)     // a pill, not a circle
     })
 
-    it('keeps a short root title as a circle (width === height)', () => {
+    it('pills a short root title too - only the radial mindmap keeps a circle', () => {
       const shortRoot = { ...makeRoot(), title: 'Hi' }
       loadDiagram(makeDiagram([shortRoot, makeChild('c1', 'Child 1', 'root', 1, 0)]))
+      const root = useMindmapStore.getState().activeMindmap!.nodes.find(n => n.parentId === null)!
+      expect(root.width).not.toBe(root.height)
+    })
+
+    it('leaves a mindmap root square', () => {
+      const shortRoot = { ...makeRoot(), title: 'Hi' }
+      loadDiagram({ ...makeDiagram([shortRoot, makeChild('c1', 'Child 1', 'root', 1, 0)]), type: 'mindmap' })
       const root = useMindmapStore.getState().activeMindmap!.nodes.find(n => n.parentId === null)!
       expect(root.width).toBe(root.height)
     })

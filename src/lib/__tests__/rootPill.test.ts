@@ -93,8 +93,16 @@ describe('rootDrawnWidth', () => {
 
   it('respects a node font size override', () => {
     expect(rootDrawnWidth({ ...pillRoot, fontSize: 50 }, 'logic-chart')).toBe(rootPillWidth(pillRoot.title, 50))
-    // A small enough font lets the title fit a circle, so it stops being a pill.
-    expect(rootDrawnWidth({ ...pillRoot, fontSize: 20 }, 'logic-chart')).toBe(STALE_W)
+    expect(rootDrawnWidth({ ...pillRoot, fontSize: 20 }, 'logic-chart')).toBe(rootPillWidth(pillRoot.title, 20))
+  })
+
+  it('pills a SHORT title too - only mindmap and honeycomb keep a round root', () => {
+    const shortRoot = { depth: 0, title: 'Hi', width: STALE_W }
+    expect(rootDrawnWidth(shortRoot, 'logic-chart')).toBe(rootPillWidth('Hi', ROOT_FONT))
+    expect(rootDrawnWidth(shortRoot, 'timeline')).toBe(rootPillWidth('Hi', ROOT_FONT))
+    expect(rootDrawnWidth(shortRoot, 'fishbone')).toBe(rootPillWidth('Hi', ROOT_FONT))
+    expect(rootDrawnWidth(shortRoot, 'mindmap')).toBe(STALE_W)
+    expect(rootDrawnWidth(shortRoot, 'honeycomb')).toBe(STALE_W)
   })
 })
 

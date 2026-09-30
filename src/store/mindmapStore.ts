@@ -18,7 +18,7 @@ import { parseIndentedOutline, normalizeOutlineRoots, assembleOutlineTree, compu
 import { computeTimelineLayout } from '../lib/layout/timeline'
 import { computeHoneycombLayout } from '../lib/layout/honeycomb'
 import { getTheme } from '../lib/themes'
-import { rootPillWidth, ROOT_FONT } from '../lib/rootPill'
+import { rootPillWidth, rootIsPill, ROOT_FONT } from '../lib/rootPill'
 import { nodeHeight } from '../lib/nodeMetrics'
 import { normalizeWidthsPerDepth } from '../lib/widthNormalize'
 import { guessIcon } from '../lib/autoIcon'
@@ -273,11 +273,10 @@ export const useMindmapStore = create<MindmapStore>()(
             ? { ...n, height: 0, manuallyPositioned: false }
             : { ...n, width: 0, height: 0, manuallyPositioned: false }
         }
-        // Root: a long title (or an already-pill root) renders as a pill that the
-        // canvas auto-sizes from the title. Reserve the SAME width the canvas draws
-        // (Node.tsx autoPillW: cap 720, +80 pad) so children never overlap the pill.
-        const isPill = n.title.length >= 15 || n.width !== n.height
-        if (isPill) {
+        // Root: every diagram but the radial mindmap and the honeycomb draws a
+        // pill (src/lib/rootPill rootIsPill). Reserve the SAME width the canvas
+        // draws so children never overlap it.
+        if (rootIsPill(n, d.type)) {
           return { ...n, width: rootPillWidth(n.title, n.fontSize ?? ROOT_FONT), height: nodeHeight(0) }
         }
         return n

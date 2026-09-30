@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { renderMindmapSvg } from '../../lib/render-svg'
 import type { Diagram } from '../../types'
 import { SocialFooter } from './SocialFooter'
+import { isDemo } from '../../lib/demo'
 
 // The one lockup, mirroring Sequences' Wordmark.tsx (app/Wordmark.tsx): the app's
 // own icon plus its name at the same size / weight rules, so the header reads as
@@ -73,7 +74,10 @@ export function ViewerPage({ diagram, id }: { diagram: Diagram | null; id: strin
           style={{ background: '#fff', border: '1px solid #e5e7eb', padding: 24, boxShadow: '0 1px 3px rgba(15,23,42,0.06)', overflow: 'hidden' }}
           dangerouslySetInnerHTML={{ __html: svg }}
         />
-        <SocialFooter />
+        {/* Showcase footer on the demo maps only: those are the ones handed out as
+            examples of the app. A personal map someone shared is not a portfolio
+            page, so it ends at the diagram. */}
+        {isDemo(diagram.tags) && <SocialFooter />}
       </div>
     </main>
   )

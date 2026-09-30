@@ -3,7 +3,7 @@ import type { MindmapNode } from '../../types'
 import { useMindmapStore } from '../../store/mindmapStore'
 import { NodeIcon, getLucideIcon } from './NodeIcon'
 import { wrapText, initialFontSize, nodeInitial, radialLabelFor, LABEL_FONT, RADIAL_ROOT_FONT } from '../../lib/layout/mindmap'
-import { rootPillWidth, rootPillFontSize, rootTitleNeedsPill, rootCircleDiameter, rootDrawnWidth, ROOT_FONT } from '../../lib/rootPill'
+import { rootPillWidth, rootPillFontSize, rootIsPill, rootCircleDiameter, rootDrawnWidth } from '../../lib/rootPill'
 import { getTheme } from '../../lib/themes'
 import { LABEL_TEXT, timelineSubFill, timelineSubText,
   hexToRgb, darken, depthFill, isDarkBg, lighten, neonFilterId, neonRootColor,
@@ -137,12 +137,9 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   // themes read none of this and keep today's subtle look.
   const neon = diagramType === 'mindmap' && isDarkBg(getTheme(themeId).canvasBg)
   const canDrag = (isRoot && diagramType !== 'mindmap') || diagramType === 'logic-chart'
-  // Root shape: in mindmap mode always circle; otherwise user-set or auto from title length
-  const isRootPill = isRoot && diagramType !== 'mindmap' && diagramType !== 'honeycomb' && (
-    node.shape === 'pill' ? true :
-    node.shape === 'circle' ? false :
-    rootTitleNeedsPill(node.title, node.fontSize ?? ROOT_FONT)
-  )
+  // Root shape: a circle only in mindmap mode (or on an explicit per-node shape),
+  // a pill everywhere else - see src/lib/rootPill rootIsPill.
+  const isRootPill = isRoot && rootIsPill(node, diagramType)
   const isFishbone = diagramType === 'fishbone'
   // The Mind Map type draws a radial constellation (src/lib/layout/mindmap): every
   // node is a circle sized by the weight of its own subtree, with the label drawn
@@ -280,7 +277,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
     if (!val || val === node.title) return
     const updates: Partial<MindmapNode> = { title: val }
     if (isRoot) {
-      if (node.shape !== 'circle' && (node.shape === 'pill' || rootTitleNeedsPill(val, baseFontSize))) {
+      if (rootIsPill(node, diagramType)) {
         // pill: auto width, fixed height
         updates.width = rootPillWidth(val, baseFontSize)
         updates.height = nodeMetrics(0).height

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { computeTimelineLayout } from '../timeline'
 import { nodeHeight, nodeMinWidth } from '../../nodeMetrics'
+import { rootCircleDiameter, rootPillWidth } from '../../rootPill'
 import type { MindmapNode } from '../../../types'
 
 function node(overrides: Partial<MindmapNode> & { id: string }): MindmapNode {
@@ -29,23 +30,50 @@ describe('computeTimelineLayout', () => {
     expect(computeTimelineLayout(input)).toBe(input)
   })
 
-  it('places a lone root with default size at the spine', () => {
+  it('draws a lone root as a pill, not a circle (only mindmap keeps a round root)', () => {
     const out = computeTimelineLayout([node({ id: 'root', depth: 0 })])
     expect(out).toHaveLength(1)
     const root = byId(out, 'root')
+    const h = nodeHeight(0)
     expect(root.x).toBe(80)
-    expect(root.width).toBe(180) // default
-    expect(root.height).toBe(180) // default
-    expect(root.y).toBe(SPINE_Y - 180 / 2)
+    expect(root.width).toBe(rootPillWidth('Node'))
+    expect(root.height).toBe(h)
+    expect(root.y).toBe(SPINE_Y - h / 2)
     expect(root.manuallyPositioned).toBe(false)
   })
 
-  it('uses stored root width/height when greater than zero', () => {
-    const out = computeTimelineLayout([node({ id: 'root', depth: 0, width: 260, height: 120 })])
+  it('pills a long title too, instead of growing a circle around it', () => {
+    const title = 'First 90 Days'
+    const out = computeTimelineLayout([node({ id: 'root', depth: 0, title, width: 180, height: 180 })])
     const root = byId(out, 'root')
-    expect(root.width).toBe(260)
-    expect(root.height).toBe(120)
-    expect(root.y).toBe(SPINE_Y - 120 / 2)
+    expect(root.width).toBe(rootPillWidth(title))
+    expect(root.height).toBe(nodeHeight(0))
+  })
+
+  it('sizes an explicit circle root to fit its own title, not a flat default', () => {
+    const out = computeTimelineLayout([node({ id: 'root', depth: 0, shape: 'circle' })])
+    const root = byId(out, 'root')
+    const d = rootCircleDiameter('Node')
+    expect(d).toBeGreaterThan(180)
+    expect(root.width).toBe(d)
+    expect(root.height).toBe(d)
+    expect(root.y).toBe(SPINE_Y - d / 2)
+  })
+
+  it('keeps a stored size on a circle root only where it is bigger than the fitting circle', () => {
+    const out = computeTimelineLayout([node({ id: 'root', depth: 0, shape: 'circle', width: 260, height: 120 })])
+    const root = byId(out, 'root')
+    const d = rootCircleDiameter('Node')
+    expect(root.width).toBe(260)   // stored, wider than the circle that fits 'Node'
+    expect(root.height).toBe(d)    // stored 120 would have clipped the title
+    expect(root.y).toBe(SPINE_Y - d / 2)
+  })
+
+  it('never lets a long title overflow an explicit root circle', () => {
+    const title = 'First 90 Days'
+    const out = computeTimelineLayout([node({ id: 'root', depth: 0, shape: 'circle', title, width: 180, height: 180 })])
+    expect(byId(out, 'root').width).toBe(rootCircleDiameter(title))
+    expect(rootCircleDiameter(title)).toBeGreaterThan(180)
   })
 
   it('alternates L1 nodes above and below the spine (even=above, odd=below)', () => {

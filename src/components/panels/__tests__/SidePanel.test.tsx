@@ -413,9 +413,9 @@ describe('SidePanel — Style tab', () => {
   })
 
   it('Branch selected tile carries the same selected style as a selected Type tile', () => {
-    loadDiagram() // default diagramType 'logic-chart', root shape defaults to circle
+    loadDiagram() // default diagramType 'logic-chart', root shape defaults to pill
     render(<SidePanel nodeId="root" onClose={vi.fn()} />)
-    const selectedShapeTile = screen.getByText('Circle').closest('button')!
+    const selectedShapeTile = screen.getAllByText('Pill')[0].closest('button')!
     expect(selectedShapeTile).toHaveStyle({ borderColor: '#3b82f6', background: '#eff6ff' })
 
     // Map tab hosts the Type block — its selected tile uses the same treatment

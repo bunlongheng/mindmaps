@@ -1,6 +1,7 @@
 import type { MindmapNode } from '../../types/index.js'
 import { shapedNodeSize } from '../nodeShape.js'
 import { nodeFontSize, nodeHeight, nodeWidth, estimateTextWidth } from '../nodeMetrics.js'
+import { rootCircleDiameter, rootIsPill, rootPillWidth, ROOT_FONT } from '../rootPill.js'
 
 const SPINE_Y = 400
 const ROOT_X = 80
@@ -50,8 +51,16 @@ export function computeTimelineLayout(nodes: MindmapNode[]): MindmapNode[] {
     .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
 
   const result: MindmapNode[] = []
-  const rootW = root.width > 0 ? root.width : 180
-  const rootH = root.height > 0 ? root.height : 180
+  // The root sizes itself from its title, the same rule the logic-chart layout
+  // (src/lib/layout/mindmaps-layout) uses: a pill by default, and a circle grown
+  // to fit the title when the node explicitly asks for one. Every imported map
+  // stores the root at a flat 180, so without this a title of more than about 5
+  // characters spilled out of the shape on the canvas AND on the share image.
+  const rootFs = root.fontSize ?? ROOT_FONT
+  const pill = rootIsPill(root, 'timeline')
+  const circle = pill ? 0 : rootCircleDiameter(root.title, rootFs)
+  const rootW = pill ? rootPillWidth(root.title, rootFs) : Math.max(circle, root.width > 0 ? root.width : 180)
+  const rootH = pill ? nodeHeight(0) : Math.max(circle, root.height > 0 ? root.height : 180)
   result.push({ ...root, x: ROOT_X, y: SPINE_Y - rootH / 2, width: rootW, height: rootH, manuallyPositioned: false })
 
   let curX = ROOT_X + rootW + 48

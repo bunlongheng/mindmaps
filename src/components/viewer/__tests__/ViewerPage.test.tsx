@@ -42,11 +42,20 @@ describe('ViewerPage', () => {
     expect(svg!.querySelector('title')!.textContent).toBe('My Map')
   })
 
-  it('renders all 5 footer links', () => {
-    render(<ViewerPage diagram={makeDiagram()} id="m1" />)
+  it('renders all 5 footer links on a demo map', () => {
+    render(<ViewerPage diagram={makeDiagram({ tags: ['demo'] })} id="m1" />)
     for (const label of ['Portfolio', 'GitHub', 'LinkedIn', 'Instagram', 'X']) {
       expect(screen.getByTitle(label)).toBeInTheDocument()
     }
+  })
+
+  it('leaves the social footer off a map that is not a demo', () => {
+    render(<ViewerPage diagram={makeDiagram({ tags: ['Work'] })} id="m1" />)
+    expect(screen.queryByTitle('GitHub')).toBeNull()
+    expect(screen.queryByText('Bunlong')).toBeNull()
+    cleanup()
+    render(<ViewerPage diagram={makeDiagram({ tags: undefined })} id="m1" />)
+    expect(screen.queryByTitle('GitHub')).toBeNull()
   })
 
   it('sets document title to "<name> · Mindmaps" and restores it on unmount', () => {

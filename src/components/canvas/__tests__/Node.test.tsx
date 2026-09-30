@@ -828,9 +828,9 @@ describe('Node — editing', () => {
     expect(useMindmapStore.getState().activeMindmap!.nodes.find(n => n.id === 'n1')!.title).toBe('NewViaBlur')
   })
 
-  it('editing a short root title sets equal width/height (circle) on commit', () => {
+  it('editing an explicit circle root sets equal width/height on commit', () => {
     vi.useFakeTimers()
-    const root = makeRoot({ title: 'Hi' })
+    const root = makeRoot({ title: 'Hi', shape: 'circle' })
     loadStore([root, makeNode()])
     const { container } = renderNode(root)
     const g = container.querySelector('[data-node-id="root"] > g') as Element
@@ -1078,7 +1078,8 @@ describe('Node — color helper edge cases', () => {
   })
 
   it('renders the root SiriWave with empty l1Colors (FALLBACK palette)', () => {
-    const root = makeRoot()
+    // SiriWave only rides a round root, and only a circle root is round now.
+    const root = makeRoot({ shape: 'circle' })
     loadStore([root, makeNode()])
     const { container } = renderNode(root, { l1Colors: [] })
     // SiriWave blobs are <circle> elements with a blur filter group

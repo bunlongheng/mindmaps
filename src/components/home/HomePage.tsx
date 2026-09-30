@@ -5,7 +5,7 @@ import { useDiagram, authHeaders } from '../../hooks/useDiagram'
 import { useIsMobile } from '../../hooks/useIsMobile'
 import { showToast } from '../CuteToast'
 import type { DiagramMeta, MindmapNode } from '../../types'
-import { Plus, Search, Trash2, LayoutGrid, List, Globe, Sparkles, Loader2, Tag, X, Bot, Briefcase, User, BookOpen, Zap, GraduationCap, FlaskConical, Beaker, FileInput, type LucideIcon } from 'lucide-react'
+import { Plus, Search, Trash2, LayoutGrid, List, Globe, Sparkles, Loader2, Tag, X, Bot, Briefcase, User, BookOpen, Zap, GraduationCap, FlaskConical, Beaker, FileInput, Presentation, type LucideIcon } from 'lucide-react'
 import { ImportModal } from '../modals/ImportModal'
 import { MindmapsLogo } from '../MindmapsLogo'
 import { getTheme } from '../../lib/themes'
@@ -15,6 +15,7 @@ import { hexToRgb, l1PaletteColor, applyDepthBackground } from '../../lib/color'
 import { AIThinkingOverlay } from '../AIThinkingOverlay'
 import { soundHover, soundPaste } from '../../lib/sounds'
 import { buildTagColorMap, tagColor, type TagColor } from '../../lib/tagColors'
+import { DEMO_TAG, isDemo } from '../../lib/demo'
 
 const PRESET_TAGS = ['AI', 'Work', 'Personal', 'Research']
 
@@ -62,6 +63,22 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
     if (tag) p.set('tag', tag); else p.delete('tag')
     const next = p.toString() ? `?${p}` : window.location.pathname
     window.history.replaceState({}, '', next)
+  }
+  // Which half of the library is on screen: the owner's own maps, or the public
+  // showcase maps tagged `demo`. Kept in the URL like the tag filter so a reload
+  // (or a shared link to the demos) lands on the same tab.
+  const [scope, _setScope] = useState<'mine' | 'demo'>(() => {
+    const p = new URLSearchParams(window.location.search)
+    return p.get('tab') === 'demo' ? 'demo' : 'mine'
+  })
+  const setScope = (next: 'mine' | 'demo') => {
+    _setScope(next)
+    // A tag pill from the other tab would filter to nothing here, so drop it.
+    setActiveTag(null)
+    const p = new URLSearchParams(window.location.search)
+    if (next === 'demo') p.set('tab', 'demo'); else p.delete('tab')
+    p.delete('tag')
+    window.history.replaceState({}, '', p.toString() ? `?${p}` : window.location.pathname)
   }
   const [tagModalId, setTagModalId] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<DiagramMeta | null>(null)
@@ -137,20 +154,29 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
   // All unique tags (preset + any used in diagrams) — used by the tag editor modal.
   const allTags = Array.from(new Set([...PRESET_TAGS, ...diagrams.flatMap(d => d.tags ?? [])]))
 
-  // Tags that still have at least one map. The filter bar only shows these, so a
-  // tag disappears once its last map is deleted/untagged.
+  // The active tab owns the split, so everything below it — search, tag pills,
+  // counts, the grid — sees only the maps on this side.
+  const scoped = useMemo(
+    () => diagrams.filter(d => isDemo(d.tags) === (scope === 'demo')),
+    [diagrams, scope],
+  )
+  const demoCount = useMemo(() => diagrams.filter(d => isDemo(d.tags)).length, [diagrams])
+
+  // Tags that still have at least one map in this tab. The filter bar only shows
+  // these, so a tag disappears once its last map is deleted/untagged.
   const usedTags = useMemo(() => {
     const s = new Set<string>()
-    diagrams.forEach(d => (d.tags ?? []).forEach(t => s.add(t)))
+    scoped.forEach(d => (d.tags ?? []).forEach(t => s.add(t)))
     return s
-  }, [diagrams])
-  const barTags = allTags.filter(t => usedTags.has(t))
+  }, [scoped])
+  // `demo` never gets a pill: the tab already is that filter.
+  const barTags = allTags.filter(t => usedTags.has(t) && t !== DEMO_TAG)
 
   // Maps matching the search box only (ignoring the active tag). Pill counts bind
   // to this set so each count reflects what the current search would surface.
   const searchFiltered = useMemo(
-    () => diagrams.filter(d => d.name.toLowerCase().includes(search.toLowerCase())),
-    [diagrams, search],
+    () => scoped.filter(d => d.name.toLowerCase().includes(search.toLowerCase())),
+    [scoped, search],
   )
 
   const filtered = searchFiltered.filter(d => {
@@ -391,6 +417,31 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
         scrollbarWidth: 'none', alignItems: 'center',
         maxWidth: 1600, margin: '0 auto',
       }}>
+        {/* Mine / Demos tabs. The top-level split sits ahead of the tag pills it
+            scopes; the Demos side only appears once a map is tagged `demo`. */}
+        {demoCount > 0 && ([['mine', 'Mine', User, '#1e293b'], ['demo', 'Demos', Presentation, '#7c3aed']] as const).map(([key, label, Icon, accent]) => {
+          const isActive = scope === key
+          const count = key === 'demo' ? demoCount : diagrams.length - demoCount
+          return (
+            <button key={key} data-scope={key} onClick={() => setScope(key)} title={key === 'demo' ? 'Showcase maps' : 'My own maps'} style={{
+              display: 'flex', alignItems: 'center', gap: 5,
+              padding: '5px 13px', borderRadius: 999, fontSize: 12, fontWeight: 600,
+              fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+              border: `1.5px solid ${isActive ? accent : BORDER}`,
+              background: isActive ? accent : '#fff',
+              color: isActive ? '#fff' : TEXT_MUTED,
+              transition: 'all 0.15s',
+            }}>
+              <Icon size={11} />
+              {!isMobile && label}
+              <span style={{ fontSize: 11, fontWeight: 700, opacity: 0.7 }}>{count}</span>
+            </button>
+          )
+        })}
+        {demoCount > 0 && (
+          <div style={{ width: 1, height: 20, background: BORDER, margin: '0 4px', flexShrink: 0 }} />
+        )}
+
         {/* All */}
         {(() => {
           const isActive = activeTag === null
@@ -435,10 +486,12 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
           )
         })}
 
-        {/* No Tag */}
+        {/* No Tag. Hidden at 0: on the Demos tab every map is tagged, and an
+            always-0 pill is just noise. */}
         {(() => {
           const isActive = activeTag === '__no_tag__'
           const count = searchFiltered.filter(d => (d.tags ?? []).length === 0).length
+          if (count === 0 && !isActive) return null
           return (
             <button onClick={() => setActiveTag(isActive ? null : '__no_tag__')} style={{
               display: 'flex', alignItems: 'center', gap: 5,

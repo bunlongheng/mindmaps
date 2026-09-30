@@ -1,5 +1,5 @@
 import type { MindmapNode } from '../../types/index.js'
-import { rootPillWidth, rootCircleDiameter, rootTitleNeedsPill, ROOT_FONT } from '../rootPill.js'
+import { rootPillWidth, rootCircleDiameter, rootIsPill, ROOT_FONT } from '../rootPill.js'
 import { shapedNodeSize } from '../nodeShape.js'
 import { nodeFontSize, nodeHeight, nodeMinWidth, nodeWidth, estimateTextWidth } from '../nodeMetrics.js'
 
@@ -23,9 +23,8 @@ function autoWidth(node: MindmapNode, depth: number): number {
 function nodeSize(node: MindmapNode, depth: number) {
   if (depth === 0) {
     const fs = node.fontSize ?? ROOT_FONT
-    const isPill = node.shape === 'pill' ||
-      (node.shape !== 'circle' && rootTitleNeedsPill(node.title, fs))
-    if (isPill) {
+    // This layout only ever serves the box diagrams, never the radial mindmap.
+    if (rootIsPill(node, 'logic-chart')) {
       // Same width the canvas draws (src/lib/rootPill) so the trunk meets the
       // pill's edge instead of starting inside it.
       const w = rootPillWidth(node.title, fs)
