@@ -34,15 +34,20 @@ export function applyDepthBackground(baseHex: string, depth: number): string {
  * old 80% at depth 2 painted a topic and its children in nearly the same fill, so a
  * branch with 5 children read as 1 solid block on every diagram type.
  *
- *   depth 1 -> 100%   depth 2 -> 15%   depth 3 -> 11%   depth 4 -> 7%   depth 5+ -> 5%
+ *   depth 1 -> 100%   depth 2 -> 15%   depth 3 -> 7%   depth 4 -> 4%   depth 5+ -> 3%
+ *
+ * The old 11% at depth 3 was 4 points off depth 2, which on an already 85%-white
+ * wash is a handful of channel levels - the leaf boxes read as the same colour as
+ * the layer above them. Each step below depth 2 now roughly halves what is left, so
+ * a leaf is visibly paler than its parent.
  *
  * Exported so the canvas (Node.tsx), the server renderer (render-svg.ts) and the
  * tests all read the same numbers.
  */
-export const DEPTH_STRENGTH: Readonly<Record<number, number>> = { 1: 1, 2: 0.15, 3: 0.11, 4: 0.07 }
+export const DEPTH_STRENGTH: Readonly<Record<number, number>> = { 1: 1, 2: 0.15, 3: 0.07, 4: 0.04 }
 
 /** Strength used at depth 5 and deeper. */
-export const DEPTH_STRENGTH_FLOOR = 0.05
+export const DEPTH_STRENGTH_FLOOR = 0.03
 
 /** Strength of the branch colour at a given depth (see DEPTH_STRENGTH). */
 export function depthStrength(depth: number): number {

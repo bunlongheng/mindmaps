@@ -117,12 +117,12 @@ describe('l1PaletteColor', () => {
 
 describe('depth ladder (DEPTH_STRENGTH / depthStrength / depthFill)', () => {
   it('matches the documented table', () => {
-    expect(DEPTH_STRENGTH).toEqual({ 1: 1, 2: 0.15, 3: 0.11, 4: 0.07 })
-    expect(DEPTH_STRENGTH_FLOOR).toBe(0.05)
+    expect(DEPTH_STRENGTH).toEqual({ 1: 1, 2: 0.15, 3: 0.07, 4: 0.04 })
+    expect(DEPTH_STRENGTH_FLOOR).toBe(0.03)
     expect(depthStrength(1)).toBe(1)
     expect(depthStrength(2)).toBe(0.15)
-    expect(depthStrength(3)).toBe(0.11)
-    expect(depthStrength(4)).toBe(0.07)
+    expect(depthStrength(3)).toBe(0.07)
+    expect(depthStrength(4)).toBe(0.04)
   })
 
   it('floors at depth 5 and deeper', () => {
@@ -154,14 +154,16 @@ describe('depth ladder (DEPTH_STRENGTH / depthStrength / depthFill)', () => {
     const d4 = chan(depthFill('#ed1c24', 4))
     // Green channel is the one with room to move on red. Below depth 1 every level is
     // a pale wash, so the steps are small but each one still moves toward white.
-    expect(d3[1] - d2[1]).toBeGreaterThanOrEqual(5)
+    // Depth 3 has to be the one that reads: a leaf sitting next to its own parent
+    // used to be ~7 levels apart, close enough to look like the same fill.
+    expect(d3[1] - d2[1]).toBeGreaterThanOrEqual(14)
     expect(d4[1] - d3[1]).toBeGreaterThanOrEqual(5)
     expect(d3[2] - d2[2]).toBeGreaterThan(0)
   })
 
   it('mixes exactly (1 - strength) toward white', () => {
-    // #000000 at 11% strength -> 89% of the way to white -> 227
-    expect(depthFill('#000000', 3)).toBe('#e3e3e3')
+    // #000000 at 7% strength -> 93% of the way to white -> 237
+    expect(depthFill('#000000', 3)).toBe('#ededed')
     expect(depthFill('#ffffff', 5)).toBe('#ffffff')
   })
 })
