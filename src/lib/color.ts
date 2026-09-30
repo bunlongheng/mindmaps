@@ -110,6 +110,24 @@ export function nodeStrokeWidth(depth: number): number {
 }
 
 /**
+ * Box fill opacity per layer, so each layer sits back a little further into the
+ * canvas than the one above it. Every box used to paint at a flat 1.0.
+ *
+ *   depth 0/1 -> 1     depth 2 -> 0.92   depth 3 -> 0.84   depth 4+ -> 0.76
+ *
+ * Gentle on purpose: the fill is already a pale wash below L1, so this is the last
+ * nudge of recession, not the main signal. Text, borders and the emoji badge stay
+ * fully opaque. Exported so both renderers read the same numbers.
+ */
+export const NODE_FILL_OPACITY_BY_DEPTH = [1, 0.92, 0.84, 0.76]
+
+/** Fill opacity for a box at the given depth (see NODE_FILL_OPACITY_BY_DEPTH). */
+export function nodeFillOpacity(depth: number): number {
+  if (depth <= 1) return NODE_FILL_OPACITY_BY_DEPTH[0]
+  return NODE_FILL_OPACITY_BY_DEPTH[Math.min(depth - 1, NODE_FILL_OPACITY_BY_DEPTH.length - 1)]
+}
+
+/**
  * Node fill for a branch colour at a given depth: the colour mixed toward white by
  * (1 - strength). Depth 0 (the root) is returned untouched. Returns hex so callers
  * can run the same isLight() readability check on the result.

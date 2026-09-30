@@ -6,7 +6,7 @@ import { wrapText, initialFontSize, nodeInitial, radialLabelFor, LABEL_FONT, RAD
 import { rootPillWidth, rootPillFontSize, rootIsPill, rootCircleDiameter, rootDrawnWidth } from '../../lib/rootPill'
 import { getTheme } from '../../lib/themes'
 import { LABEL_TEXT, timelineSubFill, timelineSubText,
-  hexToRgb, darken, depthFill, isDarkBg, lighten, neonFilterId, neonRootColor, nodeStrokeWidth,
+  hexToRgb, darken, depthFill, isDarkBg, lighten, neonFilterId, neonRootColor, nodeFillOpacity, nodeStrokeWidth,
   NEON_ROOT_GRADIENT, NEON_ROOT_LIGHTEN, NEON_TEXT, NEON_TEXT_FILTER,
   NEON_TEXT_MUTED, NEON_TEXT_MUTED_OPACITY,
 } from '../../lib/color'
@@ -246,8 +246,9 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   const fontSize = isRootPill ? rootPillFontSize(node.title, baseFontSize) : baseFontSize
   const fontWeight = node.bold ? '700' : (isRoot ? '500' : node.depth === 1 ? '500' : '400')
 
-  // Depth-based bg opacity only (text stays fully opaque)
-  const bgOpacity = 1
+  // Depth-based bg opacity only (text, border and badge stay fully opaque) - one
+  // shared ladder with the server renderer (src/lib/color nodeFillOpacity).
+  const bgOpacity = nodeFillOpacity(node.depth)
   // L1 nodes get a diagonal gradient fill (lighter top-left -> base -> darker bottom-right).
   const nodeFill = bg
   const fontStyle = node.italic ? 'italic' : 'normal'

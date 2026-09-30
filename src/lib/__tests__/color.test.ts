@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { hexToRgb, applyDepthTransparency, applyDepthBackground, darken, l1PaletteColor, L1_PALETTE, depthFill, depthStrength, timelineSubFill, timelineSubText, TIMELINE_SUB_TINT, tint, DEPTH_STRENGTH, DEPTH_STRENGTH_FLOOR, edgeWidthForDepth, EDGE_WIDTH_BY_DEPTH, nodeStrokeWidth, NODE_STROKE_BY_DEPTH, isDarkBg, lighten, neonBlur, neonFilterId, neonFilterSpecs, neonRootColor, NEON_ROOT_FALLBACK } from '../color'
+import { hexToRgb, applyDepthTransparency, applyDepthBackground, darken, l1PaletteColor, L1_PALETTE, depthFill, depthStrength, timelineSubFill, timelineSubText, TIMELINE_SUB_TINT, tint, DEPTH_STRENGTH, DEPTH_STRENGTH_FLOOR, edgeWidthForDepth, EDGE_WIDTH_BY_DEPTH, nodeStrokeWidth, NODE_STROKE_BY_DEPTH, nodeFillOpacity, NODE_FILL_OPACITY_BY_DEPTH, isDarkBg, lighten, neonBlur, neonFilterId, neonFilterSpecs, neonRootColor, NEON_ROOT_FALLBACK } from '../color'
 import { THEMES } from '../themes'
 
 describe('hexToRgb', () => {
@@ -165,6 +165,28 @@ describe('depth ladder (DEPTH_STRENGTH / depthStrength / depthFill)', () => {
     // #000000 at 7% strength -> 93% of the way to white -> 237
     expect(depthFill('#000000', 3)).toBe('#ededed')
     expect(depthFill('#ffffff', 5)).toBe('#ffffff')
+  })
+})
+
+describe('fill opacity ladder (NODE_FILL_OPACITY_BY_DEPTH / nodeFillOpacity)', () => {
+  it('steps back one notch per layer', () => {
+    expect(NODE_FILL_OPACITY_BY_DEPTH).toEqual([1, 0.92, 0.84, 0.76])
+    expect(nodeFillOpacity(1)).toBe(1)
+    expect(nodeFillOpacity(2)).toBe(0.92)
+    expect(nodeFillOpacity(3)).toBe(0.84)
+    expect(nodeFillOpacity(4)).toBe(0.76)
+  })
+
+  it('keeps the root fully opaque and floors at the last step', () => {
+    expect(nodeFillOpacity(0)).toBe(1)
+    expect(nodeFillOpacity(5)).toBe(0.76)
+    expect(nodeFillOpacity(12)).toBe(0.76)
+  })
+
+  it('never goes back up as depth grows', () => {
+    for (let d = 1; d < 9; d++) {
+      expect(nodeFillOpacity(d + 1)).toBeLessThanOrEqual(nodeFillOpacity(d))
+    }
   })
 })
 

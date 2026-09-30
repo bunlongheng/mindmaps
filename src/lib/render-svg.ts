@@ -18,7 +18,7 @@ import { computeTimelineLayout, TIMELINE_ELBOW_R } from './layout/timeline.js'
 import { computeHoneycombLayout } from './layout/honeycomb.js'
 import { getTheme } from './themes.js'
 import { LABEL_TEXT, timelineSubFill, timelineSubText,
-  hexToRgb, darken, depthFill, applyDepthTransparency, edgeWidthForDepth, nodeStrokeWidth,
+  hexToRgb, darken, depthFill, applyDepthTransparency, edgeWidthForDepth, nodeFillOpacity, nodeStrokeWidth,
   radialEdgeWidth, RADIAL_EDGE_OPACITY, isDarkBg, lighten, neonFilterId, neonFilterSpecs,
   neonRootColor, NEON_CORE_OPACITY, NEON_EDGE_CORE_OPACITY, NEON_EDGE_FILTER,
   NEON_EDGE_GLOW_BLUR, NEON_EDGE_GLOW_OPACITY, NEON_EDGE_GLOW_WIDTH, NEON_EDGE_LIGHTEN,
@@ -435,6 +435,12 @@ function renderNode(node: MindmapNode, type: DiagramType, paletteColor: string |
   if (rootNeon) strokeColor = lighten(rootNeon, 0.4)
   if (node.borderColor) { strokeColor = node.borderColor; strokeW = Math.max(strokeW, node.borderWidth ?? 1.5) }
 
+  // Same shared fill-opacity ladder as the canvas (src/lib/color nodeFillOpacity), so
+  // each layer sits back a little further. Body fill only - border, badge and text
+  // stay opaque. Empty at L1, which keeps the root and topic markup unchanged.
+  const bgOp = nodeFillOpacity(node.depth)
+  const bgOpAttr = bgOp < 1 ? ` fill-opacity="${bgOp}"` : ''
+
   // Gloss is opt-in per map (root node flag). When on, root, L1 and L2 boxes carry a
   // soft top-of-box gloss; L3+ are already pale, so it would be lost. Dark-background
   // boxes get the stronger gradient stops, light
@@ -472,7 +478,7 @@ function renderNode(node: MindmapNode, type: DiagramType, paletteColor: string |
   if (isHex) {
     const hexR = hex?.radius ?? hexCellLayout(node, combSize).r
     const pts = hexPoints(cx, cy, hexR)
-    parts.push(`<polygon points="${pts}" fill="${esc(bg)}" stroke="${esc(strokeColor)}" stroke-width="${strokeW}" stroke-linejoin="round"/>`)
+    parts.push(`<polygon points="${pts}" fill="${esc(bg)}"${bgOpAttr} stroke="${esc(strokeColor)}" stroke-width="${strokeW}" stroke-linejoin="round"/>`)
   } else if (isRoot) {
     if (isRootPill) {
       parts.push(`<rect x="0" y="0" width="${r2(displayW)}" height="${r2(h)}" rx="${r2(h / 2)}" ry="${r2(h / 2)}" fill="${esc(bg)}" stroke="${esc(strokeColor)}" stroke-width="${strokeW}"/>`)
@@ -500,14 +506,14 @@ function renderNode(node: MindmapNode, type: DiagramType, paletteColor: string |
     } else if (node.depth <= 2) {
       parts.push(`<circle cx="${r2(cx)}" cy="${r2(cy)}" r="${r2(cr * 1.1)}" fill="${esc(col)}" opacity="0.3" filter="url(#mm-glow)"/>`)
     }
-    parts.push(`<circle cx="${r2(cx)}" cy="${r2(cy)}" r="${r2(cr)}" fill="${esc(bg)}"/>`)
+    parts.push(`<circle cx="${r2(cx)}" cy="${r2(cy)}" r="${r2(cr)}" fill="${esc(bg)}"${bgOpAttr}/>`)
     parts.push(`<circle cx="${r2(cx)}" cy="${r2(cy)}" r="${r2(cr)}" fill="none" stroke="${esc(strokeColor)}" stroke-width="${strokeW}"/>`)
     if (showGloss) {
       parts.push(`<circle cx="${r2(cx)}" cy="${r2(cy)}" r="${r2(cr)}" fill="url(#${GLOSS_RADIAL_ID})" fill-opacity="${glossFillOpacity}"/>`)
     }
   } else if (drawCircle) {
     const cr = displayW / 2
-    parts.push(`<circle cx="${r2(cx)}" cy="${r2(cy)}" r="${r2(cr)}" fill="${esc(bg)}"/>`)
+    parts.push(`<circle cx="${r2(cx)}" cy="${r2(cy)}" r="${r2(cr)}" fill="${esc(bg)}"${bgOpAttr}/>`)
     parts.push(`<circle cx="${r2(cx)}" cy="${r2(cy)}" r="${r2(cr)}" fill="none" stroke="${esc(strokeColor)}" stroke-width="${strokeW}"/>`)
     if (showGloss) {
       parts.push(`<circle cx="${r2(cx)}" cy="${r2(cy)}" r="${r2(cr)}" fill="url(#${GLOSS_RADIAL_ID})" fill-opacity="${glossFillOpacity}"/>`)
@@ -519,7 +525,7 @@ function renderNode(node: MindmapNode, type: DiagramType, paletteColor: string |
     const pts = above
       ? `${r2(sk)},0 ${r2(displayW)},0 ${r2(displayW - sk)},${r2(h)} 0,${r2(h)}`
       : `0,0 ${r2(displayW - sk)},0 ${r2(displayW)},${r2(h)} ${r2(sk)},${r2(h)}`
-    parts.push(`<polygon points="${pts}" fill="${esc(bg)}"/>`)
+    parts.push(`<polygon points="${pts}" fill="${esc(bg)}"${bgOpAttr}/>`)
     if (hasEmoji || hasIcon) {
       const badgeW = h + 1
       const badgePts = above
@@ -535,7 +541,7 @@ function renderNode(node: MindmapNode, type: DiagramType, paletteColor: string |
       parts.push(`<rect x="0" y="0" width="${r2(displayW)}" height="${r2(h)}" clip-path="url(#${clipId})" fill="url(#${GLOSS_LINEAR_ID})" fill-opacity="${glossFillOpacity}"/>`)
     }
   } else {
-    parts.push(`<rect x="0" y="0" width="${r2(displayW)}" height="${r2(h)}" rx="${effectiveRx}" ry="${effectiveRx}" fill="${esc(bg)}"/>`)
+    parts.push(`<rect x="0" y="0" width="${r2(displayW)}" height="${r2(h)}" rx="${effectiveRx}" ry="${effectiveRx}" fill="${esc(bg)}"${bgOpAttr}/>`)
     if (showGloss) {
       parts.push(`<rect x="0" y="0" width="${r2(displayW)}" height="${r2(h)}" rx="${effectiveRx}" ry="${effectiveRx}" fill="url(#${GLOSS_LINEAR_ID})" fill-opacity="${glossFillOpacity}"/>`)
     }
