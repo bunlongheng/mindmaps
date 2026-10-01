@@ -47,7 +47,7 @@ describe('vercel.json', () => {
       'Content-Security-Policy',
     ])
     const csp = config.headers[0].headers.find(h => h.key === 'Content-Security-Policy')!.value
-    expect(csp).toBe("default-src 'self'; script-src 'self' https://accounts.google.com; style-src 'self' 'unsafe-inline' https://accounts.google.com; img-src 'self' data: blob: https:; connect-src 'self' https://accounts.google.com https://oauth2.googleapis.com; font-src 'self' data:; worker-src 'self' blob:; manifest-src 'self'; frame-src 'self' https://accounts.google.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'")
+    expect(csp).toBe("default-src 'self'; script-src 'self' https://accounts.google.com; style-src 'self' 'unsafe-inline' https://accounts.google.com; img-src 'self' data: blob: https:; connect-src 'self' https://accounts.google.com https://oauth2.googleapis.com https://*.googleusercontent.com; font-src 'self' data:; worker-src 'self' blob:; manifest-src 'self'; frame-src 'self' https://accounts.google.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'")
     expect(config.headers[0].headers.find(h => h.key === 'X-Frame-Options')!.value).toBe('DENY')
   })
 })
