@@ -4,11 +4,16 @@
 // branches, 2 to 4 leaves each) so the diagram reads at card size instead of
 // collapsing into a grey mesh.
 //
-// Every demo also carries its own LOOK, not just its own type: the 4 themes, the
-// 3 line styles, the 4 node shapes, both honeycomb comb styles and both graph
-// circle directions are each spent on at least one map. Two maps of the same type
-// never share a theme, so the tab reads as 12 different diagrams instead of one
-// diagram drawn 12 times.
+// Every demo also carries its own LOOK, not just its own type: the 3 line styles,
+// the 4 node shapes, both honeycomb comb styles and both graph circle directions
+// are each spent on at least one map, so the tab reads as 12 different diagrams
+// instead of one diagram drawn 12 times.
+//
+// The THEME is the one thing deliberately NOT mixed. Every demo is `default`, the
+// white canvas, so the Demos tab is one consistent light surface and the cards sit
+// in a grid without a dark one punching a hole in it. The dark themes (cyberpunk,
+// monokai) and the cream retro are still there for a person's own maps - they are
+// just not what the showcase is showing off.
 //
 // Usage:
 //   node scripts/seed-demos.mjs --dry                  # print what would be sent
@@ -20,7 +25,7 @@
 // never from this file. Against localhost the dev proxy signs the request, so no
 // key is needed there. --replace needs the key even locally: it calls the CRUD API.
 
-// Each entry is { title, type, theme, lines, outline, rootStyle? } where outline is
+// Each entry is { title, type, lines, outline, rootStyle? } where outline is
 // the JSON outline the API renders: { Root: [ { emoji, Branch: [leaf, ...] } ] }.
 //
 // A branch may carry `shape` (rect | rounded | pill | circle) and its whole subtree
@@ -39,7 +44,6 @@ export const DEMOS = [
   {
     title: 'System Design Basics',
     type: 'logic-chart',
-    theme: 'default',
     lines: 'curved',
     outline: {
       'System Design Basics': [
@@ -54,7 +58,6 @@ export const DEMOS = [
   {
     title: 'REST API Design',
     type: 'logic-chart',
-    theme: 'retro',
     lines: 'orthogonal',
     outline: {
       'REST API Design': [
@@ -70,7 +73,6 @@ export const DEMOS = [
   {
     title: 'Learn TypeScript',
     type: 'mindmap',
-    theme: 'default',
     lines: 'curved',
     outline: {
       'Learn TypeScript': [
@@ -87,7 +89,6 @@ export const DEMOS = [
   {
     title: 'Claude Code Top 10',
     type: 'mindmap',
-    theme: 'cyberpunk',
     lines: 'curved',
     rootStyle: { gloss: true },
     outline: {
@@ -106,7 +107,6 @@ export const DEMOS = [
   {
     title: 'Machine Learning',
     type: 'graph',
-    theme: 'default',
     lines: 'curved',
     rootStyle: { ringSize: 'inward' },
     outline: {
@@ -123,7 +123,6 @@ export const DEMOS = [
   {
     title: 'How JEV Routes Local AI Agents',
     type: 'graph',
-    theme: 'monokai',
     lines: 'straight',
     rootStyle: { ringSize: 'outward' },
     outline: {
@@ -141,7 +140,6 @@ export const DEMOS = [
   {
     title: 'First 90 Days',
     type: 'timeline',
-    theme: 'default',
     lines: 'curved',
     outline: {
       'First 90 Days': [
@@ -155,7 +153,6 @@ export const DEMOS = [
   {
     title: 'History of the Web',
     type: 'timeline',
-    theme: 'retro',
     lines: 'straight',
     outline: {
       'History of the Web': [
@@ -173,7 +170,6 @@ export const DEMOS = [
   {
     title: 'Slow Page Load',
     type: 'fishbone',
-    theme: 'default',
     lines: 'straight',
     outline: {
       'Slow Page Load': [
@@ -187,7 +183,6 @@ export const DEMOS = [
   {
     title: 'Customer Churn',
     type: 'fishbone',
-    theme: 'monokai',
     lines: 'curved',
     rootStyle: { gloss: true },
     outline: {
@@ -205,7 +200,6 @@ export const DEMOS = [
   {
     title: 'Developer Toolkit',
     type: 'honeycomb',
-    theme: 'default',
     lines: 'curved',
     rootStyle: { combStyle: 'mesh' },
     outline: {
@@ -222,7 +216,6 @@ export const DEMOS = [
   {
     title: 'Design System',
     type: 'honeycomb',
-    theme: 'cyberpunk',
     lines: 'straight',
     rootStyle: { combStyle: 'web', combSize: 'outward' },
     outline: {
@@ -241,6 +234,8 @@ export const DEMOS = [
 const APP = (process.env.APP ?? 'http://localhost:5173').replace(/\/$/, '')
 const KEY = (process.env.KEY ?? process.env.MINDMAPS_API_SECRET ?? process.env.MINDMAP_AI_API_KEY ?? '').trim()
 const DRY = process.argv.includes('--dry')
+/** Every showcase map ships on the white canvas - see the note at the top of this file. */
+const THEME = 'default'
 const REPLACE = process.argv.includes('--replace')
 
 const auth = () => (KEY ? { Authorization: `Bearer ${KEY}` } : {})
@@ -248,7 +243,7 @@ const auth = () => (KEY ? { Authorization: `Bearer ${KEY}` } : {})
 function styleSummary(d) {
   const shapes = [...new Set(JSON.stringify(d.outline).match(/"shape":"(\w+)"/g) ?? [])]
     .map(s => s.split('"')[3])
-  return [d.theme, d.lines, ...shapes, ...Object.entries(d.rootStyle ?? {}).map(([k, v]) => `${k}=${v}`)].join(' ')
+  return [d.lines, ...shapes, ...Object.entries(d.rootStyle ?? {}).map(([k, v]) => `${k}=${v}`)].join(' ')
 }
 
 // Clears the existing showcase maps so a re-seed replaces them instead of stacking a
@@ -280,7 +275,7 @@ async function main() {
       headers: { 'Content-Type': 'application/json', ...auth() },
       body: JSON.stringify({
         title: d.title, type: d.type, outline: JSON.stringify(d.outline),
-        themeId: d.theme, lineStyle: d.lines, rootStyle: d.rootStyle,
+        themeId: THEME, lineStyle: d.lines, rootStyle: d.rootStyle,
         sharing: true, tags: ['demo'],
       }),
     })
