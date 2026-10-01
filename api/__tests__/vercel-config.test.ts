@@ -19,8 +19,13 @@ describe('vercel.json', () => {
     expect(r!.has).toBeUndefined()
   })
 
+  it('serves the app at /demo, the demo wall', () => {
+    const r = config.rewrites.find(x => x.source === '/demo')
+    expect(r?.destination).toBe('/index.html')
+  })
+
   it('carries no rewrite on "/" - the filesystem beats rewrites there, so that is middleware.ts', () => {
-    expect(config.rewrites).toHaveLength(1)
+    expect(config.rewrites).toHaveLength(2)
     expect(config.rewrites.some(x => x.source === '/')).toBe(false)
   })
 

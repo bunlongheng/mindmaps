@@ -65,20 +65,17 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
     window.history.replaceState({}, '', next)
   }
   // Which half of the library is on screen: the owner's own maps, or the public
-  // showcase maps tagged `demo`. Kept in the URL like the tag filter so a reload
-  // (or a shared link to the demos) lands on the same tab.
+  // showcase maps tagged `demo`. The demos live at /demo so the link reads like
+  // the other apps' demo walls; `?tab=demo` is the older spelling and still opens them.
   const [scope, _setScope] = useState<'mine' | 'demo'>(() => {
     const p = new URLSearchParams(window.location.search)
-    return p.get('tab') === 'demo' ? 'demo' : 'mine'
+    return window.location.pathname === '/demo' || p.get('tab') === 'demo' ? 'demo' : 'mine'
   })
   const setScope = (next: 'mine' | 'demo') => {
     _setScope(next)
     // A tag pill from the other tab would filter to nothing here, so drop it.
     setActiveTag(null)
-    const p = new URLSearchParams(window.location.search)
-    if (next === 'demo') p.set('tab', 'demo'); else p.delete('tab')
-    p.delete('tag')
-    window.history.replaceState({}, '', p.toString() ? `?${p}` : window.location.pathname)
+    window.history.replaceState({}, '', next === 'demo' ? '/demo' : '/')
   }
   const [tagModalId, setTagModalId] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<DiagramMeta | null>(null)

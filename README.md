@@ -13,7 +13,7 @@ Give it a title and an outline, get a laid-out map back: 6 diagram shapes over 1
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-required-4169E1?logo=postgresql&logoColor=white)
 ![Tests](https://img.shields.io/badge/tests-1244%20unit%20%2B%20151%20e2e-34C759)
 
-**Live:** [mindmaps-bheng.vercel.app](https://mindmaps-bheng.vercel.app) &middot; **Demo wall:** [/?tab=demo](https://mindmaps-bheng.vercel.app/?tab=demo)
+**Live:** [mindmaps-bheng.vercel.app](https://mindmaps-bheng.vercel.app) &middot; **Demo wall:** [/demo](https://mindmaps-bheng.vercel.app/demo)
 
 ## Features
 
