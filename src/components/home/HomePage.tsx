@@ -31,7 +31,7 @@ function TagIcon({ tag, size = 11 }: { tag: string; size?: number }) {
 
 interface HomePageProps {
   onOpen: (id: string) => void
-  user?: { email: string; name: string; userId: string } | null
+  user?: { email: string; name: string; userId: string; picture?: string } | null
   onSignOut?: () => void
   flashId?: string | null
 }
@@ -244,7 +244,7 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
   )
   // Cache avatar as base64 on first load so it never needs network again
   useEffect(() => {
-    const liveUrl = undefined
+    const liveUrl = user?.picture
     if (!liveUrl) return
     const cached = localStorage.getItem('mindmaps:avatarB64')
     if (cached) { setAvatarUrl(cached); return }

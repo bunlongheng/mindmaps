@@ -1,4 +1,3 @@
-import type { DiagramType } from '../../types'
 import { useRef, useState, useCallback, useEffect, useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { useMindmapStore } from '../../store/mindmapStore'
@@ -168,32 +167,6 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract, rightInset =
     applyTransform(p, newZoom)
   }, [activeMindmap, diagramType, applyTransform, rightInset])
 
-  // Editor load: 100% so the text is readable, anchored on the root instead of shrinking
-  // the whole map. Mind maps grow in every direction, so the root sits at the centre;
-  // logic charts, fishbones and timelines read left to right, so the root sits near the
-  // left edge and the branches get the width.
-  const anchorRoot = useCallback(() => {
-    const svg = svgRef.current
-    if (!svg || !activeMindmap?.nodes.length) return
-    const { width: svgW, height: svgH } = svg.getBoundingClientRect()
-    if (svgW === 0 || svgH === 0) return
-    const nodes = activeMindmap.nodes
-    const root = nodes.find(n => n.parentId === null) ?? nodes[0]
-    const newZoom = 1
-    const cx = root.x + root.width / 2
-    const cy = root.y + root.height / 2
-    const anchorX = (diagramType === 'graph' || diagramType === 'mindmap' || diagramType === 'honeycomb') ? svgW / 2 : Math.min(svgW / 2, Math.max(root.width / 2 + 40, svgW * 0.18))
-    zoomCurrentRef.current = newZoom
-    setZoom(newZoom)  // badge only
-    const p = { x: anchorX - cx * newZoom, y: svgH / 2 - cy * newZoom }
-    panRef.current = p
-    setPan(p)         // keep pan state in sync for selBox coords
-    applyTransform(p, newZoom)
-  }, [activeMindmap, diagramType, applyTransform])
-
-  // The shared view-only page fits the whole map; the editor opens at 100% on the root.
-  const fitView = readOnly ? fitToContent : anchorRoot
-
   // Cmd+0 / Ctrl+0 fits the whole map, in the editor and on the shared page alike.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -203,14 +176,12 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract, rightInset =
     return () => window.removeEventListener('keydown', onKey)
   }, [fitToContent])
 
-  // Opening a map anchors the root at 100%; switching its type fits the whole new
-  // layout into view, since a re-laid-out map is otherwise mostly off screen.
-  const prevFit = useRef<{ id: string | undefined; type: DiagramType }>({ id: undefined, type: diagramType })
+  // Opening a map, or switching its type, fits the whole map into view, centred.
+  // It used to open at 100% anchored on the root, which left a 4-layer chart mostly
+  // off the right edge until the user zoomed out.
   useEffect(() => {
     if (!activeMindmap) return
-    const typeSwitched = prevFit.current.id === activeMindmap.id && prevFit.current.type !== diagramType
-    prevFit.current = { id: activeMindmap.id, type: diagramType }
-    const raf = requestAnimationFrame(typeSwitched ? fitToContent : fitView)
+    const raf = requestAnimationFrame(fitToContent)
     return () => cancelAnimationFrame(raf)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeMindmap?.id, diagramType])
