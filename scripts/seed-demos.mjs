@@ -47,10 +47,26 @@ export const DEMOS = [
     lines: 'curved',
     outline: {
       'System Design Basics': [
-        { emoji: '📋', Requirements: ['Functional', 'Non-functional', 'Constraints'] },
-        { emoji: '🗄️', Data: ['Schema', 'Indexes', 'Caching'] },
-        { emoji: '📈', Scale: ['Load Balancer', 'Replicas', 'Sharding'] },
-        { emoji: '🛡️', Reliability: ['Retries', 'Timeouts', 'Backups'] },
+        { emoji: '📋', Requirements: [
+          { Functional: ['Use Cases', 'User Flows'] },
+          { 'Non-functional': ['Latency', 'Availability'] },
+          { Constraints: ['Budget', 'Team Size'] },
+        ] },
+        { emoji: '🗄️', Data: [
+          { Schema: ['Entities', 'Relations'] },
+          { Indexes: ['B-tree', 'Composite'] },
+          { Caching: ['Redis', 'TTL'] },
+        ] },
+        { emoji: '📈', Scale: [
+          { 'Load Balancer': ['Round Robin', 'Least Conn'] },
+          { Replicas: ['Read Replicas', 'Failover'] },
+          { Sharding: ['Hash Key', 'Range Key'] },
+        ] },
+        { emoji: '🛡️', Reliability: [
+          { Retries: ['Backoff', 'Idempotency'] },
+          { Timeouts: ['Per Call', 'Deadline'] },
+          { Backups: ['Snapshots', 'Restore Drill'] },
+        ] },
       ],
     },
   },
@@ -237,6 +253,9 @@ const DRY = process.argv.includes('--dry')
 /** Every showcase map ships on the white canvas - see the note at the top of this file. */
 const THEME = 'default'
 const REPLACE = process.argv.includes('--replace')
+// --only=<text>: seed (and with --replace, clear) just the demos whose title contains it.
+const ONLY = (process.argv.find(a => a.startsWith('--only=')) ?? '').slice(7).toLowerCase()
+const PICKED = DEMOS.filter(d => !ONLY || d.title.toLowerCase().includes(ONLY))
 
 const auth = () => (KEY ? { Authorization: `Bearer ${KEY}` } : {})
 
@@ -251,7 +270,7 @@ function styleSummary(d) {
 async function clearDemos() {
   const res = await fetch(`${APP}/api/mindmaps`, { headers: auth() })
   if (!res.ok) throw new Error(`list failed: ${res.status} ${await res.text()}`)
-  const maps = (await res.json()).filter(m => (m.tags ?? []).includes('demo'))
+  const maps = (await res.json()).filter(m => (m.tags ?? []).includes('demo') && PICKED.some(d => d.title === m.name))
   console.log(`--replace: deleting ${maps.length} existing demo map(s)`)
   for (const m of maps) {
     const r = await fetch(`${APP}/api/mindmaps?id=${m.id}`, { method: 'DELETE', headers: auth() })
@@ -262,14 +281,15 @@ async function clearDemos() {
 
 async function main() {
   if (DRY) {
-    for (const d of DEMOS) {
-      const nodes = 1 + Object.values(d.outline)[0].reduce((n, b) => n + 1 + Object.values(b).filter(Array.isArray)[0].length, 0)
+    const count = kids => kids.reduce((n, k) => n + 1 + (typeof k === 'string' ? 0 : count(Object.values(k).find(Array.isArray) ?? [])), 0)
+    for (const d of PICKED) {
+      const nodes = 1 + count(Object.values(d.outline)[0])
       console.log(`${d.type.padEnd(12)} ${String(nodes).padStart(3)} nodes  ${d.title.padEnd(32)} ${styleSummary(d)}`)
     }
     return
   }
   if (REPLACE) await clearDemos()
-  for (const d of DEMOS) {
+  for (const d of PICKED) {
     const res = await fetch(`${APP}/api/ai/mindmaps`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...auth() },
