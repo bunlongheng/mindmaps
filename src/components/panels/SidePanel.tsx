@@ -595,6 +595,27 @@ export function SidePanel({ nodeId, onClose, onDelete, onUpdateTags }: SidePanel
               </SBlock>
             </>
           )}
+          {diagramType === 'graph' && (
+            <>
+              <HR />
+              <SBlock title="Circles">
+                {/* Which way circle size runs. Lives on the root, like the honeycomb pair, so
+                    the home card and the share image lay out the same way the canvas does. */}
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {([
+                    { v: 'inward' as const,  label: 'Big to small', hint: 'Big centre, topics smaller, their children smaller again' },
+                    { v: 'outward' as const, label: 'Small to big', hint: 'Small centre, small topics, the children carry the weight' },
+                  ]).map(({ v, label, hint }) => (
+                    <button key={v} title={hint} aria-label={label}
+                      onClick={() => { if (rootNode) { updateNode(rootNode.id, { ringSize: v }); setTimeout(() => rerunLayout(), 0) } }}
+                      style={{ ...chip((rootNode?.ringSize ?? 'inward') === v), flex: 1, height: 30 }}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </SBlock>
+            </>
+          )}
           {diagramType !== 'fishbone' && diagramType !== 'timeline' && diagramType !== 'honeycomb' && (
             <>
               <HR />

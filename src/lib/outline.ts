@@ -19,13 +19,19 @@ export interface OutlineNode {
   manuallyPositioned: boolean
   icon?: string
   emoji?: string
+  shape?: 'rect' | 'rounded' | 'pill' | 'circle'
+  // Root-only look settings, set by the import endpoint from its `rootStyle` field.
+  gloss?: boolean
+  ringSize?: 'inward' | 'outward'
+  combStyle?: 'mesh' | 'web'
+  combSize?: 'outward' | 'inward'
 }
 
 // Keys that are metadata on a JSON outline node, never the node's title.
 // Shared by the store paste-import and the API import endpoint.
 export const OUTLINE_META_KEYS = new Set([
   'icon', 'emoji', 'bold', 'italic', 'fontSize', 'textAlign',
-  'title', 'name', 'children', 'type', 'lineStyle', 'color',
+  'title', 'name', 'children', 'type', 'lineStyle', 'color', 'shape',
 ])
 
 // Auto-detects the indent unit instead of assuming a fixed width, so 2-space, 4-space,
@@ -152,6 +158,12 @@ export interface JsonOutlineOptions {
   useEmoji?: boolean
 }
 
+const SHAPES = new Set(['rect', 'rounded', 'pill', 'circle'])
+
+function shapeOf(obj: Record<string, unknown>): OutlineNode['shape'] {
+  return typeof obj.shape === 'string' && SHAPES.has(obj.shape) ? obj.shape as OutlineNode['shape'] : undefined
+}
+
 // Flatten a { "Root": [ { icon, "Branch": ["leaf", ...] }, ... ] } tree into positioned
 // OutlineNodes (x/y left at 0 for the client layout pass). Caps: 12 branches, 10
 // children per node. Colors flow parent -> child; depth-1 branches get branchColor.
@@ -167,6 +179,7 @@ export function flattenJsonOutline(
   const nodes: OutlineNode[] = []
   let branchIdx = 0
   const colorById = new Map<string, string>()
+  const shapeById = new Map<string, OutlineNode['shape']>()
   const rootId = crypto.randomUUID()
   colorById.set(rootId, opts.rootColor)
 
@@ -180,14 +193,16 @@ export function flattenJsonOutline(
 
   function flattenNode(obj: Record<string, unknown> | string, parentId: string, depth: number, sortOrder: number) {
     const parentColor = colorById.get(parentId) ?? opts.rootColor
+    const parentShape = shapeById.get(parentId)
 
     if (typeof obj === 'string') {
       const id = crypto.randomUUID()
       colorById.set(id, parentColor)
+      shapeById.set(id, parentShape)
       nodes.push({
         id, title: obj.trim(), parentId, depth,
         x: 0, y: 0, width: opts.computeWidth(obj.trim(), depth), height: nodeHeight(depth),
-        color: parentColor, sortOrder, manuallyPositioned: false,
+        color: parentColor, sortOrder, manuallyPositioned: false, shape: parentShape,
       })
       return
     }
@@ -201,11 +216,13 @@ export function flattenJsonOutline(
       ? obj.color.trim()
       : autoColor
     colorById.set(id, color)
+    const shape = shapeOf(obj) ?? parentShape
+    shapeById.set(id, shape)
 
     nodes.push({
       id, title: titleKey.trim(), parentId, depth,
       x: 0, y: 0, width: opts.computeWidth(titleKey.trim(), depth), height: nodeHeight(depth),
-      color, sortOrder, manuallyPositioned: false,
+      color, sortOrder, manuallyPositioned: false, shape,
       icon: obj.icon as string | undefined,
       emoji: opts.useEmoji ? obj.emoji as string | undefined : undefined,
     })

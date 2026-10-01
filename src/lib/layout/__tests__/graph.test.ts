@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   computeGraphLayout, wrapText, sectorSpans, radialDiameter, diameterBand,
   relaxRadial, radialLabelFor, radialLabelSide, radialNodeExtent, truncateLabel,
-  labelMaxChars, MIN_SECTOR, ROOT_MIN_DIAMETER,
+  labelMaxChars, MIN_SECTOR, ROOT_MIN_DIAMETER, ringSizeOf,
 } from '../graph'
 import type { MindmapNode } from '../../../types'
 
@@ -532,5 +532,49 @@ describe('radial labels on a laid-out map', () => {
     const shaped = node({ id: 's', parentId: 'root', depth: 2, shape: 'rect', x: 100, y: 0, width: 120, height: 40 })
     expect(radialLabelFor(shaped, 0, 0)).toBeNull()
     expect(radialNodeExtent(shaped, 0, 0)).toEqual({ left: 100, top: 0, right: 220, bottom: 40 })
+  })
+})
+
+describe('ringSize', () => {
+  it('reads inward off a root that carries nothing', () => {
+    expect(ringSizeOf([node({ id: 'root' })])).toBe('inward')
+  })
+
+  it('reads the root flag when it is set', () => {
+    expect(ringSizeOf([node({ id: 'root', ringSize: 'outward' })])).toBe('outward')
+  })
+
+  it('outward swaps the depth-1 and depth-2 bands and leaves the dots alone', () => {
+    expect(diameterBand(1, 'outward')).toEqual(diameterBand(2))
+    expect(diameterBand(2, 'outward')).toEqual(diameterBand(1))
+    expect(diameterBand(3, 'outward')).toEqual(diameterBand(3))
+  })
+
+  // The whole point of the option: in an outward map the children are the heavy
+  // circles, which is the opposite of what the same tree lays out as by default.
+  it('lays a tree out with depth 2 bigger than depth 1, and a smaller root', () => {
+    const tree = (ringSize?: 'inward' | 'outward') => [
+      node({ id: 'root', title: 'Root', ringSize }),
+      node({ id: 'a', parentId: 'root', depth: 1, sortOrder: 0 }),
+      node({ id: 'b', parentId: 'root', depth: 1, sortOrder: 1 }),
+      node({ id: 'a1', parentId: 'a', depth: 2, sortOrder: 0 }),
+      node({ id: 'a2', parentId: 'a', depth: 2, sortOrder: 1 }),
+      node({ id: 'b1', parentId: 'b', depth: 2, sortOrder: 0 }),
+    ]
+    const out = computeGraphLayout(tree('outward'))
+    const inw = computeGraphLayout(tree('inward'))
+
+    expect(byId(out, 'a1').width).toBeGreaterThan(byId(out, 'a').width)
+    expect(byId(inw, 'a1').width).toBeLessThan(byId(inw, 'a').width)
+    expect(byId(out, 'root').width).toBeLessThan(byId(inw, 'root').width)
+  })
+
+  it('leaves every existing map on the default reading', () => {
+    const plain = computeGraphLayout([
+      node({ id: 'root', title: 'Root' }),
+      node({ id: 'a', parentId: 'root', depth: 1, sortOrder: 0 }),
+    ])
+    expect(byId(plain, 'root').width).toBe(ROOT_MIN_DIAMETER)
+    expect(byId(plain, 'a').width).toBe(diameterBand(1)[0])
   })
 })

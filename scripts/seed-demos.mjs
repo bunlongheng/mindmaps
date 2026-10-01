@@ -4,26 +4,43 @@
 // branches, 2 to 4 leaves each) so the diagram reads at card size instead of
 // collapsing into a grey mesh.
 //
+// Every demo also carries its own LOOK, not just its own type: the 4 themes, the
+// 3 line styles, the 4 node shapes, both honeycomb comb styles and both graph
+// circle directions are each spent on at least one map. Two maps of the same type
+// never share a theme, so the tab reads as 12 different diagrams instead of one
+// diagram drawn 12 times.
+//
 // Usage:
 //   node scripts/seed-demos.mjs --dry                  # print what would be sent
 //   node scripts/seed-demos.mjs                        # POST to http://localhost:5173
-//   APP=https://mindmaps-bheng.vercel.app KEY=... node scripts/seed-demos.mjs
+//   node scripts/seed-demos.mjs --replace              # delete the existing `demo` maps first
+//   APP=https://mindmaps-bheng.vercel.app KEY=... node scripts/seed-demos.mjs --replace
 //
 // The key comes from the environment (MINDMAPS_API_SECRET / MINDMAP_AI_API_KEY),
 // never from this file. Against localhost the dev proxy signs the request, so no
-// key is needed there.
+// key is needed there. --replace needs the key even locally: it calls the CRUD API.
 
-// Each entry is { title, type, outline } where outline is the JSON outline the
-// API renders: { Root: [ { emoji, Branch: [leaf, ...] } ] }. Emoji, not icon:
-// the server renderer draws emoji as real glyphs but stands a lucide icon in as
-// a neutral placeholder, and these maps are seen mostly through that renderer
-// (share page, home card). The honeycomb pair carries no emoji at all - a hex
-// cell is small and the short label alone fills it.
+// Each entry is { title, type, theme, lines, outline, rootStyle? } where outline is
+// the JSON outline the API renders: { Root: [ { emoji, Branch: [leaf, ...] } ] }.
+//
+// A branch may carry `shape` (rect | rounded | pill | circle) and its whole subtree
+// inherits it, so one key turns a branch - or the whole map - round or square.
+//
+// `rootStyle` holds the root-only settings: `ringSize` for a graph, `combStyle` and
+// `combSize` for a honeycomb, `gloss` for the top-of-box sheen.
+//
+// Emoji, not icon: the server renderer draws emoji as real glyphs but stands a
+// lucide icon in as a neutral placeholder, and these maps are seen mostly through
+// that renderer (share page, home card). The honeycomb pair carries no emoji at all
+// - a hex cell is small and the short label alone fills it.
 export const DEMOS = [
   // ── logic-chart: the default tree ─────────────────────────────────────────
+  // The baseline look, kept untouched so there is something to read the rest against.
   {
     title: 'System Design Basics',
     type: 'logic-chart',
+    theme: 'default',
+    lines: 'curved',
     outline: {
       'System Design Basics': [
         { emoji: '📋', Requirements: ['Functional', 'Non-functional', 'Constraints'] },
@@ -33,62 +50,28 @@ export const DEMOS = [
       ],
     },
   },
-  {
-    title: 'Product Launch',
-    type: 'logic-chart',
-    outline: {
-      'Product Launch': [
-        { emoji: '🔨', Build: ['Scope', 'Design', 'QA Pass'] },
-        { emoji: '📣', 'Go To Market': ['Pricing', 'Landing Page', 'Launch Post'] },
-        { emoji: '💬', Support: ['Docs', 'FAQ', 'Onboarding'] },
-        { emoji: '📊', Measure: ['Signups', 'Retention', 'Feedback'] },
-      ],
-    },
-  },
+  // Square boxes on right-angled lines: the blueprint read of the same tree.
   {
     title: 'REST API Design',
     type: 'logic-chart',
+    theme: 'retro',
+    lines: 'orthogonal',
     outline: {
       'REST API Design': [
-        { emoji: '🔗', Resources: ['Plural Paths', 'Nouns Not Verbs', 'Shallow Nesting'] },
-        { emoji: '🔁', Methods: ['GET', 'POST', 'PUT', 'DELETE'] },
-        { emoji: '📦', Responses: ['Status Codes', 'Pagination', 'Error Shape'] },
-        { emoji: '🔐', Security: ['Auth Tokens', 'Rate Limits', 'CORS'] },
+        { emoji: '🔗', shape: 'rect', Resources: ['Plural Paths', 'Nouns Not Verbs', 'Shallow Nesting'] },
+        { emoji: '🔁', shape: 'rect', Methods: ['GET', 'POST', 'PUT', 'DELETE'] },
+        { emoji: '📦', shape: 'rect', Responses: ['Status Codes', 'Pagination', 'Error Shape'] },
+        { emoji: '🔐', shape: 'rect', Security: ['Auth Tokens', 'Rate Limits', 'CORS'] },
       ],
     },
   },
 
-  // ── graph: radial constellation ───────────────────────────────────────────
-  {
-    title: 'Machine Learning',
-    type: 'graph',
-    outline: {
-      'Machine Learning': [
-        { emoji: '🎯', Supervised: ['Regression', 'Classification', 'Trees'] },
-        { emoji: '🧩', Unsupervised: ['Clustering', 'PCA', 'Anomalies'] },
-        { emoji: '🧠', 'Deep Learning': ['CNN', 'RNN', 'Transformers'] },
-        { emoji: '📐', Evaluation: ['Accuracy', 'Precision', 'Recall'] },
-        { emoji: '🚀', Deployment: ['Serving', 'Monitoring', 'Drift'] },
-      ],
-    },
-  },
-  {
-    title: 'Personal Finance',
-    type: 'graph',
-    outline: {
-      'Personal Finance': [
-        { emoji: '💼', Earn: ['Salary', 'Side Income', 'Raises'] },
-        { emoji: '🏦', Save: ['Emergency Fund', 'Automate', 'High Yield'] },
-        { emoji: '📈', Invest: ['Index Funds', '401k', 'Real Estate'] },
-        { emoji: '🛡️', Protect: ['Insurance', 'Credit Score', 'Will'] },
-        { emoji: '🧾', Spend: ['Budget', 'Needs First', 'Review Monthly'] },
-      ],
-    },
-  },
   // ── mindmap: the balanced left/right spread ───────────────────────────────
   {
     title: 'Learn TypeScript',
     type: 'mindmap',
+    theme: 'default',
+    lines: 'curved',
     outline: {
       'Learn TypeScript': [
         { emoji: '🧱', Basics: ['Types', 'Interfaces', 'Unions'] },
@@ -99,23 +82,81 @@ export const DEMOS = [
       ],
     },
   },
+  // Every box a circle: 5 groups, 10 leaves, the whole top 10 drawn round.
+  // Labels stay to 2 words - a circle sizes itself to fit its own text.
+  {
+    title: 'Claude Code Top 10',
+    type: 'mindmap',
+    theme: 'cyberpunk',
+    lines: 'curved',
+    rootStyle: { gloss: true },
+    outline: {
+      'Claude Code Top 10': [
+        { emoji: '📁', shape: 'circle', Context: ['CLAUDE.md', 'Plan Mode'] },
+        { emoji: '🧩', shape: 'circle', Extend: ['Skills', 'MCP Servers'] },
+        { emoji: '🪝', shape: 'circle', Automate: ['Hooks', 'Scheduled Runs'] },
+        { emoji: '👥', shape: 'circle', Delegate: ['Subagents', 'Worktrees'] },
+        { emoji: '🧹', shape: 'circle', Hygiene: ['Session Recap', 'Model Routing'] },
+      ],
+    },
+  },
+
+  // ── graph: radial constellation, one map each way ─────────────────────────
+  // ringSize inward (the default): big centre, topics smaller, leaves smaller again.
+  {
+    title: 'Machine Learning',
+    type: 'graph',
+    theme: 'default',
+    lines: 'curved',
+    rootStyle: { ringSize: 'inward' },
+    outline: {
+      'Machine Learning': [
+        { emoji: '🎯', Supervised: ['Regression', 'Classification', 'Trees'] },
+        { emoji: '🧩', Unsupervised: ['Clustering', 'PCA', 'Anomalies'] },
+        { emoji: '🧠', 'Deep Learning': ['CNN', 'RNN', 'Transformers'] },
+        { emoji: '📐', Evaluation: ['Accuracy', 'Precision', 'Recall'] },
+        { emoji: '🚀', Deployment: ['Serving', 'Monitoring', 'Drift'] },
+      ],
+    },
+  },
+  // ringSize outward: small centre, small topics, the leaves carry the weight.
+  {
+    title: 'How JEV Routes Local AI Agents',
+    type: 'graph',
+    theme: 'monokai',
+    lines: 'straight',
+    rootStyle: { ringSize: 'outward' },
+    outline: {
+      'How JEV Routes Local AI Agents': [
+        { emoji: '🎣', Hook: ['Reads the Prompt', 'Injects the Tier', 'Runs Before Claude'] },
+        { emoji: '🧠', Decision: ['TypeSafe Model', 'Sub Cent Per Call', 'Returns One Tier'] },
+        { emoji: '🪜', Ladder: ['Haiku', 'Sonnet', 'Opus', 'Fable'] },
+        { emoji: '🔌', Keys: ['AI Gateway', 'Direct Key Fallback', 'Silent If Unset'] },
+        { emoji: '🛡️', Guardrails: ['Judgment Stays Top', 'Escalate One Tier', 'Never Start High'] },
+      ],
+    },
+  },
 
   // ── timeline: spine left to right ─────────────────────────────────────────
   {
     title: 'First 90 Days',
     type: 'timeline',
+    theme: 'default',
+    lines: 'curved',
     outline: {
       'First 90 Days': [
-        { emoji: '👋', 'Week 1': ['Meet the Team', 'Read the Docs', 'Set Up Local'] },
-        { emoji: '🚢', 'Month 1': ['Ship Something Small', 'Map the System'] },
-        { emoji: '🧩', 'Month 2': ['Own a Feature', 'Fix a Rough Edge'] },
-        { emoji: '🏁', 'Month 3': ['Lead a Project', 'Set Next Goals'] },
+        { emoji: '👋', shape: 'pill', 'Week 1': ['Meet the Team', 'Read the Docs', 'Set Up Local'] },
+        { emoji: '🚢', shape: 'pill', 'Month 1': ['Ship Something Small', 'Map the System'] },
+        { emoji: '🧩', shape: 'pill', 'Month 2': ['Own a Feature', 'Fix a Rough Edge'] },
+        { emoji: '🏁', shape: 'pill', 'Month 3': ['Lead a Project', 'Set Next Goals'] },
       ],
     },
   },
   {
     title: 'History of the Web',
     type: 'timeline',
+    theme: 'retro',
+    lines: 'straight',
     outline: {
       'History of the Web': [
         { emoji: '📄', '1989': ['The Proposal', 'HTTP and HTML'] },
@@ -132,6 +173,8 @@ export const DEMOS = [
   {
     title: 'Slow Page Load',
     type: 'fishbone',
+    theme: 'default',
+    lines: 'straight',
     outline: {
       'Slow Page Load': [
         { emoji: '🖥️', Frontend: ['Large Bundles', 'Blocking Scripts', 'Heavy Images'] },
@@ -144,6 +187,9 @@ export const DEMOS = [
   {
     title: 'Customer Churn',
     type: 'fishbone',
+    theme: 'monokai',
+    lines: 'curved',
+    rootStyle: { gloss: true },
     outline: {
       'Customer Churn': [
         { emoji: '📦', Product: ['Missing Features', 'Known Bugs', 'Hard Onboarding'] },
@@ -155,9 +201,13 @@ export const DEMOS = [
   },
 
   // ── honeycomb: tiled hex cells, short labels, no emoji ────────────────────
+  // mesh: equal cells tiled edge to edge, the default comb.
   {
     title: 'Developer Toolkit',
     type: 'honeycomb',
+    theme: 'default',
+    lines: 'curved',
+    rootStyle: { combStyle: 'mesh' },
     outline: {
       'Developer Toolkit': [
         { Editor: ['VS Code', 'Vim', 'Cursor'] },
@@ -168,9 +218,13 @@ export const DEMOS = [
       ],
     },
   },
+  // web + outward: cells on rings around the root, growing as they go out.
   {
     title: 'Design System',
     type: 'honeycomb',
+    theme: 'cyberpunk',
+    lines: 'straight',
+    rootStyle: { combStyle: 'web', combSize: 'outward' },
     outline: {
       'Design System': [
         { Color: ['Palette', 'Tokens', 'Contrast'] },
@@ -187,23 +241,51 @@ export const DEMOS = [
 const APP = (process.env.APP ?? 'http://localhost:5173').replace(/\/$/, '')
 const KEY = (process.env.KEY ?? process.env.MINDMAPS_API_SECRET ?? process.env.MINDMAP_AI_API_KEY ?? '').trim()
 const DRY = process.argv.includes('--dry')
+const REPLACE = process.argv.includes('--replace')
+
+const auth = () => (KEY ? { Authorization: `Bearer ${KEY}` } : {})
+
+function styleSummary(d) {
+  const shapes = [...new Set(JSON.stringify(d.outline).match(/"shape":"(\w+)"/g) ?? [])]
+    .map(s => s.split('"')[3])
+  return [d.theme, d.lines, ...shapes, ...Object.entries(d.rootStyle ?? {}).map(([k, v]) => `${k}=${v}`)].join(' ')
+}
+
+// Clears the existing showcase maps so a re-seed replaces them instead of stacking a
+// second set of 12 next to the first. Only maps carrying the `demo` tag are touched.
+async function clearDemos() {
+  const res = await fetch(`${APP}/api/mindmaps`, { headers: auth() })
+  if (!res.ok) throw new Error(`list failed: ${res.status} ${await res.text()}`)
+  const maps = (await res.json()).filter(m => (m.tags ?? []).includes('demo'))
+  console.log(`--replace: deleting ${maps.length} existing demo map(s)`)
+  for (const m of maps) {
+    const r = await fetch(`${APP}/api/mindmaps?id=${m.id}`, { method: 'DELETE', headers: auth() })
+    console.log(`  ${r.status} ${m.name}`)
+    if (!r.ok) process.exitCode = 1
+  }
+}
 
 async function main() {
   if (DRY) {
     for (const d of DEMOS) {
       const nodes = 1 + Object.values(d.outline)[0].reduce((n, b) => n + 1 + Object.values(b).filter(Array.isArray)[0].length, 0)
-      console.log(`${d.type.padEnd(12)} ${String(nodes).padStart(3)} nodes  ${d.title}`)
+      console.log(`${d.type.padEnd(12)} ${String(nodes).padStart(3)} nodes  ${d.title.padEnd(32)} ${styleSummary(d)}`)
     }
     return
   }
+  if (REPLACE) await clearDemos()
   for (const d of DEMOS) {
     const res = await fetch(`${APP}/api/ai/mindmaps`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...(KEY ? { Authorization: `Bearer ${KEY}` } : {}) },
-      body: JSON.stringify({ title: d.title, type: d.type, outline: JSON.stringify(d.outline), sharing: true, tags: ['demo'] }),
+      headers: { 'Content-Type': 'application/json', ...auth() },
+      body: JSON.stringify({
+        title: d.title, type: d.type, outline: JSON.stringify(d.outline),
+        themeId: d.theme, lineStyle: d.lines, rootStyle: d.rootStyle,
+        sharing: true, tags: ['demo'],
+      }),
     })
     const body = await res.json().catch(() => ({}))
-    console.log(res.status, d.type.padEnd(12), d.title, body.id ?? body.error ?? '')
+    console.log(res.status, d.type.padEnd(12), d.title.padEnd(32), body.id ?? body.error ?? '')
     if (!res.ok) process.exitCode = 1
   }
 }
