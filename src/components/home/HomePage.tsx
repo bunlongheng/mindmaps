@@ -1010,7 +1010,7 @@ export function DiagramMinimap({ id, name, type, updatedAt, eager }: { id: strin
     const uid = stored ? JSON.parse(stored)?.userId : null
     const token = localStorage.getItem('mindmaps:token')
     let aborted = false
-    fetch(`/api/mindmaps?id=${id}${uid ? `&user_id=${uid}` : ''}`, token ? { headers: { Authorization: `Bearer ${token}` } } : undefined)
+    fetch(`/api/mindmaps?id=${id}&thumb=1${uid ? `&user_id=${uid}` : ''}`, token ? { headers: { Authorization: `Bearer ${token}` } } : undefined)
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         if (aborted || !data?.nodes?.length) return

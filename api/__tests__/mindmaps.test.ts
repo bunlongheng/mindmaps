@@ -4,6 +4,12 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 
 const queryMock = vi.fn()
 vi.mock('../_lib/db.js', () => ({ pool: { query: (...args: unknown[]) => queryMock(...args) } }))
+const notifyMock = vi.fn()
+vi.mock('../_lib/share-alert.js', async () => {
+  const real = await vi.importActual<typeof import('../_lib/share-alert.js')>('../_lib/share-alert.js')
+  return { ...real, notifyShareView: (...a: unknown[]) => notifyMock(...a) }
+})
+vi.mock('@vercel/functions', () => ({ waitUntil: (p: Promise<unknown>) => { void p } }))
 
 const KEY = 'static-agent-key-abc123'
 const SECRET = 'jwt-signing-secret'
@@ -84,6 +90,25 @@ describe('GET /api/mindmaps?id= (public shared read)', () => {
 })
 
 describe('writes require a verified identity', () => {
+  it('alerts the owner once when a person opens a shared map, and skips thumbnails and crawlers', async () => {
+    const open = async (query: Record<string, string>, ua: string) => {
+      notifyMock.mockClear()
+      queryMock.mockResolvedValue({ rows: [sharedRow] })
+      const req = mockReq({ method: 'GET', query })
+      ;(req.headers as Record<string, string>)['user-agent'] = ua
+      ;(req.headers as Record<string, string>)['x-forwarded-for'] = '73.159.109.147'
+      const res = mockRes()
+      await handler(req, res)
+      expect(res.statusCode).toBe(200)
+      return notifyMock.mock.calls
+    }
+    const human = await open({ id: 'map-1' }, 'Mozilla/5.0 (iPhone) Safari')
+    expect(human).toHaveLength(1)
+    expect(human[0][0]).toMatchObject({ mapId: sharedRow.id, title: sharedRow.name, kind: 'view', ip: '73.159.109.147' })
+    expect(await open({ id: 'map-1', thumb: '1' }, 'Mozilla/5.0 (iPhone) Safari')).toHaveLength(0)
+    expect(await open({ id: 'map-1' }, 'Slackbot-LinkExpanding 1.0')).toHaveLength(0)
+  })
+
   it('lists the shared demo maps without any auth, and never asks for a user', async () => {
     queryMock.mockResolvedValue({ rows: [{ id: 'd1', name: 'Demo', type: 'graph', sharing_enabled: true, tags: ['demo'], updated_at: 'x' }] })
     const res = mockRes()
