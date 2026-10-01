@@ -7,7 +7,7 @@ import { isDemo } from '../../lib/demo'
 // The one lockup, mirroring Sequences' Wordmark.tsx (app/Wordmark.tsx): the app's
 // own icon plus its name at the same size / weight rules, so the header reads as
 // the same app across products.
-function Wordmark({ size = 28 }: { size?: number }) {
+export function Wordmark({ size = 28 }: { size?: number }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
       <img src="/icons/android-chrome-192x192.png" alt="Mindmaps" width={size} height={size}
