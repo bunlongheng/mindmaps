@@ -6,6 +6,14 @@ export const config = { runtime: 'edge' }
 
 const RATE_LIMIT = { max: 10, windowMs: 15 * 60 * 1000 }
 
+/** Google's own profile photo URL, or undefined for anything else. Sized up from the default 96px. */
+function googlePhoto(url: unknown): string | undefined {
+  if (typeof url !== 'string') return undefined
+  const host = (() => { try { return new URL(url).hostname } catch { return '' } })()
+  if (!/(^|\.)googleusercontent\.com$/.test(host)) return undefined
+  return url.replace(/=s\d+(-c)?$/, '=s192-c')
+}
+
 // Verifies a Google Identity Services ID token (pure Google, no third-party broker) and
 // issues a Mindmaps session token for the single owner. The client signs in with
 // the Google button, gets an ID token, and posts it here; we confirm it with
@@ -45,7 +53,7 @@ export default async function handler(req: Request): Promise<Response> {
   if (!info.ok) {
     return new Response(JSON.stringify({ ok: false, error: 'Invalid session' }), { status: 401, headers: cors })
   }
-  const claims = (await info.json()) as { aud?: string; email?: string; email_verified?: string; iss?: string }
+  const claims = (await info.json()) as { aud?: string; email?: string; email_verified?: string; iss?: string; picture?: string }
 
   const audOk = claims.aud === clientId
   const emailOk = (claims.email ?? '').trim().toLowerCase() === validEmail
@@ -59,6 +67,6 @@ export default async function handler(req: Request): Promise<Response> {
   return new Response(JSON.stringify({
     ok: true,
     token,
-    user: { email: validEmail, name: 'Bunlong Heng', userId },
+    user: { email: validEmail, name: 'Bunlong Heng', userId, picture: googlePhoto(claims.picture) },
   }), { status: 200, headers: cors })
 }

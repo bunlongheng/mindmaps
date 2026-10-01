@@ -5,7 +5,7 @@
 // filters, "No maps yet" - while every API call 401'd. A session is only real
 // when the token backing it is still alive.
 
-export type SessionUser = { email: string; name: string; userId: string }
+export type SessionUser = { email: string; name: string; userId: string; picture?: string }
 
 const USER_KEY = 'mindmaps:user'
 const TOKEN_KEY = 'mindmaps:token'
