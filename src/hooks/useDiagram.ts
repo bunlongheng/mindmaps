@@ -98,6 +98,14 @@ function rowToDiagram(row: Record<string, unknown>): Diagram {
     emoji:              (n.emoji ?? undefined) as string | undefined,
     shape:              (n.shape ?? undefined) as 'circle' | 'pill' | undefined,
     url:                (n.url ?? undefined) as string | undefined,
+    branchGap:          (n.branchGap ?? undefined) as number | undefined,
+    // Root-only look settings. Dropping these here made the editor fall back to the
+    // default look (a mesh comb, an inward ring, no gloss) for a map whose stored
+    // root said otherwise, so the canvas disagreed with the home card and share image.
+    gloss:              (n.gloss ?? undefined) as boolean | undefined,
+    combStyle:          (n.combStyle ?? undefined) as MindmapNode['combStyle'],
+    combSize:           (n.combSize ?? undefined) as MindmapNode['combSize'],
+    ringSize:           (n.ringSize ?? undefined) as MindmapNode['ringSize'],
   }))
   return {
     id:             row.id as string,

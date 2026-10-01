@@ -174,6 +174,26 @@ describe('loadDiagram', () => {
     expect(returned!.nodes.find(n => n.id === 'c1')!.manuallyPositioned).toBe(false)
   })
 
+  it('keeps the root-only look settings (comb, ring, gloss) and branchGap on load', async () => {
+    const row = makeRow({
+      type: 'honeycomb',
+      nodes: [
+        { id: 'root', title: 'R', color: '#000', parentId: null, depth: 0, x: 0, y: 0, width: 180, height: 180, sortOrder: 0,
+          combStyle: 'web', combSize: 'inward', ringSize: 'outward', gloss: true, branchGap: 90 },
+      ],
+    })
+    fetchMock.mockResolvedValue(jsonResponse(row))
+    const { result } = renderHook(() => useDiagram('u1'))
+    let returned: Diagram | null = null
+    await act(async () => { returned = await result.current.loadDiagram('d1') })
+    const root = returned!.nodes[0]
+    expect(root.combStyle).toBe('web')
+    expect(root.combSize).toBe('inward')
+    expect(root.ringSize).toBe('outward')
+    expect(root.gloss).toBe(true)
+    expect(root.branchGap).toBe(90)
+  })
+
   it('treats a cache/remote pair with no updatedAt via the ?? 0 fallbacks', async () => {
     // cached has no updatedAt → localTime 0; remote also has no updated_at → remoteTime 0
     const cached = { id: 'd1', name: 'Cached NoDate', type: 'logic-chart', lineStyle: 'orthogonal', createdAt: '2024-01-01', nodes: makeNodes() }
