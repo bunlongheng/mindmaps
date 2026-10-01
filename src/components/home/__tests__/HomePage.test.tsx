@@ -1158,3 +1158,78 @@ describe('HomePage — the No Tag pill', () => {
     expect(within(second.container).queryByText('No Tag')).toBeNull()
   })
 })
+
+// A card used to paint from localStorage and then never check the server again, so a map
+// restyled anywhere else (another device, the API, a demo re-seed) kept drawing its old
+// theme on the home grid forever. The cache now carries the version it was taken at.
+describe('HomePage — a card preview follows the stored version', () => {
+  const CARD_NODES = [
+    { id: 'r', title: 'Root', parentId: null, depth: 0, color: '#000', x: 0, y: 0, width: 140, height: 140, sortOrder: 0 },
+    { id: 'a', title: 'A', parentId: 'r', depth: 1, color: '#f00', x: 0, y: 0, width: 100, height: 40, sortOrder: 0 },
+  ]
+  const STALE = '2026-01-01T00:00:00.000Z'
+  const LISTED = '2026-09-30T00:00:00.000Z'
+
+  // The refetch is gated on the card being in view, so fire the observer immediately.
+  let origIO: typeof IntersectionObserver
+  beforeEach(() => {
+    origIO = globalThis.IntersectionObserver
+    class ImmediateIO {
+      cb: IntersectionObserverCallback
+      constructor(cb: IntersectionObserverCallback) { this.cb = cb }
+      observe() {
+        this.cb([{ isIntersecting: true } as IntersectionObserverEntry], this as unknown as IntersectionObserver)
+      }
+      unobserve() {}
+      disconnect() {}
+      takeRecords() { return [] }
+    }
+    ;(globalThis as unknown as { IntersectionObserver: unknown }).IntersectionObserver = ImmediateIO
+  })
+  afterEach(() => { (globalThis as unknown as { IntersectionObserver: unknown }).IntersectionObserver = origIO })
+
+  function mountWith(cacheUpdatedAt: string | undefined) {
+    const cache: Record<string, unknown> = { id: 'v1', themeId: 'cyberpunk', lineStyle: 'orthogonal', nodes: CARD_NODES }
+    if (cacheUpdatedAt) cache.updatedAt = cacheUpdatedAt
+    localStorage.setItem('mindmaps:thumb:v1', JSON.stringify(cache))
+    seedDiagrams([{ id: 'v1', name: 'Versioned', type: 'logic-chart', updatedAt: LISTED, tags: [] }])
+
+    const cardFetches: string[] = []
+    // The list call has to keep returning the row, or the grid empties and the card
+    // unmounts before its own fetch resolves.
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      const isCard = typeof url === 'string' && url.includes('id=v1')
+      if (isCard) cardFetches.push(url)
+      return {
+        ok: true,
+        json: async () => isCard
+          ? { nodes: CARD_NODES, theme_id: 'default', line_style: 'orthogonal', updated_at: LISTED }
+          : [{ id: 'v1', name: 'Versioned', type: 'logic-chart', updated_at: LISTED, sharing_enabled: false, tags: [] }],
+      }
+    }))
+    render(<HomePage onOpen={vi.fn()} user={USER} onSignOut={vi.fn()} />)
+    return cardFetches
+  }
+
+  it('refetches a cache taken at an older version and rewrites it with the current theme', async () => {
+    const cardFetches = mountWith(STALE)
+    await waitFor(() => expect(cardFetches.length).toBeGreaterThan(0))
+    await waitFor(() => {
+      const cached = JSON.parse(localStorage.getItem('mindmaps:thumb:v1')!)
+      expect(cached.themeId).toBe('default')
+      expect(cached.updatedAt).toBe(LISTED)
+    })
+  })
+
+  it('refetches a cache written before versions were recorded', async () => {
+    const cardFetches = mountWith(undefined)
+    await waitFor(() => expect(cardFetches.length).toBeGreaterThan(0))
+  })
+
+  it('leaves a cache for the listed version alone - no fetch, no flicker', async () => {
+    const cardFetches = mountWith(LISTED)
+    await new Promise(r => setTimeout(r, 20))
+    expect(cardFetches).toEqual([])
+    expect(JSON.parse(localStorage.getItem('mindmaps:thumb:v1')!).themeId).toBe('cyberpunk')
+  })
+})
