@@ -58,6 +58,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         void rowOwner
         return res.json(shared)
       }
+      // The public demo wall: every shared map tagged `demo`, no token needed.
+      if ((req.query as Record<string, string>).scope === 'demo') {
+        const r = await pool.query(
+          "SELECT id, name, type, sharing_enabled, tags, updated_at FROM mindmaps WHERE sharing_enabled = true AND 'demo' = ANY(tags) ORDER BY updated_at DESC",
+        )
+        return res.json(r.rows)
+      }
       // Listing a user's maps requires being that user.
       if (!auth) return res.status(401).json({ error: 'Unauthorized' })
       const r = await pool.query(

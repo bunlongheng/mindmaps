@@ -1112,26 +1112,17 @@ describe('HomePage — Mine / Demos tabs', () => {
     fireEvent.click(document.querySelector('[data-scope="demo"]')!)
     expect([...document.querySelectorAll('[data-map-id]')].map(n => n.getAttribute('data-map-id')))
       .toEqual(['d1', 'd2'])
-    expect(window.location.pathname).toBe('/demo')
+    expect(window.location.search).toContain('tab=demo')
     fireEvent.click(document.querySelector('[data-scope="mine"]')!)
     expect(document.querySelectorAll('[data-map-id]').length).toBe(3)
-    expect(window.location.pathname).toBe('/')
+    expect(window.location.search).not.toContain('tab=demo')
   })
 
-  it('opens straight on the demos at /demo', () => {
-    window.history.replaceState({}, '', '/demo')
-    seedDiagrams(WITH_DEMOS)
-    render(<HomePage onOpen={vi.fn()} user={USER} onSignOut={vi.fn()} />)
-    expect(document.querySelectorAll('[data-map-id]').length).toBe(2)
-    window.history.replaceState({}, '', '/')
-  })
-
-  it('still opens the demos from the older ?tab=demo link', () => {
+  it('opens straight on the demos when the URL asks for that tab', () => {
     window.history.replaceState({}, '', '/?tab=demo')
     seedDiagrams(WITH_DEMOS)
     render(<HomePage onOpen={vi.fn()} user={USER} onSignOut={vi.fn()} />)
     expect(document.querySelectorAll('[data-map-id]').length).toBe(2)
-    window.history.replaceState({}, '', '/')
   })
 
   it('never offers `demo` as a tag pill, and scopes the pills to the open tab', () => {

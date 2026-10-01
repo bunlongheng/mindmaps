@@ -12,6 +12,7 @@ import { useMindmapStore } from './store/mindmapStore'
 import { decodeShareURL } from './lib/export/share'
 import { hasGoogleAuth, renderGoogleButton } from './lib/googleAuth'
 import { readSession, saveSession, clearSession, SESSION_EXPIRED } from './lib/session'
+import { DemoWall } from './components/demo/DemoWall'
 import { emberVanish, damageFlash } from './lib/emberVanish'
 import { ArrowLeft, SlidersHorizontal, Tag, FileDown, Network, Share2, Sparkles, GitBranch, Lightbulb, Workflow, ListTree, Waypoints, Image as ImageIcon } from 'lucide-react'
 import { Confetti } from './components/Confetti'
@@ -345,6 +346,9 @@ export default function App() {
   }, [])
 
 
+
+  // The public demo wall. No session, no spinner: it fetches its own list.
+  if (window.location.pathname === '/demo' && !getShareParam()) return <DemoWall />
 
   // Show spinner while auth or diagram is loading
   if (authLoading || diagramLoading) return (

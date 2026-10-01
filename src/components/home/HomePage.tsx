@@ -65,17 +65,21 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
     window.history.replaceState({}, '', next)
   }
   // Which half of the library is on screen: the owner's own maps, or the public
-  // showcase maps tagged `demo`. The demos live at /demo so the link reads like
-  // the other apps' demo walls; `?tab=demo` is the older spelling and still opens them.
+  // showcase maps tagged `demo`. Kept in the URL like the tag filter so a reload
+  // (or a shared link to the demos) lands on the same tab. The signed-out wall
+  // for visitors is a separate page at /demo.
   const [scope, _setScope] = useState<'mine' | 'demo'>(() => {
     const p = new URLSearchParams(window.location.search)
-    return window.location.pathname === '/demo' || p.get('tab') === 'demo' ? 'demo' : 'mine'
+    return p.get('tab') === 'demo' ? 'demo' : 'mine'
   })
   const setScope = (next: 'mine' | 'demo') => {
     _setScope(next)
     // A tag pill from the other tab would filter to nothing here, so drop it.
     setActiveTag(null)
-    window.history.replaceState({}, '', next === 'demo' ? '/demo' : '/')
+    const p = new URLSearchParams(window.location.search)
+    if (next === 'demo') p.set('tab', 'demo'); else p.delete('tab')
+    p.delete('tag')
+    window.history.replaceState({}, '', p.toString() ? `?${p}` : window.location.pathname)
   }
   const [tagModalId, setTagModalId] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<DiagramMeta | null>(null)
@@ -952,7 +956,7 @@ function textColorFor(fill: string): string {
  *  doing that at once on mount is a visible stall. */
 const EAGER_PREVIEWS = 12
 
-function DiagramMinimap({ id, name, type, updatedAt, eager }: { id: string; name: string; type: string; updatedAt: string; eager: boolean }) {
+export function DiagramMinimap({ id, name, type, updatedAt, eager }: { id: string; name: string; type: string; updatedAt: string; eager: boolean }) {
   const storeThemeId = useMindmapStore(s => s.themeId)
   const [nodes, setNodes] = useState<MindmapNode[]>([])
   const [diagramThemeId, setDiagramThemeId] = useState<string>('default')
