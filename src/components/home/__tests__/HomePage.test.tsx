@@ -910,7 +910,7 @@ describe('HomePage — DiagramMinimap inView fetch', () => {
     }))
     seedDiagrams([{ id: 'm1', name: 'Project Plan', type: 'logic-chart', updatedAt: SAMPLE[0].updatedAt, tags: [] }])
     render(<HomePage onOpen={vi.fn()} user={USER} onSignOut={vi.fn()} />)
-    await waitFor(() => expect(seen.some(u => u === '/api/mindmaps?id=m1')).toBe(true))
+    await waitFor(() => expect(seen.some(u => u === '/api/mindmaps?id=m1&thumb=1')).toBe(true))
   })
 
   it('renders the default-fallback thumbnail for an unknown diagram type', async () => {

@@ -1,4 +1,6 @@
 import { pool } from './_lib/db.js'
+import { waitUntil } from '@vercel/functions'
+import { isBot, notifyShareView, readVisit } from './_lib/share-alert.js'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { verifyToken, bearer, secretEquals } from './_lib/auth.js'
 import { corsHeaders } from './_lib/cors.js'
@@ -56,6 +58,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // Public share view: never expose the owner's user_id to unauthenticated callers.
         const { user_id: rowOwner, ...shared } = row
         void rowOwner
+        // Tell the owner someone opened the link. Card thumbnails (?thumb=1) and
+        // link-preview crawlers are not people opening the map, so they stay quiet.
+        // waitUntil keeps the alert alive after the response without delaying it.
+        const q = req.query as Record<string, string>
+        if (q.thumb !== '1' && !isBot(String(req.headers['user-agent'] ?? ''))) {
+          waitUntil(notifyShareView(readVisit(req.headers, row.id, row.name)))
+        }
         return res.json(shared)
       }
       // The public demo wall: every shared map tagged `demo`, no token needed.
