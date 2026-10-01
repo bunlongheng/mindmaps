@@ -215,4 +215,30 @@ describe('flattenJsonOutline', () => {
     expect(flattenJsonOutline(json, { ...opts, useEmoji: true })!.nodes[1].emoji).toBe('🔥')
     expect(flattenJsonOutline(json, opts)!.nodes[1].emoji).toBeUndefined()
   })
+
+  // One `shape` key turns a whole branch, so a seeded map does not have to repeat it
+  // on every leaf. A bare-string leaf carries no metadata of its own to override it.
+  it('carries a shape down the subtree and never reads it as a title', () => {
+    const { nodes } = flattenJsonOutline({
+      Root: [
+        { shape: 'circle', Round: ['one', 'two'] },
+        { Plain: ['three'] },
+      ],
+    }, opts)!
+    expect(nodes.map(n => n.title)).toEqual(['Root', 'Round', 'one', 'two', 'Plain', 'three'])
+    expect(nodes.filter(n => n.shape === 'circle').map(n => n.title)).toEqual(['Round', 'one', 'two'])
+    expect(nodes.find(n => n.title === 'three')!.shape).toBeUndefined()
+  })
+
+  it('lets a child override the shape it inherited, and drops an unknown one', () => {
+    const { nodes } = flattenJsonOutline({
+      Root: [{ shape: 'circle', Outer: [{ shape: 'pill', Inner: ['leaf'] }] }],
+    }, opts)!
+    expect(nodes.find(n => n.title === 'Inner')!.shape).toBe('pill')
+    expect(nodes.find(n => n.title === 'leaf')!.shape).toBe('pill')
+
+    const bad = flattenJsonOutline({ Root: [{ shape: 'blob', Topic: ['leaf'] }] }, opts)!
+    expect(bad.nodes.map(n => n.title)).toEqual(['Root', 'Topic', 'leaf'])
+    expect(bad.nodes.every(n => n.shape === undefined)).toBe(true)
+  })
 })

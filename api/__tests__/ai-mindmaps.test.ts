@@ -84,7 +84,7 @@ function useFakeTable(): Row[] {
 }
 
 // The insert parameter list of api/ai/mindmaps.ts, by position.
-const P_ID = 0, P_USER = 1, P_NAME = 2, P_LINE_STYLE = 4, P_TAGS = 8
+const P_ID = 0, P_USER = 1, P_NAME = 2, P_LINE_STYLE = 4, P_NODES = 7, P_TAGS = 8
 
 beforeEach(() => {
   queryMock.mockReset()
@@ -194,6 +194,65 @@ describe('POST /api/ai/mindmaps owner resolution (issue 27)', () => {
 
     expect(res.statusCode).toBe(500)
     expect(queryMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('POST /api/ai/mindmaps look settings', () => {
+  const nodesOf = () => JSON.parse(queryMock.mock.calls[0][1][P_NODES] as string)
+
+  // Root-only settings have no column: they ride on the depth-0 node so the canvas,
+  // the home card and the share image all read them from one place.
+  it('puts the recognised rootStyle values on the root node only', async () => {
+    useFakeTable()
+    await aiHandler(mockReq({
+      method: 'POST',
+      authorization: `Bearer ${KEY}`,
+      body: {
+        title: 'Styled', type: 'graph', outline: 'Root\n  Branch',
+        rootStyle: { ringSize: 'outward', gloss: true, combStyle: 'web', combSize: 'inward' },
+      },
+    }), mockRes())
+
+    const nodes = nodesOf()
+    expect(nodes[0]).toMatchObject({ ringSize: 'outward', gloss: true, combStyle: 'web', combSize: 'inward' })
+    expect(nodes[1].ringSize).toBeUndefined()
+  })
+
+  it('ignores an unknown key, a bad value and a non-object rootStyle', async () => {
+    useFakeTable()
+    await aiHandler(mockReq({
+      method: 'POST',
+      authorization: `Bearer ${KEY}`,
+      body: { title: 'Junk', outline: 'Root\n  Branch', rootStyle: { ringSize: 'sideways', nope: 1 } },
+    }), mockRes())
+    expect(nodesOf()[0].ringSize).toBeUndefined()
+    expect(nodesOf()[0].nope).toBeUndefined()
+
+    queryMock.mockClear()
+    useFakeTable()
+    await aiHandler(mockReq({
+      method: 'POST',
+      authorization: `Bearer ${KEY}`,
+      body: { title: 'Junk', outline: 'Root\n  Branch', rootStyle: 'web' },
+    }), mockRes())
+    expect(nodesOf()[0].combStyle).toBeUndefined()
+  })
+
+  it('carries a JSON outline shape onto the node and its subtree', async () => {
+    useFakeTable()
+    await aiHandler(mockReq({
+      method: 'POST',
+      authorization: `Bearer ${KEY}`,
+      body: {
+        title: 'Round', type: 'mindmap',
+        outline: JSON.stringify({ Round: [{ shape: 'circle', Topic: ['leaf'] }] }),
+      },
+    }), mockRes())
+
+    const nodes = nodesOf()
+    expect(nodes.map((n: { title: string }) => n.title)).toEqual(['Round', 'Topic', 'leaf'])
+    expect(nodes[1].shape).toBe('circle')
+    expect(nodes[2].shape).toBe('circle')
   })
 })
 

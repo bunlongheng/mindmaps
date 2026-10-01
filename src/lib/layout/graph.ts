@@ -40,6 +40,15 @@ export const DIAMETER_BANDS: Readonly<Record<number, readonly [number, number]>>
 export const ROOT_MIN_DIAMETER = 150
 
 /**
+ * Smallest root circle when size runs outward. The centre has to read as the small
+ * end of the ladder, otherwise a big root with small topics around it still looks
+ * like the default map. It still grows to fit its own title.
+ */
+export const ROOT_MIN_DIAMETER_OUTWARD = 104
+
+export type RingSize = NonNullable<MindmapNode['ringSize']>
+
+/**
  * Root title size for this type only. The shared box table's root row (ROOT_FONT, 42)
  * is built for a pill that runs across a logic chart; inside a centre circle it would
  * blow the circle up until it dwarfed the topics around it and the weight stopped
@@ -191,8 +200,22 @@ export function radialNodeExtent(node: MindmapNode, rcx: number, rcy: number): E
   }
 }
 
+/**
+ * Which way circle size runs on this map, read off the root:
+ *   'inward'  - the default, today's look: a big centre shrinking to dots outward
+ *   'outward' - the depth-1 and depth-2 bands swap, so topics start small and their
+ *               children are the heavy circles. Depth 3 and deeper stay dots either way.
+ */
+export function ringSizeOf(nodes: readonly MindmapNode[]): RingSize {
+  return nodes.find(n => n.parentId === null)?.ringSize ?? 'inward'
+}
+
 /** Diameter band for a depth (depth 3 and deeper are dots). */
-export function diameterBand(depth: number): readonly [number, number] {
+export function diameterBand(depth: number, ring: RingSize = 'inward'): readonly [number, number] {
+  if (ring === 'outward') {
+    if (depth === 1) return DIAMETER_BANDS[2]
+    if (depth === 2) return DIAMETER_BANDS[1]
+  }
   return DIAMETER_BANDS[depth] ?? DIAMETER_BANDS[3]
 }
 
@@ -209,8 +232,8 @@ function clearance(depth: number): number {
  * where in the band it lands. Square-root scaling so area, not radius, tracks the
  * weight. Monotonic in `descendants` and always inside [min, max].
  */
-export function radialDiameter(depth: number, descendants: number, maxDescendants: number): number {
-  const [min, max] = diameterBand(depth)
+export function radialDiameter(depth: number, descendants: number, maxDescendants: number, ring: RingSize = 'inward'): number {
+  const [min, max] = diameterBand(depth, ring)
   if (maxDescendants <= 0) return min
   const t = Math.min(1, Math.sqrt(Math.max(0, descendants) / maxDescendants))
   return Math.round(min + (max - min) * t)
@@ -289,11 +312,12 @@ export function radialNodeSize(
   node: MindmapNode,
   descendants: number,
   maxDescendants: number,
+  ring: RingSize = 'inward',
 ): { w: number; h: number } {
   const depth = node.depth
   const fontSize = node.fontSize ?? nodeFontSize(depth)
   if (node.shape === 'circle') {
-    const d = circleForText(node.title, fontSize, diameterBand(depth)[0])
+    const d = circleForText(node.title, fontSize, diameterBand(depth, ring)[0])
     return { w: d, h: d }
   }
   if (node.shape === 'pill') {
@@ -301,7 +325,7 @@ export function radialNodeSize(
     const w = Math.max(h, Math.ceil(estimateTextWidth(node.title, fontSize) + 2 * nodePadX(depth) + h))
     return { w, h }
   }
-  const d = radialDiameter(depth, descendants, maxDescendants)
+  const d = radialDiameter(depth, descendants, maxDescendants, ring)
   return { w: d, h: d }
 }
 
@@ -391,7 +415,8 @@ export function computeGraphLayout(nodes: MindmapNode[]): MindmapNode[] {
     if (n.depth <= 0) continue
     maxDescByDepth.set(n.depth, Math.max(maxDescByDepth.get(n.depth) ?? 0, desc(n.id)))
   }
-  const sizeOf = (n: MindmapNode) => radialNodeSize(n, desc(n.id), maxDescByDepth.get(n.depth) ?? 0)
+  const ring = ringSizeOf(nodes)
+  const sizeOf = (n: MindmapNode) => radialNodeSize(n, desc(n.id), maxDescByDepth.get(n.depth) ?? 0, ring)
 
   // Leaves carried by a subtree - the weight an angular sector is shared out by.
   const leafCache = new Map<string, number>()
@@ -406,7 +431,8 @@ export function computeGraphLayout(nodes: MindmapNode[]): MindmapNode[] {
 
   const result: MindmapNode[] = []
   const rootFs = root.fontSize ?? RADIAL_ROOT_FONT
-  const rootD = Math.max(ROOT_MIN_DIAMETER, circleForText(root.title, rootFs, ROOT_MIN_DIAMETER))
+  const rootMin = ring === 'outward' ? ROOT_MIN_DIAMETER_OUTWARD : ROOT_MIN_DIAMETER
+  const rootD = Math.max(rootMin, circleForText(root.title, rootFs, rootMin))
   result.push(root.manuallyPositioned
     ? root
     : { ...root, x: -rootD / 2, y: -rootD / 2, width: rootD, height: rootD })

@@ -62,6 +62,18 @@ function parseJsonOutline(json: unknown, BRANCH_COLORS: string[] = DEFAULT_BRANC
   })
 }
 
+/** Copy the recognised root-only look settings onto the depth-0 node, ignoring anything else. */
+function applyRootStyle(nodes: OutlineNode[], rootStyle: unknown): void {
+  if (!nodes.length || typeof rootStyle !== 'object' || rootStyle === null || Array.isArray(rootStyle)) return
+  const root = nodes.find(n => n.parentId === null)
+  if (!root) return
+  const s = rootStyle as Record<string, unknown>
+  if (typeof s.gloss === 'boolean') root.gloss = s.gloss
+  if (s.ringSize === 'inward' || s.ringSize === 'outward') root.ringSize = s.ringSize
+  if (s.combStyle === 'mesh' || s.combStyle === 'web') root.combStyle = s.combStyle
+  if (s.combSize === 'inward' || s.combSize === 'outward') root.combSize = s.combSize
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   Object.entries(corsHeaders(req.headers?.origin, 'POST, OPTIONS')).forEach(([k, v]) => res.setHeader(k, v))
   if (req.method === 'OPTIONS') return res.status(204).end()
@@ -90,20 +102,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       },
       fields: {
         title: 'required string',
-        outline: 'optional; indented text OR a JSON string (auto-detected); omit for an empty root',
+        outline: 'optional; indented text OR a JSON string (auto-detected); omit for an empty root. A JSON node may carry "shape": rect | rounded | pill | circle, which its whole subtree inherits.',
         type: 'logic-chart | mindmap | graph | fishbone | timeline | honeycomb (default logic-chart; omit unless the person explicitly asked for another layout by name)',
         themeId: 'optional (default "default")',
         lineStyle: 'optional (default "curved")',
         userId: 'optional; omit it - the map is always filed under the configured owner. If sent, it must equal that owner id or the call is rejected with 403.',
         sharing: 'optional bool, default false; set true to make the map readable by id without auth',
         colors: 'optional hex array to override the branch palette',
+        rootStyle: "optional object of root-only look settings: gloss (bool), ringSize ('inward' | 'outward', graph), combStyle ('mesh' | 'web', honeycomb), combSize ('outward' | 'inward', honeycomb web)",
         tags: "optional string array (max 8); defaults to ['API']. Use ['demo'] for a showcase map.",
       },
       note: 'This static key authorizes only the AI/import endpoints. The CRUD API (/api/mindmaps) needs a signed session token.',
     })
   }
 
-  const { title, outline, type: rawType = 'logic-chart', themeId = 'default', lineStyle = 'curved', userId = null, sharing = false, colors, tags } = body
+  const { title, outline, type: rawType = 'logic-chart', themeId = 'default', lineStyle = 'curved', userId = null, sharing = false, colors, tags, rootStyle } = body
   // Caller-chosen tags, so a showcase map can be filed under `demo` at birth
   // instead of needing a second CRUD call with a session token. Default stays
   // ['API'] so every existing caller keeps the tag it has always had.
@@ -144,6 +157,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     if (!nodes.length) nodes = parseOutline(outline, palette)
   }
+
+  // Root-only look settings (gloss, the graph ring direction, the honeycomb comb style).
+  // They live on the depth-0 node so the canvas, the home card and the share image all
+  // read them from the same place - there is no column for them.
+  applyRootStyle(nodes, rootStyle)
 
   try {
     await pool.query(
