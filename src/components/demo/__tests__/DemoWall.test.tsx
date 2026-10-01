@@ -21,7 +21,6 @@ describe('DemoWall', () => {
     await waitFor(() => expect(screen.getByText('Design System')).toBeTruthy())
     const card = document.querySelector('[data-demo-id="d1"]') as HTMLAnchorElement
     expect(card.getAttribute('href')).toBe('/?share=d1')
-    expect(screen.getByText('2 demos')).toBeTruthy()
     expect(localStorage.getItem('mindmaps:user')).toBeNull()
   })
 

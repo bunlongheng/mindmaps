@@ -41,21 +41,13 @@ export function DemoWall() {
         </a>
       </header>
 
-      <section style={{ textAlign: 'center', padding: '56px 20px 36px' }}>
+      <section style={{ textAlign: 'center', padding: '56px 20px 40px' }}>
         <h1 style={{ margin: 0, fontSize: 'clamp(30px, 4.6vw, 46px)', fontWeight: 800, letterSpacing: '-0.03em', lineHeight: 1.1, color: '#111827' }}>
           Mindmaps, <span style={{ color: '#7c3aed' }}>mapped</span> out in the open.
         </h1>
         <p style={{ margin: '14px auto 0', maxWidth: 560, fontSize: 16, lineHeight: 1.55, color: '#64748b' }}>
           A dozen maps you can open and poke at, no account needed. All of them were made with the editor you get after signing in.
         </p>
-        <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 22, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 12.5, fontWeight: 600, color: '#5b21b6', background: '#ede9fe', border: '1px solid #ddd6fe', borderRadius: 999, padding: '6px 12px' }}>
-            {rows ? `${rows.length} demo${rows.length === 1 ? '' : 's'}` : 'Loading'}
-          </span>
-          <a href="/" style={{ fontSize: 12.5, fontWeight: 600, color: '#374151', background: '#fff', border: '1px solid #e6e8ee', borderRadius: 999, padding: '6px 12px', textDecoration: 'none' }}>
-            Make your own
-          </a>
-        </div>
       </section>
 
       <section style={{ flex: 1, width: '100%', maxWidth: 1240, margin: '0 auto', padding: '0 20px 40px', boxSizing: 'border-box' }}>
