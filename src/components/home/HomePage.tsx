@@ -955,15 +955,25 @@ function textColorFor(fill: string): string {
  *  doing that at once on mount is a visible stall. */
 const EAGER_PREVIEWS = 12
 
-function DiagramMinimap({ id, name, type, eager }: { id: string; name: string; type: string; eager: boolean }) {
+function DiagramMinimap({ id, name, type, updatedAt, eager }: { id: string; name: string; type: string; updatedAt: string; eager: boolean }) {
   const storeThemeId = useMindmapStore(s => s.themeId)
   const [nodes, setNodes] = useState<MindmapNode[]>([])
   const [diagramThemeId, setDiagramThemeId] = useState<string>('default')
   const [lineStyle, setLineStyle] = useState<string>('orthogonal')
+  // Whether the nodes on screen are known to match the version the library listed.
+  const [fresh, setFresh] = useState(false)
   const wrapRef = useRef<HTMLDivElement>(null)
   const [inView, setInView] = useState(false)
 
-  // Hydrate from localStorage immediately (synchronous, free)
+  // Hydrate from localStorage immediately (synchronous, free), so the card paints
+  // without waiting on the network - even from a cache that has gone stale.
+  //
+  // `fresh` records whether that cache is for the version the library just listed.
+  // The fetch below used to be skipped the moment nodes existed, so a cache accepted
+  // blind was never corrected: a map restyled anywhere else (another device, the API,
+  // a re-seed) kept drawing its old theme on this card forever. A cache with no
+  // `updatedAt`, or an older one, still paints - it just no longer suppresses the
+  // refetch that replaces it.
   useEffect(() => {
     try {
       const data = JSON.parse(
@@ -973,9 +983,10 @@ function DiagramMinimap({ id, name, type, eager }: { id: string; name: string; t
         setNodes(data.nodes)
         setDiagramThemeId(data.themeId ?? 'default')
         setLineStyle(data.lineStyle ?? 'orthogonal')
+        setFresh(data.updatedAt === updatedAt)
       }
     } catch {}
-  }, [id, storeThemeId])
+  }, [id, updatedAt, storeThemeId])
 
   // Observe viewport — only fetch when card is visible
   useEffect(() => {
@@ -991,9 +1002,9 @@ function DiagramMinimap({ id, name, type, eager }: { id: string; name: string; t
     return () => io.disconnect()
   }, [])
 
-  // Fetch from API only when in view AND no cached nodes loaded yet
+  // Fetch from API when in view, unless a cache for THIS version is already on screen
   useEffect(() => {
-    if (!inView || nodes.length) return
+    if (!inView || (nodes.length && fresh)) return
     const stored = localStorage.getItem('mindmaps:user')
     const uid = stored ? JSON.parse(stored)?.userId : null
     const token = localStorage.getItem('mindmaps:token')
@@ -1005,15 +1016,17 @@ function DiagramMinimap({ id, name, type, eager }: { id: string; name: string; t
         setNodes(data.nodes)
         setDiagramThemeId(data.theme_id ?? 'default')
         setLineStyle(data.line_style ?? 'orthogonal')
+        setFresh(true)
         // Thumbnail-only cache (partial: no name/type/dates). Kept under its own key so
         // loadDiagram never mistakes it for a fully loaded diagram and opens a blank editor.
         localStorage.setItem(`mindmaps:thumb:${id}`, JSON.stringify({
           id, nodes: data.nodes, themeId: data.theme_id ?? 'default', lineStyle: data.line_style ?? 'orthogonal',
+          updatedAt: data.updated_at ?? updatedAt,
         }))
       })
       .catch(() => {})
     return () => { aborted = true }
-  }, [inView, id, nodes.length])
+  }, [inView, id, updatedAt, nodes.length, fresh])
 
   const theme = getTheme(diagramThemeId)
   const canvasBg = theme.canvasBg
@@ -1217,7 +1230,7 @@ function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isPublic, onTagEdit, 
 
       {/* Thumbnail */}
       <div style={{ width: '100%', aspectRatio: '2 / 1', background: 'transparent', position: 'relative' }}>
-        <DiagramMinimap id={diagram.id} name={diagram.name} type={diagram.type} eager={eager} />
+        <DiagramMinimap id={diagram.id} name={diagram.name} type={diagram.type} updatedAt={diagram.updatedAt} eager={eager} />
         {hovered && (
           <>
             <button onClick={e => { e.stopPropagation(); onTagEdit() }} title="Edit tags" aria-label={`Edit tags for ${diagram.name}`}
@@ -1271,7 +1284,7 @@ function DiagramRow({ diagram, timeAgo, onOpen, onDelete, isPublic, onTagEdit, f
     >
       {/* Thumbnail */}
       <div style={{ width: 72, height: 44, borderRadius: 8, overflow: 'hidden', flexShrink: 0, border: '1px solid #eef0f5' }}>
-        <DiagramMinimap id={diagram.id} name={diagram.name} type={diagram.type} eager={eager} />
+        <DiagramMinimap id={diagram.id} name={diagram.name} type={diagram.type} updatedAt={diagram.updatedAt} eager={eager} />
       </div>
 
       {/* Name only: the list stays clean, tags live on the grid cards and in the tag editor */}
