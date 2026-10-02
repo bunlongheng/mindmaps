@@ -92,7 +92,40 @@ describe('notifyShareView', () => {
     expect(insert?.[1].slice(0, 4)).toEqual(['map-1', 'Roadmap', 'view', '73.159.109.147'])
   })
 
-  it('posts a Stickies note instead when there is no email key', async () => {
+  it('emails through Formspree when there is no Resend key but FORMSPREE_ID is set', async () => {
+    vi.stubEnv('RESEND_API_KEY', '')
+    vi.stubEnv('OWNER_EMAIL', 'owner@example.com')
+    vi.stubEnv('FORMSPREE_ID', 'abc123')
+    dbHappy(4)
+    fetchMock.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) })
+    await notifyShareView(VISIT())
+    const form = fetchMock.mock.calls.filter(c => c[0] === 'https://formspree.io/f/abc123')
+    expect(form).toHaveLength(1)
+    const body = JSON.parse(form[0][1].body)
+    expect(body).toMatchObject({ email: 'owner@example.com', _subject: 'Opened: Roadmap - 73.159.109.147' })
+    expect(body.message).toContain('view 4')
+    expect(body.message).toContain('/s/map-1')
+    expect(body.message).not.toMatch(/https?:\/\//)
+    expect(fetchMock.mock.calls.some(c => c[0] === 'https://api.resend.com/emails')).toBe(false)
+    const update = queryMock.mock.calls.find(c => /UPDATE mindmaps_share_view_log SET emailed/.test(c[0]))
+    expect(update?.[1]).toEqual(['row-1'])
+  })
+
+  it('posts the Stickies note as well as the email when both are configured', async () => {
+    vi.stubEnv('RESEND_API_KEY', 're_test')
+    vi.stubEnv('OWNER_EMAIL', 'owner@example.com')
+    vi.stubEnv('STICKIES_API_KEY', 'sk_test')
+    vi.stubEnv('STICKIES_URL', 'https://stickies.example.com')
+    dbHappy(2)
+    fetchMock.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) })
+    await notifyShareView(VISIT())
+    expect(fetchMock.mock.calls.filter(c => c[0] === 'https://api.resend.com/emails')).toHaveLength(1)
+    const note = fetchMock.mock.calls.find(c => c[0] === 'https://stickies.example.com/api/stickies/ext')
+    expect(note).toBeTruthy()
+    expect(JSON.parse(note![1].body).content).toContain('view <b>2</b>')
+  })
+
+  it('posts a Stickies note when there is no email key', async () => {
     vi.stubEnv('RESEND_API_KEY', '')
     vi.stubEnv('STICKIES_API_KEY', 'sk_test')
     dbHappy(1)

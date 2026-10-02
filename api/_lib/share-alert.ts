@@ -1,7 +1,7 @@
 // Who opened a shared map. Fires once per real view of a public share link: every
 // view is written to mindmaps_share_view_log (so nothing is lost before an email provider
-// is configured) and emailed to OWNER_EMAIL when RESEND_API_KEY is set, with a
-// Stickies note as the fallback.
+// is configured), posted as a Stickies note when STICKIES_API_KEY is set, and
+// emailed to OWNER_EMAIL via Resend or Formspree when one is configured. Both channels fire.
 //
 // Never throws and never blocks the response - a failed alert must not stop a
 // visitor from reading the map.
@@ -137,24 +137,56 @@ function escapeHtml(s: string): string {
   return s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string))
 }
 
+/**
+ * Plain-text twin of alertBody for channels that do not render HTML. Formspree
+ * silently drops any submission containing a URL with a scheme, so links are
+ * written as bare host paths and the referer as its hostname only.
+ */
+export function alertText(v: ShareVisit, viewNumber: number): string {
+  const g = v.geo
+  const where = [g?.city || v.city, g?.region, g?.country || v.country].filter(Boolean).join(', ') || 'unknown'
+  const when = v.at.toLocaleString('en-US', { timeZone: 'America/New_York', dateStyle: 'medium', timeStyle: 'short' }) + ' ET'
+  const bare = (u: string) => u.replace(/^[a-z]+:\/\//i, '')
+  let from = 'direct'
+  if (v.referer) { try { from = new URL(v.referer).hostname } catch { from = bare(v.referer) } }
+  return [
+    `${v.title} was opened (view ${viewNumber}).`,
+    `Open: ${bare(shareUrl(v.mapId))}`,
+    `When: ${when}`,
+    `IP: ${v.ip}${g?.hostname ? ` (${g.hostname})` : ''}`,
+    `Where: ${where}`,
+    `From: ${from}`,
+    `Browser: ${v.userAgent || 'unknown'}`,
+  ].join('\n')
+}
+
+/** Resend when RESEND_API_KEY is set, else Formspree when FORMSPREE_ID is set. */
 async function sendEmail(v: ShareVisit, viewNumber: number): Promise<boolean> {
-  const key = process.env.RESEND_API_KEY
   const to = process.env.OWNER_EMAIL
-  if (!key || !to) return false
-  const res = await fetch('https://api.resend.com/emails', {
+  if (!to) return false
+  const subject = `Opened: ${v.title} - ${v.ip}`
+  const key = process.env.RESEND_API_KEY
+  if (key) {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from: process.env.SHARE_ALERT_FROM || 'Mindmaps <onboarding@resend.dev>', to: [to], subject, html: alertBody(v, viewNumber) }),
+    })
+    return res.ok
+  }
+  const form = process.env.FORMSPREE_ID
+  if (!form) return false
+  // Formspree mails each submission to the form owner (the same inbox as OWNER_EMAIL).
+  const res = await fetch(`https://formspree.io/f/${form}`, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      from: process.env.SHARE_ALERT_FROM || 'Mindmaps <onboarding@resend.dev>',
-      to: [to],
-      subject: `Opened: ${v.title} - ${v.ip}`,
-      html: alertBody(v, viewNumber),
-    }),
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: to, _subject: subject, message: alertText(v, viewNumber) }),
+    signal: AbortSignal.timeout(5000),
   })
   return res.ok
 }
 
-/** No email provider configured: post the same HTML as a note on the owner's Stickies board instead. */
+/** Post the same HTML as a note on the owner's Stickies board (folder Alerts). */
 async function postAlertNote(v: ShareVisit, viewNumber: number): Promise<void> {
   const key = process.env.STICKIES_API_KEY
   if (!key) return
@@ -179,11 +211,13 @@ export async function notifyShareView(v: ShareVisit): Promise<void> {
     const count = await pool.query('SELECT COUNT(*) AS n FROM mindmaps_share_view_log WHERE file_id = $1', [v.mapId])
     const viewNumber = Number(count.rows[0]?.n ?? 1)
     v.geo = (await lookupIp(v.ip)) ?? undefined
-    if (await sendEmail(v, viewNumber)) {
-      if (rowId) await pool.query('UPDATE mindmaps_share_view_log SET emailed = true WHERE id = $1', [rowId])
-    } else {
-      await postAlertNote(v, viewNumber)
-    }
+    // Both channels, independently: a Stickies failure never blocks the email
+    // and vice versa.
+    const [emailed] = await Promise.all([
+      sendEmail(v, viewNumber).catch(() => false),
+      postAlertNote(v, viewNumber).catch(() => undefined),
+    ])
+    if (emailed && rowId) await pool.query('UPDATE mindmaps_share_view_log SET emailed = true WHERE id = $1', [rowId])
   } catch (e) {
     console.error('[share-alert] failed', e)
   }
