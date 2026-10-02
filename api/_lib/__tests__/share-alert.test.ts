@@ -2,8 +2,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 const queryMock = vi.fn()
 vi.mock('../db.js', () => ({ pool: { query: (...a: unknown[]) => queryMock(...a) } }))
-const sendMailMock = vi.fn()
-vi.mock('nodemailer', () => ({ default: { createTransport: () => ({ sendMail: (...a: unknown[]) => sendMailMock(...a) }) } }))
 
 import { alertBody, clientIp, isBot, notifyShareView, readVisit } from '../share-alert'
 
@@ -94,19 +92,19 @@ describe('notifyShareView', () => {
     expect(insert?.[1].slice(0, 4)).toEqual(['map-1', 'Roadmap', 'view', '73.159.109.147'])
   })
 
-  it('emails over SMTP when there is no Resend key but SMTP is configured', async () => {
+  it('emails through Formspree when there is no Resend key but FORMSPREE_ID is set', async () => {
     vi.stubEnv('RESEND_API_KEY', '')
     vi.stubEnv('OWNER_EMAIL', 'owner@example.com')
-    vi.stubEnv('SMTP_HOST', 'smtp-relay.example.com')
-    vi.stubEnv('SMTP_USER', 'u')
-    vi.stubEnv('SMTP_PASS', 'p')
+    vi.stubEnv('FORMSPREE_ID', 'abc123')
     dbHappy(4)
-    sendMailMock.mockReset().mockResolvedValue({})
     fetchMock.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) })
     await notifyShareView(VISIT())
-    expect(sendMailMock).toHaveBeenCalledTimes(1)
-    expect(sendMailMock.mock.calls[0][0]).toMatchObject({ to: 'owner@example.com', subject: 'Opened: Roadmap - 73.159.109.147' })
-    expect(sendMailMock.mock.calls[0][0].html).toContain('view <b>4</b>')
+    const form = fetchMock.mock.calls.filter(c => c[0] === 'https://formspree.io/f/abc123')
+    expect(form).toHaveLength(1)
+    const body = JSON.parse(form[0][1].body)
+    expect(body).toMatchObject({ email: 'owner@example.com', _subject: 'Opened: Roadmap - 73.159.109.147' })
+    expect(body.message).toContain('view 4')
+    expect(body.message).toContain('/s/map-1')
     expect(fetchMock.mock.calls.some(c => c[0] === 'https://api.resend.com/emails')).toBe(false)
     const update = queryMock.mock.calls.find(c => /UPDATE mindmaps_share_view_log SET emailed/.test(c[0]))
     expect(update?.[1]).toEqual(['row-1'])

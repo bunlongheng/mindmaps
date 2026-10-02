@@ -1,12 +1,11 @@
 // Who opened a shared map. Fires once per real view of a public share link: every
 // view is written to mindmaps_share_view_log (so nothing is lost before an email provider
 // is configured), posted as a Stickies note when STICKIES_API_KEY is set, and
-// emailed to OWNER_EMAIL when RESEND_API_KEY is set. Both channels fire.
+// emailed to OWNER_EMAIL via Resend or Formspree when one is configured. Both channels fire.
 //
 // Never throws and never blocks the response - a failed alert must not stop a
 // visitor from reading the map.
 import type { IncomingHttpHeaders } from 'node:http'
-import nodemailer from 'nodemailer'
 import { pool } from './db.js'
 
 export interface ShareVisit {
@@ -138,30 +137,46 @@ function escapeHtml(s: string): string {
   return s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string))
 }
 
-/** Resend when RESEND_API_KEY is set, else SMTP (Brevo) when SMTP_HOST/USER/PASS are set. */
+/** Plain-text twin of alertBody for channels that do not render HTML. */
+export function alertText(v: ShareVisit, viewNumber: number): string {
+  const g = v.geo
+  const where = [g?.city || v.city, g?.region, g?.country || v.country].filter(Boolean).join(', ') || 'unknown'
+  const when = v.at.toLocaleString('en-US', { timeZone: 'America/New_York', dateStyle: 'medium', timeStyle: 'short' }) + ' ET'
+  return [
+    `${v.title} was opened (view ${viewNumber}).`,
+    `Link: ${shareUrl(v.mapId)}`,
+    `When: ${when}`,
+    `IP: ${v.ip}${g?.hostname ? ` (${g.hostname})` : ''}`,
+    `Where: ${where}`,
+    `From: ${v.referer || 'direct'}`,
+    `Browser: ${v.userAgent || 'unknown'}`,
+  ].join('\n')
+}
+
+/** Resend when RESEND_API_KEY is set, else Formspree when FORMSPREE_ID is set. */
 async function sendEmail(v: ShareVisit, viewNumber: number): Promise<boolean> {
   const to = process.env.OWNER_EMAIL
   if (!to) return false
-  const from = process.env.SHARE_ALERT_FROM || 'Mindmaps <onboarding@resend.dev>'
   const subject = `Opened: ${v.title} - ${v.ip}`
-  const html = alertBody(v, viewNumber)
   const key = process.env.RESEND_API_KEY
   if (key) {
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from, to: [to], subject, html }),
+      body: JSON.stringify({ from: process.env.SHARE_ALERT_FROM || 'Mindmaps <onboarding@resend.dev>', to: [to], subject, html: alertBody(v, viewNumber) }),
     })
     return res.ok
   }
-  const { SMTP_HOST, SMTP_USER, SMTP_PASS } = process.env
-  if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS) return false
-  const transport = nodemailer.createTransport({
-    host: SMTP_HOST, port: Number(process.env.SMTP_PORT || 587), secure: false,
-    auth: { user: SMTP_USER, pass: SMTP_PASS }, connectionTimeout: 5000,
+  const form = process.env.FORMSPREE_ID
+  if (!form) return false
+  // Formspree mails each submission to the form owner (the same inbox as OWNER_EMAIL).
+  const res = await fetch(`https://formspree.io/f/${form}`, {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: to, _subject: subject, message: alertText(v, viewNumber) }),
+    signal: AbortSignal.timeout(5000),
   })
-  await transport.sendMail({ from, to, subject, html })
-  return true
+  return res.ok
 }
 
 /** Post the same HTML as a note on the owner's Stickies board (folder Alerts). */
