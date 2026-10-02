@@ -137,18 +137,25 @@ function escapeHtml(s: string): string {
   return s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string))
 }
 
-/** Plain-text twin of alertBody for channels that do not render HTML. */
+/**
+ * Plain-text twin of alertBody for channels that do not render HTML. Formspree
+ * silently drops any submission containing a URL with a scheme, so links are
+ * written as bare host paths and the referer as its hostname only.
+ */
 export function alertText(v: ShareVisit, viewNumber: number): string {
   const g = v.geo
   const where = [g?.city || v.city, g?.region, g?.country || v.country].filter(Boolean).join(', ') || 'unknown'
   const when = v.at.toLocaleString('en-US', { timeZone: 'America/New_York', dateStyle: 'medium', timeStyle: 'short' }) + ' ET'
+  const bare = (u: string) => u.replace(/^[a-z]+:\/\//i, '')
+  let from = 'direct'
+  if (v.referer) { try { from = new URL(v.referer).hostname } catch { from = bare(v.referer) } }
   return [
     `${v.title} was opened (view ${viewNumber}).`,
-    `Link: ${shareUrl(v.mapId)}`,
+    `Open: ${bare(shareUrl(v.mapId))}`,
     `When: ${when}`,
     `IP: ${v.ip}${g?.hostname ? ` (${g.hostname})` : ''}`,
     `Where: ${where}`,
-    `From: ${v.referer || 'direct'}`,
+    `From: ${from}`,
     `Browser: ${v.userAgent || 'unknown'}`,
   ].join('\n')
 }

@@ -105,6 +105,7 @@ describe('notifyShareView', () => {
     expect(body).toMatchObject({ email: 'owner@example.com', _subject: 'Opened: Roadmap - 73.159.109.147' })
     expect(body.message).toContain('view 4')
     expect(body.message).toContain('/s/map-1')
+    expect(body.message).not.toMatch(/https?:\/\//)
     expect(fetchMock.mock.calls.some(c => c[0] === 'https://api.resend.com/emails')).toBe(false)
     const update = queryMock.mock.calls.find(c => /UPDATE mindmaps_share_view_log SET emailed/.test(c[0]))
     expect(update?.[1]).toEqual(['row-1'])
