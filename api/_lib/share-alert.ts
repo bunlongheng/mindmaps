@@ -1,11 +1,12 @@
 // Who opened a shared map. Fires once per real view of a public share link: every
 // view is written to mindmaps_share_view_log (so nothing is lost before an email provider
-// is configured) and emailed to OWNER_EMAIL when RESEND_API_KEY is set, with a
-// Stickies note as the fallback.
+// is configured), posted as a Stickies note when STICKIES_API_KEY is set, and
+// emailed to OWNER_EMAIL when RESEND_API_KEY is set. Both channels fire.
 //
 // Never throws and never blocks the response - a failed alert must not stop a
 // visitor from reading the map.
 import type { IncomingHttpHeaders } from 'node:http'
+import nodemailer from 'nodemailer'
 import { pool } from './db.js'
 
 export interface ShareVisit {
@@ -137,24 +138,33 @@ function escapeHtml(s: string): string {
   return s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string))
 }
 
+/** Resend when RESEND_API_KEY is set, else SMTP (Brevo) when SMTP_HOST/USER/PASS are set. */
 async function sendEmail(v: ShareVisit, viewNumber: number): Promise<boolean> {
-  const key = process.env.RESEND_API_KEY
   const to = process.env.OWNER_EMAIL
-  if (!key || !to) return false
-  const res = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      from: process.env.SHARE_ALERT_FROM || 'Mindmaps <onboarding@resend.dev>',
-      to: [to],
-      subject: `Opened: ${v.title} - ${v.ip}`,
-      html: alertBody(v, viewNumber),
-    }),
+  if (!to) return false
+  const from = process.env.SHARE_ALERT_FROM || 'Mindmaps <onboarding@resend.dev>'
+  const subject = `Opened: ${v.title} - ${v.ip}`
+  const html = alertBody(v, viewNumber)
+  const key = process.env.RESEND_API_KEY
+  if (key) {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from, to: [to], subject, html }),
+    })
+    return res.ok
+  }
+  const { SMTP_HOST, SMTP_USER, SMTP_PASS } = process.env
+  if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS) return false
+  const transport = nodemailer.createTransport({
+    host: SMTP_HOST, port: Number(process.env.SMTP_PORT || 587), secure: false,
+    auth: { user: SMTP_USER, pass: SMTP_PASS }, connectionTimeout: 5000,
   })
-  return res.ok
+  await transport.sendMail({ from, to, subject, html })
+  return true
 }
 
-/** No email provider configured: post the same HTML as a note on the owner's Stickies board instead. */
+/** Post the same HTML as a note on the owner's Stickies board (folder Alerts). */
 async function postAlertNote(v: ShareVisit, viewNumber: number): Promise<void> {
   const key = process.env.STICKIES_API_KEY
   if (!key) return
@@ -179,11 +189,13 @@ export async function notifyShareView(v: ShareVisit): Promise<void> {
     const count = await pool.query('SELECT COUNT(*) AS n FROM mindmaps_share_view_log WHERE file_id = $1', [v.mapId])
     const viewNumber = Number(count.rows[0]?.n ?? 1)
     v.geo = (await lookupIp(v.ip)) ?? undefined
-    if (await sendEmail(v, viewNumber)) {
-      if (rowId) await pool.query('UPDATE mindmaps_share_view_log SET emailed = true WHERE id = $1', [rowId])
-    } else {
-      await postAlertNote(v, viewNumber)
-    }
+    // Both channels, independently: a Stickies failure never blocks the email
+    // and vice versa.
+    const [emailed] = await Promise.all([
+      sendEmail(v, viewNumber).catch(() => false),
+      postAlertNote(v, viewNumber).catch(() => undefined),
+    ])
+    if (emailed && rowId) await pool.query('UPDATE mindmaps_share_view_log SET emailed = true WHERE id = $1', [rowId])
   } catch (e) {
     console.error('[share-alert] failed', e)
   }
