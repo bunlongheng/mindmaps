@@ -83,7 +83,7 @@ describe('notifyShareView', () => {
     expect(resend).toHaveLength(1)
     const body = JSON.parse(resend[0][1].body)
     expect(body.to).toEqual(['owner@example.com'])
-    expect(body.subject).toBe('Opened: Roadmap - 73.159.109.147')
+    expect(body.subject).toBe('Mindmaps - Opened: Roadmap - 73.159.109.147')
     expect(body.html).toContain('view <b>3</b>')
     expect(body.html).toContain('Massachusetts')
     const update = queryMock.mock.calls.find(c => /UPDATE mindmaps_share_view_log SET emailed/.test(c[0]))
@@ -102,7 +102,7 @@ describe('notifyShareView', () => {
     const form = fetchMock.mock.calls.filter(c => c[0] === 'https://formspree.io/f/abc123')
     expect(form).toHaveLength(1)
     const body = JSON.parse(form[0][1].body)
-    expect(body).toMatchObject({ email: 'owner@example.com', _subject: 'Opened: Roadmap - 73.159.109.147' })
+    expect(body).toMatchObject({ email: 'owner@example.com', _subject: 'Mindmaps - Opened: Roadmap - 73.159.109.147' })
     expect(body.message).toContain('view 4')
     expect(body.message).toContain('/s/map-1')
     expect(body.message).not.toMatch(/https?:\/\//)
@@ -135,7 +135,7 @@ describe('notifyShareView', () => {
     const note = fetchMock.mock.calls.find(c => String(c[0]).endsWith('/api/stickies/ext'))
     expect(note).toBeTruthy()
     const body = JSON.parse(note![1].body)
-    expect(body).toMatchObject({ type: 'html', title: 'Opened: Roadmap', folder: 'Alerts', icon: '__hero:EyeIcon' })
+    expect(body).toMatchObject({ type: 'html', title: 'Mindmaps - Opened: Roadmap', folder: 'Alerts', icon: '__app:mindmaps' })
     expect(body.content).toContain('view <b>1</b>')
     expect(note![1].headers.Authorization).toBe('Bearer sk_test')
   })
@@ -144,10 +144,10 @@ describe('notifyShareView', () => {
     vi.stubEnv('STICKIES_API_KEY', 'sk_test')
     dbHappy(1)
     fetchMock.mockResolvedValue({ ok: false, json: () => Promise.resolve({}) })
-    const v = VISIT(); v.title = 'Opened: Opened: Roadmap'
+    const v = VISIT(); v.title = 'Mindmaps - Opened: Opened: Roadmap'
     await notifyShareView(v)
     const note = fetchMock.mock.calls.find(c => String(c[0]).endsWith('/api/stickies/ext'))
-    expect(JSON.parse(note![1].body).title).toBe('Opened: Roadmap')
+    expect(JSON.parse(note![1].body).title).toBe('Mindmaps - Opened: Roadmap')
   })
 
   it('never throws when the database is down', async () => {

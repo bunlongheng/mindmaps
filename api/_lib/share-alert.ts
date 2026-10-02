@@ -97,6 +97,9 @@ async function logVisit(v: ShareVisit): Promise<string | null> {
   return r.rows[0]?.id ?? null
 }
 
+/** Note title and email subject, prefixed so Mindmaps alerts stand apart from other apps' notes. */
+export const alertTitle = (title: string) => `Mindmaps - Opened: ${title.replace(/^(Mindmaps - )?(Opened:\s*)+/i, '')}`
+
 export function alertBody(v: ShareVisit, viewNumber: number): string {
   const g = v.geo
   const city = g?.city || v.city
@@ -164,7 +167,7 @@ export function alertText(v: ShareVisit, viewNumber: number): string {
 async function sendEmail(v: ShareVisit, viewNumber: number): Promise<boolean> {
   const to = process.env.OWNER_EMAIL
   if (!to) return false
-  const subject = `Opened: ${v.title} - ${v.ip}`
+  const subject = `${alertTitle(v.title)} - ${v.ip}`
   const key = process.env.RESEND_API_KEY
   if (key) {
     const res = await fetch('https://api.resend.com/emails', {
@@ -195,10 +198,10 @@ async function postAlertNote(v: ShareVisit, viewNumber: number): Promise<void> {
     headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
       type: 'html',
-      title: `Opened: ${v.title.replace(/^(Opened:\s*)+/, '')}`,
+      title: alertTitle(v.title),
       content: alertBody(v, viewNumber),
       folder: 'Alerts',
-      icon: '__hero:EyeIcon',
+      icon: '__app:mindmaps',
     }),
     signal: AbortSignal.timeout(3000),
   })
