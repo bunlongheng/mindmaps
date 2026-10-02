@@ -5,8 +5,8 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 const queryMock = vi.fn()
 vi.mock('../_lib/db.js', () => ({ pool: { query: (...args: unknown[]) => queryMock(...args) } }))
 const notifyMock = vi.fn()
-vi.mock('../_lib/share-alert.js', async () => {
-  const real = await vi.importActual<typeof import('../_lib/share-alert.js')>('../_lib/share-alert.js')
+vi.mock('../../lib/share-alert.js', async () => {
+  const real = await vi.importActual<Record<string, unknown>>('../../lib/share-alert.js')
   return { ...real, notifyShareView: (...a: unknown[]) => notifyMock(...a) }
 })
 vi.mock('@vercel/functions', () => ({ waitUntil: (p: Promise<unknown>) => { void p } }))
@@ -104,7 +104,7 @@ describe('writes require a verified identity', () => {
     }
     const human = await open({ id: 'map-1' }, 'Mozilla/5.0 (iPhone) Safari')
     expect(human).toHaveLength(1)
-    expect(human[0][0]).toMatchObject({ mapId: sharedRow.id, title: sharedRow.name, kind: 'view', ip: '73.159.109.147' })
+    expect(human[0][0]).toMatchObject({ id: sharedRow.id, title: sharedRow.name, kind: 'view', ip: '73.159.109.147', link: `https://mindmaps-bheng.vercel.app/s/${sharedRow.id}` })
     expect(await open({ id: 'map-1', thumb: '1' }, 'Mozilla/5.0 (iPhone) Safari')).toHaveLength(0)
     expect(await open({ id: 'map-1' }, 'Slackbot-LinkExpanding 1.0')).toHaveLength(0)
   })

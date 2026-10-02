@@ -1,10 +1,13 @@
 import { pool } from './_lib/db.js'
 import { waitUntil } from '@vercel/functions'
-import { isBot, notifyShareView, readVisit } from './_lib/share-alert.js'
+import { isBot, notifyShareView, readVisit } from '../lib/share-alert.js'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { verifyToken, bearer, secretEquals } from './_lib/auth.js'
 import { corsHeaders } from './_lib/cors.js'
 import { renderMindmapSvg } from './_lib/render-svg.js'
+
+// Where a share link lives, for the link Notify puts in the alert.
+const APP_URL = (process.env.PUBLIC_APP_URL || 'https://mindmaps-bheng.vercel.app').replace(/\/$/, '')
 
 const SECRET = () => (process.env.MINDMAP_JWT_SECRET ?? '').trim()
 
@@ -63,7 +66,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // waitUntil keeps the alert alive after the response without delaying it.
         const q = req.query as Record<string, string>
         if (q.thumb !== '1' && !isBot(String(req.headers['user-agent'] ?? ''))) {
-          waitUntil(notifyShareView(readVisit(req.headers, row.id, row.name)))
+          waitUntil(notifyShareView(readVisit(req.headers, { id: row.id, title: row.name, link: `${APP_URL}/s/${row.id}` })))
         }
         return res.json(shared)
       }
