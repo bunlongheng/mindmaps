@@ -24,6 +24,13 @@ Only create + schema are exposed: the Mindmaps CRUD API (`/api/mindmaps`) is
 signed-session-only, so a static Bearer can't list/read/delete. Creation is the
 public contract.
 
+**A picture, not a row.** `create_mindmap` takes `source` and `store`. A caller that
+only needs the image - `source: "repo-audit"` for any audit or recon, or
+`store: false` for anything else - gets `{ stored: false, source, svg, nodeCount }`
+with no `id` and no `url`, and nothing is written. The caller is told apart by the
+`source` it declares, never by its title, so `/repo-audit` runs never fill the
+library.
+
 ## Env
 
 - `MINDMAP_AI_API_KEY` — **required**. Bearer for the render-only endpoint. On the

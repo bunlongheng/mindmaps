@@ -286,3 +286,70 @@ describe('a map created through the AI endpoint shows up in the library', () => 
     expect(card.updated_at).toBeTruthy()
   })
 })
+
+// A repo audit wants a picture for its report, not a row in the library (owner
+// rule 2026-10-04). The caller declares what it is in `source`; the endpoint
+// renders and stores nothing. Title is never sniffed.
+describe('POST /api/ai/mindmaps render-only (source "repo-audit" / store false)', () => {
+  it('renders the svg and stores nothing when source is repo-audit', async () => {
+    const res = mockRes()
+    await aiHandler(mockReq({
+      method: 'POST',
+      authorization: `Bearer ${KEY}`,
+      body: { title: 'mindmaps Features', outline: 'Root\n  Branch\n    Leaf', source: 'repo-audit' },
+    }), res)
+
+    expect(res.statusCode).toBe(200)
+    expect(queryMock).not.toHaveBeenCalled()
+    const out = res.jsonBody as { stored: boolean; source: string; svg: string; nodeCount: number; id?: string; url?: string }
+    expect(out.stored).toBe(false)
+    expect(out.source).toBe('repo-audit')
+    expect(out.nodeCount).toBe(3)
+    expect(out.svg).toMatch(/^<svg/)
+    expect(out.id).toBeUndefined()
+    expect(out.url).toBeUndefined()
+  })
+
+  it('renders the svg and stores nothing when store is false', async () => {
+    const res = mockRes()
+    await aiHandler(mockReq({
+      method: 'POST',
+      authorization: `Bearer ${KEY}`,
+      body: { title: 'Picture Only', outline: 'Root\n  Branch', store: false },
+    }), res)
+
+    expect(res.statusCode).toBe(200)
+    expect(queryMock).not.toHaveBeenCalled()
+    const out = res.jsonBody as { stored: boolean; source: string; svg: string }
+    expect(out.stored).toBe(false)
+    expect(out.source).toBe('render-only')
+    expect(out.svg).toMatch(/^<svg/)
+  })
+
+  it('still stores a normal call that declares no source', async () => {
+    useFakeTable()
+    const res = mockRes()
+    await aiHandler(mockReq({
+      method: 'POST',
+      authorization: `Bearer ${KEY}`,
+      body: { title: 'Normal Map', outline: 'Root\n  Branch' },
+    }), res)
+
+    expect(res.statusCode).toBe(201)
+    expect(queryMock).toHaveBeenCalledTimes(1)
+    expect((res.jsonBody as { stored?: boolean }).stored).toBeUndefined()
+  })
+
+  it('stores a map whose title mentions repo-audit but declares no source', async () => {
+    useFakeTable()
+    const res = mockRes()
+    await aiHandler(mockReq({
+      method: 'POST',
+      authorization: `Bearer ${KEY}`,
+      body: { title: 'mindmaps Features (repo-audit)', outline: 'Root\n  Branch' },
+    }), res)
+
+    expect(res.statusCode).toBe(201)
+    expect(queryMock).toHaveBeenCalledTimes(1)
+  })
+})

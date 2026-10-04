@@ -58,7 +58,7 @@ server.registerTool(
   {
     title: 'Create mindmap',
     description:
-      'Create a mind map in the Mindmaps app from an outline YOU write (no server-side AI, no Anthropic spend). `outline` is a JSON string like {"Root":[{"icon":"brain","Category A":["item 1","item 2"]}]} OR indented text (2 spaces per level). Returns the id, the canonical shareable url (https://<app>/s/<id>, which unfurls with the real diagram as its preview image), svg_url, and node count; pass format:"svg" to also get the inline SVG string. Maps are always filed under the owner\'s library - you never pass an owner, and a mismatched one is rejected with 403 rather than silently orphaned.',
+      'Create a mind map in the Mindmaps app from an outline YOU write (no server-side AI, no Anthropic spend). `outline` is a JSON string like {"Root":[{"icon":"brain","Category A":["item 1","item 2"]}]} OR indented text (2 spaces per level). Returns the id, the canonical shareable url (https://<app>/s/<id>, which unfurls with the real diagram as its preview image), svg_url, and node count; pass format:"svg" to also get the inline SVG string. Maps are always filed under the owner\'s library - you never pass an owner, and a mismatched one is rejected with 403 rather than silently orphaned. Pass source:"repo-audit" (or store:false) when the caller only needs a picture: the map is rendered and NEVER stored, so an audit never lands in the library.',
     inputSchema: {
       title: z.string().describe('The map title / root label, e.g. "Machine Learning"'),
       outline: z.string().describe('JSON-string outline (categories with items, optional per-category "icon") OR indented text. Omit for an empty root.').optional(),
@@ -66,15 +66,27 @@ server.registerTool(
       sharing: z.boolean().optional().describe('Make the map readable by URL without auth (default true so the link opens for anyone).'),
       colors: z.array(z.string()).optional().describe('Optional hex colors to override the branch palette.'),
       format: z.enum(['svg']).optional().describe('Pass "svg" to also return the rendered map as an inline self-contained SVG string.'),
+      source: z.string().max(40).optional().describe('Who is asking. "repo-audit" means a repo audit or recon: the map is RENDERED, NEVER STORED - the response carries the svg to embed in the report and no row is created. Always pass it from /repo-audit.'),
+      store: z.boolean().optional().describe('false renders the svg and stores nothing, for any caller that only needs the picture.'),
     },
   },
-  async ({ title, outline, type = 'logic-chart', sharing = true, colors, format }) => {
+  async ({ title, outline, type = 'logic-chart', sharing = true, colors, format, source, store }) => {
     try {
       const body = { title, type, userId: OWNER_ID, sharing }
       if (outline != null) body.outline = outline
       if (colors) body.colors = colors
       if (format === 'svg') body.format = 'svg'
+      if (source != null) body.source = source
+      if (store != null) body.store = store
       const r = await api('/api/ai/mindmaps', { method: 'POST', body })
+      // A repo audit gets a picture, never a row (owner rule 2026-10-04): the
+      // API answers 200 { stored:false } with no id or url to hand back.
+      if (r.stored === false) {
+        return ok({
+          stored: false, source: r.source, nodeCount: r.nodeCount, svg: r.svg,
+          note: 'Nothing was stored. Embed the svg where the report lives; there is no id or url.',
+        })
+      }
       return ok({
         id: r.id, url: r.url, svg_url: r.svg_url, nodeCount: r.nodeCount,
         ...(r.svg ? { svg: r.svg } : {}),
@@ -105,6 +117,7 @@ server.registerTool(
       'Node text may carry links: markdown [label](https://...) or a bare https:// url renders as a clickable anchor. Only http/https is linked; bare ticket keys are not.',
       'The map is owned by the configured owner and (by default) shared so the returned url opens without auth.',
       'The returned url is always /s/<id> - the one canonical share link. Hand that to a human or paste it in chat; it carries the OG tags and redirects to the app.',
+      'source:"repo-audit" (or store:false) renders the map and stores NOTHING: the answer is { stored:false, source, svg } with no id or url. A repo audit embeds that svg in its report, so audits never fill the library. The caller is told apart by the source it declares, never by its title.',
     ],
     example_json_outline: {
       title: 'Machine Learning',

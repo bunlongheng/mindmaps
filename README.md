@@ -54,6 +54,12 @@ The `201` carries `url`, `svg_url` and `nodeCount`. Once it is shared, the SVG U
 ![System Design Basics]($APP/api/mindmaps?id=<id>&format=svg)
 ```
 
+**A picture, not a row.** A caller that only needs the image says so and nothing is
+stored: `"source":"repo-audit"` (any audit or recon) or `"store":false`. The answer is
+`200 {"stored":false,"source":...,"svg":"<svg ...>","nodeCount":n}` with no `id` and no
+`url` - embed that SVG wherever the report lives. The caller is told apart by the
+`source` it declares, never by its title, so `/repo-audit` runs never fill the library.
+
 ## Quick start
 
 ```bash
@@ -86,7 +92,7 @@ npm run dev                        # http://localhost:5173
 
 | Route | Auth | Returns |
 |---|---|---|
-| `POST /api/ai/mindmaps` | Bearer | A new map, with `url`, `svg_url` and `nodeCount`. Render-only |
+| `POST /api/ai/mindmaps` | Bearer | A new map, with `url`, `svg_url` and `nodeCount`. Render-only. With `source:"repo-audit"` or `store:false` it returns `{stored:false, svg}` and stores nothing |
 | `POST /api/ai/generate-mindmap` | Owner session | A new map written by Claude from a prompt. The Bearer key is rejected here |
 | `GET /api/mindmaps?id=` | Public if shared | JSON, or `?format=svg` |
 | `GET /s/:id` | Public if shared | Share page with Open Graph card |
