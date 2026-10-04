@@ -555,7 +555,11 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract, rightInset =
               svgRef={svgRef}
               readOnly={readOnly}
               noInteract={noInteract}
-              l1Colors={node.depth === 0 ? activeMindmap.nodes.filter(n => n.depth === 1).map(n => n.color) : undefined}
+              // The root glow must use the colours the topics are actually PAINTED
+              // with, which is computeBranchColors - the same map the boxes and edges
+              // read. Using the raw stored n.color made the glow show the palette a map
+              // was born with while the boxes had since been recoloured.
+              l1Colors={node.depth === 0 ? activeMindmap.nodes.filter(n => n.depth === 1).map(n => paletteColors.get(n.id) ?? n.color) : undefined}
               paletteColor={paletteColors.get(node.id) ?? null}
               rootCenter={rootCenter}
               childCount={counts.childCounts.get(node.id) ?? 0}
