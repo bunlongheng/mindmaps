@@ -111,12 +111,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         colors: 'optional hex array to override the branch palette',
         rootStyle: "optional object of root-only look settings: gloss (bool), ringSize ('inward' | 'outward', graph), combStyle ('mesh' | 'web', honeycomb), combSize ('outward' | 'inward', honeycomb web)",
         tags: "optional string array (max 8); defaults to ['API']. Use ['demo'] for a showcase map.",
+        source: 'optional string (max 40) naming the caller. "repo-audit" renders the map and stores NOTHING: the response is 200 { stored:false, source, svg } with no id or url.',
+        store: 'optional bool; false renders the svg and stores nothing, for any caller that only needs the picture.',
       },
       note: 'This static key authorizes only the AI/import endpoints. The CRUD API (/api/mindmaps) needs a signed session token.',
     })
   }
 
   const { title, outline, type: rawType = 'logic-chart', themeId = 'default', lineStyle = 'curved', userId = null, sharing = false, colors, tags, rootStyle } = body
+  // A repo audit wants a picture for its report, not a row in the library
+  // (owner rule 2026-10-04): source "repo-audit", or store: false, renders the
+  // SVG and stores nothing, so an audit never lands in the maps list. The
+  // source travels in the body, so the caller is told apart by what it says it
+  // is, not by its title.
+  const source = typeof body.source === 'string' && body.source.trim() ? body.source.trim().slice(0, 40) : null
+  const renderOnly = source === 'repo-audit' || body.store === false
   // Caller-chosen tags, so a showcase map can be filed under `demo` at birth
   // instead of needing a second CRUD call with a session token. Default stays
   // ['API'] so every existing caller keeps the tag it has always had.
@@ -162,6 +171,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // They live on the depth-0 node so the canvas, the home card and the share image all
   // read them from the same place - there is no column for them.
   applyRootStyle(nodes, rootStyle)
+
+  if (renderOnly) {
+    try {
+      return res.status(200).json({
+        stored: false,
+        source: source ?? 'render-only',
+        nodeCount: nodes.length,
+        svg: renderMindmapSvg({ id, name: title, type, line_style: lineStyle, theme_id: themeId, nodes }),
+        note: 'Nothing was stored. Embed the svg where the report lives; there is no id or url.',
+      })
+    } catch (e: unknown) {
+      // Nothing was saved, so there is no svg_url to fall back on - unlike the
+      // stored path, a render failure here is the whole answer failing.
+      return res.status(500).json({ error: 'SVG render failed', detail: e instanceof Error ? e.message : String(e) })
+    }
+  }
 
   try {
     await pool.query(
