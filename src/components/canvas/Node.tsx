@@ -1007,14 +1007,10 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   )
 }
 
-const BLOB_OFFSETS = [
-  { ox: 0.45, oy: -0.30, dur: '6s',   start: 0   },
-  { ox: -0.50, oy: 0.40, dur: '8s',   start: 90  },
-  { ox: 0.30,  oy: 0.50, dur: '7s',   start: 180 },
-  { ox: -0.40, oy: -0.45, dur: '9s',  start: 270 },
-  { ox: 0.55,  oy: 0.20, dur: '5.5s', start: 45  },
-  { ox: -0.30, oy: -0.20, dur: '6.5s', start: 135 },
-]
+// How far each glow blob sits from the root centre, as a fraction of the root
+// radius. One ring of blobs, so the spread is a single number instead of the old
+// hand-placed offset table.
+const BLOB_SPREAD = 0.46
 const FALLBACK_COLORS = ['#0080FF','#BF5AF2','#FF375F','#34C8E8','#FF9F0A','#30D158']
 
 /** Generate shades of a color — lighter variations, same hue */
@@ -1109,10 +1105,14 @@ function Fireflies({ cx, cy, r, color, colors, count = 10, shape = 'dot' }: { cx
 
 function SiriWave({ cx, cy, r, colors }: { cx: number; cy: number; r: number; colors: string[] }) {
   const palette = colors.length > 0 ? colors : FALLBACK_COLORS
-  const blobs = BLOB_OFFSETS.map((o, i) => ({
-    color: palette[i % palette.length],
-    ox: r * o.ox, oy: r * o.oy, dur: o.dur, start: o.start,
-  }))
+  // One blob per topic colour, evenly spaced around the root, so EVERY branch is
+  // represented in the glow. The old fixed table of 6 offsets cycled the palette:
+  // a 5-topic map repeated a colour and an 8-topic map lost 2 entirely.
+  // Start at -90deg so the first topic's colour sits at the top, where the eye lands.
+  const blobs = palette.map((color, i) => {
+    const a = (i / palette.length) * Math.PI * 2 - Math.PI / 2
+    return { color, ox: Math.cos(a) * r * BLOB_SPREAD, oy: Math.sin(a) * r * BLOB_SPREAD }
+  })
   const filterId = `siri-blur-${Math.round(cx)}`
 
   return (
@@ -1123,16 +1123,12 @@ function SiriWave({ cx, cy, r, colors }: { cx: number; cy: number; r: number; co
         </filter>
       </defs>
 
-      {/* Rotating colorful blobs */}
+      {/* Still colourful blobs - they glow and stay put (owner rule 2026-10-04).
+          No rotation and no pulse: the spin pulled the eye away from the labels
+          and burned GPU on an idle canvas. */}
       <g filter={`url(#${filterId})`} opacity={0.72}>
         {blobs.map((b, i) => (
-          <circle key={i} cx={cx + b.ox} cy={cy + b.oy} r={r * 0.88} fill={b.color}>
-            <animateTransform attributeName="transform" type="rotate"
-              from={`${b.start} ${cx} ${cy}`} to={`${b.start + 360} ${cx} ${cy}`}
-              dur={b.dur} repeatCount="indefinite" />
-            <animate attributeName="r" values={`${r * 0.8};${r * 1.0};${r * 0.8}`}
-              dur={b.dur} repeatCount="indefinite" />
-          </circle>
+          <circle key={i} cx={cx + b.ox} cy={cy + b.oy} r={r * 0.88} fill={b.color} />
         ))}
       </g>
 
