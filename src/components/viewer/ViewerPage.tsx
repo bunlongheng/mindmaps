@@ -52,10 +52,20 @@ export function ViewerPage({ diagram, id }: { diagram: Diagram | null; id: strin
         <a href="/" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none' }}>
           <Wordmark size={28} />
         </a>
+        {/* The reader's 1 action sits in the same floating pill Flows puts at the
+            right of a shared diagram, and the pill's tiles are the squares the
+            footer ends with: a shared link reads the same at the top and at the
+            bottom, in every app in the family. */}
         {id && (
-          <a href={`/api/mindmaps?id=${id}&format=svg`} style={{ fontSize: 13, fontWeight: 600, color: '#4b5563', textDecoration: 'none' }}>
-            Download SVG
-          </a>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0, background: '#ffffff', border: '1px solid #e4e6e8', borderRadius: 14, boxShadow: '0 4px 24px rgba(0,0,0,0.08)', padding: '4px 6px' }}>
+            <style>{`.mm-act{display:flex;align-items:center;gap:6px;height:30px;padding:0 10px;border-radius:8px;color:#64748b;font-size:13px;text-decoration:none;transition:background .1s}.mm-act:hover{background:#f1f5f9}`}</style>
+            <a className="mm-act" href={`/api/mindmaps?id=${id}&format=svg`} title="Download this map as an SVG">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 3v12" /><path d="m7 11 5 5 5-5" /><path d="M5 21h14" />
+              </svg>
+              <span>Download SVG</span>
+            </a>
+          </div>
         )}
       </header>
 
