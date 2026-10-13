@@ -29,6 +29,16 @@ describe('splitSides', () => {
     expect(splitSides([1])).toEqual({ right: [1], left: [] })
     expect(splitSides([])).toEqual({ right: [], left: [] })
   })
+
+  it('cuts where the 2 sides are closest in height, keeping order', () => {
+    // A tall branch late in the list no longer piles onto the left.
+    const hs = [12, 8, 9, 4, 8, 7, 10, 13, 31, 12, 16, 8]
+    const { right, left } = splitSides(hs, h => h)
+    expect(right).toEqual([12, 8, 9, 4, 8, 7, 10, 13])
+    expect(left).toEqual([31, 12, 16, 8])
+    // 1 huge first branch takes the right on its own.
+    expect(splitSides([50, 1, 1, 1], h => h)).toEqual({ right: [50], left: [1, 1, 1] })
+  })
 })
 
 describe('computeMindmapLayout', () => {
