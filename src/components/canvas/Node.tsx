@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback } from 'react'
+import { memo, useRef, useState, useCallback } from 'react'
 import type { MindmapNode } from '../../types'
 import { useMindmapStore } from '../../store/mindmapStore'
 import { NodeIcon, getLucideIcon } from './NodeIcon'
@@ -111,7 +111,8 @@ function isLight(hex: string): boolean {
   return lum > 130
 }
 
-export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onDragMove, onRootDragOffset, svgRef, readOnly, noInteract = false, l1Colors = [], paletteColor = null, childCount = 0, descendantCount = 0, nodeCount = 0, rootCenter = null, cellRadius }: NodeProps) {
+// Memoized: a selection change re-renders only the nodes whose isSelected flipped, not all of them.
+export const Node = memo(function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onDragMove, onRootDragOffset, svgRef, readOnly, noInteract = false, l1Colors = [], paletteColor = null, childCount = 0, descendantCount = 0, nodeCount = 0, rootCenter = null, cellRadius }: NodeProps) {
   const isRoot = node.depth === 0
   const isL2Plus = node.depth >= 2
   // Brighter/more-vivid version of the node colour, used for all coloured fills.
@@ -1005,7 +1006,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
     </g>
     </g>
   )
-}
+})
 
 const BLOB_OFFSETS = [
   { ox: 0.45, oy: -0.30, dur: '6s',   start: 0   },
