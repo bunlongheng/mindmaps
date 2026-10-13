@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import type { MindmapNode } from '../../types'
 import type { LineStyle, DiagramType } from '../../types'
 import { Edge } from './Edge'
@@ -90,7 +91,8 @@ function BracketConnector({ parent, children, goRight = true, showOrderNumbers =
   )
 }
 
-export function EdgeLayer({ nodes, lineStyle, diagramType, paletteColors }: EdgeLayerProps) {
+// Memoized: selecting a node changes no edge input, so the edges skip that render.
+export const EdgeLayer = memo(function EdgeLayer({ nodes, lineStyle, diagramType, paletteColors }: EdgeLayerProps) {
   const showOrderNumbers = useMindmapStore(s => s.showOrderNumbers)
   const themeId = useMindmapStore(s => s.themeId)
   // On a dark canvas the radial branches are luminous tubes, not hairlines: a blurred
@@ -489,4 +491,4 @@ export function EdgeLayer({ nodes, lineStyle, diagramType, paletteColors }: Edge
       ))}
     </g>
   )
-}
+})

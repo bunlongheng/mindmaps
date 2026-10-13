@@ -51,6 +51,12 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract, rightInset =
   }, [activeMindmap?.nodes])
 
   const paletteColors = useMemo(() => computeBranchColors(activeMindmap?.nodes ?? []), [activeMindmap?.nodes])
+  // Stable per node set, so the memoized Node / EdgeLayer skip a render on selection change.
+  const visibleNodes = useMemo(() => {
+    const ns = activeMindmap?.nodes ?? []
+    return hideDetails ? ns.filter(n => n.depth <= 2) : ns
+  }, [activeMindmap?.nodes, hideDetails])
+  const l1Colors = useMemo(() => (activeMindmap?.nodes ?? []).filter(n => n.depth === 1).map(n => n.color), [activeMindmap?.nodes])
   // Mesh doorways: the wall a cell shares with its parent, painted in the branch colour.
   // Drawn as 1 layer above every cell, so no parent's own wall can paint over a door.
   const meshDoors = useMemo(() => {
@@ -362,8 +368,12 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract, rightInset =
         n.x < box.x + box.w && n.x + n.width > box.x &&
         n.y < box.y + box.h && n.y + n.height > box.y
       )
-      setSelectedNodeIds(hits.map(n => n.id))
-      onNodeSelect(hits.length === 1 ? hits[0].id : null)
+      // Only write when the hit set changed: an identical array still re-renders every subscriber.
+      const prev = useMindmapStore.getState().selectedNodeIds
+      if (hits.length !== prev.length || hits.some((n, i) => n.id !== prev[i])) {
+        setSelectedNodeIds(hits.map(n => n.id))
+        onNodeSelect(hits.length === 1 ? hits[0].id : null)
+      }
     }
   }, [activeMindmap, setSelectedNodeIds, onNodeSelect])
 
@@ -472,8 +482,10 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract, rightInset =
     rootAutoPanRafRef.current = requestAnimationFrame(autoPanLoop)
   }, [])
 
+  // Reads the selection from the store, so the callback stays stable and memoized nodes skip re-render.
   const handleSelect = useCallback((id: string, multi: boolean) => {
     if (multi) {
+      const selectedNodeIds = useMindmapStore.getState().selectedNodeIds
       const next = selectedNodeIds.includes(id) ? selectedNodeIds.filter(n => n !== id) : [...selectedNodeIds, id]
       setSelectedNodeIds(next)
       onNodeSelect(next.length === 1 ? next[0] : null)
@@ -481,7 +493,8 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract, rightInset =
       setSelectedNodeIds([id])
       onNodeSelect(id)
     }
-  }, [selectedNodeIds, setSelectedNodeIds, onNodeSelect])
+  }, [setSelectedNodeIds, onNodeSelect])
+  const handleDoubleClick = useCallback((n: { id: string }) => { setSelectedNodeIds([n.id]); onNodeSelect(n.id) }, [setSelectedNodeIds, onNodeSelect])
 
   if (!activeMindmap) {
     return <div style={{ position: 'absolute', inset: 0, background: canvasBg }} />
@@ -541,8 +554,8 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract, rightInset =
               ))}
             </g>
           )}
-          <EdgeLayer nodes={hideDetails ? activeMindmap.nodes.filter(n => n.depth <= 2) : activeMindmap.nodes} lineStyle={lineStyle} diagramType={diagramType} paletteColors={paletteColors} />
-          {(hideDetails ? activeMindmap.nodes.filter(n => n.depth <= 2) : activeMindmap.nodes).map(node => (
+          <EdgeLayer nodes={visibleNodes} lineStyle={lineStyle} diagramType={diagramType} paletteColors={paletteColors} />
+          {visibleNodes.map(node => (
             <Node
               key={node.id}
               node={node}
@@ -551,11 +564,11 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract, rightInset =
               onDragEnd={handleDragEnd}
               onDragMove={handleDragMove}
               onRootDragOffset={handleRootDragOffset}
-              onDoubleClick={n => { setSelectedNodeIds([n.id]); onNodeSelect(n.id) }}
+              onDoubleClick={handleDoubleClick}
               svgRef={svgRef}
               readOnly={readOnly}
               noInteract={noInteract}
-              l1Colors={node.depth === 0 ? activeMindmap.nodes.filter(n => n.depth === 1).map(n => n.color) : undefined}
+              l1Colors={node.depth === 0 ? l1Colors : undefined}
               paletteColor={paletteColors.get(node.id) ?? null}
               rootCenter={rootCenter}
               childCount={counts.childCounts.get(node.id) ?? 0}
