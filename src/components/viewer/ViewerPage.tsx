@@ -29,7 +29,18 @@ export function ViewerPage({ diagram, id }: { diagram: Diagram | null; id: strin
     return () => { document.title = prev }
   }, [name])
 
-  if (!diagram) return null
+  // The spinner covers loading, so no diagram here means the load failed: the map
+  // is not shared (403) or no longer exists. Say so instead of a blank page.
+  if (!diagram) return (
+    <main style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, padding: 20, background: '#eceef2', fontFamily: 'Inter, system-ui, -apple-system, sans-serif', textAlign: 'center' }}>
+      <Wordmark size={36} />
+      <div style={{ fontSize: 18, fontWeight: 700, color: '#111827' }}>This map isn't available</div>
+      <div style={{ fontSize: 14, color: '#64748b', maxWidth: 360 }}>
+        It isn't shared, or it no longer exists. Ask the owner to turn sharing on.
+      </div>
+      <a href="/" style={{ marginTop: 4, fontSize: 14, fontWeight: 600, color: '#6366f1', textDecoration: 'none' }}>Go to Mindmaps</a>
+    </main>
+  )
 
   const svg = renderMindmapSvg({
     id: diagram.id,
