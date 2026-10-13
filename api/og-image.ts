@@ -40,6 +40,7 @@ const TYPE_LABEL: Record<string, string> = {
 interface ShareRow extends MindmapRow {
   tags: string[] | null
   updated_at: Date | string | null
+  locked?: boolean
 }
 
 /** Strip the renderer's own <svg> wrapper so it can be nested at a fixed box. */
@@ -70,13 +71,26 @@ function diagramCard(row: ShareRow): string {
   const display = name.length > 58 ? name.slice(0, 55) + '...' : name
   const nodes = Array.isArray(row.nodes) ? row.nodes.length : 0
   const label = TYPE_LABEL[row.type] || row.type || 'Logic Chart'
-  const meta = `${nodes} node${nodes === 1 ? '' : 's'}, ${label}`
+  // A passcode-locked map still previews, but says so: no counts, and the
+  // diagram blurred past reading under a big lock.
+  const locked = Boolean(row.locked)
+  const meta = locked ? 'Passcode protected. Type the passcode to open it.' : `${nodes} node${nodes === 1 ? '' : 's'}, ${label}`
   const canvasBg = getTheme(row.theme_id ?? 'default').canvasBg
 
-  const diagram = inlineDiagram(
+  let diagram = inlineDiagram(
     renderMindmapSvg(row),
     PAD, STRIP_H + PAD, W - PAD * 2, H - STRIP_H - PAD * 2,
   )
+  if (locked) {
+    const cx = W / 2, cy = STRIP_H + (H - STRIP_H) / 2
+    diagram = `<defs><filter id="lockblur" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="16"/></filter></defs>`
+      + `<g filter="url(#lockblur)">${diagram}</g>`
+      + `<rect x="0" y="${STRIP_H}" width="${W}" height="${H - STRIP_H}" fill="#ffffff" fill-opacity="0.35"/>`
+      + `<circle cx="${cx}" cy="${cy}" r="96" fill="#16191d"/>`
+      + `<g transform="translate(${cx - 52} ${cy - 56}) scale(4.33)" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></g>`
+      + `<rect x="${W - PAD - 92}" y="64" width="92" height="28" rx="14" fill="#ffffff"/>`
+      + `<text x="${W - PAD - 46}" y="83" text-anchor="middle" fill="#16191d" font-size="15" font-weight="600">Locked</text>`
+  }
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="Inter">
   <rect width="${W}" height="${H}" fill="${esc(canvasBg)}"/>
@@ -97,7 +111,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (UUID_RE.test(id)) {
     try {
       const r = await pool.query(
-        'SELECT name, type, line_style, theme_id, nodes, tags, updated_at FROM mindmaps WHERE id=$1 AND sharing_enabled=true',
+        'SELECT name, type, line_style, theme_id, nodes, tags, updated_at, passcode_hash IS NOT NULL AS locked FROM mindmaps WHERE id=$1 AND sharing_enabled=true',
         [id],
       )
       if (r.rows.length) row = { id, ...r.rows[0] } as ShareRow
@@ -124,7 +138,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const stamp = row?.updated_at ? new Date(row.updated_at).getTime() : 0
     res.setHeader('Content-Type', 'image/png')
     res.setHeader('Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=86400')
-    res.setHeader('ETag', `"og-${row ? id : 'generic'}-${stamp}"`)
+    res.setHeader('ETag', `"og-${row ? id : 'generic'}-${stamp}${row?.locked ? '-l' : ''}"`)
     res.send(png)
   } catch (e: unknown) {
     console.error('og-image: rasterize failed', e)

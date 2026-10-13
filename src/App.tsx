@@ -5,7 +5,8 @@ import { DiagramCanvas } from './components/canvas/DiagramCanvas'
 import { SidePanel } from './components/panels/SidePanel'
 import { ImportModal } from './components/modals/ImportModal'
 import { HomePage } from './components/home/HomePage'
-import { useDiagram } from './hooks/useDiagram'
+import { useDiagram, authHeaders } from './hooks/useDiagram'
+import { LockMenu } from './components/LockMenu'
 import { useIsMobile } from './hooks/useIsMobile'
 import { useIsTouchDevice } from './hooks/useIsTouchDevice'
 import { useMindmapStore } from './store/mindmapStore'
@@ -166,6 +167,30 @@ export default function App() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [showConfetti, setShowConfetti] = useState(() => new URLSearchParams(window.location.search).has('imported'))
   const confettiCount = (() => { const t = new URLSearchParams(window.location.search).get('tokens'); return t ? Math.min(280, Math.max(40, Math.round(parseInt(t) / 1000 * 60))) : 60 })()
+
+  // Set, change or clear ("") the share passcode from the Lock menu. Setting one
+  // also shares the map, so the link opens to the lock screen. Patches the store
+  // directly (no layout, no history, not dirty). Resolves true when the server took it.
+  async function setPasscode(passcode: string): Promise<boolean> {
+    const id = activeMindmap?.id
+    if (!id) return false
+    try {
+      const r = await fetch(`/api/mindmaps?id=${encodeURIComponent(id)}`, { method: 'PATCH', headers: authHeaders(), body: JSON.stringify({ passcode }) })
+      if (!r.ok) throw new Error(`HTTP ${r.status}`)
+      const { sharing_enabled, has_passcode, passcode: saved } = await r.json()
+      useMindmapStore.setState(s => s.activeMindmap?.id === id
+        ? { activeMindmap: { ...s.activeMindmap, sharingEnabled: sharing_enabled, hasPasscode: has_passcode, passcode: saved || '' } }
+        : {})
+      if (!has_passcode) showToast('Passcode removed', { color: '#1a1d2e' })
+      else navigator.clipboard.writeText(`${window.location.origin}/s/${id}`).then(
+        () => showToast('Passcode set - link copied', { color: '#1a1d2e' }),
+        () => showToast('Passcode set - the link opens to a lock screen', { color: '#1a1d2e' }))
+      return true
+    } catch {
+      showToast('Could not change the passcode', { color: '#ef4444' })
+      return false
+    }
+  }
 
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   // True when the editor was opened by pushing a new history entry from within the
@@ -459,12 +484,14 @@ export default function App() {
 
 
 
-        {/* Settings toggle button — top right, only when a diagram is loaded */}
-        {activeMindmap && <button
+        {/* Top right, only when a diagram is loaded: the owner's Lock (share
+            passcode), then Settings. */}
+        {activeMindmap && <div style={{ position: 'fixed', top: 14, right: 14, zIndex: 20, display: 'flex', alignItems: 'center', gap: 8 }}>
+        {effectiveUserId && <LockMenu hasPasscode={!!activeMindmap.hasPasscode} passcode={activeMindmap.passcode ?? ''} onSetPasscode={setPasscode} isMobile={isMobile} />}
+        <button
           onClick={() => setShowPanel(p => !p)}
           title="Settings"
           style={{
-            position: 'fixed', top: 14, right: 14, zIndex: 20,
             width: isMobile ? 48 : undefined,
             height: isMobile ? 48 : 36,
             padding: isMobile ? 0 : '0 14px',
@@ -481,7 +508,8 @@ export default function App() {
         >
           <SlidersHorizontal size={isMobile ? 22 : 15} />
           {!isMobile && 'Settings'}
-        </button>}
+        </button>
+        </div>}
       </div>
 
       {/* Right side panel — shown when a node is selected */}

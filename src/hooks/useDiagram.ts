@@ -50,7 +50,10 @@ function lsGetDiagram(id: string): Diagram | null {
 }
 function lsSaveDiagram(d: Diagram) {
   const now = new Date().toISOString()
-  const saved = { ...d, updatedAt: now }
+  // The owner's plain passcode never lands in localStorage.
+  const { passcode: _passcode, ...rest } = d
+  void _passcode
+  const saved = { ...rest, updatedAt: now }
   localStorage.setItem(lsKey(d.id), JSON.stringify(saved))
   const list = lsGetList()
   const idx = list.findIndex(m => m.id === d.id)
@@ -115,6 +118,8 @@ function rowToDiagram(row: Record<string, unknown>): Diagram {
     createdAt:      (row.created_at as string) ?? new Date().toISOString(),
     updatedAt:      (row.updated_at as string) ?? new Date().toISOString(),
     sharingEnabled: (row.sharing_enabled ?? false) as boolean,
+    hasPasscode:    Boolean(row.has_passcode),
+    passcode:       (row.passcode as string | undefined) ?? '',
     themeId:        (row.theme_id as string | undefined) ?? 'default',
     tags:           (row.tags as string[] | undefined) ?? [],
     nodes,
@@ -168,6 +173,15 @@ export function useDiagram(userId: string | null = null) {
       try {
         const res = await fetch(`${API_BASE}?${params}`, { headers: authHeaders() })
         if (!res.ok) {
+          // A passcode-locked share answers 401 passcode_required: the visitor goes
+          // to its lock screen, which sends them back here with an unlock cookie.
+          if (res.status === 401) {
+            const body = await res.clone().json().catch(() => ({})) as { passcode_required?: boolean; id?: string }
+            if (body.passcode_required) {
+              window.location.replace(`/api/unlock?id=${encodeURIComponent(body.id ?? id)}`)
+              return new Promise<null>(() => {}) // the page is leaving; keep the spinner up
+            }
+          }
           // Retry 5xx once; treat 4xx (not found / not shared) as final.
           if (res.status >= 500 && attempt === 0) { await new Promise(r => setTimeout(r, 500)); continue }
           // Only a signed-in read can be an expired session; an anonymous 401 on a
