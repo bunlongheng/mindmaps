@@ -30,6 +30,13 @@ describe('ViewerPage', () => {
     expect(link.getAttribute('href')).toBe('/api/mindmaps?id=m1&format=svg')
   })
 
+  it('says the map is unavailable instead of a blank page when it failed to load', () => {
+    render(<ViewerPage diagram={null} id="m1" />)
+    expect(screen.getByText("This map isn't available")).toBeInTheDocument()
+    expect(screen.getByText('Go to Mindmaps').getAttribute('href')).toBe('/')
+    expect(screen.queryByText('Download SVG')).toBeNull()
+  })
+
   it('hides Download SVG for a ?d= decoded share (no id)', () => {
     render(<ViewerPage diagram={makeDiagram()} id={null} />)
     expect(screen.queryByText('Download SVG')).toBeNull()
