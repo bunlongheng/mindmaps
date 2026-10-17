@@ -43,6 +43,8 @@ export interface Diagram {
   createdAt: string
   updatedAt: string
   sharingEnabled?: boolean
+  hasPasscode?: boolean  // the share link opens to a lock screen until the passcode is typed
+  passcode?: string      // owner only: the current passcode, for the Lock menu's box
   showOrderNumbers?: boolean
   themeId?: string
   tags?: string[]
