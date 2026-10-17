@@ -30,6 +30,7 @@ export interface MindmapNode {
   combSize?: 'outward' | 'inward'  // root node only, honeycomb web style: cells grow outward (default) or shrink outward
   combStyle?: 'mesh' | 'web'       // root node only, honeycomb: 'mesh' tiles equal cells edge to edge with no lines (default); 'web' rings cells around the root with connectors
   ringSize?: 'inward' | 'outward'  // root node only, graph: 'inward' grows circles toward the root (default, today's look); 'outward' swaps the bands so they grow away from it
+  collapsed?: boolean  // its children (and their subtrees) are hidden on the canvas
   url?: string         // optional hyperlink — clicking the node opens it
 }
 

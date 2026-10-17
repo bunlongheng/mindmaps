@@ -492,12 +492,12 @@ describe('App — keyboard shortcuts', () => {
     }))
   }
 
-  it('Cmd+S saves and shows a toast in the editor', async () => {
+  it('Cmd+S saves and flashes the green check in the editor', async () => {
     renderEditor()
     render(<App />)
     await waitFor(() => expect(screen.getByTestId('canvas')).toBeInTheDocument())
     await act(async () => { fireEvent.keyDown(document.body, { key: 's', metaKey: true }) })
-    await waitFor(() => expect(showToast).toHaveBeenCalledWith(expect.stringContaining('saved'), expect.anything()))
+    await waitFor(() => expect(screen.getByRole('status', { name: 'Saved' })).toBeInTheDocument())
   })
 
   it('Tab adds a child node in the editor', async () => {
@@ -650,7 +650,7 @@ describe('App — extra coverage', () => {
     await waitFor(() => expect(screen.getByTestId('canvas')).toBeInTheDocument())
     act(() => { useMindmapStore.getState().setIsDirty(true) }) // schedules the 1.5s timer
     await act(async () => { fireEvent.keyDown(document.body, { key: 's', ctrlKey: true }) })
-    await waitFor(() => expect(showToast).toHaveBeenCalledWith(expect.stringContaining('saved'), expect.anything()))
+    await waitFor(() => expect(screen.getByRole('status', { name: 'Saved' })).toBeInTheDocument())
   })
 
   it('back navigation saves a dirty diagram before leaving', async () => {

@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback } from 'react'
+import { useRef, useState, useCallback, memo } from 'react'
 import type { MindmapNode } from '../../types'
 import { useMindmapStore } from '../../store/mindmapStore'
 import { NodeIcon, getLucideIcon } from './NodeIcon'
@@ -19,6 +19,8 @@ import { hexCellLayout, hexPoints, hexFontSize, hexFill, hexTextColor, meshWallC
 interface NodeProps {
   node: MindmapNode
   isSelected: boolean
+  // Only the lone selected node gets the + / hide-children controls, like Xmind
+  soloSelected?: boolean
   onSelect: (id: string, multi: boolean) => void
   onDragEnd: (id: string, dx: number, dy: number) => void
   onDoubleClick: (node: MindmapNode) => void
@@ -111,7 +113,7 @@ function isLight(hex: string): boolean {
   return lum > 130
 }
 
-export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onDragMove, onRootDragOffset, svgRef, readOnly, noInteract = false, l1Colors = [], paletteColor = null, childCount = 0, descendantCount = 0, nodeCount = 0, rootCenter = null, cellRadius }: NodeProps) {
+function NodeImpl({ node, isSelected, soloSelected = false, onSelect, onDragEnd, onDoubleClick, onDragMove, onRootDragOffset, svgRef, readOnly, noInteract = false, l1Colors = [], paletteColor = null, childCount = 0, descendantCount = 0, nodeCount = 0, rootCenter = null, cellRadius }: NodeProps) {
   const isRoot = node.depth === 0
   const isL2Plus = node.depth >= 2
   // Brighter/more-vivid version of the node colour, used for all coloured fills.
@@ -317,7 +319,11 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
     if (!pt) return
     const dx = pt.x - dragStart.current.x
     const dy = pt.y - dragStart.current.y
-    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) didDrag.current = true
+    // A click wobbles a pixel or two; only a real drag may move (and re-render) the map
+    if (!didDrag.current) {
+      if (Math.abs(dx) <= 3 && Math.abs(dy) <= 3) return
+      didDrag.current = true
+    }
     let newX = dragStart.current.nodeX + dx
     if (isRoot) {
       const l1 = useMindmapStore.getState().activeMindmap?.nodes.find(n => n.depth === 1)
@@ -641,6 +647,11 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
             value={draft}
             autoComplete="off"
             onChange={e => setDraft(e.target.value)}
+            // Keep clicks inside the field so they place the caret instead of panning/dragging the map
+            onPointerDown={e => e.stopPropagation()}
+            onPointerMove={e => e.stopPropagation()}
+            onPointerUp={e => e.stopPropagation()}
+            onDoubleClick={e => e.stopPropagation()}
             onBlur={commitEdit}
             onKeyDown={e => {
               if (e.key === 'Enter') { e.preventDefault(); commitEdit() }
@@ -653,6 +664,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
               color: textColor, fontSize, fontWeight, fontStyle,
               fontFamily: 'Inter, system-ui, sans-serif',
               textAlign: isRoot ? 'center' : align, padding: '0 4px', caretColor: textColor,
+              userSelect: 'text', WebkitUserSelect: 'text',
             }}
           />
         </foreignObject>
@@ -907,6 +919,41 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
 
 
 
+      {/* Branch controls on box layouts: a dot that hides/shows the children (always shown
+          while collapsed, with the hidden count) and a blue + that adds a child. They sit
+          on the node's outward side - away from the root on a mind map. */}
+      {!noInteract && !readOnly && !editing && (diagramType === 'mindmap' || diagramType === 'logic-chart') && (soloSelected || node.collapsed) && (() => {
+        const outRight = isRoot || diagramType === 'logic-chart' || !rootCenter || node.x + displayW / 2 >= rootCenter.x
+        const edgeX = outRight ? displayW : 0, dir = outRight ? 1 : -1
+        const branch = paletteColor ?? node.color
+        const stop = (e: React.SyntheticEvent) => e.stopPropagation()
+        const dotX = edgeX + dir * 12, plusX = edgeX + dir * (childCount > 0 ? 34 : 16)
+        return (
+          <g onPointerDown={stop} onDoubleClick={stop}>
+            {childCount > 0 && (soloSelected || node.collapsed) && (
+              <g role="button" aria-label={node.collapsed ? 'Show children' : 'Hide children'} style={{ cursor: 'pointer' }}
+                onClick={e => { e.stopPropagation(); useMindmapStore.getState().updateNode(node.id, { collapsed: !node.collapsed }) }}>
+                <circle cx={dotX} cy={cy} r={node.collapsed ? 10 : 6} fill="#ffffff" stroke={branch} strokeWidth={2} />
+                {node.collapsed && <text x={dotX} y={cy} textAnchor="middle" dominantBaseline="central" fontSize={descendantCount > 99 ? 8 : 10} fontWeight={700}
+                  fontFamily="Inter, system-ui, sans-serif" fill={branch} style={{ pointerEvents: 'none' }}>{descendantCount}</text>}
+              </g>
+            )}
+            {soloSelected && (
+              <g role="button" aria-label="Add child" style={{ cursor: 'pointer' }}
+                onClick={e => {
+                  e.stopPropagation()
+                  const st = useMindmapStore.getState()
+                  if (node.collapsed) st.updateNode(node.id, { collapsed: false })
+                  onSelect(st.addNode(node.id).id, false)
+                }}>
+                <circle cx={plusX} cy={cy} r={10} fill="#3b82f6" />
+                <path d={`M ${plusX - 4.5} ${cy} H ${plusX + 4.5} M ${plusX} ${cy - 4.5} V ${cy + 4.5}`} stroke="#ffffff" strokeWidth={2} strokeLinecap="round" />
+              </g>
+            )}
+          </g>
+        )
+      })()}
+
       {/* Selection ring — always on top. Hidden on touch devices (noInteract), not merely on
           read-only maps (readOnly) — a desktop-mouse read-only/locked map should still show
           what's selected; only a touch device should never show the blue ring. */}
@@ -1141,3 +1188,5 @@ function SiriWave({ cx, cy, r, colors }: { cx: number; cy: number; r: number; co
   )
 }
 
+// Memoized so selecting one node does not re-render the whole map
+export const Node = memo(NodeImpl)

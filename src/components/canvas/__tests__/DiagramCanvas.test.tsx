@@ -226,10 +226,11 @@ describe('DiagramCanvas — rubber-band selection', () => {
 })
 
 describe('DiagramCanvas — pan and zoom (wheel)', () => {
-  it('wheel without ctrl pans the canvas (group transform updates)', () => {
+  it('wheel without ctrl pans the canvas (group transform updates on the next frame)', async () => {
     loadStore([makeRoot(), makeNode()])
     const { g } = renderCanvas()
     act(() => { fireEvent.wheel(g.ownerSVGElement!, { deltaX: 20, deltaY: 30 }) })
+    await act(() => new Promise(r => requestAnimationFrame(() => r(undefined))))
     const t = g.getAttribute('transform')
     expect(t).toContain('translate')
   })

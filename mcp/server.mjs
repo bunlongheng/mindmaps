@@ -113,7 +113,7 @@ server.registerTool(
       `type is one of: ${VALID_TYPES.join(', ')}. Default logic-chart: omit type unless the person explicitly asked for another layout by name. Never choose mindmap, honeycomb, fishbone or timeline on your own. Unknown types fall back to logic-chart.`,
       'honeycomb: hexagon cells clustered around their parent.',
       '"top 10 X" / "5 best Y" phrasing → a flat list of items; "break down X by category" → categorized branches.',
-      'A node may carry "shape": one of rect, rounded, pill, circle. Omit it to keep the diagram\'s default box.',
+      'A node may carry "shape": one of rect, rounded, pill, circle. Omit it for the default round pill.',
       'Node text may carry links: markdown [label](https://...) or a bare https:// url renders as a clickable anchor. Only http/https is linked; bare ticket keys are not.',
       'The map is owned by the configured owner and (by default) shared so the returned url opens without auth.',
       'The returned url is always /s/<id> - the one canonical share link. Hand that to a human or paste it in chat; it carries the OG tags and redirects to the app.',

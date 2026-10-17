@@ -92,7 +92,7 @@ function rebalanceColors(nodes: MindmapNode[], palette: string[]): MindmapNode[]
   })
 }
 
-function runLayout(nodes: MindmapNode[], type: DiagramType): MindmapNode[] {
+export function runLayout(nodes: MindmapNode[], type: DiagramType): MindmapNode[] {
   switch (type) {
     case 'mindmap':     return computeMindmapLayout(nodes)
     case 'graph':     return computeGraphLayout(nodes)
@@ -129,6 +129,7 @@ interface MindmapStore {
   showOrderNumbers: boolean
   showChildCount: boolean
   hideDetails: boolean
+  hiddenFromDepth: number | null   // layers at this depth and deeper are hidden; null shows all
   isImporting: boolean
   resizePreview: { depth: number; width: number } | null
   // History
@@ -157,6 +158,7 @@ interface MindmapStore {
   setShowOrderNumbers: (v: boolean) => void
   setShowChildCount: (v: boolean) => void
   setHideDetails: (v: boolean) => void
+  setHiddenFromDepth: (d: number | null) => void
   setIsImporting: (v: boolean) => void
   setResizePreview: (v: { depth: number; width: number } | null) => void
   undo: () => void
@@ -253,6 +255,7 @@ export const useMindmapStore = create<MindmapStore>()(
     showOrderNumbers: true,
     showChildCount: false,
     hideDetails: false,
+    hiddenFromDepth: null,
     isImporting: false,
     resizePreview: null,
     past: [],
@@ -649,6 +652,7 @@ export const useMindmapStore = create<MindmapStore>()(
     setShowChildCount: (v) => set({ showChildCount: v }),
 
     setHideDetails: (v) => set({ hideDetails: v }),
+    setHiddenFromDepth: (d) => set({ hiddenFromDepth: d }),
 
     setIsImporting: (v) => set({ isImporting: v }),
     setResizePreview: (v) => set({ resizePreview: v }),

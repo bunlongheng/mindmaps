@@ -10,3 +10,6 @@ body { font-family: 'Inter', system-ui, sans-serif; background: #ffffff; color: 
   100% { transform: scale(1) rotate(0deg); opacity: 1; }
 }
 @keyframes _aiSpin { to { transform: rotate(360deg); } }
+
+/* Mid zoom gesture: skip per-node shadows and glows so each frame is a cheap repaint */
+svg[data-zooming] * { filter: none !important; }

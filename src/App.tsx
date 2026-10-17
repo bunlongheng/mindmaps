@@ -49,7 +49,8 @@ function getShareParam(search = window.location.search) {
 
 export default function App() {
   // Simple auth — check localStorage for session
-  const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  // Caddy serves dev at <app>.localhost, which counts as local too
+  const isLocal = window.location.hostname === 'localhost' || window.location.hostname.endsWith('.localhost') || window.location.hostname === '127.0.0.1'
   const [user, setUser] = useState<{ email: string; name: string; userId: string } | null>(() => {
     // import.meta.env.DEV is a compile-time constant, so Vite strips this whole branch -
     // including the owner literals below - from the production bundle.
@@ -168,6 +169,13 @@ export default function App() {
   const confettiCount = (() => { const t = new URLSearchParams(window.location.search).get('tokens'); return t ? Math.min(280, Math.max(40, Math.round(parseInt(t) / 1000 * 60))) : 60 })()
 
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Cmd+S flashes a green check (like Flows); the timestamp remounts it so each save replays the pop
+  const [savedAt, setSavedAt] = useState(0)
+  useEffect(() => {
+    if (!savedAt) return
+    const t = setTimeout(() => setSavedAt(0), 1400)
+    return () => clearTimeout(t)
+  }, [savedAt])
   // True when the editor was opened by pushing a new history entry from within the
   // app (so the Back button can pop that entry like the browser's own Back button).
   const pushedEditorEntry = useRef(false)
@@ -263,9 +271,7 @@ export default function App() {
         const { activeMindmap: m } = useMindmapStore.getState()
         if (m && view === 'editor') {
           if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
-          saveDiagram(m).then(() => {
-            showToast(`"${m.name}" saved`, { color: '#1a1d2e' })
-          })
+          saveDiagram(m).then(() => setSavedAt(Date.now()))
         }
         return
       }
@@ -419,6 +425,18 @@ export default function App() {
   return (
     <div style={{ display: 'flex', height: '100vh', width: '100vw', overflow: 'hidden', fontFamily: 'Inter, system-ui, sans-serif', touchAction: 'pan-x pan-y' }}>
       <CuteToast />
+      {savedAt > 0 && (
+        <div key={savedAt} className="mm-save-check" role="status" aria-label="Saved" style={{
+          position: 'fixed', top: 18, left: '50%', marginLeft: -16, zIndex: 300, pointerEvents: 'none',
+          width: 32, height: 32, borderRadius: '50%', background: '#16a34a',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 14px rgba(22,163,74,0.35)',
+        }}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+          <style>{`@keyframes mm-save-pop { 0% { transform: scale(0); opacity: 0 } 60% { transform: scale(1.15) } 100% { transform: scale(1); opacity: 1 } }
+            @keyframes mm-save-out { to { opacity: 0; transform: scale(0.8) } }
+            .mm-save-check { animation: mm-save-pop 0.28s ease-out, mm-save-out 0.3s ease-in 1.1s forwards }`}</style>
+        </div>
+      )}
       {/* Confetti on first load after AI generation */}
       {showConfetti && (
         <Confetti count={confettiCount} onDone={() => {

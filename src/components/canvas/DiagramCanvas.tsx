@@ -1,6 +1,6 @@
 import { useRef, useState, useCallback, useEffect, useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
-import { useMindmapStore } from '../../store/mindmapStore'
+import { useMindmapStore, runLayout } from '../../store/mindmapStore'
 import { getTheme } from '../../lib/themes'
 import { EdgeLayer } from './EdgeLayer'
 import { Node } from './Node'
@@ -27,11 +27,11 @@ interface DiagramCanvasProps {
 export function DiagramCanvas({ onNodeSelect, readOnly, noInteract, rightInset = 0 }: DiagramCanvasProps) {
   // Shallow-selected slice so the canvas only re-renders when one of these actually changes,
   // not on unrelated store writes (resizePreview, HUD flags, showChildCount, etc.).
-  const { activeMindmap, selectedNodeIds, setSelectedNodeIds, diagramType, lineStyle, themeId, addNode, reorderNode, isImporting, hideDetails } = useMindmapStore(
+  const { activeMindmap, selectedNodeIds, setSelectedNodeIds, diagramType, lineStyle, themeId, addNode, reorderNode, isImporting, hideDetails, hiddenFromDepth } = useMindmapStore(
     useShallow(s => ({
       activeMindmap: s.activeMindmap, selectedNodeIds: s.selectedNodeIds, setSelectedNodeIds: s.setSelectedNodeIds,
       diagramType: s.diagramType, lineStyle: s.lineStyle, themeId: s.themeId, addNode: s.addNode,
-      reorderNode: s.reorderNode, isImporting: s.isImporting, hideDetails: s.hideDetails,
+      reorderNode: s.reorderNode, isImporting: s.isImporting, hideDetails: s.hideDetails, hiddenFromDepth: s.hiddenFromDepth,
     })),
   )
   const counts = useMemo(() => computeSubtreeCounts(activeMindmap?.nodes ?? []), [activeMindmap?.nodes])
@@ -50,6 +50,24 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract, rightInset =
     return r ? { x: r.x + r.width / 2, y: r.y + r.height / 2 } : null
   }, [activeMindmap?.nodes])
 
+  const visibleNodes = useMemo(() => {
+    const maxDepth = Math.min(hideDetails ? 2 : Infinity, hiddenFromDepth === null ? Infinity : hiddenFromDepth - 1)
+    const nodes = activeMindmap?.nodes ?? []
+    // A collapsed node hides its whole subtree
+    const hidden = new Set<string>()
+    const hide = (pid: string) => { for (const c of nodes) if (c.parentId === pid && !hidden.has(c.id)) { hidden.add(c.id); hide(c.id) } }
+    for (const n of nodes) if (n.collapsed) hide(n.id)
+    const shown = nodes.filter(n => n.depth <= maxDepth && !hidden.has(n.id))
+    if (shown.length === nodes.length) return nodes
+    // Re-pack the levels still showing so they close the gaps the hidden ones left,
+    // then shift back so the root stays put. Display only - nothing is stored.
+    const laid = runLayout(shown.map(n => ({ ...n, manuallyPositioned: false })), diagramType)
+    const root = nodes.find(n => n.parentId === null)
+    const laidRoot = laid.find(n => n.parentId === null)
+    if (!root || !laidRoot) return laid
+    const dx = root.x - laidRoot.x, dy = root.y - laidRoot.y
+    return laid.map(n => ({ ...n, x: n.x + dx, y: n.y + dy }))
+  }, [activeMindmap?.nodes, hideDetails, hiddenFromDepth, diagramType])
   const paletteColors = useMemo(() => computeBranchColors(activeMindmap?.nodes ?? []), [activeMindmap?.nodes])
   // Mesh doorways: the wall a cell shares with its parent, painted in the branch colour.
   // Drawn as 1 layer above every cell, so no parent's own wall can paint over a door.
@@ -136,14 +154,38 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract, rightInset =
     if (gRef.current) gRef.current.setAttribute('transform', `translate(${p.x},${p.y}) scale(${z})`)
   }, [])
 
+  // Zoom gestures fire 100+ events a second. Coalesce them into 1 transform write per frame,
+  // update the % badge in the DOM, and only touch React state once the gesture settles.
+  // While zooming, the svg carries data-zooming so CSS drops the per-node shadows/glows,
+  // which otherwise re-rasterize every frame on a 200-node map.
+  const zoomBadgeRef = useRef<HTMLDivElement>(null)
+  const zoomFrameRef = useRef<number | null>(null)
+  const zoomEndTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const scheduleZoom = useCallback(() => {
+    svgRef.current?.setAttribute('data-zooming', '')
+    if (zoomFrameRef.current === null) {
+      zoomFrameRef.current = requestAnimationFrame(() => {
+        zoomFrameRef.current = null
+        applyTransform()
+        const t = zoomBadgeRef.current?.firstChild
+        if (t) t.nodeValue = `${Math.round(zoomCurrentRef.current * 100)}%`
+      })
+    }
+    if (zoomEndTimer.current) clearTimeout(zoomEndTimer.current)
+    zoomEndTimer.current = setTimeout(() => {
+      svgRef.current?.removeAttribute('data-zooming')
+      setZoom(zoomCurrentRef.current)
+    }, 160)
+  }, [applyTransform])
+
   // Fit the whole map into the viewport (zoom capped at 100%). Used by the shared
   // view-only page on load and by Cmd+0 anywhere, so a visitor sees the entire map first.
   const fitToContent = useCallback(() => {
     const svg = svgRef.current
-    if (!svg || !activeMindmap?.nodes.length) return
+    if (!svg || !visibleNodes.length) return
     const { width: svgW, height: svgH } = svg.getBoundingClientRect()
     if (svgW === 0 || svgH === 0) return
-    const nodes = activeMindmap.nodes
+    const nodes = visibleNodes
     // A radial mind map hangs its names outside the circles, so the fit has to cover
     // the label boxes too or the outermost titles are cropped off the viewport.
     const root = nodes.find(n => n.parentId === null)
@@ -165,7 +207,7 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract, rightInset =
     panRef.current = p
     setPan(p)         // keep pan state in sync for selBox coords
     applyTransform(p, newZoom)
-  }, [activeMindmap, diagramType, applyTransform, rightInset])
+  }, [visibleNodes, diagramType, applyTransform, rightInset])
 
   // Cmd+0 / Ctrl+0 fits the whole map, in the editor and on the shared page alike.
   useEffect(() => {
@@ -176,7 +218,10 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract, rightInset =
     return () => window.removeEventListener('keydown', onKey)
   }, [fitToContent])
 
-  // Opening a map, or switching its type, fits the whole map into view, centred.
+  // A newly opened map starts with every layer showing
+  useEffect(() => { if (useMindmapStore.getState().hiddenFromDepth !== null) useMindmapStore.getState().setHiddenFromDepth(null) }, [activeMindmap?.id])
+
+  // Opening a map, switching its type, or hiding/showing a layer fits the whole map into view, centred.
   // It used to open at 100% anchored on the root, which left a 4-layer chart mostly
   // off the right edge until the user zoomed out.
   useEffect(() => {
@@ -184,7 +229,7 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract, rightInset =
     const raf = requestAnimationFrame(fitToContent)
     return () => cancelAnimationFrame(raf)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeMindmap?.id, diagramType])
+  }, [activeMindmap?.id, diagramType, hiddenFromDepth])
 
   // Rubber-band selection state
   const [selBox, setSelBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
@@ -237,12 +282,11 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract, rightInset =
       }
       panRef.current = newPan
       zoomCurrentRef.current = newZoom
-      applyTransform(newPan, newZoom)
-      setZoom(newZoom)  // badge only
+      scheduleZoom()
       flashZoomHud()
     } else {
       panRef.current = { x: panRef.current.x - dx, y: panRef.current.y - dy }
-      applyTransform()
+      scheduleZoom()
     }
   }
 
@@ -339,8 +383,7 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract, rightInset =
         }
         panRef.current = newPan
         zoomCurrentRef.current = newZoom
-        applyTransform(newPan, newZoom)
-        setZoom(newZoom)  // badge only
+        scheduleZoom()
         flashZoomHud()
       }
       lastPinchDist.current = dist
@@ -472,16 +515,23 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract, rightInset =
     rootAutoPanRafRef.current = requestAnimationFrame(autoPanLoop)
   }, [])
 
+  // Read selection through a ref so handleSelect stays stable and memoized Nodes skip re-rendering on select
+  const selectedRef = useRef(selectedNodeIds)
+  selectedRef.current = selectedNodeIds
   const handleSelect = useCallback((id: string, multi: boolean) => {
     if (multi) {
-      const next = selectedNodeIds.includes(id) ? selectedNodeIds.filter(n => n !== id) : [...selectedNodeIds, id]
+      const cur = selectedRef.current
+      const next = cur.includes(id) ? cur.filter(n => n !== id) : [...cur, id]
       setSelectedNodeIds(next)
       onNodeSelect(next.length === 1 ? next[0] : null)
     } else {
       setSelectedNodeIds([id])
       onNodeSelect(id)
     }
-  }, [selectedNodeIds, setSelectedNodeIds, onNodeSelect])
+  }, [setSelectedNodeIds, onNodeSelect])
+
+  const handleDoubleClick = useCallback((n: { id: string }) => { setSelectedNodeIds([n.id]); onNodeSelect(n.id) }, [setSelectedNodeIds, onNodeSelect])
+  const l1Colors = useMemo(() => (activeMindmap?.nodes ?? []).filter(n => n.depth === 1).map(n => n.color), [activeMindmap?.nodes])
 
   if (!activeMindmap) {
     return <div style={{ position: 'absolute', inset: 0, background: canvasBg }} />
@@ -541,21 +591,22 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract, rightInset =
               ))}
             </g>
           )}
-          <EdgeLayer nodes={hideDetails ? activeMindmap.nodes.filter(n => n.depth <= 2) : activeMindmap.nodes} lineStyle={lineStyle} diagramType={diagramType} paletteColors={paletteColors} />
-          {(hideDetails ? activeMindmap.nodes.filter(n => n.depth <= 2) : activeMindmap.nodes).map(node => (
+          <EdgeLayer nodes={visibleNodes} lineStyle={lineStyle} diagramType={diagramType} paletteColors={paletteColors} />
+          {visibleNodes.map(node => (
             <Node
               key={node.id}
               node={node}
               isSelected={selectedNodeIds.includes(node.id)}
+              soloSelected={selectedNodeIds.length === 1 && selectedNodeIds[0] === node.id}
               onSelect={handleSelect}
               onDragEnd={handleDragEnd}
               onDragMove={handleDragMove}
               onRootDragOffset={handleRootDragOffset}
-              onDoubleClick={n => { setSelectedNodeIds([n.id]); onNodeSelect(n.id) }}
+              onDoubleClick={handleDoubleClick}
               svgRef={svgRef}
               readOnly={readOnly}
               noInteract={noInteract}
-              l1Colors={node.depth === 0 ? activeMindmap.nodes.filter(n => n.depth === 1).map(n => n.color) : undefined}
+              l1Colors={node.depth === 0 ? l1Colors : undefined}
               paletteColor={paletteColors.get(node.id) ?? null}
               rootCenter={rootCenter}
               childCount={counts.childCounts.get(node.id) ?? 0}
@@ -645,7 +696,7 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract, rightInset =
       )}
 
       {/* Zoom badge — always visible in bottom-left, highlights when actively zooming */}
-      <div style={{
+      <div ref={zoomBadgeRef} style={{
         position: 'fixed', bottom: 18, left: 18,
         background: showZoomHud ? 'rgba(15,20,40,0.88)' : 'rgba(15,20,40,0.45)',
         backdropFilter: 'blur(8px)',
@@ -658,7 +709,7 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract, rightInset =
         whiteSpace: 'nowrap',
         userSelect: 'none',
       }}>
-        {Math.round(zoom * 100)}%
+        {`${Math.round(zoom * 100)}%`}
       </div>
 
       {/* Root drag HUD */}
