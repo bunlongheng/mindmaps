@@ -166,6 +166,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     if (!nodes.length) nodes = parseOutline(outline, palette)
   }
+  // API-made maps default every box to a round pill; an explicit "shape" still wins
+  for (const n of nodes) if (n.depth > 0 && !n.shape) n.shape = 'pill'
 
   // Root-only look settings (gloss, the graph ring direction, the honeycomb comb style).
   // They live on the depth-0 node so the canvas, the home card and the share image all

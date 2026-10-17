@@ -12,10 +12,12 @@
 //   depth | font      | height       | padX
 //   ------+-----------+--------------+------------------
 //     0   | ROOT_FONT | ROOT_PILL_H  | ROOT_PILL_PAD / 2   (the root, sized in src/lib/rootPill)
-//     1   | 20        | 44           | 14
-//     2   | 18        | 40           | 12
-//     3   | 16        | 36           | 12
+//     1   | 26        | 54           | 18
+//     2   | 17        | 38           | 12
+//     3   | 15        | 34           | 11
 //    4+   | 14        | 32           | 10
+//
+// Level 1 is a clear step up from its children (26 vs 17) so the main topics read first.
 //
 // A node carrying an explicit `fontSize` keeps it; only the default comes from here.
 // Callers must never re-declare a size: read fontSize/height/padX from `nodeMetrics`,
@@ -36,9 +38,9 @@ export interface NodeMetric {
 /** Index is depth; the last row covers every deeper level. */
 const TABLE: readonly NodeMetric[] = [
   { fontSize: ROOT_FONT, height: ROOT_PILL_H, padX: ROOT_PILL_PAD / 2 },
-  { fontSize: 20, height: 44, padX: 14 },
-  { fontSize: 18, height: 40, padX: 12 },
-  { fontSize: 16, height: 36, padX: 12 },
+  { fontSize: 26, height: 54, padX: 18 },
+  { fontSize: 17, height: 38, padX: 12 },
+  { fontSize: 15, height: 34, padX: 11 },
   { fontSize: 14, height: 32, padX: 10 },
 ]
 

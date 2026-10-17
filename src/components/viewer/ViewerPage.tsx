@@ -2,7 +2,6 @@ import { useEffect } from 'react'
 import { renderMindmapSvg } from '../../lib/render-svg'
 import type { Diagram } from '../../types'
 import { SocialFooter } from './SocialFooter'
-import { isDemo } from '../../lib/demo'
 
 // The one lockup, mirroring Sequences' Wordmark.tsx (app/Wordmark.tsx): the app's
 // own icon plus its name at the same size / weight rules, so the header reads as
@@ -19,6 +18,10 @@ export function Wordmark({ size = 28 }: { size?: number }) {
   )
 }
 
+const TYPE_LABEL: Record<string, string> = {
+  'logic-chart': 'Logic Chart', mindmap: 'Mind Map', graph: 'Graph', fishbone: 'Fishbone', timeline: 'Timeline', honeycomb: 'Honeycomb',
+}
+
 export function ViewerPage({ diagram, id }: { diagram: Diagram | null; id: string | null }) {
   const name = diagram?.name || 'Diagram'
 
@@ -29,7 +32,18 @@ export function ViewerPage({ diagram, id }: { diagram: Diagram | null; id: strin
     return () => { document.title = prev }
   }, [name])
 
-  if (!diagram) return null
+  // The spinner covers loading, so no diagram here means the load failed: the map
+  // is not shared (403) or no longer exists. Say so instead of a blank page.
+  if (!diagram) return (
+    <main style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, padding: 20, background: '#eceef2', fontFamily: 'Inter, system-ui, -apple-system, sans-serif', textAlign: 'center' }}>
+      <Wordmark size={36} />
+      <div style={{ fontSize: 18, fontWeight: 700, color: '#111827' }}>This map isn't available</div>
+      <div style={{ fontSize: 14, color: '#64748b', maxWidth: 360 }}>
+        It isn't shared, or it no longer exists. Ask the owner to turn sharing on.
+      </div>
+      <a href="/" style={{ marginTop: 4, fontSize: 14, fontWeight: 600, color: '#6366f1', textDecoration: 'none' }}>Go to Mindmaps</a>
+    </main>
+  )
 
   const svg = renderMindmapSvg({
     id: diagram.id,
@@ -71,6 +85,19 @@ export function ViewerPage({ diagram, id }: { diagram: Diagram | null; id: strin
 
       {/* Clean, light, full-width diagram - the whole point of the page. */}
       <div className="mm-viewer-container" style={{ maxWidth: 1240, margin: '0 auto', padding: '28px 20px 64px' }}>
+        {/* Glossy hero, the landing a Flows share opens with: the map's name large
+            over a soft indigo wash, its size and kind underneath. */}
+        <div style={{
+          position: 'relative', overflow: 'hidden', marginBottom: 16, padding: '28px 28px 24px', borderRadius: 16,
+          background: 'linear-gradient(135deg,#1e1b4b 0%,#312e81 55%,#4338ca 100%)',
+          boxShadow: '0 10px 30px rgba(49,46,129,0.25), inset 0 1px 0 rgba(255,255,255,0.18)',
+        }}>
+          <div aria-hidden="true" style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg,rgba(255,255,255,0.14) 0%,rgba(255,255,255,0) 48%)', pointerEvents: 'none' }} />
+          <h1 style={{ position: 'relative', margin: 0, fontSize: 'clamp(22px,4vw,34px)', fontWeight: 800, letterSpacing: '-0.02em', color: '#fff', lineHeight: 1.15 }}>{name}</h1>
+          <div style={{ position: 'relative', marginTop: 8, fontSize: 14, color: 'rgba(255,255,255,0.7)' }}>
+            {`${diagram.nodes.length} node${diagram.nodes.length === 1 ? '' : 's'}, ${TYPE_LABEL[diagram.type] ?? 'Mind Map'}`}
+          </div>
+        </div>
         {/* auto-fit: the SVG has a viewBox, so max-width:100% + height:auto scales
             the whole diagram to fit the card on load - nothing chopped off. The
             page itself scrolls vertically like any document; no canvas, no wheel
@@ -84,10 +111,8 @@ export function ViewerPage({ diagram, id }: { diagram: Diagram | null; id: strin
           style={{ background: '#fff', border: '1px solid #e5e7eb', padding: 24, boxShadow: '0 1px 3px rgba(15,23,42,0.06)', overflow: 'hidden' }}
           dangerouslySetInnerHTML={{ __html: svg }}
         />
-        {/* Showcase footer on the demo maps only: those are the ones handed out as
-            examples of the app. A personal map someone shared is not a portfolio
-            page, so it ends at the diagram. */}
-        {isDemo(diagram.tags) && <SocialFooter />}
+        {/* Every shared map ends with the signature and tiles, as Flows and Stickies do. */}
+        <SocialFooter />
       </div>
     </main>
   )

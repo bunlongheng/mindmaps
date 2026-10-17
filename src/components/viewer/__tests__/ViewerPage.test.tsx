@@ -26,8 +26,15 @@ describe('ViewerPage', () => {
 
   it('links Download SVG to the map id when the map came from the API by id', () => {
     render(<ViewerPage diagram={makeDiagram()} id="m1" />)
-    const link = screen.getByText('Download SVG')
+    const link = screen.getByText('Download SVG').closest('a')!
     expect(link.getAttribute('href')).toBe('/api/mindmaps?id=m1&format=svg')
+  })
+
+  it('says the map is unavailable instead of a blank page when it failed to load', () => {
+    render(<ViewerPage diagram={null} id="m1" />)
+    expect(screen.getByText("This map isn't available")).toBeInTheDocument()
+    expect(screen.getByText('Go to Mindmaps').getAttribute('href')).toBe('/')
+    expect(screen.queryByText('Download SVG')).toBeNull()
   })
 
   it('hides Download SVG for a ?d= decoded share (no id)', () => {
@@ -49,13 +56,10 @@ describe('ViewerPage', () => {
     }
   })
 
-  it('leaves the social footer off a map that is not a demo', () => {
+  it('shows the social footer and the hero name on any shared map', () => {
     render(<ViewerPage diagram={makeDiagram({ tags: ['Work'] })} id="m1" />)
-    expect(screen.queryByTitle('GitHub')).toBeNull()
-    expect(screen.queryByText('Bunlong')).toBeNull()
-    cleanup()
-    render(<ViewerPage diagram={makeDiagram({ tags: undefined })} id="m1" />)
-    expect(screen.queryByTitle('GitHub')).toBeNull()
+    expect(screen.getByTitle('GitHub')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument()
   })
 
   it('sets document title to "<name> · Mindmaps" and restores it on unmount', () => {
