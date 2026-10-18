@@ -210,13 +210,26 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract, rightInset =
   }, [visibleNodes, diagramType, applyTransform, rightInset])
 
   // Cmd+0 / Ctrl+0 fits the whole map, in the editor and on the shared page alike.
+  // Cmd/Ctrl + and - zoom the map around the screen centre instead of the browser page.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === '0') { e.preventDefault(); fitToContent() }
+      if (!(e.metaKey || e.ctrlKey)) return
+      if (e.key === '0') { e.preventDefault(); fitToContent(); return }
+      const factor = e.key === '=' || e.key === '+' ? 1.2 : e.key === '-' || e.key === '_' ? 1 / 1.2 : 0
+      const rect = svgRef.current?.getBoundingClientRect()
+      if (!factor || !rect) return
+      e.preventDefault()
+      const oldZoom = zoomCurrentRef.current
+      const newZoom = Math.max(0.02, Math.min(10, oldZoom * factor))
+      const mx = rect.width / 2, my = rect.height / 2
+      panRef.current = { x: mx - ((mx - panRef.current.x) / oldZoom) * newZoom, y: my - ((my - panRef.current.y) / oldZoom) * newZoom }
+      zoomCurrentRef.current = newZoom
+      scheduleZoom()
+      flashZoomHud()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [fitToContent])
+  }, [fitToContent, scheduleZoom, flashZoomHud])
 
   // A newly opened map starts with every layer showing
   useEffect(() => { if (useMindmapStore.getState().hiddenFromDepth !== null) useMindmapStore.getState().setHiddenFromDepth(null) }, [activeMindmap?.id])

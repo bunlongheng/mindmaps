@@ -82,6 +82,11 @@ function rowToDiagram(row: Record<string, unknown>): Diagram {
     id:                 n.id as string,
     title:              n.title as string,
     color:              n.color as string,
+    // Dropping these made a map open in palette colours / shared widths / fully expanded,
+    // unlike the card and share image, and the next save wiped them from the stored map.
+    colorMode:          (n.colorMode ?? undefined) as MindmapNode['colorMode'],
+    widthMode:          (n.widthMode ?? undefined) as MindmapNode['widthMode'],
+    collapsed:          (n.collapsed ?? undefined) as boolean | undefined,
     parentId:           (n.parentId ?? null) as string | null,
     depth:              n.depth as number,
     x:                  n.x as number,

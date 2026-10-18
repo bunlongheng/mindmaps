@@ -113,6 +113,16 @@ function isLight(hex: string): boolean {
   return lum > 130
 }
 
+// Every node reads root-only settings on each store change; cache the root per node list
+// so a select on a 400-node map is 1 lookup, not 1200 scans of the whole list.
+const rootCache = new WeakMap<MindmapNode[], MindmapNode | null>()
+function rootOf(nodes: MindmapNode[] | undefined): MindmapNode | null {
+  if (!nodes) return null
+  let r = rootCache.get(nodes)
+  if (r === undefined) { r = nodes.find(n => n.parentId === null) ?? null; rootCache.set(nodes, r) }
+  return r
+}
+
 function NodeImpl({ node, isSelected, soloSelected = false, onSelect, onDragEnd, onDoubleClick, onDragMove, onRootDragOffset, svgRef, readOnly, noInteract = false, l1Colors = [], paletteColor = null, childCount = 0, descendantCount = 0, nodeCount = 0, rootCenter = null, cellRadius }: NodeProps) {
   const isRoot = node.depth === 0
   const isL2Plus = node.depth >= 2
@@ -130,9 +140,9 @@ function NodeImpl({ node, isSelected, soloSelected = false, onSelect, onDragEnd,
   const diagramType = useMindmapStore(s => s.diagramType)
   const themeId = useMindmapStore(s => s.themeId)
   const showChildCount = useMindmapStore(s => s.showChildCount)
-  const mapGloss = useMindmapStore(s => s.activeMindmap?.nodes.find(n => n.parentId === null)?.gloss === true)
-  const combSize = useMindmapStore(s => s.activeMindmap?.nodes.find(n => n.parentId === null)?.combSize ?? 'outward')
-  const combStyle = useMindmapStore(s => s.activeMindmap?.nodes.find(n => n.parentId === null)?.combStyle ?? 'mesh')
+  const mapGloss = useMindmapStore(s => rootOf(s.activeMindmap?.nodes)?.gloss === true)
+  const combSize = useMindmapStore(s => rootOf(s.activeMindmap?.nodes)?.combSize ?? 'outward')
+  const combStyle = useMindmapStore(s => rootOf(s.activeMindmap?.nodes)?.combStyle ?? 'mesh')
   // On a dark canvas the radial mind map is painted as a living circuit: every circle
   // is a glowing orb, the root a violet-to-blue one, and the labels are white or light
   // grey. Only paint changes - sizes, positions and hit areas are identical. Light

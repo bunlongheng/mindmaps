@@ -148,23 +148,23 @@ test.describe('SidePanel — Map tab', () => {
     }
   })
 
-  test('Show order # toggle removes and re-adds the order-number badges', async ({ page }) => {
+  test('Show order # toggle adds and removes the order-number badges', async ({ page }) => {
     await openEditorWithPanel(page)
-    // Default ON for a blank logic-chart: EdgeLayer draws a white badge circle
+    // Default OFF. When on, EdgeLayer draws a white badge circle
     // (r=10, fill #ffffff) with the order number on each L1 connector stub.
     const orderCircles = () => page.evaluate(() =>
       [...document.querySelectorAll('.diagram-canvas-root svg circle')]
         .filter(c => c.getAttribute('r') === '10' && c.getAttribute('fill') === '#ffffff').length
     )
-    await expect.poll(orderCircles, { timeout: 5_000 }).toBeGreaterThan(0)
+    await expect.poll(orderCircles, { timeout: 5_000 }).toBe(0)
 
     const toggle = page.getByText('Show order #', { exact: true }).locator('..').locator('button')
     await toggle.click()
-    await expect.poll(orderCircles, { timeout: 5_000 }).toBe(0)
-
-    // Toggle back ON
-    await toggle.click()
     await expect.poll(orderCircles, { timeout: 5_000 }).toBeGreaterThan(0)
+
+    // Toggle back OFF
+    await toggle.click()
+    await expect.poll(orderCircles, { timeout: 5_000 }).toBe(0)
   })
 
   test('Show count toggle appends child counts to L1 labels', async ({ page }) => {
