@@ -9,7 +9,6 @@ import type { Theme } from '../../lib/themes'
 import { X, AlignLeft, AlignCenter, AlignRight, Copy, Check, FileDown, Trash2, Sparkles, Code2, Square, Squircle, Circle, Tag, Undo2, Redo2 } from 'lucide-react'
 import { getLucideIcon } from '../canvas/NodeIcon'
 import { showToast, dismissToast } from '../CuteToast'
-import { soundChaChing } from '../../lib/sounds'
 import { buildTagColorMap, tagColor } from '../../lib/tagColors'
 import { authHeaders } from '../../hooks/useDiagram'
 import { levelCounts } from '../../lib/nodeCounts'
@@ -179,11 +178,12 @@ export function SidePanel({ nodeId, onClose, onDelete, onUpdateTags }: SidePanel
 
   const runAIIcons = useCallback(async () => {
     if (!activeMindmap || iconLoading) return
-    const nodes = activeMindmap.nodes.filter(n => n.depth > 0)
+    // Icons go on level 1 topics only; deeper boxes stay text so the map reads clean
+    const nodes = activeMindmap.nodes.filter(n => n.depth === 1)
     // Only assign icons to nodes that don't already have one
     const nodesWithoutIcons = nodes.filter(n => !n.icon && !n.emoji)
     if (nodesWithoutIcons.length === 0) {
-      showToast('All nodes already have icons', { color: '#64748b', duration: 2000 })
+      showToast('All level 1 topics already have icons', { color: '#64748b', duration: 2000 })
       return
     }
     setIconLoading(true)
@@ -250,7 +250,6 @@ export function SidePanel({ nodeId, onClose, onDelete, onUpdateTags }: SidePanel
       })
       blinkStyle.remove()
       dismissToast()
-      soundChaChing()
       const tokLabel = tokenCount >= 1000 ? `${(tokenCount / 1000).toFixed(1)}k` : `${tokenCount}`
       const label = tokenCount > 0 ? `✦ ${tokLabel} tokens` : '✦ Icons ready!'
       showToast(label, { color: '#1a1d2e', confetti: true, duration: 3500 })

@@ -246,7 +246,7 @@ function NodeImpl({ node, isSelected, soloSelected = false, onSelect, onDragEnd,
   // so long titles never overflow. Shared with the layout (src/lib/rootPill) so
   // the trunk meets the pill's edge instead of starting inside it.
   const fontSize = isRootPill ? rootPillFontSize(node.title, baseFontSize) : baseFontSize
-  const fontWeight = node.bold ? '700' : (isRoot ? '500' : node.depth === 1 ? '500' : '400')
+  const fontWeight = node.bold ? '700' : (isRoot ? '500' : node.depth === 1 ? '500' : node.depth === 2 ? '600' : '400')
 
   // Depth-based bg opacity only (text, border and badge stay fully opaque) - one
   // shared ladder with the server renderer (src/lib/color nodeFillOpacity).
@@ -435,7 +435,9 @@ function NodeImpl({ node, isSelected, soloSelected = false, onSelect, onDragEnd,
   const glossFbClipId = `gloss-fb-${node.id}`
   const showFishboneGloss = isFishboneNode && !nodeShape && showGloss
   const hasBadge = (hasEmoji || hasIcon) && !isRoot && !isRadial && !drawCircle
-  const editX = isRoot ? cx - r * 0.75 : hasBadge ? node.height : (align === 'left' ? 8 : 2)
+  // On a mind map the badge leads from the root: a left-side topic carries it on its right edge.
+  const badgeRight = diagramType === 'mindmap' && !isRoot && !!rootCenter && node.x + displayW / 2 < rootCenter.x
+  const editX = isRoot ? cx - r * 0.75 : hasBadge ? (badgeRight ? 2 : node.height) : (align === 'left' ? 8 : 2)
   const editW = isRoot ? r * 1.5 : hasBadge ? displayW - node.height - 4 : displayW - editX - 2
   // The editor shows the raw title (markdown links included), which can be far longer
   // than the drawn label, so let the field grow past the box instead of clipping it.
@@ -621,7 +623,7 @@ function NodeImpl({ node, isSelected, soloSelected = false, onSelect, onDragEnd,
           )}
           {/* White badge behind border — border ring sits on top */}
           {(hasEmoji || hasIcon) && (
-            <rect x={0} y={0} width={node.height + 1} height={node.height} fill="#ffffff" />
+            <rect x={badgeRight ? displayW - node.height - 1 : 0} y={0} width={node.height + 1} height={node.height} fill="#ffffff" />
           )}
           {/* Border ring — doubled stroke so clip cuts outer half, stays inset */}
           {(strokeW > 0 || previewW !== null) && (
@@ -774,8 +776,8 @@ function NodeImpl({ node, isSelected, soloSelected = false, onSelect, onDragEnd,
             const emojiSize = Math.round(sq * 0.52)
             // For fishbone: shift icon center to account for parallelogram skew
             const skOff = isFishboneNode ? node.height * 0.35 / 2 : 0
-            const emojiCX = sq / 2 + skOff
-            const textX = sq + ICON_GAP + skOff
+            const emojiCX = badgeRight ? displayW - sq / 2 : sq / 2 + skOff
+            const textX = badgeRight ? displayW - sq - ICON_GAP : sq + ICON_GAP + skOff
             const h = node.height
             return (
               <>
@@ -787,7 +789,7 @@ function NodeImpl({ node, isSelected, soloSelected = false, onSelect, onDragEnd,
                 <text
                   x={textX}
                   y={h / 2 + fontSize * 0.38}
-                  textAnchor="start"
+                  textAnchor={badgeRight ? 'end' : 'start'}
                   fontSize={fontSize} fontWeight={fontWeight} fontStyle={fontStyle}
                   fontFamily="Inter, system-ui, sans-serif"
                   fill={textColor}
@@ -801,16 +803,16 @@ function NodeImpl({ node, isSelected, soloSelected = false, onSelect, onDragEnd,
             const iconSize = Math.round(sq * 0.48)
             // For fishbone: center icon within the skewed badge area
             const skOff = isFishboneNode ? node.height * 0.35 / 2 : 0
-            const iconX = (sq - iconSize) / 2 + skOff
+            const iconX = badgeRight ? displayW - sq + (sq - iconSize) / 2 : (sq - iconSize) / 2 + skOff
             const iconY = (sq - iconSize) / 2
-            const textX = sq + ICON_GAP + skOff
+            const textX = badgeRight ? displayW - sq - ICON_GAP : sq + ICON_GAP + skOff
             return (
               <>
                 <NodeIcon icon={resolvedIcon} x={iconX} y={iconY} size={iconSize} color={col} strokeWidth={node.depth === 1 ? 2.5 : 1.8} />
                 <text
                   x={textX}
                   y={node.height / 2 + fontSize * 0.38}
-                  textAnchor="start"
+                  textAnchor={badgeRight ? 'end' : 'start'}
                   fontSize={fontSize} fontWeight={fontWeight} fontStyle={fontStyle}
                   fontFamily="Inter, system-ui, sans-serif"
                   fill={textColor}

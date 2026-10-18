@@ -252,7 +252,7 @@ export const useMindmapStore = create<MindmapStore>()(
     diagramType: 'logic-chart',
     lineStyle: 'curved',
     themeId: localStorage.getItem('mindmaps:themeId') ?? 'default',
-    showOrderNumbers: true,
+    showOrderNumbers: false,
     showChildCount: false,
     hideDetails: false,
     hiddenFromDepth: null,
@@ -295,7 +295,7 @@ export const useMindmapStore = create<MindmapStore>()(
         diagramType: d.type,
         lineStyle: d.lineStyle,
         themeId,
-        showOrderNumbers: d.showOrderNumbers ?? true,
+        showOrderNumbers: d.showOrderNumbers ?? false,
         past: [],
         future: [],
         isDirty: false,
@@ -686,7 +686,7 @@ export const useMindmapStore = create<MindmapStore>()(
       if (!state.activeMindmap) return
       state.snapshotHistory('autoIcons')
       const nodes = state.activeMindmap.nodes.map(n =>
-        n.depth > 0 ? { ...n, icon: n.icon ?? guessIcon(n.title) } : n
+        n.depth === 1 ? { ...n, icon: n.icon ?? guessIcon(n.title) } : n
       )
       set({ activeMindmap: { ...state.activeMindmap, nodes }, isDirty: true })
     },

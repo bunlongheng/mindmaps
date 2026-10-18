@@ -52,14 +52,14 @@ function CurvedEdge({ parent, child, goRight = true, color, glow = false }: { pa
 
 /** Fan connector — smooth bezier curves all originating from the parent's center edge,
  *  fanning out to each child's center edge (the "braces" style) */
-function BracketConnector({ parent, children, goRight = true, showOrderNumbers = false, colorOf, glow }: { parent: MindmapNode; children: MindmapNode[]; goRight?: boolean; showOrderNumbers?: boolean; colorOf?: (n: MindmapNode) => string; glow?: Set<string> }) {
+function BracketConnector({ parent, children, goRight = true, showOrderNumbers = false, colorOf, glow, lineStyle = 'curved' }: { parent: MindmapNode; children: MindmapNode[]; goRight?: boolean; showOrderNumbers?: boolean; colorOf?: (n: MindmapNode) => string; glow?: Set<string>; lineStyle?: LineStyle }) {
   const colour = (n: MindmapNode) => colorOf?.(n) ?? n.color
   if (children.length === 0) return null
 
   const sorted = [...children].sort((a, b) => a.y - b.y)
 
   // Single child: simple bezier
-  if (children.length === 1) {
+  if (children.length === 1 && lineStyle === 'curved') {
     return <CurvedEdge parent={parent} child={sorted[0]} goRight={goRight} color={colour(sorted[0])} glow={glow?.has(sorted[0].id)} />
   }
 
@@ -79,7 +79,12 @@ function BracketConnector({ parent, children, goRight = true, showOrderNumbers =
         const gap = Math.abs(cx2 - px)
         // Both control points at 50% x — departs horizontal from parent, arrives horizontal at child
         const c1x = goRight ? px + gap * 0.5 : px - gap * 0.5
-        const d = `M ${px} ${py} C ${c1x} ${py}, ${c1x} ${cy}, ${cx2} ${cy}` + (isCol2 ? ` L ${boxEdge} ${cy}` : '')
+        // Straight: one segment to the child. Square: a short run out of the parent, a shared
+        // vertical trunk, then level into the child. Brace: the default bezier fan.
+        const elbowX = goRight ? px + Math.min(gap / 2, 24) : px - Math.min(gap / 2, 24)
+        const d = (lineStyle === 'straight' ? `M ${px} ${py} L ${cx2} ${cy}`
+          : lineStyle === 'orthogonal' ? `M ${px} ${py} H ${elbowX} V ${cy} H ${cx2}`
+          : `M ${px} ${py} C ${c1x} ${py}, ${c1x} ${cy}, ${cx2} ${cy}`) + (isCol2 ? ` L ${boxEdge} ${cy}` : '')
         // Number badge sits just outside the child box, on the curve itself: the curve is
         // still bending 18px out, so find its y there (x is monotonic in t, bisect for it)
         const numX = goRight ? cx2 - 18 : cx2 + 18
@@ -90,7 +95,9 @@ function BracketConnector({ parent, children, goRight = true, showOrderNumbers =
           if ((x < numX) === goRight) lo = t; else hi = t
         }
         const tb = (lo + hi) / 2
-        const numY = (1 - tb) ** 3 * py + 3 * (1 - tb) ** 2 * tb * py + 3 * (1 - tb) * tb * tb * cy + tb ** 3 * cy
+        const numY = lineStyle === 'straight' ? py + (cy - py) * (numX - px) / ((cx2 - px) || 1)
+          : lineStyle === 'orthogonal' ? cy
+          : (1 - tb) ** 3 * py + 3 * (1 - tb) ** 2 * tb * py + 3 * (1 - tb) * tb * tb * cy + tb ** 3 * cy
         return (
           <g key={child.id}>
             {glow?.has(child.id) && <path d={d} stroke={STEM_GLOW.stroke} strokeOpacity={STEM_GLOW.strokeOpacity} strokeWidth={edgeWidthForDepth(child.depth) + STEM_GLOW.extra} fill="none" strokeLinecap="round" />}
@@ -333,8 +340,8 @@ function EdgeLayerImpl({ nodes, lineStyle, diagramType, paletteColors }: EdgeLay
           const onLeft = kids.filter(k => k.x + k.width / 2 < cx)
           return (
             <g key={parent.id}>
-              <BracketConnector parent={parent} children={onRight} goRight showOrderNumbers={showOrderNumbers} colorOf={pc} glow={glow} />
-              <BracketConnector parent={parent} children={onLeft} goRight={false} showOrderNumbers={showOrderNumbers} colorOf={pc} glow={glow} />
+              <BracketConnector parent={parent} children={onRight} goRight showOrderNumbers={showOrderNumbers} colorOf={pc} glow={glow} lineStyle={lineStyle} />
+              <BracketConnector parent={parent} children={onLeft} goRight={false} showOrderNumbers={showOrderNumbers} colorOf={pc} glow={glow} lineStyle={lineStyle} />
             </g>
           )
         })}

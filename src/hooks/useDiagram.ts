@@ -4,7 +4,6 @@ import { showToast } from '../components/CuteToast'
 import { useMindmapStore } from '../store/mindmapStore'
 import { ROOT_COLORS } from '../lib/color'
 import { nodeHeight, nodeMinWidth } from '../lib/nodeMetrics'
-import { soundCreate, soundDelete, soundSave, soundPaste } from '../lib/sounds'
 import { endSession } from '../lib/session'
 import type { Diagram, DiagramMeta, MindmapNode } from '../types'
 
@@ -237,7 +236,6 @@ export function useDiagram(userId: string | null = null) {
       }),
     }, diagram.name)
     setIsDirty(false)
-    soundSave()
   }, [setIsDirty, userId])
 
   const createDiagram = useCallback(async (name: string): Promise<string> => {
@@ -263,7 +261,6 @@ export function useDiagram(userId: string | null = null) {
     setActiveMindmap(diagram)
     localStorage.setItem('activeMindmapId', id)
     setDiagrams(lsGetList())
-    soundCreate()
     showToast(`✦ "${name}" created`, { color: '#1a1d2e', confetti: true })
 
     // Sync to server in background
@@ -294,7 +291,6 @@ export function useDiagram(userId: string | null = null) {
     setActiveMindmap(diagram)
     localStorage.setItem('activeMindmapId', id)
     setDiagrams(lsGetList())
-    soundPaste()
     showToast(`✦ "${finalName}" created`, { color: '#22c55e', confetti: true })
 
     if (userId) {
@@ -319,7 +315,6 @@ export function useDiagram(userId: string | null = null) {
     lsDeleteDiagram(id)
     const { diagrams } = useMindmapStore.getState()
     setDiagrams(diagrams.filter(d => d.id !== id))
-    soundDelete()
     showToast(`"${name ?? 'Map'}" deleted`, { color: '#1a1d2e' })
 
     if (userId) {
