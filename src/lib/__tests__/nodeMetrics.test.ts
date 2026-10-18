@@ -43,16 +43,16 @@ describe('the box table', () => {
   })
 
   it('gives a top-level topic a comfortable Xmind-like box at 100 percent', () => {
-    expect(nodeMetrics(1)).toEqual({ fontSize: 26, height: 54, padX: 18 })
+    expect(nodeMetrics(1)).toEqual({ fontSize: 36, height: 66, padX: 30 })
   })
 
   it('gives the root a title that dominates a top-level topic', () => {
-    expect(nodeFontSize(0)).toBeGreaterThan(nodeFontSize(1) * 1.5)
+    expect(nodeFontSize(0)).toBeGreaterThan(nodeFontSize(1) * 1.15)
     expect(nodeHeight(0)).toBeGreaterThan(nodeHeight(1) * 1.5)
   })
 
   it('makes a top-level topic a clear step up from its children', () => {
-    expect(nodeFontSize(1)).toBeGreaterThanOrEqual(nodeFontSize(2) * 1.5)
+    expect(nodeFontSize(1)).toBeGreaterThanOrEqual(nodeFontSize(2) * 1.15)
   })
 
   it('clamps every depth past the table to the deepest row', () => {

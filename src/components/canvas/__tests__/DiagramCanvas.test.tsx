@@ -5,10 +5,6 @@ import { useMindmapStore } from '../../../store/mindmapStore'
 import type { Diagram, DiagramType, MindmapNode } from '../../../types'
 
 vi.mock('../../../components/CuteToast', () => ({ showToast: vi.fn() }))
-vi.mock('../../../lib/sounds', () => ({
-  soundClick: vi.fn(), soundCreate: vi.fn(), soundHover: vi.fn(),
-  soundSave: vi.fn(), soundDelete: vi.fn(), soundPaste: vi.fn(),
-}))
 
 function makeRoot(over: Partial<MindmapNode> = {}): MindmapNode {
   return { id: 'root', title: 'Root', color: '#6366f1', parentId: null, depth: 0, x: 0, y: 0, width: 180, height: 180, ...over }
@@ -305,11 +301,12 @@ describe('DiagramCanvas — pointer move without selection', () => {
 })
 
 describe('DiagramCanvas — touch & pinch', () => {
-  it('single-finger touch on the background pans', () => {
+  it('single-finger touch on the background pans', async () => {
     loadStore([makeRoot(), makeNode()])
     const { svg, g } = renderCanvas()
     act(() => { fireEvent.pointerDown(svg, { pointerType: 'touch', clientX: 100, clientY: 100, pointerId: 1 }) })
     act(() => { fireEvent.pointerMove(svg, { pointerType: 'touch', clientX: 150, clientY: 120, pointerId: 1 }) })
+    await act(() => new Promise(r => requestAnimationFrame(() => r(undefined))))
     expect(g.getAttribute('transform')).toContain('translate')
     act(() => { fireEvent.pointerUp(svg, { pointerType: 'touch', pointerId: 1 }) })
   })
@@ -340,11 +337,12 @@ describe('DiagramCanvas — touch & pinch', () => {
 
 describe('DiagramCanvas — space/middle-button pan', () => {
 
-  it('middle-button drag pans', () => {
+  it('middle-button drag pans', async () => {
     loadStore([makeRoot(), makeNode()])
     const { svg, g } = renderCanvas()
     act(() => { fireEvent.pointerDown(svg, { pointerType: 'mouse', button: 1, clientX: 100, clientY: 100, pointerId: 1 }) })
     act(() => { fireEvent.pointerMove(svg, { pointerType: 'mouse', clientX: 130, clientY: 130, pointerId: 1 }) })
+    await act(() => new Promise(r => requestAnimationFrame(() => r(undefined))))
     expect(g.getAttribute('transform')).toContain('translate')
     act(() => { fireEvent.pointerUp(svg, { pointerType: 'mouse', pointerId: 1 }) })
   })

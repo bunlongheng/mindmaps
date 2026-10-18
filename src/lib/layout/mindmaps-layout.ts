@@ -3,9 +3,9 @@ import { rootPillWidth, rootCircleDiameter, rootIsPill, ROOT_FONT } from '../roo
 import { shapedNodeSize } from '../nodeShape.js'
 import { nodeFontSize, nodeHeight, nodeMinWidth, nodeWidth, estimateTextWidth } from '../nodeMetrics.js'
 
-const H_GAPS: Record<number, number> = { 0: 120, 1: 60 }
-const DEFAULT_H_GAP = 50
-export const V_GAP = 22
+const H_GAPS: Record<number, number> = { 0: 100, 1: 50 }
+const DEFAULT_H_GAP = 40
+export const V_GAP = 8
 export { H_GAPS }
 
 function getHGap(depth: number) { return H_GAPS[depth] ?? DEFAULT_H_GAP }

@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { normalizeWidthsPerDepth } from '../../widthNormalize'
 import { computeMindmapLayout, splitSides } from '../mindmap'
 import type { MindmapNode } from '../../../types'
 
@@ -61,12 +62,13 @@ describe('computeMindmapLayout', () => {
     expect(root.y + root.height / 2).toBeCloseTo(mid, 5)
   })
 
-  it('gives every auto topic the same width, so both columns line up', () => {
+  it('fits each topic to its own title, so one long title widens only its own box', () => {
     const nodes = tree(4)
     nodes.find(n => n.id === 't0')!.title = 'A much longer topic title than the rest'
-    const out = computeMindmapLayout(nodes)
-    const widths = new Set(out.filter(n => n.depth === 1).map(n => n.width))
-    expect(widths.size).toBe(1)
+    const out = computeMindmapLayout(normalizeWidthsPerDepth(nodes, 'mindmap'))
+    const l1 = out.filter(n => n.depth === 1)
+    const long = byId(out, 't0').width
+    expect(l1.filter(n => n.id !== 't0').every(n => n.width < long)).toBe(true)
   })
 
   it('leaves a manually positioned root where it was put', () => {

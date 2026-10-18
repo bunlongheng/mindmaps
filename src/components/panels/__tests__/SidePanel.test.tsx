@@ -706,7 +706,7 @@ describe('SidePanel — Auto Icons (AI)', () => {
     loadDiagram(d)
     render(<SidePanel nodeId={null} onClose={vi.fn()} />)
     fireEvent.click(screen.getByText('✦ Auto Icons (AI)'))
-    await waitFor(() => expect(showToast).toHaveBeenCalledWith('All nodes already have icons', expect.anything()))
+    await waitFor(() => expect(showToast).toHaveBeenCalledWith('All level 1 topics already have icons', expect.anything()))
     expect(fetch).not.toHaveBeenCalled()
   })
 

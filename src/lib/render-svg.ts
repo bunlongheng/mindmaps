@@ -456,7 +456,7 @@ function renderNode(node: MindmapNode, type: DiagramType, paletteColor: string |
   const baseFontSize = Number(node.fontSize)
     || (isRoot && type === 'graph' ? RADIAL_ROOT_FONT : metric.fontSize)
   const fontSize = isRootPill ? rootPillFontSize(node.title, baseFontSize) : baseFontSize
-  const fontWeight = node.bold ? '700' : (isRoot ? '500' : node.depth === 1 ? '500' : '400')
+  const fontWeight = node.bold ? '700' : (isRoot ? '500' : node.depth === 1 ? '500' : node.depth === 2 ? '600' : '400')
 
   const hasEmoji = (!isRoot || isHex) && !!node.emoji
   const hasIcon = !isRoot && !hasEmoji && !!node.icon

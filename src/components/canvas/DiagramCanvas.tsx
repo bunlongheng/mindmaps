@@ -229,7 +229,15 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract, rightInset =
     const raf = requestAnimationFrame(fitToContent)
     return () => cancelAnimationFrame(raf)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeMindmap?.id, diagramType, hiddenFromDepth])
+  }, [activeMindmap?.id, diagramType, hiddenFromDepth, rightInset])
+
+  // Resizing the window refits too, so the whole map stays in view at all times
+  useEffect(() => {
+    let raf = 0
+    const onResize = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(fitToContent) }
+    window.addEventListener('resize', onResize)
+    return () => { window.removeEventListener('resize', onResize); cancelAnimationFrame(raf) }
+  }, [fitToContent])
 
   // Rubber-band selection state
   const [selBox, setSelBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
@@ -351,7 +359,7 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract, rightInset =
       const dx = e.clientX - mousePanRef.current.x
       const dy = e.clientY - mousePanRef.current.y
       panRef.current = { x: panRef.current.x + dx, y: panRef.current.y + dy }
-      applyTransform()
+      scheduleZoom()
       mousePanRef.current = { x: e.clientX, y: e.clientY }
       return
     }
@@ -360,7 +368,7 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract, rightInset =
       const dx = e.clientX - touchPanRef.current.x
       const dy = e.clientY - touchPanRef.current.y
       panRef.current = { x: panRef.current.x + dx, y: panRef.current.y + dy }
-      applyTransform()
+      scheduleZoom()
       touchPanRef.current = { x: e.clientX, y: e.clientY }
       return
     }

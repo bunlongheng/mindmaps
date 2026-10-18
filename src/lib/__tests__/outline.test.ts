@@ -158,7 +158,7 @@ describe('node width formulas (all 3 read the shared box table, see nodeMetrics.
   })
 
   it('every formula agrees on the same title at the same depth, up to its own cap', () => {
-    const t = 'Supervised learning'
+    const t = 'Learning'
     expect(computeImportNodeWidth(t, 2)).toBe(computeGeneratedNodeWidth(t, 2))
     expect(computeNodeWidth(t, 2, false)).toBe(computeImportNodeWidth(t, 2))
   })

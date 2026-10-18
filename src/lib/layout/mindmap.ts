@@ -1,6 +1,5 @@
 import type { MindmapNode } from '../../types/index.js'
-import { autoWidth, nodeSize, place, subtreeH, V_GAP, H_GAPS } from './mindmaps-layout.js'
-import { nodeMinWidth } from '../nodeMetrics.js'
+import { nodeSize, place, subtreeH, V_GAP, H_GAPS } from './mindmaps-layout.js'
 
 // The Mind Map: the classic balanced tree. The central topic sits in the middle and
 // its topics spread BOTH ways - the first half to the right, the rest to the left -
@@ -40,24 +39,14 @@ function placeSide(
   }
 }
 
-/** A typical wide screen; the layout picks whichever leaf wrap fits it at the larger zoom. */
-const FIT_W = 1600, FIT_H = 1000
-
 export function computeMindmapLayout(nodes: MindmapNode[]): MindmapNode[] {
-  // Long leaf lists make a tall, narrow map that a screen can only show tiny. Try them
-  // in 1 and in 2 columns and keep whichever fits a wide screen bigger.
-  const fitZoom = (laid: MindmapNode[]) => {
-    const xs = laid.flatMap(n => [n.x, n.x + n.width]), ys = laid.flatMap(n => [n.y, n.y + n.height])
-    return Math.min(FIT_W / Math.max(1, Math.max(...xs) - Math.min(...xs)), FIT_H / Math.max(1, Math.max(...ys) - Math.min(...ys)))
-  }
-  const one = layoutWithCols(nodes, 1)
-  const two = layoutWithCols(nodes, 2)
-  return spreadToScreen(fitZoom(two) > fitZoom(one) * 1.05 ? two : one)
+  // Leaves always stay in 1 column per branch; the spread fills the wide screen instead.
+  return spreadToScreen(layoutWithCols(nodes, 1))
 }
 
 /** Maps at least this big get their branches spread sideways to fill a wide screen. */
 const SPREAD_MIN_NODES = 40
-const SPREAD_ASPECT = 1.8, SPREAD_MAX = 2
+const SPREAD_ASPECT = 1.5, SPREAD_MAX = 2
 
 // A big map is still taller than a wide screen, so it fits by height and leaves both sides
 // empty. Push every box sideways from the root (box sizes stay) until the map is about as
@@ -87,18 +76,13 @@ function layoutWithCols(nodes: MindmapNode[], cols: number): MindmapNode[] {
   const l1s = nodes.filter(n => n.parentId === root.id)
     .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
 
-  // Every auto-width topic shares the widest topic's width, so both columns line up.
-  const autoL1s = l1s.filter(n => n.widthMode !== 'manual')
-  const l1UniformW = autoL1s.length > 0 ? Math.max(...autoL1s.map(n => autoWidth(n, 1))) : nodeMinWidth(1)
-  const nodesForLayout = nodes.map(n =>
-    (l1s.some(l => l.id === n.id) && n.widthMode !== 'manual') ? { ...n, width: l1UniformW } : n
-  )
+  const { right, left } = splitSides(l1s)
+  const nodesForLayout = nodes
 
   const { w: rw, h: rh } = nodeSize(root, 0)
   const rootX = root.manuallyPositioned ? root.x : ROOT_CX - rw / 2
   const gap = root.branchGap ?? H_GAPS[0]
 
-  const { right, left } = splitSides(l1s)
   const result: MindmapNode[] = []
   placeSide(right, rootX + rw + gap, CENTER_Y, nodesForLayout, result, true, cols)
   placeSide(left, rootX - gap, CENTER_Y, nodesForLayout, result, false, cols)

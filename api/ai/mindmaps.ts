@@ -96,7 +96,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         headers: { Authorization: 'Bearer $MINDMAP_AI_API_KEY', 'Content-Type': 'application/json' },
         body: {
           title: 'My Mindmap Title',
-          type: 'logic-chart',
+          type: 'mindmap',
           outline: '{"Root":[{"icon":"brain","Category A":["item 1","item 2"]},{"icon":"zap","Category B":["item 3"]}]}',
         },
       },
@@ -118,7 +118,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     })
   }
 
-  const { title, outline, type: rawType = 'logic-chart', themeId = 'default', lineStyle = 'curved', userId = null, sharing = false, colors, tags, rootStyle } = body
+  const { title, outline, type: rawType = 'mindmap', themeId = 'default', lineStyle = 'curved', userId = null, sharing = false, colors, tags, rootStyle } = body
   // A repo audit wants a picture for its report, not a row in the library
   // (owner rule 2026-10-04): source "repo-audit", or store: false, renders the
   // SVG and stores nothing, so an audit never lands in the maps list. The
@@ -134,7 +134,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     : ['API']
   // Coerce unknown diagram types to the safe default (matches the documented behavior + client legacy-type healing).
   const VALID_TYPES = new Set(['logic-chart', 'mindmap', 'graph', 'fishbone', 'timeline', 'honeycomb'])
-  const type = VALID_TYPES.has(rawType) ? rawType : 'logic-chart'
+  const type = VALID_TYPES.has(rawType) ? rawType : 'mindmap'
 
   // Every API map belongs to the configured owner. The static key already proves the caller
   // is the owner's agent, so an omitted userId defaults to that owner instead of writing a

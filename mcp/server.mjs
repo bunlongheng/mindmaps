@@ -62,7 +62,7 @@ server.registerTool(
     inputSchema: {
       title: z.string().describe('The map title / root label, e.g. "Machine Learning"'),
       outline: z.string().describe('JSON-string outline (categories with items, optional per-category "icon") OR indented text. Omit for an empty root.').optional(),
-      type: z.enum(VALID_TYPES).optional().describe('Layout. Leave it out for logic-chart, the default for every map. Only pass mindmap, honeycomb, fishbone or timeline when the person explicitly asked for that layout by name.'),
+      type: z.enum(VALID_TYPES).optional().describe('Layout. Leave it out for mindmap, the default for every map. Only pass logic-chart, honeycomb, fishbone or timeline when the person explicitly asked for that layout by name.'),
       sharing: z.boolean().optional().describe('Make the map readable by URL without auth (default true so the link opens for anyone).'),
       colors: z.array(z.string()).optional().describe('Optional hex colors to override the branch palette.'),
       format: z.enum(['svg']).optional().describe('Pass "svg" to also return the rendered map as an inline self-contained SVG string.'),
@@ -70,7 +70,7 @@ server.registerTool(
       store: z.boolean().optional().describe('false renders the svg and stores nothing, for any caller that only needs the picture.'),
     },
   },
-  async ({ title, outline, type = 'logic-chart', sharing = true, colors, format, source, store }) => {
+  async ({ title, outline, type = 'mindmap', sharing = true, colors, format, source, store }) => {
     try {
       const body = { title, type, userId: OWNER_ID, sharing }
       if (outline != null) body.outline = outline
@@ -110,7 +110,7 @@ server.registerTool(
       'outline is a JSON string OR indented text (2 spaces per level), auto-detected.',
       'JSON form: { "Root": [ { "icon": "brain", "Category A": ["item 1","item 2"] }, { "Category B": ["item 3"] } ] }. "icon" is optional per category.',
       'Indented form: the first line is the root; each 2-space indent is one level deeper.',
-      `type is one of: ${VALID_TYPES.join(', ')}. Default logic-chart: omit type unless the person explicitly asked for another layout by name. Never choose mindmap, honeycomb, fishbone or timeline on your own. Unknown types fall back to logic-chart.`,
+      `type is one of: ${VALID_TYPES.join(', ')}. Default mindmap: omit type unless the person explicitly asked for another layout by name. Never choose logic-chart, honeycomb, fishbone or timeline on your own. Unknown types fall back to mindmap.`,
       'honeycomb: hexagon cells clustered around their parent.',
       '"top 10 X" / "5 best Y" phrasing → a flat list of items; "break down X by category" → categorized branches.',
       'A node may carry "shape": one of rect, rounded, pill, circle. Omit it for the default round pill.',
@@ -121,7 +121,7 @@ server.registerTool(
     ],
     example_json_outline: {
       title: 'Machine Learning',
-      type: 'logic-chart',
+      type: 'mindmap',
       outline: '{"Machine Learning":[{"icon":"chart","Supervised":["Regression","Classification"]},{"icon":"shuffle","Unsupervised":["Clustering","Dimensionality Reduction"]},{"icon":"trophy","Reinforcement":["Q-Learning","Policy Gradient"]}]}',
     },
     example_indented_outline: {
