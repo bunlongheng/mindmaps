@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach } from 'vitest'
 import { render, screen, cleanup } from '@testing-library/react'
 import { ViewerPage } from '../ViewerPage'
+import { toOutline } from '../../../lib/export/outline'
 import type { Diagram, MindmapNode } from '../../../types'
 
 afterEach(() => cleanup())
@@ -42,24 +43,21 @@ describe('ViewerPage', () => {
     expect(screen.queryByText('Download SVG')).toBeNull()
   })
 
-  it('injects the rendered SVG carrying the map name as its title', () => {
-    const { container } = render(<ViewerPage diagram={makeDiagram({ name: 'My Map' })} id="m1" />)
-    const svg = container.querySelector('.mm-viewer-card svg')
-    expect(svg).toBeTruthy()
-    expect(svg!.querySelector('title')!.textContent).toBe('My Map')
+  it('shows the map name in the header', () => {
+    render(<ViewerPage diagram={makeDiagram({ name: 'My Map' })} id="m1" />)
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('My Map')
   })
 
-  it('renders all 5 footer links on a demo map', () => {
-    render(<ViewerPage diagram={makeDiagram({ tags: ['demo'] })} id="m1" />)
-    for (const label of ['Portfolio', 'GitHub', 'LinkedIn', 'Instagram', 'X']) {
-      expect(screen.getByTitle(label)).toBeInTheDocument()
-    }
+  it('offers Copy for AI and JSON exports', () => {
+    render(<ViewerPage diagram={makeDiagram()} id="m1" />)
+    expect(screen.getByText('Copy for AI')).toBeInTheDocument()
+    expect(screen.getByText('JSON')).toBeInTheDocument()
   })
 
-  it('shows the social footer and the hero name on any shared map', () => {
-    render(<ViewerPage diagram={makeDiagram({ tags: ['Work'] })} id="m1" />)
-    expect(screen.getByTitle('GitHub')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument()
+  it('outlines the map as nested Markdown for an AI agent', () => {
+    const d = makeDiagram()
+    d.nodes.push({ id: 'g1', title: 'Grandchild', color: '#ef4444', parentId: 'c1', depth: 2, x: 0, y: 0, width: 100, height: 30, sortOrder: 0, url: 'https://x.dev' })
+    expect(toOutline(d)).toBe('# My Map\n\n- Child\n  - Grandchild (https://x.dev)\n')
   })
 
   it('sets document title to "<name> · Mindmaps" and restores it on unmount', () => {

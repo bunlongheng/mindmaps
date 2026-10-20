@@ -169,17 +169,17 @@ describe('/api/unlock', () => {
     expect(String(res.body)).toContain('Secret Map')
   })
 
-  it('answers a wrong passcode with 401 and ACCESS DENIED, no cookie', async () => {
+  it('answers a wrong passcode with 401 and Wrong passcode, no cookie', async () => {
     const res = await post('nope', '10.0.0.1')
     expect(res.statusCode).toBe(401)
-    expect(String(res.body)).toContain('ACCESS DENIED')
+    expect(String(res.body)).toContain('Wrong passcode')
     expect(res.headers['Set-Cookie']).toBeUndefined()
   })
 
   it('accepts the passcode in any case and sets a 30-day HttpOnly cookie the read then honours', async () => {
     const res = await post('  OPEN Sesame ', '10.0.0.2')
-    expect(res.statusCode).toBe(200)
-    expect(String(res.body)).toContain('ACCESS GRANTED')
+    expect(res.statusCode).toBe(303)
+    expect(res.headers.Location).toBe(`/?share=${ID}&reveal=1`)
     const cookie = res.headers['Set-Cookie']
     expect(cookie).toMatch(/Max-Age=2592000; HttpOnly; SameSite=Lax/)
     queryMock.mockResolvedValue({ rows: [lockedRow()] })
@@ -191,7 +191,7 @@ describe('/api/unlock', () => {
   it('rate limits guesses to 10 per 5 minutes per IP', async () => {
     for (let i = 0; i < 10; i++) expect((await post('nope', '10.0.0.3')).statusCode).toBe(401)
     expect((await post('open sesame', '10.0.0.3')).statusCode).toBe(429)
-  })
+  }, 15_000) // 10 slow scrypt checks, each redrawing the lock backdrop
 
   it('404s a private map', async () => {
     queryMock.mockResolvedValue({ rows: [{ id: ID, name: 'x', sharing_enabled: false, passcode_hash: HASH }] })

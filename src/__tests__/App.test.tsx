@@ -399,13 +399,13 @@ describe('App — delete confirm modal', () => {
 })
 
 describe('App — viewer / share view', () => {
-  it('renders the document viewer for a ?share= link without a user', async () => {
+  it('renders the look-only canvas for a ?share= link without a user', async () => {
     setHostname('app.example.com')
     setUrl('/?share=abc')
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ id: 'abc', name: 'Shared', type: 'logic-chart', nodes: makeDiagram().nodes, line_style: 'orthogonal', theme_id: 'default' }) })))
     render(<App />)
     await waitFor(() => expect(screen.getByText('Mindmaps')).toBeInTheDocument())
-    expect(screen.queryByTestId('canvas')).toBeNull()
+    expect(screen.getByTestId('canvas').getAttribute('data-readonly')).toBe('1')
     expect(screen.getByText('Download SVG')).toBeInTheDocument()
   })
 
@@ -414,7 +414,7 @@ describe('App — viewer / share view', () => {
     decodeShareURL.mockReturnValue(makeDiagram({ name: 'Decoded' }))
     render(<App />)
     await waitFor(() => expect(screen.getByText('Mindmaps')).toBeInTheDocument())
-    expect(screen.queryByTestId('canvas')).toBeNull()
+    expect(screen.getByTestId('canvas').getAttribute('data-readonly')).toBe('1')
     expect(screen.queryByText('Download SVG')).toBeNull()
   })
 })
