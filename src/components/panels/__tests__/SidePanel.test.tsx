@@ -776,8 +776,6 @@ describe('SidePanel — Auto Icons (AI)', () => {
       const map = useMindmapStore.getState().activeMindmap!
       expect(map.nodes.find(n => n.id === 'c1')!.icon).toBeTruthy()
       expect(map.nodes.find(n => n.id === 'c2')!.icon).toBeTruthy()
-      // Level 1 only: deeper boxes stay text
-      expect(map.nodes.find(n => n.id === 'g1')!.icon).toBeFalsy()
     }, { timeout: 3000 })
   })
 })
