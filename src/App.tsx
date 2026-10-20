@@ -250,17 +250,18 @@ export default function App() {
 
 
   useEffect(() => {
-    if (!isDirty || !activeMindmap) return
+    // The shared page is look-only: it never writes the map back, even for the owner.
+    if (!isDirty || !activeMindmap || view === 'viewer') return
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
     saveTimerRef.current = setTimeout(() => saveDiagram(activeMindmap), 1500)
     return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current) }
-  }, [isDirty, activeMindmap])
+  }, [isDirty, activeMindmap, view])
 
   // Save on tab close / refresh so no work is lost
   useEffect(() => {
     function onBeforeUnload() {
       const { activeMindmap: m, isDirty: d } = useMindmapStore.getState()
-      if (d && m) saveDiagram(m)
+      if (d && m && !getShareParam() && !decodeShareURL()) saveDiagram(m)
     }
     window.addEventListener('beforeunload', onBeforeUnload)
     return () => window.removeEventListener('beforeunload', onBeforeUnload)

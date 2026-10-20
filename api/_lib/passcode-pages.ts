@@ -1,6 +1,7 @@
-// The passcode lock screen and the "access granted" beat, ported verbatim
-// from Stickies (and Flows lib/passcode-pages.js) so a locked share looks the
-// same in every app. Pure HTML builders: no React, no DB.
+// The passcode lock screen, the same liquid glass card as Flows
+// (lib/passcode-pages.js) and Stickies, so a locked share looks the same in
+// every app. A right passcode goes straight to the map, which plays its own
+// reveal (src/components/viewer/UnlockReveal.tsx). Pure HTML builders: no React, no DB.
 
 const esc = (s: unknown) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
@@ -8,177 +9,112 @@ const HEAD = `<meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex">`;
 
-/** The black safe: title on the LCD, 1 masked field, Enter submits. */
-export function gatePage({ action, title, bad }: { action: string; title: string; bad?: boolean }): string {
-  const alert = bad ? `<div class="alert">ACCESS DENIED</div>` : `<div class="alert hidden">&nbsp;</div>`;
-  return `<!DOCTYPE html><html lang="en"><head>
+/** Liquid glass lock: a white frosted card with the title, 1 masked field,
+ *  Enter submits. With a `backdrop` (a tiny PNG data URI of the map) the
+ *  card sits on that map, blurred past reading, instead of a plain wash. */
+export function gatePage({ action, title, bad, backdrop }: { action: string; title: string; bad?: boolean; backdrop?: string | null }): string {
+  const bg = typeof backdrop === "string" && backdrop.startsWith("data:image/png;base64,") ? backdrop : null;
+  const alert = bad ? `<div class="alert" role="alert">Wrong passcode</div>` : `<div class="alert hidden">&nbsp;</div>`;
+  return `<!DOCTYPE html><html lang="en"${bg ? ` class="has-blur"` : ""}><head>
 ${HEAD}
-<title>SAFE // ${esc(title)}</title>
+<title>${esc(title)}</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-html,body{height:100%;background:radial-gradient(ellipse at 50% 30%,#181818 0%,#000 80%);color:#bdbdbd;font-family:'SF Pro Display',-apple-system,BlinkMacSystemFont,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
-.room{min-height:100%;display:flex;align-items:center;justify-content:center;padding:32px 20px;perspective:1400px}
-.safe{position:relative;width:100%;max-width:420px;padding:38px 30px 34px;border-radius:22px;
-  background:linear-gradient(145deg,#1c1c1c 0%,#0e0e0e 35%,#050505 100%);
+html,body{height:100%;background:linear-gradient(160deg,#f7f8fb 0%,#eceef5 100%);color:#0f172a;font-family:Inter,-apple-system,BlinkMacSystemFont,'SF Pro Display',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+.room{min-height:100%;display:flex;align-items:center;justify-content:center;padding:32px 16px}
+/* Optical glass bubble: the diagram shows THROUGH the card. A thin white
+   base, a diagonal reflection, a pearl interior, colour at the perimeter, an
+   iridescent conic rim drawn only on the border, inset rims for thickness,
+   and edge flares embedded under the content. The middle stays readable. */
+.glass{position:relative;width:max-content;min-width:min(440px,calc(100vw - 32px));max-width:min(760px,calc(100vw - 32px));padding:40px;border-radius:36px;text-align:center;isolation:isolate;overflow:hidden;
+  background:
+    linear-gradient(118deg,rgba(255,255,255,0) 30%,rgba(255,255,255,0.42) 44%,rgba(255,255,255,0) 58%),
+    radial-gradient(120% 90% at 50% 40%,rgba(255,255,255,0.28) 0%,rgba(250,248,255,0.1) 60%,rgba(240,236,255,0) 100%),
+    radial-gradient(60% 40% at 0% 0%,rgba(255,200,185,0.2) 0%,rgba(255,200,185,0) 100%),
+    radial-gradient(60% 40% at 100% 100%,rgba(185,170,255,0.22) 0%,rgba(185,170,255,0) 100%),
+    radial-gradient(45% 35% at 0% 100%,rgba(170,225,245,0.16) 0%,rgba(170,225,245,0) 100%),
+    linear-gradient(160deg,rgba(255,255,255,0.34) 0%,rgba(255,255,255,0.22) 100%);
+  -webkit-backdrop-filter:blur(14px) saturate(180%);backdrop-filter:blur(14px) saturate(180%);
   box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.07),
-    inset 0 -1px 0 rgba(0,0,0,0.7),
-    inset 0 0 0 1px rgba(255,255,255,0.025),
-    0 1px 0 rgba(255,255,255,0.04),
-    0 30px 60px -20px rgba(0,0,0,0.95),
-    0 80px 120px -40px rgba(0,0,0,0.8);
-  transform:rotateX(2deg);
-}
-/* brushed metal sheen */
-.safe::before{content:"";position:absolute;inset:0;border-radius:22px;pointer-events:none;
-  background:repeating-linear-gradient(90deg,rgba(255,255,255,0.014) 0,rgba(255,255,255,0.014) 1px,transparent 1px,transparent 3px);
-  mix-blend-mode:overlay;}
-.rivet{position:absolute;width:9px;height:9px;border-radius:50%;
-  background:radial-gradient(circle at 35% 30%,#3a3a3a 0%,#0c0c0c 70%,#000 100%);
-  box-shadow:inset 0 0.5px 1px rgba(255,255,255,0.18),0 1px 2px rgba(0,0,0,0.9);}
-.rivet.tl{top:12px;left:12px}.rivet.tr{top:12px;right:12px}
-.rivet.bl{bottom:12px;left:12px}.rivet.br{bottom:12px;right:12px}
-.bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px}
-.brand{font-size:9px;letter-spacing:0.32em;color:#555;font-weight:700;font-family:ui-monospace,SFMono-Regular,monospace}
-.brand b{color:#bdbdbd}
-.status{display:flex;align-items:center;gap:8px;font-size:9px;letter-spacing:0.2em;color:#6c6c6c;font-family:ui-monospace,monospace;font-weight:700}
-.led{width:9px;height:9px;border-radius:50%;display:inline-block;background:#fff;
-  box-shadow:0 0 6px #fff,0 0 14px rgba(255,255,255,0.5),inset 0 -1px 1px rgba(0,0,0,0.3)}
-.led-slow{animation:pulse 1.6s ease-in-out infinite}
-.led-fast{animation:pulse 0.45s ease-in-out infinite}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
-/* LCD display - black + white phosphor */
-.lcd{
-  background:linear-gradient(180deg,#0a0a0a 0%,#020202 100%);
-  border:1px solid #1a1a1a;
-  border-radius:8px;
-  padding:18px 18px 16px;
-  margin-bottom:22px;
-  box-shadow:inset 0 2px 8px rgba(0,0,0,0.9),inset 0 0 0 1px rgba(0,0,0,0.4),0 1px 0 rgba(255,255,255,0.04);
-  font-family:ui-monospace,'SF Mono',Menlo,monospace;
-  position:relative;
-}
-.lcd::after{content:"";position:absolute;inset:0;border-radius:8px;pointer-events:none;
-  background:repeating-linear-gradient(0deg,rgba(0,0,0,0.22) 0,rgba(0,0,0,0.22) 1px,transparent 1px,transparent 2px);}
-.lcd .label{font-size:9px;letter-spacing:0.32em;color:#5a5a5a;font-weight:700;margin-bottom:6px}
-.lcd .name{font-size:14px;color:#f4f4f4;text-shadow:0 0 8px rgba(255,255,255,0.18);font-weight:600;word-break:break-word;line-height:1.4}
-.alert{margin:-6px 0 16px;font-size:10px;letter-spacing:0.3em;color:#fff;font-weight:700;text-align:center;font-family:ui-monospace,monospace;text-shadow:0 0 10px rgba(255,255,255,0.7);animation:flash 0.5s ease-in-out 3}
-@keyframes flash{0%,100%{opacity:1}50%{opacity:0.25}}
+    0 40px 90px -24px rgba(50,60,110,0.26),0 6px 18px -6px rgba(50,60,110,0.08),
+    inset 0 2px 0 rgba(255,255,255,0.95),inset 2px 0 0 rgba(255,255,255,0.7),
+    inset 0 -2px 0 rgba(190,175,255,0.35),inset -2px 0 0 rgba(200,190,255,0.25),
+    inset 0 0 0 1px rgba(255,255,255,0.5);
+  animation:rise .45s cubic-bezier(.2,.8,.2,1) both}
+@keyframes rise{from{opacity:0;transform:translateY(8px) scale(.97)}to{opacity:1;transform:none}}
+/* iridescent bubble rim: conic gradient masked to a 1.5px ring */
+.glass::before{content:"";position:absolute;inset:0;border-radius:inherit;padding:1.5px;pointer-events:none;z-index:3;
+  background:conic-gradient(from 210deg at 50% 50%,
+    rgba(255,200,215,0.95) 0deg,rgba(255,228,215,0.8) 40deg,rgba(255,255,255,0.95) 80deg,
+    rgba(200,235,255,0.85) 130deg,rgba(170,225,245,0.9) 170deg,rgba(255,255,255,0.9) 210deg,
+    rgba(205,190,255,0.95) 260deg,rgba(225,205,255,0.9) 300deg,rgba(255,200,215,0.95) 360deg);
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);mask-composite:exclude}
+/* inner edge: the glass has thickness, the top-left catches the light */
+.glass::after{content:"";position:absolute;inset:5px;border-radius:31px;pointer-events:none;z-index:3;
+  box-shadow:inset 1px 1.5px 0 rgba(255,255,255,0.95),inset -1px -1.5px 0 rgba(190,180,255,0.3)}
+/* flares live under the content, pinned to the edges */
+.flare{position:absolute;pointer-events:none;z-index:0;border-radius:50%;filter:blur(10px)}
+.f1{top:-40px;left:-40px;width:200px;height:140px;background:radial-gradient(closest-side,rgba(255,205,190,0.5),rgba(255,205,190,0))}
+.f2{top:14px;left:26px;width:120px;height:14px;border-radius:999px;filter:blur(4px);transform:rotate(-28deg);background:linear-gradient(90deg,rgba(255,255,255,0),rgba(255,255,255,0.95),rgba(255,255,255,0))}
+.f3{top:10px;left:40px;width:10px;height:10px;filter:blur(1.5px);background:rgba(255,255,255,1);box-shadow:0 0 10px 3px rgba(255,255,255,0.8)}
+.f4{top:-30px;right:-20px;width:160px;height:90px;background:radial-gradient(closest-side,rgba(255,255,255,0.6),rgba(255,255,255,0))}
+.f5{bottom:-40px;left:-40px;width:170px;height:120px;background:radial-gradient(closest-side,rgba(165,225,245,0.4),rgba(165,225,245,0))}
+.f6{bottom:-50px;right:-50px;width:230px;height:160px;background:radial-gradient(closest-side,rgba(180,165,255,0.5),rgba(180,165,255,0))}
+.f7{bottom:12px;right:22px;width:120px;height:120px;border-radius:50%;filter:blur(2px);border:2px solid rgba(255,255,255,0);border-right-color:rgba(255,255,255,0.75);border-bottom-color:rgba(255,255,255,0.55);transform:rotate(-20deg);background:none}
+.glass>*:not(.flare){position:relative;z-index:1}
+.logo{display:block;margin:0 auto 20px;width:76px;height:76px;border-radius:20px;box-shadow:0 10px 26px rgba(28,30,33,0.3),inset 0 0 0 1px rgba(255,255,255,0.3)}
+.caption{font-size:14px;color:#5b6475;margin-top:8px;line-height:1.5}
+.name{font-size:28px;line-height:1.2;font-weight:700;letter-spacing:-0.025em;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-shadow:0 1px 0 rgba(255,255,255,0.6)}
+.alert{margin:18px 0 -6px;font-size:13.5px;font-weight:600;color:#d92d20;animation:shake 0.4s ease-in-out}
+@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-6px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(4px)}}
 .alert.hidden{visibility:hidden;animation:none}
-.entry{
-  display:flex;align-items:center;
-  background:linear-gradient(180deg,#0a0a0a 0%,#020202 100%);
-  border:1px solid #1a1a1a;border-radius:10px;
-  padding:6px 16px;
-  box-shadow:inset 0 2px 6px rgba(0,0,0,0.9),0 1px 0 rgba(255,255,255,0.03);
-}
+/* glass input: see-through, recessed, glossy top edge */
+.entry{margin-top:28px;height:64px;display:flex;align-items:center;gap:10px;padding:0 8px 0 20px;border-radius:20px;
+  background:linear-gradient(180deg,rgba(255,255,255,0.55) 0%,rgba(255,255,255,0.32) 100%);
+  -webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);
+  border:1px solid rgba(255,255,255,0.9);
+  box-shadow:inset 0 1.5px 0 rgba(255,255,255,1),inset 0 -1px 0 rgba(200,190,255,0.25),inset 0 6px 14px -8px rgba(80,70,150,0.14),0 10px 30px -12px rgba(90,80,170,0.22),0 0 0 1px rgba(120,110,200,0.06);
+  transition:box-shadow .15s}
+.entry:focus-within{box-shadow:inset 0 1.5px 0 rgba(255,255,255,1),inset 0 -1px 0 rgba(200,190,255,0.25),inset 0 6px 14px -8px rgba(80,70,150,0.14),0 10px 30px -12px rgba(90,80,170,0.3),0 0 0 4px rgba(129,140,248,0.26)}
+.entry svg.lock{flex:none;width:22px;height:22px;color:#5b6475}
 /* type=text + text-security masks input WITHOUT being a password field, so
    LastPass/1Password never attach their autofill icon. */
-.entry input{flex:1;background:transparent;border:0;outline:0;color:#fff;font-size:16px;font-family:ui-monospace,monospace;letter-spacing:0.25em;padding:10px 0;text-shadow:0 0 4px rgba(255,255,255,0.3);-webkit-text-security:disc;text-security:disc}
-.entry input::placeholder{color:#3a3a3a;letter-spacing:0.15em;font-size:12px}
-.meta{margin-top:18px;display:flex;align-items:center;justify-content:space-between;font-size:9px;letter-spacing:0.25em;color:#3a3a3a;font-family:ui-monospace,monospace;font-weight:600}
-.meta .dot{width:4px;height:4px;border-radius:50%;background:#3a3a3a;display:inline-block;margin:0 8px;vertical-align:middle}
+.entry input{flex:1;min-width:0;background:transparent;border:0;outline:0;color:#1f2937;font-size:18px;font-weight:600;font-family:inherit;letter-spacing:0.18em;padding:0;-webkit-text-security:disc;text-security:disc}
+.entry input::placeholder{color:#7c8596;font-weight:400;letter-spacing:0.01em}
+/* glass bubble button */
+.go{flex:none;width:48px;height:48px;border:1px solid rgba(255,255,255,0.55);border-radius:50%;cursor:pointer;display:grid;place-items:center;color:#fff;position:relative;overflow:hidden;
+  background:linear-gradient(150deg,#b4b2ff 0%,#8f8bf4 60%,#8580ee 100%);
+  box-shadow:0 10px 20px -6px rgba(110,100,230,0.6),inset 0 1.5px 0 rgba(255,255,255,0.8),inset 0 -2px 4px rgba(90,80,200,0.35);transition:transform .12s,box-shadow .12s}
+.go::before{content:"";position:absolute;left:14%;top:8%;width:62%;height:40%;border-radius:50%;background:linear-gradient(180deg,rgba(255,255,255,0.75),rgba(255,255,255,0));pointer-events:none}
+.go:hover{transform:translateY(-1px);box-shadow:0 12px 24px -6px rgba(110,100,230,0.7),inset 0 1.5px 0 rgba(255,255,255,0.8),inset 0 -2px 4px rgba(90,80,200,0.35)}
+.go:active{transform:translateY(0) scale(0.97)}
+.go:focus-visible{outline:3px solid rgba(129,140,248,0.6);outline-offset:2px}
+.go svg{width:20px;height:20px;position:relative}
+.blur{position:fixed;inset:-60px;background:#fff url("${bg || ""}") center/contain no-repeat;filter:blur(22px) saturate(1.1);z-index:0}
+.veil{position:fixed;inset:0;background:rgba(255,255,255,0.2);z-index:0}
+.has-blur .room{position:relative;z-index:1}
+html.has-blur,html.has-blur body{background:#f5f6f8}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  .glass{background:rgba(255,255,255,0.9)}.entry{background:rgba(255,255,255,0.95)}}
+@media (prefers-reduced-motion:reduce){.glass,.alert,.go{animation:none;transition:none}}
 </style>
 </head><body>
+${bg ? `<div class="blur" aria-hidden="true"></div><div class="veil" aria-hidden="true"></div>` : ""}
 <div class="room">
-<form class="safe" method="POST" action="${esc(action)}">
-  <span class="rivet tl"></span><span class="rivet tr"></span>
-  <span class="rivet bl"></span><span class="rivet br"></span>
-
-  <div class="lcd">
-    <div class="label">CONTENTS</div>
-    <div class="name">${esc(title)}</div>
-  </div>
-
+<form class="glass" method="POST" action="${esc(action)}">
+  <span class="flare f1" aria-hidden="true"></span><span class="flare f2" aria-hidden="true"></span><span class="flare f3" aria-hidden="true"></span>
+  <span class="flare f4" aria-hidden="true"></span><span class="flare f5" aria-hidden="true"></span><span class="flare f6" aria-hidden="true"></span><span class="flare f7" aria-hidden="true"></span>
+  <img class="logo" src="/icons/android-chrome-192x192.png" alt="Mindmaps" width="76" height="76">
+  <div class="name">${esc(title)}</div>
+  <div class="caption">Protected map</div>
   ${alert}
 
   <div class="entry">
-    <input name="passcode" type="text" autofocus autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore data-bwignore data-form-type="other" required placeholder="passcode">
+    <svg class="lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2.5"/><path d="M8 11V7.5a4 4 0 0 1 8 0V11"/></svg>
+    <input name="passcode" type="text" autofocus autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore data-bwignore data-form-type="other" required placeholder="Passcode" aria-label="Passcode">
+    <button class="go" type="submit" aria-label="Open map"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
   </div>
 </form>
 </div>
-</body></html>`;
-}
-
-/** Radar sweep, SCANNING FILE -> ACCESS GRANTED, then on to the map. The
- *  script carries the CSP nonce; the meta refresh still moves on when a
- *  stricter CSP blocks the script. */
-export function unlockedPage({ target, nonce }: { target: string; nonce?: string | null }): string {
-  const veil = "#ffffff";
-  return `<!DOCTYPE html><html lang="en"><head>
-${HEAD}
-<title>ACCESS GRANTED</title>
-<meta http-equiv="refresh" content="2;url=${esc(target)}">
-<style>
-*{box-sizing:border-box;margin:0;padding:0}
-html,body{height:100%;overflow:hidden;-webkit-font-smoothing:antialiased}
-body{background:radial-gradient(ellipse at 50% 30%,#181818 0%,#000 80%);font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
-.scene{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:26px;
-  animation:appear .28s ease-out both,dissolve .48s ease-in 1.42s forwards}
-@keyframes appear{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:none}}
-@keyframes dissolve{to{opacity:0;filter:blur(18px);transform:scale(1.04)}}
-.veil{position:fixed;inset:0;background:${veil};opacity:0;pointer-events:none;animation:veil .55s ease-in 1.4s forwards}
-@keyframes veil{to{opacity:1}}
-/* radar dish: rings + crosshair etched into dark glass */
-.radar{position:relative;width:46vmin;height:46vmin;max-width:340px;max-height:340px;border-radius:50%;overflow:hidden;
-  background:
-    repeating-radial-gradient(circle at 50% 50%,rgba(74,201,143,.16) 0 1px,transparent 1px 25%),
-    linear-gradient(rgba(74,201,143,.16),rgba(74,201,143,.16)) 50% 0/1px 100% no-repeat,
-    linear-gradient(rgba(74,201,143,.16),rgba(74,201,143,.16)) 0 50%/100% 1px no-repeat,
-    radial-gradient(circle at 50% 50%,#0f1512 0%,#070908 70%,#000 100%);
-  box-shadow:0 0 0 1px rgba(74,201,143,.22),0 0 40px rgba(74,201,143,.12),inset 0 0 40px rgba(0,0,0,.8)}
-/* the beam: a thin bright edge with a long fading trail behind it */
-.sweep{position:absolute;inset:0;border-radius:50%;
-  background:conic-gradient(from 0deg,rgba(74,201,143,0) 0deg,rgba(74,201,143,.05) 220deg,rgba(74,201,143,.28) 330deg,rgba(120,255,190,.9) 359deg,rgba(74,201,143,0) 360deg);
-  animation:sweep 1.25s linear .15s 1 forwards;transform:rotate(0deg)}
-@keyframes sweep{to{transform:rotate(720deg)}}
-.center{position:absolute;top:50%;left:50%;width:6px;height:6px;margin:-3px;border-radius:50%;background:#4ac98f;box-shadow:0 0 10px #4ac98f}
-/* blips light up as the beam passes, then linger */
-.blip{position:absolute;width:7px;height:7px;margin:-3.5px;border-radius:50%;background:#7dffbe;opacity:0;
-  box-shadow:0 0 10px 2px rgba(125,255,190,.8);animation:blip 1.1s ease-out forwards}
-.b1{top:32%;left:64%;animation-delay:.42s}.b2{top:66%;left:40%;animation-delay:.68s}.b3{top:44%;left:26%;animation-delay:.94s}
-@keyframes blip{0%{opacity:0;transform:scale(.4)}15%{opacity:1;transform:scale(1.4)}100%{opacity:.75;transform:scale(1)}}
-/* LCD readout under the dish */
-.lcd{position:relative;height:18px;width:46vmin;max-width:340px;text-align:center;font-size:12px;letter-spacing:.34em;font-weight:700}
-.lcd span{position:absolute;inset:0;white-space:nowrap}
-.scan{color:rgba(74,201,143,.75);animation:scanTxt 1.2s steps(1) forwards}
-@keyframes scanTxt{0%{opacity:1}100%{opacity:0}}
-.ok{color:#7dffbe;text-shadow:0 0 12px rgba(125,255,190,.8);opacity:0;animation:okTxt .3s ease-out 1.2s forwards}
-@keyframes okTxt{to{opacity:1}}
-.scan i{font-style:normal;animation:dots 1.2s steps(4) infinite}
-@keyframes dots{0%{content:""}}
-@media (prefers-reduced-motion:reduce){.scene,.sweep,.blip,.veil,.scan,.ok{animation-duration:.01ms;animation-delay:0s}}
-</style>
-</head><body>
-<div class="scene">
-  <div class="radar">
-    <div class="sweep"></div>
-    <span class="blip b1"></span><span class="blip b2"></span><span class="blip b3"></span>
-    <span class="center"></span>
-  </div>
-  <div class="lcd"><span class="scan">SCANNING FILE</span><span class="ok">ACCESS GRANTED</span></div>
-</div>
-<div class="veil"></div>
-<script${nonce ? ` nonce="${esc(nonce)}"` : ""}>
-(function(){
-  try {
-    var AC = window.AudioContext || window.webkitAudioContext;
-    if (AC) {
-      var ctx = new AC();
-      var beep = function(freq, start, dur){
-        var o = ctx.createOscillator(), g = ctx.createGain();
-        o.type = "square"; o.frequency.value = freq;
-        g.gain.setValueAtTime(0, ctx.currentTime + start);
-        g.gain.linearRampToValueAtTime(0.08, ctx.currentTime + start + 0.01);
-        g.gain.linearRampToValueAtTime(0, ctx.currentTime + start + dur);
-        o.connect(g); g.connect(ctx.destination);
-        o.start(ctx.currentTime + start); o.stop(ctx.currentTime + start + dur + 0.02);
-      };
-      beep(523.25, 0.42, 0.06); beep(523.25, 0.68, 0.06); beep(523.25, 0.94, 0.06); beep(987.77, 1.2, 0.26);
-    }
-  } catch(e){}
-  setTimeout(function(){ window.location.replace(${JSON.stringify(target)}); }, 1950);
-})();
-</script>
 </body></html>`;
 }
