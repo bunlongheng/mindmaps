@@ -758,7 +758,7 @@ describe('SidePanel — Auto Icons (AI)', () => {
     }, { timeout: 3000 })
   })
 
-  it('assigns AI icons and forces icons for nodes AI missed', async () => {
+  it('assigns AI icons and forces icons for level 1 nodes AI missed', async () => {
     loadDiagram()
     ;(fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: true,
@@ -776,7 +776,8 @@ describe('SidePanel — Auto Icons (AI)', () => {
       const map = useMindmapStore.getState().activeMindmap!
       expect(map.nodes.find(n => n.id === 'c1')!.icon).toBeTruthy()
       expect(map.nodes.find(n => n.id === 'c2')!.icon).toBeTruthy()
-      expect(map.nodes.find(n => n.id === 'g1')!.icon).toBeTruthy()
+      // Level 1 only: deeper boxes stay text
+      expect(map.nodes.find(n => n.id === 'g1')!.icon).toBeFalsy()
     }, { timeout: 3000 })
   })
 })
