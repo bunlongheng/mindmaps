@@ -1233,3 +1233,38 @@ describe('HomePage — a card preview follows the stored version', () => {
     expect(JSON.parse(localStorage.getItem('mindmaps:thumb:v1')!).themeId).toBe('cyberpunk')
   })
 })
+
+describe('HomePage - avatar cache', () => {
+  const PIC = { ...USER, picture: 'https://img.example/a.png' }
+
+  it('uses the cached base64 avatar without fetching the picture', () => {
+    localStorage.setItem('mindmaps:avatarB64', 'data:image/png;base64,CACHED')
+    render(<HomePage onOpen={vi.fn()} user={PIC} onSignOut={vi.fn()} />)
+    const calls = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls.map(c => c[0])
+    expect(calls).not.toContain('https://img.example/a.png')
+    expect(document.querySelector('img[src="data:image/png;base64,CACHED"]')).not.toBeNull()
+  })
+
+  it('fetches the picture once, caches it as base64 and shows it', async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url === 'https://img.example/a.png') return { ok: true, blob: async () => new Blob(['x'], { type: 'image/png' }) }
+      return { ok: true, json: async () => [] }
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    render(<HomePage onOpen={vi.fn()} user={PIC} onSignOut={vi.fn()} />)
+    await waitFor(() => expect(localStorage.getItem('mindmaps:avatarB64')).toMatch(/^data:image\/png;base64,/))
+    expect(localStorage.getItem('mindmaps:avatar')).toBe('https://img.example/a.png')
+    await waitFor(() => expect(document.querySelector('img[src^="data:image/png;base64,"]')).not.toBeNull())
+  })
+
+  it('falls back to the live picture url when the fetch fails', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      if (url === 'https://img.example/a.png') throw new Error('offline')
+      return { ok: true, json: async () => [] }
+    }))
+    render(<HomePage onOpen={vi.fn()} user={PIC} onSignOut={vi.fn()} />)
+    await waitFor(() => expect(localStorage.getItem('mindmaps:avatar')).toBe('https://img.example/a.png'))
+    expect(localStorage.getItem('mindmaps:avatarB64')).toBeNull()
+    await waitFor(() => expect(document.querySelector('img[src="https://img.example/a.png"]')).not.toBeNull())
+  })
+})

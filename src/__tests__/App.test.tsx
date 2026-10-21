@@ -733,3 +733,59 @@ describe('App — beforeunload save', () => {
     vi.useRealTimers()
   })
 })
+
+describe('App - Lock menu passcode', () => {
+  type Reply = { ok: boolean; status?: number; body?: unknown }
+  async function openLock(reply: Reply) {
+    setUrl('/?map=m1')
+    const diagram = makeDiagram()
+    const patch = vi.fn(async () => ({ ok: reply.ok, status: reply.status ?? 200, json: async () => reply.body ?? {} }))
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+      if (init?.method === 'PATCH') return patch(url, init)
+      if (typeof url === 'string' && url.includes('id=m1')) {
+        return { ok: true, json: async () => ({ id: 'm1', name: 'My Map', type: 'logic-chart', nodes: diagram.nodes, line_style: 'orthogonal', theme_id: 'default', tags: [], has_passcode: true, passcode: 'old', sharing_enabled: true }) }
+      }
+      return { ok: true, json: async () => [] }
+    }))
+    render(<App />)
+    await waitFor(() => expect(screen.getByTestId('canvas')).toBeInTheDocument())
+    fireEvent.click(screen.getByTitle(/Lock/, { selector: 'button[aria-haspopup]' }))
+    return patch
+  }
+  const typeAndSave = async (value: string) => {
+    fireEvent.change(screen.getByLabelText('Passcode'), { target: { value } })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /^(Set|Update)$/ })) })
+  }
+
+  it('sets a passcode, copies the share link and stores it on the map', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+    const patch = await openLock({ ok: true, body: { sharing_enabled: true, has_passcode: true, passcode: 'secret' } })
+    await typeAndSave('secret')
+    expect(patch).toHaveBeenCalledWith('/api/mindmaps?id=m1', expect.objectContaining({ body: JSON.stringify({ passcode: 'secret' }) }))
+    await waitFor(() => expect(showToast).toHaveBeenCalledWith('Passcode set - link copied', expect.anything()))
+    expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/s/m1`)
+    expect(useMindmapStore.getState().activeMindmap).toMatchObject({ hasPasscode: true, passcode: 'secret', sharingEnabled: true })
+  })
+
+  it('says the link opens to a lock screen when the clipboard is refused', async () => {
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText: vi.fn().mockRejectedValue(new Error('no')) }, configurable: true })
+    await openLock({ ok: true, body: { sharing_enabled: true, has_passcode: true, passcode: 'secret' } })
+    await typeAndSave('secret')
+    await waitFor(() => expect(showToast).toHaveBeenCalledWith('Passcode set - the link opens to a lock screen', expect.anything()))
+  })
+
+  it('removes the passcode with the Lock access switch', async () => {
+    await openLock({ ok: true, body: { sharing_enabled: false, has_passcode: false, passcode: '' } })
+    await act(async () => { fireEvent.click(screen.getByRole('menuitemcheckbox')) })
+    await waitFor(() => expect(showToast).toHaveBeenCalledWith('Passcode removed', expect.anything()))
+    expect(useMindmapStore.getState().activeMindmap).toMatchObject({ hasPasscode: false, passcode: '' })
+  })
+
+  it('toasts an error and keeps the box open when the server refuses', async () => {
+    await openLock({ ok: false, status: 500 })
+    await typeAndSave('secret')
+    expect(showToast).toHaveBeenCalledWith('Could not change the passcode', expect.anything())
+    expect(screen.getByLabelText('Passcode')).toBeInTheDocument()
+  })
+})
