@@ -46,7 +46,7 @@ export function MapNotes({ top = 64 }: { top?: number }) {
             <span style={{ flex: 1, fontSize: 13, fontWeight: 700 }}>Legend</span>
             {keyOpen ? <ChevronDown size={16} color="#94a3b8" /> : <ChevronUp size={16} color="#94a3b8" />}
           </button>
-          {keyOpen && <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 2, marginTop: 8, maxHeight: '40vh', overflowY: 'auto' }}>
+          {keyOpen && <ul style={{ listStyle: 'none', padding: 0, display: 'grid', gap: 2, margin: '8px -7px 0', maxHeight: '40vh', overflowY: 'auto', overflowX: 'hidden' }}>
             {legend.map((r, i) => {
               const on = focus.includes(i)
               return (
@@ -56,7 +56,7 @@ export function MapNotes({ top = 64 }: { top?: number }) {
                     title={on ? 'Show all again' : `Show only: ${r.label}`} style={{
                       ...toggle, alignItems: 'center', fontSize: 12, color: on ? '#111827' : '#334155',
                       // The selected row gets an outline so it pops; off rows keep a clear border so nothing shifts
-                      padding: '3px 6px', margin: '0 -7px', width: 'calc(100% + 14px)', borderRadius: 6,
+                      padding: '3px 6px', borderRadius: 6,
                       border: `1px solid ${on ? '#6366f1' : 'transparent'}`, background: on ? 'rgba(99,102,241,0.08)' : 'transparent',
                     }}>
                     {r.emoji
