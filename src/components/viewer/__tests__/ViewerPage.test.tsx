@@ -1,10 +1,10 @@
-import { describe, it, expect, afterEach } from 'vitest'
-import { render, screen, cleanup } from '@testing-library/react'
+import { describe, it, expect, afterEach, vi } from 'vitest'
+import { render, screen, cleanup, fireEvent, act } from '@testing-library/react'
 import { ViewerPage } from '../ViewerPage'
 import { toOutline } from '../../../lib/export/outline'
 import type { Diagram, MindmapNode } from '../../../types'
 
-afterEach(() => cleanup())
+afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.useRealTimers() })
 
 function makeDiagram(overrides: Partial<Diagram> = {}): Diagram {
   const nodes: MindmapNode[] = [
@@ -75,5 +75,47 @@ describe('ViewerPage', () => {
     unmount()
     expect(document.title).toBe('Untouched')
     document.title = prevTitle
+  })
+
+  it('copies the outline and flips the label to Copied, then back', async () => {
+    vi.useFakeTimers()
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+    render(<ViewerPage diagram={makeDiagram()} id="m1" />)
+    await act(async () => { fireEvent.click(screen.getByText('Copy for AI')) })
+    expect(writeText).toHaveBeenCalledWith('# My Map\n\n- Child\n')
+    expect(screen.getByText('Copied')).toBeInTheDocument()
+    act(() => { vi.advanceTimersByTime(1600) })
+    expect(screen.getByText('Copy for AI')).toBeInTheDocument()
+  })
+
+  it('swallows a clipboard rejection', async () => {
+    const writeText = vi.fn().mockRejectedValue(new Error('denied'))
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+    render(<ViewerPage diagram={makeDiagram()} id="m1" />)
+    await act(async () => { fireEvent.click(screen.getByText('Copy for AI')) })
+    expect(screen.getByText('Copy for AI')).toBeInTheDocument()
+  })
+
+  it('does nothing on Copy for AI when there is no clipboard', () => {
+    Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true })
+    render(<ViewerPage diagram={makeDiagram()} id="m1" />)
+    fireEvent.click(screen.getByText('Copy for AI'))
+    expect(screen.getByText('Copy for AI')).toBeInTheDocument()
+  })
+
+  it('downloads the map as JSON from the JSON button', () => {
+    const url = vi.fn(() => 'blob:x')
+    Object.assign(URL, { createObjectURL: url, revokeObjectURL: vi.fn() })
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    render(<ViewerPage diagram={makeDiagram()} id="m1" />)
+    fireEvent.click(screen.getByText('JSON'))
+    expect(url).toHaveBeenCalled()
+    expect(click).toHaveBeenCalled()
+  })
+
+  it('falls back to "Diagram" as the title name when the diagram has no name', () => {
+    render(<ViewerPage diagram={makeDiagram({ name: '' })} id="m1" />)
+    expect(document.title).toBe('Diagram · Mindmaps')
   })
 })

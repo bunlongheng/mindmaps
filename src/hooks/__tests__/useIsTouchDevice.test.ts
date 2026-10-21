@@ -107,3 +107,18 @@ describe('useIsTouchDevice', () => {
     expect(result.current).toBe(true)
   })
 })
+
+describe('useIsTouchDevice without matchMedia', () => {
+  it('reports false and does not subscribe when matchMedia is missing', () => {
+    const original = window.matchMedia
+    // @ts-expect-error simulating an environment with no matchMedia
+    window.matchMedia = undefined
+    try {
+      const { result, unmount } = renderHook(() => useIsTouchDevice())
+      expect(result.current).toBe(false)
+      unmount()
+    } finally {
+      window.matchMedia = original
+    }
+  })
+})

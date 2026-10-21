@@ -632,3 +632,35 @@ describe('localStorage helpers via the hook', () => {
     expect(returned!.id).toBe('d1')
   })
 })
+
+describe('loadDiagram on a 401', () => {
+  const realLocation = window.location
+  afterEach(() => { Object.defineProperty(window, 'location', { configurable: true, writable: true, value: realLocation }) })
+
+  it('sends the visitor to the lock screen for a passcode-locked share and keeps the spinner up', async () => {
+    const replace = vi.fn()
+    Object.defineProperty(window, 'location', { configurable: true, writable: true, value: { ...realLocation, replace } })
+    fetchMock.mockResolvedValue({ ok: false, status: 401, clone: () => ({ json: async () => ({ passcode_required: true, id: 'd 1' }) }) } as unknown as Response)
+    const { result } = renderHook(() => useDiagram(null))
+    let settled = false
+    act(() => { result.current.loadDiagram('d1').then(() => { settled = true }) })
+    await vi.waitFor(() => expect(replace).toHaveBeenCalledWith('/api/unlock?id=d%201'))
+    expect(settled).toBe(false)
+  })
+
+  it('treats a 401 without passcode_required as final, and a body that is not JSON too', async () => {
+    fetchMock.mockResolvedValue({ ok: false, status: 401, clone: () => ({ json: async () => { throw new Error('bad json') } }) } as unknown as Response)
+    const { result } = renderHook(() => useDiagram(null))
+    let returned: Diagram | null = makeRow() as unknown as Diagram
+    await act(async () => { returned = await result.current.loadDiagram('d1') })
+    expect(returned).toBeNull()
+  })
+
+  it('ends a signed-in session when its read is refused with a 401', async () => {
+    fetchMock.mockResolvedValue({ ok: false, status: 401, clone: () => ({ json: async () => ({}) }) } as unknown as Response)
+    localStorage.setItem('mindmaps:user', '{"userId":"u1"}')
+    const { result } = renderHook(() => useDiagram('u1'))
+    await act(async () => { await result.current.loadDiagram('d1') })
+    expect(localStorage.getItem('mindmaps:user')).toBeNull()
+  })
+})
