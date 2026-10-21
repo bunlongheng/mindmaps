@@ -57,7 +57,7 @@ describe('MapNotes', () => {
     expect(screen.queryByTestId('map-note')).not.toBeInTheDocument()
   })
 
-  it('focuses legend rows on click and clears them with Show all', () => {
+  it('focuses legend rows on click, a second click drops one, no Show all link', () => {
     load({ legend: [{ emoji: '🔴', label: 'Deep' }, { emoji: '🟢', label: 'Light' }] })
     render(<MapNotes />)
     const deep = screen.getByRole('button', { name: /Deep/ })
@@ -68,9 +68,9 @@ describe('MapNotes', () => {
     expect(useMindmapStore.getState().legendFocus).toEqual([0, 1])
     fireEvent.click(deep)
     expect(useMindmapStore.getState().legendFocus).toEqual([1])
-    fireEvent.click(screen.getByText('Show all'))
-    expect(useMindmapStore.getState().legendFocus).toEqual([])
     expect(screen.queryByText('Show all')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Light/ }))
+    expect(useMindmapStore.getState().legendFocus).toEqual([])
   })
 
   it('drops the focus when another map opens', () => {
