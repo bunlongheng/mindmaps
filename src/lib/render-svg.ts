@@ -7,8 +7,8 @@
 //
 // HARD RULES (Vercel serverless safety): pure TS only. NO fs, NO sharp, NO native
 // deps, NO external fetches, NO <image href>, NO foreignObject, NO <script>.
-// Fonts fall back to system faces; emoji render as plain text glyphs; lucide icons
-// render as a tiny neutral placeholder instead of pulling the icon library.
+// Fonts fall back to system faces; emoji render as plain text glyphs; curated lucide
+// icons draw from their path data, anything else as a tiny neutral placeholder.
 import type { MindmapNode, DiagramType, LineStyle } from '../types/index.js'
 import { computeMindmapsLayout } from './layout/mindmaps-layout.js'
 import { computeMindmapLayout } from './layout/mindmap.js'
@@ -28,6 +28,7 @@ import { LABEL_TEXT, timelineSubFill, timelineSubText,
 import { computeBranchColors } from './branchColor.js'
 import { rootPillWidth, rootPillFontSize, rootIsPill, ROOT_FONT } from './rootPill.js'
 import { nodeMetrics, ICON_GAP } from './nodeMetrics.js'
+import { ICON_MAP, ICON_SYNONYMS } from './icons.js'
 import { normalizeWidthsPerDepth } from './widthNormalize.js'
 import { shapeRx } from './nodeShape.js'
 import { parseLinkedTitle, sliceSegments, lineRanges, type LinkSegment } from './links.js'
@@ -58,6 +59,21 @@ const r2 = (v: number): number => Math.round(v * 100) / 100
 // ── Ported helpers (Node.tsx / mindmapStore.ts - not exported there) ─────────
 
 /** True if the color is light enough that dark text is readable (Node.tsx isLight). */
+
+type IconNode = [string, Record<string, string>][]
+// A curated lucide icon as raw SVG, centred on (cx, cy). The icon's own path data
+// rides on the element its forwardRef render returns, so no React render is needed.
+// null when the name isn't curated - the caller keeps its neutral placeholder.
+function iconGlyph(name: string, cx: number, cy: number, size: number, color: string): string | null {
+  const Icon = (ICON_MAP[name] ?? ICON_MAP[ICON_SYNONYMS[name]]) as unknown as
+    { render?: (p: object, r: null) => { props?: { iconNode?: IconNode } } } | undefined
+  const nodes = Icon?.render?.({}, null)?.props?.iconNode
+  if (!nodes) return null
+  const body = nodes.map(([tag, attrs]) => `<${tag} ${Object.entries(attrs).filter(([k]) => k !== 'key')
+    .map(([k, v]) => `${k}="${esc(String(v))}"`).join(' ')}/>`).join('')
+  return `<g transform="translate(${r2(cx - size / 2)},${r2(cy - size / 2)}) scale(${r2(size / 24)})" fill="none" stroke="${esc(color)}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${body}</g>`
+}
+
 function isLight(hex: string): boolean {
   if (!hex.startsWith('#')) return true
   const [r, g, b] = hexToRgb(hex)
@@ -456,7 +472,7 @@ function renderNode(node: MindmapNode, type: DiagramType, paletteColor: string |
   const baseFontSize = Number(node.fontSize)
     || (isRoot && type === 'graph' ? RADIAL_ROOT_FONT : metric.fontSize)
   const fontSize = isRootPill ? rootPillFontSize(node.title, baseFontSize) : baseFontSize
-  const fontWeight = node.bold ? '700' : (isRoot ? '500' : node.depth === 1 ? '500' : '400')
+  const fontWeight = node.bold ? '700' : (isRoot ? '500' : node.depth === 1 ? '500' : node.depth === 2 ? '600' : '400')
 
   const hasEmoji = (!isRoot || isHex) && !!node.emoji
   const hasIcon = !isRoot && !hasEmoji && !!node.icon
@@ -569,8 +585,8 @@ function renderNode(node: MindmapNode, type: DiagramType, paletteColor: string |
     if (hasEmoji) {
       parts.push(`<text x="${r2(cx)}" y="${r2(iconCY + iconSize * 0.36)}" text-anchor="middle" font-size="${r2(iconSize)}">${esc(node.emoji)}</text>`)
     } else if (hasIcon) {
-      // No icon library server-side: a neutral ring stands in for the lucide glyph.
-      parts.push(`<circle cx="${r2(cx)}" cy="${r2(iconCY)}" r="${r2(iconSize / 2.4)}" fill="none" stroke="${esc(textColor)}" stroke-width="2"/>`)
+      parts.push(iconGlyph(node.icon!, cx, iconCY, iconSize, textColor)
+        ?? `<circle cx="${r2(cx)}" cy="${r2(iconCY)}" r="${r2(iconSize / 2.4)}" fill="none" stroke="${esc(textColor)}" stroke-width="2"/>`)
     }
     const titleTspans = titleLines.map((line, i) =>
       `<tspan x="${r2(cx)}" y="${r2(firstLineY + i * lineH)}">${esc(line)}</tspan>`).join('')
@@ -591,8 +607,8 @@ function renderNode(node: MindmapNode, type: DiagramType, paletteColor: string |
       if (hasEmoji) {
         parts.push(`<text x="${r2(cx)}" y="${r2(cy + glyph * 0.36)}" text-anchor="middle" font-size="${glyph}">${esc(node.emoji)}</text>`)
       } else if (hasIcon) {
-        // No icon library server-side: a neutral ring stands in for the lucide glyph.
-        parts.push(`<circle cx="${r2(cx)}" cy="${r2(cy)}" r="${r2(glyph / 2.4)}" fill="none" stroke="${esc(textColor)}" stroke-width="2"/>`)
+        parts.push(iconGlyph(node.icon!, cx, cy, glyph, textColor)
+        ?? `<circle cx="${r2(cx)}" cy="${r2(cy)}" r="${r2(glyph / 2.4)}" fill="none" stroke="${esc(textColor)}" stroke-width="2"/>`)
       } else {
         if (neon) {
           parts.push(`<text x="${r2(cx)}" y="${r2(cy + glyph * 0.36)}" text-anchor="middle" font-size="${glyph}" font-weight="600" fill="${NEON_TEXT}" filter="url(#${NEON_TEXT_FILTER})">${esc(nodeInitial(node.title))}</text>`)
@@ -622,12 +638,16 @@ function renderNode(node: MindmapNode, type: DiagramType, paletteColor: string |
     parts.push(`<text x="${r2(h / 2 + skOff)}" y="${r2(h / 2 + emojiSize * 0.36)}" text-anchor="middle" font-size="${emojiSize}">${esc(node.emoji)}</text>`)
     parts.push(`<text x="${r2(h + ICON_GAP + skOff)}" y="${r2(h / 2 + fontSize * 0.38)}" text-anchor="start" font-size="${fontSize}" font-weight="${fontWeight}" fill="${esc(textColor)}">${labelBody}</text>`)
   } else if (hasIcon) {
-    // Neutral placeholder for the lucide icon (no icon dep server-side)
     const iconSize = Math.round(h * 0.48)
     const ix = (h - iconSize) / 2 + skOff
     const iy = (h - iconSize) / 2
-    parts.push(`<rect x="${r2(ix)}" y="${r2(iy)}" width="${iconSize}" height="${iconSize}" rx="${Math.round(iconSize / 4)}" fill="none" stroke="${esc(col)}" stroke-width="2"/>`)
-    parts.push(`<circle cx="${r2(ix + iconSize / 2)}" cy="${r2(iy + iconSize / 2)}" r="${r2(iconSize / 6)}" fill="${esc(col)}"/>`)
+    const glyph = iconGlyph(node.icon!, ix + iconSize / 2, iy + iconSize / 2, iconSize, col)
+    if (glyph) parts.push(glyph)
+    else {
+      // Neutral placeholder when the name isn't a curated icon
+      parts.push(`<rect x="${r2(ix)}" y="${r2(iy)}" width="${iconSize}" height="${iconSize}" rx="${Math.round(iconSize / 4)}" fill="none" stroke="${esc(col)}" stroke-width="2"/>`)
+      parts.push(`<circle cx="${r2(ix + iconSize / 2)}" cy="${r2(iy + iconSize / 2)}" r="${r2(iconSize / 6)}" fill="${esc(col)}"/>`)
+    }
     parts.push(`<text x="${r2(h + ICON_GAP + skOff)}" y="${r2(h / 2 + fontSize * 0.38)}" text-anchor="start" font-size="${fontSize}" font-weight="${fontWeight}" fill="${esc(textColor)}">${labelBody}</text>`)
   } else {
     const tx = isRoot ? cx : align === 'left' ? metric.padX + skOff : align === 'right' ? displayW - metric.padX : displayW / 2

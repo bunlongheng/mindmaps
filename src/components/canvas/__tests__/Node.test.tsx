@@ -206,11 +206,11 @@ describe('Node — rendering by depth / type', () => {
 
     const circle = makeNode({ id: 'sc', shape: 'circle' })
     loadStore([makeRoot(), circle])
-    const { container } = renderNode(circle)
-    const circles = Array.from(container.querySelectorAll('circle'))
-    expect(circles.length).toBeGreaterThan(0)
     // The drawn circle must be wide enough for the label it holds
     const drawn = useMindmapStore.getState().activeMindmap!.nodes.find(n => n.id === 'sc')!
+    const { container } = renderNode(drawn)
+    const circles = Array.from(container.querySelectorAll('circle'))
+    expect(circles.length).toBeGreaterThan(0)
     expect(drawn.width).toBe(drawn.height)
     expect(Number(circles[0].getAttribute('r'))).toBeGreaterThanOrEqual(drawn.width / 2)
   })

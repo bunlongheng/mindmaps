@@ -4,7 +4,6 @@ import { showToast } from '../components/CuteToast'
 import { useMindmapStore } from '../store/mindmapStore'
 import { ROOT_COLORS } from '../lib/color'
 import { nodeHeight, nodeMinWidth } from '../lib/nodeMetrics'
-import { soundCreate, soundDelete, soundSave, soundPaste } from '../lib/sounds'
 import { endSession } from '../lib/session'
 import type { Diagram, DiagramMeta, MindmapNode } from '../types'
 
@@ -50,7 +49,10 @@ function lsGetDiagram(id: string): Diagram | null {
 }
 function lsSaveDiagram(d: Diagram) {
   const now = new Date().toISOString()
-  const saved = { ...d, updatedAt: now }
+  // The owner's plain passcode never lands in localStorage.
+  const { passcode: _passcode, ...rest } = d
+  void _passcode
+  const saved = { ...rest, updatedAt: now }
   localStorage.setItem(lsKey(d.id), JSON.stringify(saved))
   const list = lsGetList()
   const idx = list.findIndex(m => m.id === d.id)
@@ -80,6 +82,11 @@ function rowToDiagram(row: Record<string, unknown>): Diagram {
     id:                 n.id as string,
     title:              n.title as string,
     color:              n.color as string,
+    // Dropping these made a map open in palette colours / shared widths / fully expanded,
+    // unlike the card and share image, and the next save wiped them from the stored map.
+    colorMode:          (n.colorMode ?? undefined) as MindmapNode['colorMode'],
+    widthMode:          (n.widthMode ?? undefined) as MindmapNode['widthMode'],
+    collapsed:          (n.collapsed ?? undefined) as boolean | undefined,
     parentId:           (n.parentId ?? null) as string | null,
     depth:              n.depth as number,
     x:                  n.x as number,
@@ -106,6 +113,9 @@ function rowToDiagram(row: Record<string, unknown>): Diagram {
     combStyle:          (n.combStyle ?? undefined) as MindmapNode['combStyle'],
     combSize:           (n.combSize ?? undefined) as MindmapNode['combSize'],
     ringSize:           (n.ringSize ?? undefined) as MindmapNode['ringSize'],
+    note:               (n.note ?? undefined) as MindmapNode['note'],
+    legend:             (n.legend ?? undefined) as MindmapNode['legend'],
+    showLegend:         (n.showLegend ?? undefined) as boolean | undefined,
   }))
   return {
     id:             row.id as string,
@@ -115,6 +125,8 @@ function rowToDiagram(row: Record<string, unknown>): Diagram {
     createdAt:      (row.created_at as string) ?? new Date().toISOString(),
     updatedAt:      (row.updated_at as string) ?? new Date().toISOString(),
     sharingEnabled: (row.sharing_enabled ?? false) as boolean,
+    hasPasscode:    Boolean(row.has_passcode),
+    passcode:       (row.passcode as string | undefined) ?? '',
     themeId:        (row.theme_id as string | undefined) ?? 'default',
     tags:           (row.tags as string[] | undefined) ?? [],
     nodes,
@@ -168,6 +180,15 @@ export function useDiagram(userId: string | null = null) {
       try {
         const res = await fetch(`${API_BASE}?${params}`, { headers: authHeaders() })
         if (!res.ok) {
+          // A passcode-locked share answers 401 passcode_required: the visitor goes
+          // to its lock screen, which sends them back here with an unlock cookie.
+          if (res.status === 401) {
+            const body = await res.clone().json().catch(() => ({})) as { passcode_required?: boolean; id?: string }
+            if (body.passcode_required) {
+              window.location.replace(`/api/unlock?id=${encodeURIComponent(body.id ?? id)}`)
+              return new Promise<null>(() => {}) // the page is leaving; keep the spinner up
+            }
+          }
           // Retry 5xx once; treat 4xx (not found / not shared) as final.
           if (res.status >= 500 && attempt === 0) { await new Promise(r => setTimeout(r, 500)); continue }
           // Only a signed-in read can be an expired session; an anonymous 401 on a
@@ -223,7 +244,6 @@ export function useDiagram(userId: string | null = null) {
       }),
     }, diagram.name)
     setIsDirty(false)
-    soundSave()
   }, [setIsDirty, userId])
 
   const createDiagram = useCallback(async (name: string): Promise<string> => {
@@ -249,7 +269,6 @@ export function useDiagram(userId: string | null = null) {
     setActiveMindmap(diagram)
     localStorage.setItem('activeMindmapId', id)
     setDiagrams(lsGetList())
-    soundCreate()
     showToast(`✦ "${name}" created`, { color: '#1a1d2e', confetti: true })
 
     // Sync to server in background
@@ -280,7 +299,6 @@ export function useDiagram(userId: string | null = null) {
     setActiveMindmap(diagram)
     localStorage.setItem('activeMindmapId', id)
     setDiagrams(lsGetList())
-    soundPaste()
     showToast(`✦ "${finalName}" created`, { color: '#22c55e', confetti: true })
 
     if (userId) {
@@ -305,7 +323,6 @@ export function useDiagram(userId: string | null = null) {
     lsDeleteDiagram(id)
     const { diagrams } = useMindmapStore.getState()
     setDiagrams(diagrams.filter(d => d.id !== id))
-    soundDelete()
     showToast(`"${name ?? 'Map'}" deleted`, { color: '#1a1d2e' })
 
     if (userId) {

@@ -768,13 +768,13 @@ describe('mindmapStore', () => {
       useMindmapStore.getState().reorderNode('c2', 'c1')
       useMindmapStore.getState().resizeNodeDepth(1, 260)
       useMindmapStore.getState().setShareEnabled(true)
-      useMindmapStore.getState().setShowOrderNumbers(false)
+      useMindmapStore.getState().setShowOrderNumbers(true)
       useMindmapStore.getState().autoAssignIcons()
       expect(pastLen()).toBe(5)
       useMindmapStore.getState().undo()
-      expect(useMindmapStore.getState().showOrderNumbers).toBe(false)
-      useMindmapStore.getState().undo()
       expect(useMindmapStore.getState().showOrderNumbers).toBe(true)
+      useMindmapStore.getState().undo()
+      expect(useMindmapStore.getState().showOrderNumbers).toBe(false)
       expect(useMindmapStore.getState().activeMindmap!.sharingEnabled).toBe(true)
     })
 
@@ -1183,11 +1183,11 @@ describe('mindmapStore', () => {
       expect(useMindmapStore.getState().themeId).toBe('cyberpunk')
     })
 
-    it('defaults showOrderNumbers to true when undefined', () => {
+    it('defaults showOrderNumbers to false when undefined', () => {
       const d = makeDiagram()
       delete (d as { showOrderNumbers?: boolean }).showOrderNumbers
       useMindmapStore.getState().setActiveMindmap(d)
-      expect(useMindmapStore.getState().showOrderNumbers).toBe(true)
+      expect(useMindmapStore.getState().showOrderNumbers).toBe(false)
     })
   })
 

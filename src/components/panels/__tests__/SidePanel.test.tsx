@@ -706,7 +706,7 @@ describe('SidePanel — Auto Icons (AI)', () => {
     loadDiagram(d)
     render(<SidePanel nodeId={null} onClose={vi.fn()} />)
     fireEvent.click(screen.getByText('✦ Auto Icons (AI)'))
-    await waitFor(() => expect(showToast).toHaveBeenCalledWith('All nodes already have icons', expect.anything()))
+    await waitFor(() => expect(showToast).toHaveBeenCalledWith('All level 1 topics already have icons', expect.anything()))
     expect(fetch).not.toHaveBeenCalled()
   })
 
@@ -758,7 +758,7 @@ describe('SidePanel — Auto Icons (AI)', () => {
     }, { timeout: 3000 })
   })
 
-  it('assigns AI icons and forces icons for nodes AI missed', async () => {
+  it('assigns AI icons and forces icons for level 1 nodes AI missed', async () => {
     loadDiagram()
     ;(fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: true,
@@ -776,7 +776,6 @@ describe('SidePanel — Auto Icons (AI)', () => {
       const map = useMindmapStore.getState().activeMindmap!
       expect(map.nodes.find(n => n.id === 'c1')!.icon).toBeTruthy()
       expect(map.nodes.find(n => n.id === 'c2')!.icon).toBeTruthy()
-      expect(map.nodes.find(n => n.id === 'g1')!.icon).toBeTruthy()
     }, { timeout: 3000 })
   })
 })
@@ -797,7 +796,7 @@ describe('SidePanel — Share tab', () => {
     expect(screen.getByText('Link preview')).toBeInTheDocument()
     expect(screen.getByTestId('share-url')).toHaveTextContent(`${window.location.origin}/s/d1`)
     const img = screen.getByAltText('Share card preview') as HTMLImageElement
-    expect(img.getAttribute('src')).toBe('/api/og-image?id=d1&v=private')
+    expect(img.getAttribute('src')).toMatch(/^data:image\/svg\+xml/)
     fireEvent.click(screen.getByText('Link disabled').parentElement!.querySelector('button')!)
     expect(img.getAttribute('src')).toBe('/api/og-image?id=d1&v=public')
   })

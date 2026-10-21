@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach } from 'vitest'
 import { render, screen, cleanup } from '@testing-library/react'
 import { ViewerPage } from '../ViewerPage'
+import { toOutline } from '../../../lib/export/outline'
 import type { Diagram, MindmapNode } from '../../../types'
 
 afterEach(() => cleanup())
@@ -26,8 +27,15 @@ describe('ViewerPage', () => {
 
   it('links Download SVG to the map id when the map came from the API by id', () => {
     render(<ViewerPage diagram={makeDiagram()} id="m1" />)
-    const link = screen.getByText('Download SVG')
+    const link = screen.getByText('Download SVG').closest('a')!
     expect(link.getAttribute('href')).toBe('/api/mindmaps?id=m1&format=svg')
+  })
+
+  it('says the map is unavailable instead of a blank page when it failed to load', () => {
+    render(<ViewerPage diagram={null} id="m1" />)
+    expect(screen.getByText("This map isn't available")).toBeInTheDocument()
+    expect(screen.getByText('Go to Mindmaps').getAttribute('href')).toBe('/')
+    expect(screen.queryByText('Download SVG')).toBeNull()
   })
 
   it('hides Download SVG for a ?d= decoded share (no id)', () => {
@@ -35,27 +43,28 @@ describe('ViewerPage', () => {
     expect(screen.queryByText('Download SVG')).toBeNull()
   })
 
-  it('injects the rendered SVG carrying the map name as its title', () => {
-    const { container } = render(<ViewerPage diagram={makeDiagram({ name: 'My Map' })} id="m1" />)
-    const svg = container.querySelector('.mm-viewer-card svg')
-    expect(svg).toBeTruthy()
-    expect(svg!.querySelector('title')!.textContent).toBe('My Map')
+  it('shows the map name in the header', () => {
+    render(<ViewerPage diagram={makeDiagram({ name: 'My Map' })} id="m1" />)
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('My Map')
   })
 
-  it('renders all 5 footer links on a demo map', () => {
-    render(<ViewerPage diagram={makeDiagram({ tags: ['demo'] })} id="m1" />)
-    for (const label of ['Portfolio', 'GitHub', 'LinkedIn', 'Instagram', 'X']) {
-      expect(screen.getByTitle(label)).toBeInTheDocument()
-    }
+  it('offers Copy for AI and JSON exports', () => {
+    render(<ViewerPage diagram={makeDiagram()} id="m1" />)
+    expect(screen.getByText('Copy for AI')).toBeInTheDocument()
+    expect(screen.getByText('JSON')).toBeInTheDocument()
   })
 
-  it('leaves the social footer off a map that is not a demo', () => {
-    render(<ViewerPage diagram={makeDiagram({ tags: ['Work'] })} id="m1" />)
-    expect(screen.queryByTitle('GitHub')).toBeNull()
-    expect(screen.queryByText('Bunlong')).toBeNull()
-    cleanup()
-    render(<ViewerPage diagram={makeDiagram({ tags: undefined })} id="m1" />)
-    expect(screen.queryByTitle('GitHub')).toBeNull()
+  it('outlines the map as nested Markdown for an AI agent', () => {
+    const d = makeDiagram()
+    d.nodes.push({ id: 'g1', title: 'Grandchild', color: '#ef4444', parentId: 'c1', depth: 2, x: 0, y: 0, width: 100, height: 30, sortOrder: 0, url: 'https://x.dev' })
+    expect(toOutline(d)).toBe('# My Map\n\n- Child\n  - Grandchild (https://x.dev)\n')
+  })
+
+  it('leads the outline with the note and legend and keeps each node dot', () => {
+    const d = makeDiagram()
+    d.nodes[0] = { ...d.nodes[0], note: { title: 'What it is', body: 'The goal' }, legend: [{ emoji: '🔴', label: 'Deep' }, { color: '#22c55e', label: 'Light' }, { label: 'Plain' }] }
+    d.nodes[1] = { ...d.nodes[1], emoji: '🔴' }
+    expect(toOutline(d)).toBe('# My Map\n\n**What it is**\n\nThe goal\n\nLegend:\n- 🔴 Deep\n- #22c55e Light\n- Plain\n\n- 🔴 Child\n')
   })
 
   it('sets document title to "<name> · Mindmaps" and restores it on unmount', () => {

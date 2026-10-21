@@ -12,10 +12,15 @@
 //   depth | font      | height       | padX
 //   ------+-----------+--------------+------------------
 //     0   | ROOT_FONT | ROOT_PILL_H  | ROOT_PILL_PAD / 2   (the root, sized in src/lib/rootPill)
-//     1   | 20        | 44           | 14
-//     2   | 18        | 40           | 12
-//     3   | 16        | 36           | 12
-//    4+   | 14        | 32           | 10
+//     1   | 36        | 66           | 30
+//     2   | 31        | 54           | 26
+//     3   | 26        | 38           | 18
+//    4+   | 24        | 36           | 16
+//
+// Level 1 still leads its children (36 vs 31) so the main topics read first, and level 2
+// (semibold, 31) stands clearly above level 3 (26).
+// Child boxes are snug (text about 80 percent of the box): a big map fits by height, so
+// every px of row padding is a px of text size lost at fit zoom.
 //
 // A node carrying an explicit `fontSize` keeps it; only the default comes from here.
 // Callers must never re-declare a size: read fontSize/height/padX from `nodeMetrics`,
@@ -36,10 +41,10 @@ export interface NodeMetric {
 /** Index is depth; the last row covers every deeper level. */
 const TABLE: readonly NodeMetric[] = [
   { fontSize: ROOT_FONT, height: ROOT_PILL_H, padX: ROOT_PILL_PAD / 2 },
-  { fontSize: 20, height: 44, padX: 14 },
-  { fontSize: 18, height: 40, padX: 12 },
-  { fontSize: 16, height: 36, padX: 12 },
-  { fontSize: 14, height: 32, padX: 10 },
+  { fontSize: 36, height: 66, padX: 30 },
+  { fontSize: 31, height: 54, padX: 26 },
+  { fontSize: 26, height: 38, padX: 18 },
+  { fontSize: 24, height: 36, padX: 16 },
 ]
 
 /** Deepest row in the table; every depth past it shares this metric. */

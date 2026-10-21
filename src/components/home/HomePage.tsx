@@ -13,7 +13,6 @@ import { renderMindmapSvg } from '../../lib/render-svg'
 import { emberVanish, blinkDoomed } from '../../lib/emberVanish'
 import { hexToRgb, l1PaletteColor, applyDepthBackground } from '../../lib/color'
 import { AIThinkingOverlay } from '../AIThinkingOverlay'
-import { soundHover, soundPaste } from '../../lib/sounds'
 import { buildTagColorMap, tagColor, type TagColor } from '../../lib/tagColors'
 import { DEMO_TAG, isDemo } from '../../lib/demo'
 
@@ -131,7 +130,6 @@ export function HomePage({ onOpen, user, onSignOut, flashId }: HomePageProps) {
     const lines = trimmed.split('\n').filter(l => l.trim())
     const hasIndent = lines.some(l => /^[ \t]+/.test(l))
     if (isJson || (lines.length >= 2 && hasIndent)) {
-      soundPaste()
       useMindmapStore.getState().loadFromOutline(trimmed)
     } else {
       showToast('Incompatible format — paste JSON or indented outline', { color: '#ef4444', duration: 3000 })
@@ -1196,7 +1194,7 @@ function DiagramCard({ diagram, timeAgo, onOpen, onDelete, isPublic, onTagEdit, 
       tabIndex={0}
       data-map-id={diagram.id}
       aria-label={`Open ${diagram.name}`}
-      onMouseEnter={() => { setHovered(true); soundHover() }}
+      onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       onFocus={() => setHovered(true)}
       onBlur={() => setHovered(false)}
@@ -1267,7 +1265,7 @@ function DiagramRow({ diagram, timeAgo, onOpen, onDelete, isPublic, onTagEdit, f
       tabIndex={0}
       data-map-id={diagram.id}
       aria-label={`Open ${diagram.name}`}
-      onMouseEnter={() => { setHovered(true); soundHover() }}
+      onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       onFocus={() => setHovered(true)}
       onBlur={() => setHovered(false)}

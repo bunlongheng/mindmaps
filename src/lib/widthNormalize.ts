@@ -16,21 +16,23 @@ function autoWidthFor(n: MindmapNode): number {
   })
 }
 
-/** Make every auto-mode node at the same depth share the widest label's width at that depth. */
+/** Make auto-mode nodes at the same depth (sibling group, below a mind map's level 1) share the widest label's width. */
 export function normalizeWidthsPerDepth(nodes: MindmapNode[], type?: DiagramType): MindmapNode[] {
   // The mind map is a radial constellation: every circle's diameter IS its subtree's
   // weight, so sharing one width per depth would erase the thing it says.
   if (type === 'graph' || type === 'honeycomb') return nodes
-  const maxByDepth = new Map<number, number>()
+  // In a mind map every box fits its own label: one long title never widens its neighbours.
+  const key = (n: MindmapNode) => type === 'mindmap' ? `n:${n.id}` : `d:${n.depth}`
+  const maxByKey = new Map<string, number>()
   for (const n of nodes) {
     if (n.depth > 0 && n.shape !== 'circle' && n.widthMode !== 'manual') {
-      maxByDepth.set(n.depth, Math.max(maxByDepth.get(n.depth) ?? 0, autoWidthFor(n)))
+      maxByKey.set(key(n), Math.max(maxByKey.get(key(n)) ?? 0, autoWidthFor(n)))
     }
   }
   return nodes.map(n => {
     if (n.depth <= 0) return n
     if (n.shape === 'circle') return n               // circles keep individual sizes
     if (n.widthMode === 'manual') return n            // manual keeps its own width
-    return { ...n, width: maxByDepth.get(n.depth) ?? n.width }
+    return { ...n, width: maxByKey.get(key(n)) ?? n.width }
   })
 }

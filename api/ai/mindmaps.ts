@@ -74,6 +74,29 @@ function applyRootStyle(nodes: OutlineNode[], rootStyle: unknown): void {
   if (s.combSize === 'inward' || s.combSize === 'outward') root.combSize = s.combSize
 }
 
+const str = (v: unknown, max: number) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : undefined)
+
+/** Copy a caller's note card ({ title, body }) and legend rows onto the root, trimmed and capped. */
+function applyNoteLegend(nodes: OutlineNode[], note: unknown, legend: unknown, showLegend: unknown): void {
+  const root = nodes.find(n => n.parentId === null)
+  if (!root) return
+  if (note && typeof note === 'object' && !Array.isArray(note)) {
+    const n = note as Record<string, unknown>
+    const clean = { title: str(n.title, 200), body: str(n.body, 2000) }
+    if (clean.title || clean.body) root.note = clean
+  }
+  if (Array.isArray(legend)) {
+    const rows = legend.slice(0, 20).flatMap(r => {
+      const o = (r && typeof r === 'object' ? r : {}) as Record<string, unknown>
+      const label = str(o.label, 80)
+      const color = typeof o.color === 'string' && /^#[0-9a-f]{3,8}$/i.test(o.color) ? o.color : undefined
+      return label ? [{ label, emoji: str(o.emoji, 8), color }] : []
+    })
+    if (rows.length) root.legend = rows
+  }
+  if (typeof showLegend === 'boolean') root.showLegend = showLegend
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   Object.entries(corsHeaders(req.headers?.origin, 'POST, OPTIONS')).forEach(([k, v]) => res.setHeader(k, v))
   if (req.method === 'OPTIONS') return res.status(204).end()
@@ -96,7 +119,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         headers: { Authorization: 'Bearer $MINDMAP_AI_API_KEY', 'Content-Type': 'application/json' },
         body: {
           title: 'My Mindmap Title',
-          type: 'logic-chart',
+          type: 'mindmap',
           outline: '{"Root":[{"icon":"brain","Category A":["item 1","item 2"]},{"icon":"zap","Category B":["item 3"]}]}',
         },
       },
@@ -109,6 +132,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         userId: 'optional; omit it - the map is always filed under the configured owner. If sent, it must equal that owner id or the call is rejected with 403.',
         sharing: 'optional bool, default false; set true to make the map readable by id without auth',
         colors: 'optional hex array to override the branch palette',
+        note: 'optional { title, body } card shown at the top left of the map (title max 200, body max 2000 chars)',
+        legend: 'optional array (max 20) of { label, emoji?, color? } key rows shown at the bottom left, e.g. [{"emoji":"🔴","label":"Deep testing"}]; pair it with node "emoji" dots',
+        showLegend: 'optional bool, default true; false hides the legend card but keeps its rows (set root.showLegend on an existing map through PUT)',
         rootStyle: "optional object of root-only look settings: gloss (bool), ringSize ('inward' | 'outward', graph), combStyle ('mesh' | 'web', honeycomb), combSize ('outward' | 'inward', honeycomb web)",
         tags: "optional string array (max 8); defaults to ['API']. Use ['demo'] for a showcase map.",
         source: 'optional string (max 40) naming the caller. "repo-audit" renders the map and stores NOTHING: the response is 200 { stored:false, source, svg } with no id or url.',
@@ -118,7 +144,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     })
   }
 
-  const { title, outline, type: rawType = 'logic-chart', themeId = 'default', lineStyle = 'curved', userId = null, sharing = false, colors, tags, rootStyle } = body
+  const { title, outline, type: rawType = 'mindmap', themeId = 'default', lineStyle = 'curved', userId = null, sharing = false, colors, tags, rootStyle, note, legend } = body
   // A repo audit wants a picture for its report, not a row in the library
   // (owner rule 2026-10-04): source "repo-audit", or store: false, renders the
   // SVG and stores nothing, so an audit never lands in the maps list. The
@@ -134,7 +160,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     : ['API']
   // Coerce unknown diagram types to the safe default (matches the documented behavior + client legacy-type healing).
   const VALID_TYPES = new Set(['logic-chart', 'mindmap', 'graph', 'fishbone', 'timeline', 'honeycomb'])
-  const type = VALID_TYPES.has(rawType) ? rawType : 'logic-chart'
+  const type = VALID_TYPES.has(rawType) ? rawType : 'mindmap'
 
   // Every API map belongs to the configured owner. The static key already proves the caller
   // is the owner's agent, so an omitted userId defaults to that owner instead of writing a
@@ -166,11 +192,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     if (!nodes.length) nodes = parseOutline(outline, palette)
   }
+  // API-made maps default every box to a round pill; an explicit "shape" still wins
+  for (const n of nodes) if (n.depth > 0 && !n.shape) n.shape = 'pill'
 
   // Root-only look settings (gloss, the graph ring direction, the honeycomb comb style).
   // They live on the depth-0 node so the canvas, the home card and the share image all
   // read them from the same place - there is no column for them.
   applyRootStyle(nodes, rootStyle)
+  applyNoteLegend(nodes, note, legend, body.showLegend)
 
   if (renderOnly) {
     try {

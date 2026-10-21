@@ -399,14 +399,26 @@ describe('App — delete confirm modal', () => {
 })
 
 describe('App — viewer / share view', () => {
-  it('renders the document viewer for a ?share= link without a user', async () => {
+  it('renders the look-only canvas for a ?share= link without a user', async () => {
     setHostname('app.example.com')
     setUrl('/?share=abc')
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ id: 'abc', name: 'Shared', type: 'logic-chart', nodes: makeDiagram().nodes, line_style: 'orthogonal', theme_id: 'default' }) })))
     render(<App />)
     await waitFor(() => expect(screen.getByText('Mindmaps')).toBeInTheDocument())
-    expect(screen.queryByTestId('canvas')).toBeNull()
+    expect(screen.getByTestId('canvas').getAttribute('data-readonly')).toBe('1')
     expect(screen.getByText('Download SVG')).toBeInTheDocument()
+  })
+
+  it('opens a ?share= link in the editor for the signed-in owner', async () => {
+    setHostname('app.example.com')
+    setUrl('/?share=abc')
+    localStorage.setItem('mindmaps:user', JSON.stringify({ email: 'a@b.c', name: 'Owner', userId: 'u1' }))
+    localStorage.setItem('mindmaps:token', `h.${btoa(JSON.stringify({ sub: 'u1', exp: Math.floor(Date.now() / 1000) + 3600 }))}.s`)
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ id: 'abc', name: 'Shared', type: 'logic-chart', nodes: makeDiagram().nodes, line_style: 'orthogonal', theme_id: 'default' }) })))
+    render(<App />)
+    await waitFor(() => expect(screen.getByTestId('canvas').getAttribute('data-readonly')).toBe('0'))
+    expect(window.location.search).toBe('?map=abc')
+    expect(screen.queryByText('Download SVG')).toBeNull()
   })
 
   it('renders the viewer from a decoded share URL, with no Download SVG link', async () => {
@@ -414,7 +426,7 @@ describe('App — viewer / share view', () => {
     decodeShareURL.mockReturnValue(makeDiagram({ name: 'Decoded' }))
     render(<App />)
     await waitFor(() => expect(screen.getByText('Mindmaps')).toBeInTheDocument())
-    expect(screen.queryByTestId('canvas')).toBeNull()
+    expect(screen.getByTestId('canvas').getAttribute('data-readonly')).toBe('1')
     expect(screen.queryByText('Download SVG')).toBeNull()
   })
 })
@@ -492,12 +504,12 @@ describe('App — keyboard shortcuts', () => {
     }))
   }
 
-  it('Cmd+S saves and shows a toast in the editor', async () => {
+  it('Cmd+S saves and flashes the green check in the editor', async () => {
     renderEditor()
     render(<App />)
     await waitFor(() => expect(screen.getByTestId('canvas')).toBeInTheDocument())
     await act(async () => { fireEvent.keyDown(document.body, { key: 's', metaKey: true }) })
-    await waitFor(() => expect(showToast).toHaveBeenCalledWith(expect.stringContaining('saved'), expect.anything()))
+    await waitFor(() => expect(screen.getByRole('status', { name: 'Saved' })).toBeInTheDocument())
   })
 
   it('Tab adds a child node in the editor', async () => {
@@ -650,7 +662,7 @@ describe('App — extra coverage', () => {
     await waitFor(() => expect(screen.getByTestId('canvas')).toBeInTheDocument())
     act(() => { useMindmapStore.getState().setIsDirty(true) }) // schedules the 1.5s timer
     await act(async () => { fireEvent.keyDown(document.body, { key: 's', ctrlKey: true }) })
-    await waitFor(() => expect(showToast).toHaveBeenCalledWith(expect.stringContaining('saved'), expect.anything()))
+    await waitFor(() => expect(screen.getByRole('status', { name: 'Saved' })).toBeInTheDocument())
   })
 
   it('back navigation saves a dirty diagram before leaving', async () => {

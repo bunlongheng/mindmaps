@@ -6,11 +6,6 @@ import type { Diagram, MindmapNode } from '../../types'
 
 // showToast is DOM-based — mock it
 vi.mock('../../components/CuteToast', () => ({ showToast: vi.fn() }))
-// exportToJSON is exercised in the copy path — keep the real impl but guard sounds
-vi.mock('../../lib/sounds', () => ({
-  soundCreate: vi.fn(), soundDelete: vi.fn(), soundSave: vi.fn(),
-  soundPaste: vi.fn(), soundClick: vi.fn(), soundHover: vi.fn(),
-}))
 
 import { showToast } from '../../components/CuteToast'
 
