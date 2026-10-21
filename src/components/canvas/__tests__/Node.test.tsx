@@ -1085,6 +1085,33 @@ describe('Node — color helper edge cases', () => {
     // SiriWave blobs are <circle> elements with a blur filter group
     expect(container.querySelector('filter')).toBeTruthy()
   })
+
+  it('draws one glow blob per topic colour, every colour used once', () => {
+    // Owner rule 2026-10-04: spread the glow across ALL the topic colours. The old
+    // fixed table of 6 offsets cycled the palette, so a 5-topic map repeated one
+    // colour and an 8-topic map dropped 2 on the floor.
+    const root = makeRoot({ shape: 'circle' })
+    loadStore([root, makeNode()])
+    const topics = ['#22c55e', '#14b8a6', '#ef4444', '#f97316', '#eab308']
+    const { container } = renderNode(root, { l1Colors: topics })
+    const glow = container.querySelector('g[filter^="url(#siri-blur"]')
+    expect(glow).toBeTruthy()
+    const fills = Array.from(glow!.querySelectorAll('circle')).map(c => c.getAttribute('fill'))
+    expect(fills).toHaveLength(topics.length)
+    expect(new Set(fills)).toEqual(new Set(topics))
+  })
+
+  it('freezes the root glow in place - no spin, no pulse', () => {
+    // Owner rule 2026-10-04: it glows and stays put. A rotating blob pulled the eye
+    // off the labels and kept the GPU busy on a canvas nobody was touching.
+    const root = makeRoot({ shape: 'circle' })
+    loadStore([root, makeNode()])
+    const { container } = renderNode(root, { l1Colors: ['#22c55e', '#ef4444'] })
+    const glow = container.querySelector('g[filter^="url(#siri-blur"]')
+    expect(glow).toBeTruthy()
+    expect(glow!.querySelector('animateTransform')).toBeFalsy()
+    expect(glow!.querySelector('animate')).toBeFalsy()
+  })
 })
 
 describe('Node — move guards with null ref mid-drag', () => {
