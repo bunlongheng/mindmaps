@@ -739,7 +739,7 @@ describe('App - Lock menu passcode', () => {
   async function openLock(reply: Reply) {
     setUrl('/?map=m1')
     const diagram = makeDiagram()
-    const patch = vi.fn(async () => ({ ok: reply.ok, status: reply.status ?? 200, json: async () => reply.body ?? {} }))
+    const patch = vi.fn(async (_url: string, _init?: RequestInit) => ({ ok: reply.ok, status: reply.status ?? 200, json: async () => reply.body ?? {} }))
     vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
       if (init?.method === 'PATCH') return patch(url, init)
       if (typeof url === 'string' && url.includes('id=m1')) {
@@ -749,7 +749,7 @@ describe('App - Lock menu passcode', () => {
     }))
     render(<App />)
     await waitFor(() => expect(screen.getByTestId('canvas')).toBeInTheDocument())
-    fireEvent.click(screen.getByTitle(/Lock/, { selector: 'button[aria-haspopup]' }))
+    fireEvent.click(screen.getAllByTitle(/Lock/).find(b => b.hasAttribute('aria-haspopup'))!)
     return patch
   }
   const typeAndSave = async (value: string) => {
