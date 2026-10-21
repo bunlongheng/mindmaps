@@ -554,7 +554,10 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract, rightInset =
   }, [setSelectedNodeIds, onNodeSelect])
 
   const handleDoubleClick = useCallback((n: { id: string }) => { setSelectedNodeIds([n.id]); onNodeSelect(n.id) }, [setSelectedNodeIds, onNodeSelect])
-  const l1Colors = useMemo(() => (activeMindmap?.nodes ?? []).filter(n => n.depth === 1).map(n => n.color), [activeMindmap?.nodes])
+  // The root glow must use the colours the topics are actually PAINTED with, which is
+  // computeBranchColors - the same map the boxes and edges read. Using the raw stored
+  // n.color made the glow show the palette a map was born with after a recolour.
+  const l1Colors = useMemo(() => (activeMindmap?.nodes ?? []).filter(n => n.depth === 1).map(n => paletteColors.get(n.id) ?? n.color), [activeMindmap?.nodes, paletteColors])
 
   if (!activeMindmap) {
     return <div style={{ position: 'absolute', inset: 0, background: canvasBg }} />
