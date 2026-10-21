@@ -238,6 +238,42 @@ describe('POST /api/ai/mindmaps look settings', () => {
     expect(nodesOf()[0].combStyle).toBeUndefined()
   })
 
+  // An agent sends the note card and legend in the payload; they ride on the root
+  // node, trimmed and capped, and junk rows are dropped.
+  it('puts a note and a cleaned legend on the root node', async () => {
+    useFakeTable()
+    await aiHandler(mockReq({
+      method: 'POST',
+      authorization: `Bearer ${KEY}`,
+      body: {
+        title: 'Keyed', outline: 'Root\n  Branch',
+        note: { title: '  What it shows ', body: 'Goal text', junk: 1 },
+        legend: [{ emoji: '🔴', label: 'Deep' }, { color: '#22c55e', label: 'Light' }, { color: 'red', label: 'Bad colour' }, { emoji: '⚪' }, 'nope'],
+      },
+    }), mockRes())
+    const root = nodesOf()[0]
+    expect(root.note).toEqual({ title: 'What it shows', body: 'Goal text' })
+    expect(root.legend).toEqual([
+      { label: 'Deep', emoji: '🔴', color: undefined },
+      { label: 'Light', emoji: undefined, color: '#22c55e' },
+      { label: 'Bad colour', emoji: undefined, color: undefined },
+    ])
+    expect(nodesOf()[1].note).toBeUndefined()
+    expect(root.showLegend).toBeUndefined()
+  })
+
+  it('skips an empty note and a legend that is not an array', async () => {
+    useFakeTable()
+    await aiHandler(mockReq({
+      method: 'POST',
+      authorization: `Bearer ${KEY}`,
+      body: { title: 'Bare', outline: 'Root\n  Branch', note: { title: '  ' }, legend: { label: 'x' }, showLegend: false },
+    }), mockRes())
+    expect(nodesOf()[0].note).toBeUndefined()
+    expect(nodesOf()[0].legend).toBeUndefined()
+    expect(nodesOf()[0].showLegend).toBe(false)
+  })
+
   it('carries a JSON outline shape onto the node and its subtree', async () => {
     useFakeTable()
     await aiHandler(mockReq({

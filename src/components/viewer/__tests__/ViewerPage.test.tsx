@@ -60,6 +60,13 @@ describe('ViewerPage', () => {
     expect(toOutline(d)).toBe('# My Map\n\n- Child\n  - Grandchild (https://x.dev)\n')
   })
 
+  it('leads the outline with the note and legend and keeps each node dot', () => {
+    const d = makeDiagram()
+    d.nodes[0] = { ...d.nodes[0], note: { title: 'What it is', body: 'The goal' }, legend: [{ emoji: '🔴', label: 'Deep' }, { color: '#22c55e', label: 'Light' }, { label: 'Plain' }] }
+    d.nodes[1] = { ...d.nodes[1], emoji: '🔴' }
+    expect(toOutline(d)).toBe('# My Map\n\n**What it is**\n\nThe goal\n\nLegend:\n- 🔴 Deep\n- #22c55e Light\n- Plain\n\n- 🔴 Child\n')
+  })
+
   it('sets document title to "<name> · Mindmaps" and restores it on unmount', () => {
     const prevTitle = document.title
     document.title = 'Untouched'

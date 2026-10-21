@@ -68,9 +68,12 @@ server.registerTool(
       format: z.enum(['svg']).optional().describe('Pass "svg" to also return the rendered map as an inline self-contained SVG string.'),
       source: z.string().max(40).optional().describe('Who is asking. "repo-audit" means a repo audit or recon: the map is RENDERED, NEVER STORED - the response carries the svg to embed in the report and no row is created. Always pass it from /repo-audit.'),
       store: z.boolean().optional().describe('false renders the svg and stores nothing, for any caller that only needs the picture.'),
+      note: z.object({ title: z.string().optional(), body: z.string().optional() }).optional().describe('Card at the top left of the map: a heading (e.g. what the map shows) and a body (the goal, the source, how to read it).'),
+      legend: z.array(z.object({ label: z.string(), emoji: z.string().optional(), color: z.string().optional() })).optional().describe('Key at the bottom left: what each node emoji dot or colour means, e.g. [{"emoji":"🔴","label":"Deep testing"}]. Max 20 rows.'),
+      showLegend: z.boolean().optional().describe('false hides the legend card but keeps its rows; true (the default) shows it.'),
     },
   },
-  async ({ title, outline, type = 'mindmap', sharing = true, colors, format, source, store }) => {
+  async ({ title, outline, type = 'mindmap', sharing = true, colors, format, source, store, note, legend, showLegend }) => {
     try {
       const body = { title, type, userId: OWNER_ID, sharing }
       if (outline != null) body.outline = outline
@@ -78,6 +81,9 @@ server.registerTool(
       if (format === 'svg') body.format = 'svg'
       if (source != null) body.source = source
       if (store != null) body.store = store
+      if (note) body.note = note
+      if (legend) body.legend = legend
+      if (showLegend != null) body.showLegend = showLegend
       const r = await api('/api/ai/mindmaps', { method: 'POST', body })
       // A repo audit gets a picture, never a row (owner rule 2026-10-04): the
       // API answers 200 { stored:false } with no id or url to hand back.
@@ -117,6 +123,7 @@ server.registerTool(
       'Node text may carry links: markdown [label](https://...) or a bare https:// url renders as a clickable anchor. Only http/https is linked; bare ticket keys are not.',
       'The map is owned by the configured owner and (by default) shared so the returned url opens without auth.',
       'The returned url is always /s/<id> - the one canonical share link. Hand that to a human or paste it in chat; it carries the OG tags and redirects to the app.',
+      'note: optional { title, body } card at the top left (what the map shows, its goal or source). legend: optional [{ label, emoji?, color? }] key at the bottom left. Pair a legend of status dots with per-node "emoji" (e.g. 🔴 🟢 ⚪) so a reader can tell what each dot means. showLegend:false hides the legend card and keeps its rows; on an existing map set showLegend on the root node.',
       'source:"repo-audit" (or store:false) renders the map and stores NOTHING: the answer is { stored:false, source, svg } with no id or url. A repo audit embeds that svg in its report, so audits never fill the library. The caller is told apart by the source it declares, never by its title.',
     ],
     example_json_outline: {

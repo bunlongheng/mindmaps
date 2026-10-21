@@ -409,6 +409,18 @@ describe('App — viewer / share view', () => {
     expect(screen.getByText('Download SVG')).toBeInTheDocument()
   })
 
+  it('opens a ?share= link in the editor for the signed-in owner', async () => {
+    setHostname('app.example.com')
+    setUrl('/?share=abc')
+    localStorage.setItem('mindmaps:user', JSON.stringify({ email: 'a@b.c', name: 'Owner', userId: 'u1' }))
+    localStorage.setItem('mindmaps:token', `h.${btoa(JSON.stringify({ sub: 'u1', exp: Math.floor(Date.now() / 1000) + 3600 }))}.s`)
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ id: 'abc', name: 'Shared', type: 'logic-chart', nodes: makeDiagram().nodes, line_style: 'orthogonal', theme_id: 'default' }) })))
+    render(<App />)
+    await waitFor(() => expect(screen.getByTestId('canvas').getAttribute('data-readonly')).toBe('0'))
+    expect(window.location.search).toBe('?map=abc')
+    expect(screen.queryByText('Download SVG')).toBeNull()
+  })
+
   it('renders the viewer from a decoded share URL, with no Download SVG link', async () => {
     setHostname('app.example.com')
     decodeShareURL.mockReturnValue(makeDiagram({ name: 'Decoded' }))

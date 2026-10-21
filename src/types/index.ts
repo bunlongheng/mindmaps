@@ -32,7 +32,14 @@ export interface MindmapNode {
   ringSize?: 'inward' | 'outward'  // root node only, graph: 'inward' grows circles toward the root (default, today's look); 'outward' swaps the bands so they grow away from it
   collapsed?: boolean  // its children (and their subtrees) are hidden on the canvas
   url?: string         // optional hyperlink — clicking the node opens it
+  note?: MapNote        // root node only: the card at the top left of the canvas
+  legend?: LegendItem[] // root node only: the key at the bottom left of the canvas
+  showLegend?: boolean  // root node only: false hides the legend card but keeps its rows
 }
+
+export interface MapNote { title?: string; body?: string }
+// One key row: a dot (emoji, e.g. a status circle) or a colour swatch, then its meaning
+export interface LegendItem { label: string; emoji?: string; color?: string }
 
 export interface Diagram {
   id: string

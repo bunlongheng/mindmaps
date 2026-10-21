@@ -48,6 +48,17 @@ curl -X POST "$APP/api/ai/mindmaps" \
        "outline":"System Design Basics\n  Requirements\n    Functional\n    Non-functional\n  Data\n    Schema\n    Caching"}'
 ```
 
+**Note and legend.** A map can carry a note card (top left) and a legend (bottom left), as Flows does. Add them to the same POST:
+
+```json
+{"title":"Vertex MVP","outline":"...",
+ "note":{"title":"What it tests","body":"Each dot shows how much testing a feature gets."},
+ "legend":[{"emoji":"🔴","label":"Deep testing"},{"emoji":"🟢","label":"Light testing"},{"color":"#94a3b8","label":"Parked"}],
+ "showLegend":true}
+```
+
+Tag a node with the same `emoji` (or `color`) as a legend row and the legend becomes a filter: clicking a row shows only those nodes and their parents, and the map refits. `showLegend:false` hides the card but keeps the rows. See [AGENTS.md](AGENTS.md).
+
 The `201` carries `url`, `svg_url` and `nodeCount`. Once it is shared, the SVG URL is the image - no auth, no browser:
 
 ```markdown

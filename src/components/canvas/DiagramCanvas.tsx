@@ -11,6 +11,7 @@ import {
   NEON_CORE_OPACITY, NEON_HALO_OPACITY, NEON_TEXT_BLUR, NEON_TEXT_FILTER,
 } from '../../lib/color'
 import { computeSubtreeCounts } from '../../lib/nodeCounts'
+import { legendHidden } from '../../lib/legend'
 import { combSizeOf, combStyleOf, drawnCellRadius, hexDoorEdge, hexPoints, meshFillerCells, meshGroupOutlines, meshCellRadius, MESH_WALL_WIDTH } from '../../lib/hex'
 import { darken } from '../../lib/color'
 import { radialNodeExtent } from '../../lib/layout/graph'
@@ -27,11 +28,11 @@ interface DiagramCanvasProps {
 export function DiagramCanvas({ onNodeSelect, readOnly, noInteract, rightInset = 0 }: DiagramCanvasProps) {
   // Shallow-selected slice so the canvas only re-renders when one of these actually changes,
   // not on unrelated store writes (resizePreview, HUD flags, showChildCount, etc.).
-  const { activeMindmap, selectedNodeIds, setSelectedNodeIds, diagramType, lineStyle, themeId, addNode, reorderNode, isImporting, hideDetails, hiddenFromDepth } = useMindmapStore(
+  const { activeMindmap, selectedNodeIds, setSelectedNodeIds, diagramType, lineStyle, themeId, addNode, reorderNode, isImporting, hideDetails, hiddenFromDepth, legendFocus } = useMindmapStore(
     useShallow(s => ({
       activeMindmap: s.activeMindmap, selectedNodeIds: s.selectedNodeIds, setSelectedNodeIds: s.setSelectedNodeIds,
       diagramType: s.diagramType, lineStyle: s.lineStyle, themeId: s.themeId, addNode: s.addNode,
-      reorderNode: s.reorderNode, isImporting: s.isImporting, hideDetails: s.hideDetails, hiddenFromDepth: s.hiddenFromDepth,
+      reorderNode: s.reorderNode, isImporting: s.isImporting, hideDetails: s.hideDetails, hiddenFromDepth: s.hiddenFromDepth, legendFocus: s.legendFocus,
     })),
   )
   const counts = useMemo(() => computeSubtreeCounts(activeMindmap?.nodes ?? []), [activeMindmap?.nodes])
@@ -53,8 +54,9 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract, rightInset =
   const visibleNodes = useMemo(() => {
     const maxDepth = Math.min(hideDetails ? 2 : Infinity, hiddenFromDepth === null ? Infinity : hiddenFromDepth - 1)
     const nodes = activeMindmap?.nodes ?? []
+    // Focused legend rows (e.g. only the red dots) hide every other feature
+    const hidden = legendHidden(nodes, nodes.find(n => n.parentId === null)?.legend ?? [], legendFocus)
     // A collapsed node hides its whole subtree
-    const hidden = new Set<string>()
     const hide = (pid: string) => { for (const c of nodes) if (c.parentId === pid && !hidden.has(c.id)) { hidden.add(c.id); hide(c.id) } }
     for (const n of nodes) if (n.collapsed) hide(n.id)
     const shown = nodes.filter(n => n.depth <= maxDepth && !hidden.has(n.id))
@@ -67,7 +69,7 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract, rightInset =
     if (!root || !laidRoot) return laid
     const dx = root.x - laidRoot.x, dy = root.y - laidRoot.y
     return laid.map(n => ({ ...n, x: n.x + dx, y: n.y + dy }))
-  }, [activeMindmap?.nodes, hideDetails, hiddenFromDepth, diagramType])
+  }, [activeMindmap?.nodes, hideDetails, hiddenFromDepth, legendFocus, diagramType])
   const paletteColors = useMemo(() => computeBranchColors(activeMindmap?.nodes ?? []), [activeMindmap?.nodes])
   // Mesh doorways: the wall a cell shares with its parent, painted in the branch colour.
   // Drawn as 1 layer above every cell, so no parent's own wall can paint over a door.
@@ -234,7 +236,7 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract, rightInset =
   // A newly opened map starts with every layer showing
   useEffect(() => { if (useMindmapStore.getState().hiddenFromDepth !== null) useMindmapStore.getState().setHiddenFromDepth(null) }, [activeMindmap?.id])
 
-  // Opening a map, switching its type, or hiding/showing a layer fits the whole map into view, centred.
+  // Opening a map, switching its type, hiding/showing a layer or focusing legend rows fits the whole map into view, centred.
   // It used to open at 100% anchored on the root, which left a 4-layer chart mostly
   // off the right edge until the user zoomed out.
   useEffect(() => {
@@ -242,7 +244,7 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract, rightInset =
     const raf = requestAnimationFrame(fitToContent)
     return () => cancelAnimationFrame(raf)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeMindmap?.id, diagramType, hiddenFromDepth, rightInset])
+  }, [activeMindmap?.id, diagramType, hiddenFromDepth, legendFocus, rightInset])
 
   // Resizing the window refits too, so the whole map stays in view at all times
   useEffect(() => {

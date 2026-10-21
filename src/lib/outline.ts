@@ -22,6 +22,9 @@ export interface OutlineNode {
   shape?: 'rect' | 'rounded' | 'pill' | 'circle'
   // Root-only look settings, set by the import endpoint from its `rootStyle` field.
   gloss?: boolean
+  note?: { title?: string; body?: string }
+  legend?: { label: string; emoji?: string; color?: string }[]
+  showLegend?: boolean
   ringSize?: 'inward' | 'outward'
   combStyle?: 'mesh' | 'web'
   combSize?: 'outward' | 'inward'
