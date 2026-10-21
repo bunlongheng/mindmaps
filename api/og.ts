@@ -13,14 +13,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   let name = 'Mindmaps'
   let desc = 'Visual mind map and diagram tool'
   let nodeCount = 0
+  let locked = false
 
   try {
-    const r = await pool.query('SELECT name, nodes FROM mindmaps WHERE id=$1 AND sharing_enabled=true', [id])
+    const r = await pool.query('SELECT name, nodes, passcode_hash IS NOT NULL AS locked FROM mindmaps WHERE id=$1 AND sharing_enabled=true', [id])
     if (r.rows.length) {
       name = r.rows[0].name || 'Untitled'
+      locked = Boolean(r.rows[0].locked)
       const nodes = r.rows[0].nodes
       nodeCount = Array.isArray(nodes) ? nodes.length : 0
-      desc = `${name} - ${nodeCount} node${nodeCount !== 1 ? 's' : ''}`
+      // A locked map previews as locked: its title, never anything inside it.
+      desc = locked ? 'Passcode protected. Type the passcode to open it.' : `${name} - ${nodeCount} node${nodeCount !== 1 ? 's' : ''}`
     }
   } catch { /* fall through with defaults */ }
 
@@ -28,7 +31,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // /s/<id> is the one canonical share URL - vercel.json rewrites it here, so the
   // link a human copies and the link an unfurler crawls are the same string.
   const url = `${base}/s/${id}`
-  const image = `${base}/api/og-image?id=${id}`
+  const image = `${base}/api/og-image?id=${id}${locked ? '&l=1' : ''}`
   const safeName = esc(name)
   const safeDesc = esc(desc)
 

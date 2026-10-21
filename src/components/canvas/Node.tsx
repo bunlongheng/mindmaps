@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback } from 'react'
+import { useRef, useState, useCallback, memo } from 'react'
 import type { MindmapNode } from '../../types'
 import { useMindmapStore } from '../../store/mindmapStore'
 import { NodeIcon, getLucideIcon } from './NodeIcon'
@@ -19,6 +19,8 @@ import { hexCellLayout, hexPoints, hexFontSize, hexFill, hexTextColor, meshWallC
 interface NodeProps {
   node: MindmapNode
   isSelected: boolean
+  // Only the lone selected node gets the + / hide-children controls, like Xmind
+  soloSelected?: boolean
   onSelect: (id: string, multi: boolean) => void
   onDragEnd: (id: string, dx: number, dy: number) => void
   onDoubleClick: (node: MindmapNode) => void
@@ -111,7 +113,17 @@ function isLight(hex: string): boolean {
   return lum > 130
 }
 
-export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onDragMove, onRootDragOffset, svgRef, readOnly, noInteract = false, l1Colors = [], paletteColor = null, childCount = 0, descendantCount = 0, nodeCount = 0, rootCenter = null, cellRadius }: NodeProps) {
+// Every node reads root-only settings on each store change; cache the root per node list
+// so a select on a 400-node map is 1 lookup, not 1200 scans of the whole list.
+const rootCache = new WeakMap<MindmapNode[], MindmapNode | null>()
+function rootOf(nodes: MindmapNode[] | undefined): MindmapNode | null {
+  if (!nodes) return null
+  let r = rootCache.get(nodes)
+  if (r === undefined) { r = nodes.find(n => n.parentId === null) ?? null; rootCache.set(nodes, r) }
+  return r
+}
+
+function NodeImpl({ node, isSelected, soloSelected = false, onSelect, onDragEnd, onDoubleClick, onDragMove, onRootDragOffset, svgRef, readOnly, noInteract = false, l1Colors = [], paletteColor = null, childCount = 0, descendantCount = 0, nodeCount = 0, rootCenter = null, cellRadius }: NodeProps) {
   const isRoot = node.depth === 0
   const isL2Plus = node.depth >= 2
   // Brighter/more-vivid version of the node colour, used for all coloured fills.
@@ -128,9 +140,9 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   const diagramType = useMindmapStore(s => s.diagramType)
   const themeId = useMindmapStore(s => s.themeId)
   const showChildCount = useMindmapStore(s => s.showChildCount)
-  const mapGloss = useMindmapStore(s => s.activeMindmap?.nodes.find(n => n.parentId === null)?.gloss === true)
-  const combSize = useMindmapStore(s => s.activeMindmap?.nodes.find(n => n.parentId === null)?.combSize ?? 'outward')
-  const combStyle = useMindmapStore(s => s.activeMindmap?.nodes.find(n => n.parentId === null)?.combStyle ?? 'mesh')
+  const mapGloss = useMindmapStore(s => rootOf(s.activeMindmap?.nodes)?.gloss === true)
+  const combSize = useMindmapStore(s => rootOf(s.activeMindmap?.nodes)?.combSize ?? 'outward')
+  const combStyle = useMindmapStore(s => rootOf(s.activeMindmap?.nodes)?.combStyle ?? 'mesh')
   // On a dark canvas the radial mind map is painted as a living circuit: every circle
   // is a glowing orb, the root a violet-to-blue one, and the labels are white or light
   // grey. Only paint changes - sizes, positions and hit areas are identical. Light
@@ -244,7 +256,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   // so long titles never overflow. Shared with the layout (src/lib/rootPill) so
   // the trunk meets the pill's edge instead of starting inside it.
   const fontSize = isRootPill ? rootPillFontSize(node.title, baseFontSize) : baseFontSize
-  const fontWeight = node.bold ? '700' : (isRoot ? '500' : node.depth === 1 ? '500' : '400')
+  const fontWeight = node.bold ? '700' : (isRoot ? '500' : node.depth === 1 ? '500' : node.depth === 2 ? '600' : '400')
 
   // Depth-based bg opacity only (text, border and badge stay fully opaque) - one
   // shared ladder with the server renderer (src/lib/color nodeFillOpacity).
@@ -317,7 +329,11 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
     if (!pt) return
     const dx = pt.x - dragStart.current.x
     const dy = pt.y - dragStart.current.y
-    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) didDrag.current = true
+    // A click wobbles a pixel or two; only a real drag may move (and re-render) the map
+    if (!didDrag.current) {
+      if (Math.abs(dx) <= 3 && Math.abs(dy) <= 3) return
+      didDrag.current = true
+    }
     let newX = dragStart.current.nodeX + dx
     if (isRoot) {
       const l1 = useMindmapStore.getState().activeMindmap?.nodes.find(n => n.depth === 1)
@@ -429,7 +445,9 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
   const glossFbClipId = `gloss-fb-${node.id}`
   const showFishboneGloss = isFishboneNode && !nodeShape && showGloss
   const hasBadge = (hasEmoji || hasIcon) && !isRoot && !isRadial && !drawCircle
-  const editX = isRoot ? cx - r * 0.75 : hasBadge ? node.height : (align === 'left' ? 8 : 2)
+  // On a mind map the badge leads from the root: a left-side topic carries it on its right edge.
+  const badgeRight = diagramType === 'mindmap' && !isRoot && !!rootCenter && node.x + displayW / 2 < rootCenter.x
+  const editX = isRoot ? cx - r * 0.75 : hasBadge ? (badgeRight ? 2 : node.height) : (align === 'left' ? 8 : 2)
   const editW = isRoot ? r * 1.5 : hasBadge ? displayW - node.height - 4 : displayW - editX - 2
   // The editor shows the raw title (markdown links included), which can be far longer
   // than the drawn label, so let the field grow past the box instead of clipping it.
@@ -615,7 +633,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
           )}
           {/* White badge behind border — border ring sits on top */}
           {(hasEmoji || hasIcon) && (
-            <rect x={0} y={0} width={node.height + 1} height={node.height} fill="#ffffff" />
+            <rect x={badgeRight ? displayW - node.height - 1 : 0} y={0} width={node.height + 1} height={node.height} fill="#ffffff" />
           )}
           {/* Border ring — doubled stroke so clip cuts outer half, stays inset */}
           {(strokeW > 0 || previewW !== null) && (
@@ -641,6 +659,11 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
             value={draft}
             autoComplete="off"
             onChange={e => setDraft(e.target.value)}
+            // Keep clicks inside the field so they place the caret instead of panning/dragging the map
+            onPointerDown={e => e.stopPropagation()}
+            onPointerMove={e => e.stopPropagation()}
+            onPointerUp={e => e.stopPropagation()}
+            onDoubleClick={e => e.stopPropagation()}
             onBlur={commitEdit}
             onKeyDown={e => {
               if (e.key === 'Enter') { e.preventDefault(); commitEdit() }
@@ -653,6 +676,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
               color: textColor, fontSize, fontWeight, fontStyle,
               fontFamily: 'Inter, system-ui, sans-serif',
               textAlign: isRoot ? 'center' : align, padding: '0 4px', caretColor: textColor,
+              userSelect: 'text', WebkitUserSelect: 'text',
             }}
           />
         </foreignObject>
@@ -762,8 +786,8 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
             const emojiSize = Math.round(sq * 0.52)
             // For fishbone: shift icon center to account for parallelogram skew
             const skOff = isFishboneNode ? node.height * 0.35 / 2 : 0
-            const emojiCX = sq / 2 + skOff
-            const textX = sq + ICON_GAP + skOff
+            const emojiCX = badgeRight ? displayW - sq / 2 : sq / 2 + skOff
+            const textX = badgeRight ? displayW - sq - ICON_GAP : sq + ICON_GAP + skOff
             const h = node.height
             return (
               <>
@@ -775,7 +799,7 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
                 <text
                   x={textX}
                   y={h / 2 + fontSize * 0.38}
-                  textAnchor="start"
+                  textAnchor={badgeRight ? 'end' : 'start'}
                   fontSize={fontSize} fontWeight={fontWeight} fontStyle={fontStyle}
                   fontFamily="Inter, system-ui, sans-serif"
                   fill={textColor}
@@ -789,16 +813,16 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
             const iconSize = Math.round(sq * 0.48)
             // For fishbone: center icon within the skewed badge area
             const skOff = isFishboneNode ? node.height * 0.35 / 2 : 0
-            const iconX = (sq - iconSize) / 2 + skOff
+            const iconX = badgeRight ? displayW - sq + (sq - iconSize) / 2 : (sq - iconSize) / 2 + skOff
             const iconY = (sq - iconSize) / 2
-            const textX = sq + ICON_GAP + skOff
+            const textX = badgeRight ? displayW - sq - ICON_GAP : sq + ICON_GAP + skOff
             return (
               <>
                 <NodeIcon icon={resolvedIcon} x={iconX} y={iconY} size={iconSize} color={col} strokeWidth={node.depth === 1 ? 2.5 : 1.8} />
                 <text
                   x={textX}
                   y={node.height / 2 + fontSize * 0.38}
-                  textAnchor="start"
+                  textAnchor={badgeRight ? 'end' : 'start'}
                   fontSize={fontSize} fontWeight={fontWeight} fontStyle={fontStyle}
                   fontFamily="Inter, system-ui, sans-serif"
                   fill={textColor}
@@ -906,6 +930,41 @@ export function Node({ node, isSelected, onSelect, onDragEnd, onDoubleClick, onD
       )}
 
 
+
+      {/* Branch controls on box layouts: a dot that hides/shows the children (always shown
+          while collapsed, with the hidden count) and a blue + that adds a child. They sit
+          on the node's outward side - away from the root on a mind map. */}
+      {!noInteract && !readOnly && !editing && (diagramType === 'mindmap' || diagramType === 'logic-chart') && (soloSelected || node.collapsed) && (() => {
+        const outRight = isRoot || diagramType === 'logic-chart' || !rootCenter || node.x + displayW / 2 >= rootCenter.x
+        const edgeX = outRight ? displayW : 0, dir = outRight ? 1 : -1
+        const branch = paletteColor ?? node.color
+        const stop = (e: React.SyntheticEvent) => e.stopPropagation()
+        const dotX = edgeX + dir * 12, plusX = edgeX + dir * (childCount > 0 ? 34 : 16)
+        return (
+          <g onPointerDown={stop} onDoubleClick={stop}>
+            {childCount > 0 && (soloSelected || node.collapsed) && (
+              <g role="button" aria-label={node.collapsed ? 'Show children' : 'Hide children'} style={{ cursor: 'pointer' }}
+                onClick={e => { e.stopPropagation(); useMindmapStore.getState().updateNode(node.id, { collapsed: !node.collapsed }) }}>
+                <circle cx={dotX} cy={cy} r={node.collapsed ? 10 : 6} fill="#ffffff" stroke={branch} strokeWidth={2} />
+                {node.collapsed && <text x={dotX} y={cy} textAnchor="middle" dominantBaseline="central" fontSize={descendantCount > 99 ? 8 : 10} fontWeight={700}
+                  fontFamily="Inter, system-ui, sans-serif" fill={branch} style={{ pointerEvents: 'none' }}>{descendantCount}</text>}
+              </g>
+            )}
+            {soloSelected && (
+              <g role="button" aria-label="Add child" style={{ cursor: 'pointer' }}
+                onClick={e => {
+                  e.stopPropagation()
+                  const st = useMindmapStore.getState()
+                  if (node.collapsed) st.updateNode(node.id, { collapsed: false })
+                  onSelect(st.addNode(node.id).id, false)
+                }}>
+                <circle cx={plusX} cy={cy} r={10} fill="#3b82f6" />
+                <path d={`M ${plusX - 4.5} ${cy} H ${plusX + 4.5} M ${plusX} ${cy - 4.5} V ${cy + 4.5}`} stroke="#ffffff" strokeWidth={2} strokeLinecap="round" />
+              </g>
+            )}
+          </g>
+        )
+      })()}
 
       {/* Selection ring — always on top. Hidden on touch devices (noInteract), not merely on
           read-only maps (readOnly) — a desktop-mouse read-only/locked map should still show
@@ -1141,3 +1200,5 @@ function SiriWave({ cx, cy, r, colors }: { cx: number; cy: number; r: number; co
   )
 }
 
+// Memoized so selecting one node does not re-render the whole map
+export const Node = memo(NodeImpl)

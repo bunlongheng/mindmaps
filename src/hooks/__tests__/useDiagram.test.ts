@@ -4,15 +4,10 @@ import { useDiagram, lsDeleteDiagram } from '../useDiagram'
 import { useMindmapStore } from '../../store/mindmapStore'
 import type { Diagram, MindmapNode } from '../../types'
 
-// DOM-based toast + Web Audio sounds → mock
+// DOM-based toast → mock
 vi.mock('../../components/CuteToast', () => ({ showToast: vi.fn() }))
-vi.mock('../../lib/sounds', () => ({
-  soundCreate: vi.fn(), soundDelete: vi.fn(), soundSave: vi.fn(),
-  soundPaste: vi.fn(), soundClick: vi.fn(), soundHover: vi.fn(), soundIncoming: vi.fn(),
-}))
 
 import { showToast } from '../../components/CuteToast'
-import { soundSave, soundCreate, soundPaste, soundDelete } from '../../lib/sounds'
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 function makeRow(over: Record<string, unknown> = {}): Record<string, unknown> {
@@ -350,7 +345,6 @@ describe('saveDiagram', () => {
     const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string)
     expect(body).toMatchObject({ id: 'd1', user_id: 'u1', theme_id: 'retro', sharing_enabled: true })
     expect(useMindmapStore.getState().isDirty).toBe(false)
-    expect(soundSave).toHaveBeenCalled()
   })
 
   it('still clears dirty + plays sound when the POST throws', async () => {
@@ -359,7 +353,6 @@ describe('saveDiagram', () => {
     const { result } = renderHook(() => useDiagram('u1'))
     await act(async () => { await result.current.saveDiagram(d) })
     expect(useMindmapStore.getState().isDirty).toBe(false)
-    expect(soundSave).toHaveBeenCalled()
   })
 
   it('defaults sharing_enabled/theme_id when the diagram omits them', async () => {
@@ -385,7 +378,6 @@ describe('createDiagram', () => {
     expect(map.lineStyle).toBe('curved')
     expect(map.nodes.filter(n => n.depth === 1)).toHaveLength(5)
     expect(localStorage.getItem('activeMindmapId')).toBe(id)
-    expect(soundCreate).toHaveBeenCalled()
     expect(showToast).toHaveBeenCalledWith(expect.stringContaining('Fresh'), expect.objectContaining({ confetti: true }))
     expect(fetchMock).not.toHaveBeenCalled()
   })
@@ -419,7 +411,6 @@ describe('createDiagramFromNodes', () => {
     await act(async () => { id = await result.current.createDiagramFromNodes('Imported', makeNodes()) })
     expect(id).toBeTruthy()
     expect(useMindmapStore.getState().activeMindmap!.name).toBe('Imported')
-    expect(soundPaste).toHaveBeenCalled()
     expect(showToast).toHaveBeenCalledWith(expect.stringContaining('Imported'), expect.objectContaining({ color: '#22c55e' }))
   })
 
@@ -465,7 +456,6 @@ describe('deleteDiagram', () => {
     await act(async () => { await result.current.deleteDiagram('d1', 'Del') })
     expect(useMindmapStore.getState().diagrams.map(d => d.id)).toEqual(['d2'])
     expect(localStorage.getItem('mindmaps:diagram:d1')).toBeNull()
-    expect(soundDelete).toHaveBeenCalled()
     expect(showToast).toHaveBeenCalledWith(expect.stringContaining('Del'), expect.anything())
     expect(fetchMock).not.toHaveBeenCalled()
   })

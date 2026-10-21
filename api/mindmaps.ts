@@ -5,6 +5,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { verifyToken, bearer, secretEquals } from './_lib/auth.js'
 import { corsHeaders } from './_lib/cors.js'
 import { renderMindmapSvg } from './_lib/render-svg.js'
+import { hashPasscode, isUnlocked, sealPasscode, openPasscode } from './_lib/passcode.js'
 
 // Where a share link lives, for the link Notify puts in the alert.
 const APP_URL = (process.env.PUBLIC_APP_URL || 'https://mindmaps-bheng.vercel.app').replace(/\/$/, '')
@@ -12,7 +13,7 @@ const APP_URL = (process.env.PUBLIC_APP_URL || 'https://mindmaps-bheng.vercel.ap
 const SECRET = () => (process.env.MINDMAP_JWT_SECRET ?? '').trim()
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  Object.entries(corsHeaders(req.headers?.origin)).forEach(([k, v]) => res.setHeader(k, v))
+  Object.entries(corsHeaders(req.headers?.origin, 'GET, POST, PUT, PATCH, DELETE, OPTIONS')).forEach(([k, v]) => res.setHeader(k, v))
   if (req.method === 'OPTIONS') return res.status(204).end()
 
   try {
@@ -38,28 +39,39 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method === 'GET') {
       if (id) {
         const r = await pool.query(
-          'SELECT id, user_id, name, type, line_style, sharing_enabled, theme_id, nodes, tags, updated_at FROM mindmaps WHERE id=$1',
+          'SELECT id, user_id, name, type, line_style, sharing_enabled, theme_id, nodes, tags, updated_at, passcode_hash, passcode_enc FROM mindmaps WHERE id=$1',
           [id],
         )
         if (!r.rows.length) return res.status(404).json({ error: 'Not found' })
         const row = r.rows[0]
         const isOwner = auth && auth.sub === row.user_id
         if (!isOwner && !row.sharing_enabled) return res.status(403).json({ error: 'Not shared' })
+        // A passcode-locked share serves nothing - no JSON, no picture - until
+        // the visitor has unlocked it on the lock screen (/api/unlock).
+        const locked = Boolean(row.passcode_hash)
+        if (locked && !isOwner && !isUnlocked(req.headers?.cookie, row.id, row.passcode_hash)) {
+          res.setHeader('Cache-Control', 'no-store')
+          return res.status(401).json({ error: 'Passcode required', passcode_required: true, id: row.id })
+        }
         // ?format=svg -> render the map to a self-contained SVG (docs-ready).
         // Same visibility rules as the JSON read (public if shared, else owner).
         if ((req.query as Record<string, string>).format === 'svg') {
           try {
             const svg = renderMindmapSvg(row)
             res.setHeader('Content-Type', 'image/svg+xml; charset=utf-8')
-            res.setHeader('Cache-Control', 'public, max-age=60')
+            res.setHeader('Cache-Control', locked ? 'private, no-store' : 'public, max-age=60')
             return res.status(200).send(svg)
           } catch (e: unknown) {
             return res.status(500).json({ error: 'Failed to render SVG', detail: e instanceof Error ? e.message : String(e) })
           }
         }
-        if (isOwner) return res.json(row)
+        // Never the hash; only the owner gets the passcode back, for their Passcode box.
+        const { passcode_hash: _hash, passcode_enc: sealed, ...plain } = row
+        void _hash
+        if (locked) res.setHeader('Cache-Control', 'private, no-store')
+        if (isOwner) return res.json({ ...plain, has_passcode: locked, ...(locked ? { passcode: openPasscode(sealed) } : {}) })
         // Public share view: never expose the owner's user_id to unauthenticated callers.
-        const { user_id: rowOwner, ...shared } = row
+        const { user_id: rowOwner, ...shared } = plain
         void rowOwner
         // Tell the owner someone opened the link. Card thumbnails (?thumb=1) and
         // link-preview crawlers are not people opening the map, so they stay quiet.
@@ -68,19 +80,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (q.thumb !== '1' && !isBot(String(req.headers['user-agent'] ?? ''))) {
           waitUntil(notifyShareView(readVisit(req.headers, { id: row.id, title: row.name, link: `${APP_URL}/s/${row.id}` })))
         }
-        return res.json(shared)
+        return res.json({ ...shared, has_passcode: locked })
       }
       // The public demo wall: every shared map tagged `demo`, no token needed.
       if ((req.query as Record<string, string>).scope === 'demo') {
         const r = await pool.query(
-          "SELECT id, name, type, sharing_enabled, tags, updated_at FROM mindmaps WHERE sharing_enabled = true AND 'demo' = ANY(tags) ORDER BY updated_at DESC",
+          "SELECT id, name, type, sharing_enabled, tags, updated_at FROM mindmaps WHERE sharing_enabled = true AND passcode_hash IS NULL AND 'demo' = ANY(tags) ORDER BY updated_at DESC",
         )
         return res.json(r.rows)
       }
       // Listing a user's maps requires being that user.
       if (!auth) return res.status(401).json({ error: 'Unauthorized' })
       const r = await pool.query(
-        'SELECT id, name, type, sharing_enabled, tags, updated_at FROM mindmaps WHERE user_id=$1 ORDER BY updated_at DESC',
+        'SELECT id, name, type, sharing_enabled, tags, updated_at, (passcode_hash IS NOT NULL) AS has_passcode FROM mindmaps WHERE user_id=$1 ORDER BY updated_at DESC',
         [auth.sub],
       )
       return res.json(r.rows)
@@ -126,6 +138,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // rowCount 0 means no map with that id is owned by this user - nothing was updated.
       if (result.rowCount === 0) return res.status(404).json({ error: 'Not found' })
       return res.json({ ok: true })
+    }
+
+    // PATCH { passcode: string } - lock the share link behind a passcode, "" removes
+    // it. Trimmed and lowercased, so the lock screen's check matches. Setting one
+    // also shares the map, so the link opens to the lock screen, not "not shared".
+    if (req.method === 'PATCH') {
+      const b = req.body ?? {}
+      const targetId = id ?? b.id
+      if (!targetId) return res.status(400).json({ error: 'id required' })
+      if (typeof b.passcode !== 'string') return res.status(400).json({ error: 'passcode (string) required' })
+      const plainCode = b.passcode.trim().toLowerCase()
+      if (plainCode.length > 200) return res.status(400).json({ error: 'passcode is 200 characters at most' })
+      const hash = plainCode ? await hashPasscode(plainCode) : null
+      const r = await pool.query(
+        `UPDATE mindmaps SET passcode_hash=$1::text, passcode_enc=$2::text, sharing_enabled=(sharing_enabled OR $1::text IS NOT NULL)
+         WHERE id=$3 AND user_id=$4 RETURNING id, sharing_enabled, (passcode_hash IS NOT NULL) AS has_passcode`,
+        [hash, plainCode ? sealPasscode(plainCode) : null, targetId, uid],
+      )
+      if (!r.rows.length) return res.status(404).json({ error: 'Not found' })
+      return res.json({ ...r.rows[0], passcode: plainCode })
     }
 
     if (req.method === 'DELETE') {

@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import type { MindmapNode } from '../../types'
 import type { LineStyle, DiagramType } from '../../types'
 import { Edge } from './Edge'
@@ -25,57 +26,86 @@ interface EdgeLayerProps {
 }
 
 /** Curved bezier connecting parent center-edge to child center-edge (auto-detects direction) */
-function CurvedEdge({ parent, child, goRight = true, color }: { parent: MindmapNode; child: MindmapNode; goRight?: boolean; color?: string }) {
+/** Blue halo drawn under the stem(s) leading to the selected node */
+const STEM_GLOW = { stroke: '#3b82f6', strokeOpacity: 0.35, extra: 7 } as const
+
+function CurvedEdge({ parent, child, goRight = true, color, glow = false }: { parent: MindmapNode; child: MindmapNode; goRight?: boolean; color?: string; glow?: boolean }) {
   const x1 = goRight ? parent.x + parent.width : parent.x
   const y1 = parent.y + parent.height / 2
   const x2 = goRight ? child.x : child.x + child.width
   const y2 = child.y + child.height / 2
   const cx = (x1 + x2) / 2
+  const d = `M ${x1} ${y1} C ${cx} ${y1} ${cx} ${y2} ${x2} ${y2}`
   return (
-    <path
-      d={`M ${x1} ${y1} C ${cx} ${y1} ${cx} ${y2} ${x2} ${y2}`}
-      stroke={color ?? child.color}
-      strokeWidth={edgeWidthForDepth(child.depth)}
-      fill="none"
-      strokeLinecap="round"
-    />
+    <>
+      {glow && <path d={d} stroke={STEM_GLOW.stroke} strokeOpacity={STEM_GLOW.strokeOpacity} strokeWidth={edgeWidthForDepth(child.depth) + STEM_GLOW.extra} fill="none" strokeLinecap="round" />}
+      <path
+        d={d}
+        stroke={color ?? child.color}
+        strokeWidth={edgeWidthForDepth(child.depth)}
+        fill="none"
+        strokeLinecap="round"
+      />
+    </>
   )
 }
 
 /** Fan connector — smooth bezier curves all originating from the parent's center edge,
  *  fanning out to each child's center edge (the "braces" style) */
-function BracketConnector({ parent, children, goRight = true, showOrderNumbers = false, colorOf }: { parent: MindmapNode; children: MindmapNode[]; goRight?: boolean; showOrderNumbers?: boolean; colorOf?: (n: MindmapNode) => string }) {
+function BracketConnector({ parent, children, goRight = true, showOrderNumbers = false, colorOf, glow, lineStyle = 'curved' }: { parent: MindmapNode; children: MindmapNode[]; goRight?: boolean; showOrderNumbers?: boolean; colorOf?: (n: MindmapNode) => string; glow?: Set<string>; lineStyle?: LineStyle }) {
   const colour = (n: MindmapNode) => colorOf?.(n) ?? n.color
   if (children.length === 0) return null
 
   const sorted = [...children].sort((a, b) => a.y - b.y)
 
   // Single child: simple bezier
-  if (children.length === 1) {
-    return <CurvedEdge parent={parent} child={sorted[0]} goRight={goRight} color={colour(sorted[0])} />
+  if (children.length === 1 && lineStyle === 'curved') {
+    return <CurvedEdge parent={parent} child={sorted[0]} goRight={goRight} color={colour(sorted[0])} glow={glow?.has(sorted[0].id)} />
   }
 
   const px = goRight ? parent.x + parent.width : parent.x
   const py = parent.y + parent.height / 2
+  // Leaves wrapped into 2 columns: the near column's edge, where column-2 curves level off
+  const col1Edge = goRight ? Math.min(...children.map(c => c.x)) : Math.max(...children.map(c => c.x + c.width))
 
   return (
     <g>
       {sorted.map(child => {
         const cy  = child.y + child.height / 2
-        const cx2 = goRight ? child.x : child.x + child.width
+        const boxEdge = goRight ? child.x : child.x + child.width
+        const isCol2 = goRight ? boxEdge > col1Edge + 1 : boxEdge < col1Edge - 1
+        // A column-2 leaf: curve to just before column 1, then run straight through its gap
+        const cx2 = isCol2 ? (goRight ? col1Edge - 10 : col1Edge + 10) : boxEdge
         const gap = Math.abs(cx2 - px)
         // Both control points at 50% x — departs horizontal from parent, arrives horizontal at child
         const c1x = goRight ? px + gap * 0.5 : px - gap * 0.5
-        const d = `M ${px} ${py} C ${c1x} ${py}, ${c1x} ${cy}, ${cx2} ${cy}`
-        // Number badge sits just outside the child box
+        // Straight: one segment to the child. Square: a short run out of the parent, a shared
+        // vertical trunk, then level into the child. Brace: the default bezier fan.
+        const elbowX = goRight ? px + Math.min(gap / 2, 24) : px - Math.min(gap / 2, 24)
+        const d = (lineStyle === 'straight' ? `M ${px} ${py} L ${cx2} ${cy}`
+          : lineStyle === 'orthogonal' ? `M ${px} ${py} H ${elbowX} V ${cy} H ${cx2}`
+          : `M ${px} ${py} C ${c1x} ${py}, ${c1x} ${cy}, ${cx2} ${cy}`) + (isCol2 ? ` L ${boxEdge} ${cy}` : '')
+        // Number badge sits just outside the child box, on the curve itself: the curve is
+        // still bending 18px out, so find its y there (x is monotonic in t, bisect for it)
         const numX = goRight ? cx2 - 18 : cx2 + 18
+        let lo = 0, hi = 1
+        for (let k = 0; k < 20; k++) {
+          const t = (lo + hi) / 2, u = 1 - t
+          const x = u * u * u * px + 3 * u * u * t * c1x + 3 * u * t * t * c1x + t * t * t * cx2
+          if ((x < numX) === goRight) lo = t; else hi = t
+        }
+        const tb = (lo + hi) / 2
+        const numY = lineStyle === 'straight' ? py + (cy - py) * (numX - px) / ((cx2 - px) || 1)
+          : lineStyle === 'orthogonal' ? cy
+          : (1 - tb) ** 3 * py + 3 * (1 - tb) ** 2 * tb * py + 3 * (1 - tb) * tb * tb * cy + tb ** 3 * cy
         return (
           <g key={child.id}>
+            {glow?.has(child.id) && <path d={d} stroke={STEM_GLOW.stroke} strokeOpacity={STEM_GLOW.strokeOpacity} strokeWidth={edgeWidthForDepth(child.depth) + STEM_GLOW.extra} fill="none" strokeLinecap="round" />}
             <path d={d} stroke={colour(child)} strokeWidth={edgeWidthForDepth(child.depth)} fill="none" strokeLinecap="round" />
             {showOrderNumbers && parent.depth === 0 && (
               <>
-                <circle cx={numX} cy={cy} r={10} fill="#ffffff" stroke={colour(child)} strokeWidth={2} />
-                <text x={numX} y={cy + 4}
+                <circle cx={numX} cy={numY} r={10} fill="#ffffff" stroke={colour(child)} strokeWidth={2} />
+                <text x={numX} y={numY + 4}
                   textAnchor="middle" fontSize={11} fontWeight="700"
                   fontFamily="Inter, system-ui, sans-serif" fill={colour(child)}
                   style={{ pointerEvents: 'none' }}>
@@ -90,8 +120,15 @@ function BracketConnector({ parent, children, goRight = true, showOrderNumbers =
   )
 }
 
-export function EdgeLayer({ nodes, lineStyle, diagramType, paletteColors }: EdgeLayerProps) {
+function EdgeLayerImpl({ nodes, lineStyle, diagramType, paletteColors }: EdgeLayerProps) {
   const showOrderNumbers = useMindmapStore(s => s.showOrderNumbers)
+  const selectedNodeIds = useMindmapStore(s => s.selectedNodeIds)
+  // Every stem from the root down to each selected node glows, so its branch reads at a glance
+  const glow = new Set<string>()
+  for (const id of selectedNodeIds) {
+    let cur = nodes.find(n => n.id === id)
+    while (cur && cur.parentId) { glow.add(cur.id); const pid = cur.parentId; cur = nodes.find(n => n.id === pid) }
+  }
   const themeId = useMindmapStore(s => s.themeId)
   // On a dark canvas the radial branches are luminous tubes, not hairlines: a blurred
   // glow line under a crisp lightened core. Light themes keep the single thin line.
@@ -213,7 +250,7 @@ export function EdgeLayer({ nodes, lineStyle, diagramType, paletteColors }: Edge
         <g>
           {allParents.map(parent => {
             const children = nodes.filter(n => n.parentId === parent.id)
-            return <BracketConnector key={parent.id} parent={parent} children={children} showOrderNumbers={showOrderNumbers} colorOf={pc} />
+            return <BracketConnector key={parent.id} parent={parent} children={children} showOrderNumbers={showOrderNumbers} colorOf={pc} glow={glow} />
           })}
         </g>
       )
@@ -303,8 +340,8 @@ export function EdgeLayer({ nodes, lineStyle, diagramType, paletteColors }: Edge
           const onLeft = kids.filter(k => k.x + k.width / 2 < cx)
           return (
             <g key={parent.id}>
-              <BracketConnector parent={parent} children={onRight} goRight showOrderNumbers={showOrderNumbers} colorOf={pc} />
-              <BracketConnector parent={parent} children={onLeft} goRight={false} showOrderNumbers={showOrderNumbers} colorOf={pc} />
+              <BracketConnector parent={parent} children={onRight} goRight showOrderNumbers={showOrderNumbers} colorOf={pc} glow={glow} lineStyle={lineStyle} />
+              <BracketConnector parent={parent} children={onLeft} goRight={false} showOrderNumbers={showOrderNumbers} colorOf={pc} glow={glow} lineStyle={lineStyle} />
             </g>
           )
         })}
@@ -490,3 +527,6 @@ export function EdgeLayer({ nodes, lineStyle, diagramType, paletteColors }: Edge
     </g>
   )
 }
+
+// Memoized so selecting one node does not re-render the whole map
+export const EdgeLayer = memo(EdgeLayerImpl)

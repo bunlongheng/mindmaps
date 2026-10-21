@@ -206,8 +206,10 @@ describe('renderMindmapSvg smoke', () => {
 
     it('draws 2 paths per branch on a dark theme and 1 on a light one', () => {
       const branches = mkNodes().length - 1
-      expect([...svgOfTheme('cyberpunk').matchAll(/<path /g)].length).toBe(branches * 2)
-      expect([...svgOfTheme('default').matchAll(/<path /g)].length).toBe(branches)
+      // Branch paths only - node icons draw their own <path>s inside a scaled <g>.
+      const edgePaths = (svg: string) => [...svg.replace(/<g transform="[^"]*scale\([^)]*\)"[^>]*>.*?<\/g>/g, '').matchAll(/<path /g)].length
+      expect(edgePaths(svgOfTheme('cyberpunk'))).toBe(branches * 2)
+      expect(edgePaths(svgOfTheme('default'))).toBe(branches)
     })
 
     it('carries a filter and the root orb gradient only on the dark themes', () => {

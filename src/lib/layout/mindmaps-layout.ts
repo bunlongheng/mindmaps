@@ -3,9 +3,9 @@ import { rootPillWidth, rootCircleDiameter, rootIsPill, ROOT_FONT } from '../roo
 import { shapedNodeSize } from '../nodeShape.js'
 import { nodeFontSize, nodeHeight, nodeMinWidth, nodeWidth, estimateTextWidth } from '../nodeMetrics.js'
 
-const H_GAPS: Record<number, number> = { 0: 120, 1: 60 }
-const DEFAULT_H_GAP = 50
-export const V_GAP = 22
+const H_GAPS: Record<number, number> = { 0: 100, 1: 50 }
+const DEFAULT_H_GAP = 40
+export const V_GAP = 8
 export { H_GAPS }
 
 function getHGap(depth: number) { return H_GAPS[depth] ?? DEFAULT_H_GAP }
@@ -43,14 +43,31 @@ export function nodeSize(node: MindmapNode, depth: number) {
   return shapedNodeSize(node, nodeFontSize(depth), w, h)
 }
 
-export function subtreeH(nodeId: string, depth: number, nodes: MindmapNode[]): number {
+/** A run of more than this many leaf children may wrap into 2 columns (mind map only). */
+const WRAP_MIN_LEAVES = 4
+const WRAP_COL_GAP = 28
+
+/** The leaf grid a node's children wrap into, or null when they stay in 1 column. */
+function leafGrid(children: MindmapNode[], childDepth: number, nodes: MindmapNode[], cols: number) {
+  if (cols < 2 || children.length <= WRAP_MIN_LEAVES) return null
+  if (children.some(c => nodes.some(n => n.parentId === c.id))) return null
+  const h = Math.max(...children.map(c => nodeSize(c, childDepth).h))
+  const pitch = h + V_GAP
+  const rows = Math.ceil(children.length / 2)
+  // Column 2 sits half a row down, so its connectors pass through column 1's gaps
+  return { h, pitch, rows, colW: Math.max(...children.map(c => nodeSize(c, childDepth).w)), totalH: rows * h + (rows - 1) * V_GAP + pitch / 2 }
+}
+
+export function subtreeH(nodeId: string, depth: number, nodes: MindmapNode[], cols = 1): number {
   const node = nodes.find(n => n.id === nodeId)
   const children = nodes.filter(n => n.parentId === nodeId)
   const fallbackH = nodeHeight(depth)
   const h = node ? nodeSize(node, depth).h : fallbackH
   if (children.length === 0) return h
   const childDepth = depth + 1
-  const childrenTotal = children.reduce((sum, c) => sum + subtreeH(c.id, childDepth, nodes), 0)
+  const grid = leafGrid(children, childDepth, nodes, cols)
+  if (grid) return Math.max(h, grid.totalH)
+  const childrenTotal = children.reduce((sum, c) => sum + subtreeH(c.id, childDepth, nodes, cols), 0)
   return Math.max(h, childrenTotal + (children.length - 1) * V_GAP)
 }
 
@@ -67,6 +84,7 @@ export function place(
   nodes: MindmapNode[],
   result: MindmapNode[],
   goRight = true,
+  cols = 1,
 ) {
   const node = nodes.find(n => n.id === nodeId)
   if (!node) return
@@ -89,14 +107,25 @@ export function place(
   // For goLeft:  childAnchorX is the right edge of the child column
   const childAnchorX = goRight ? nodeX + w + getHGap(depth) : nodeX - getHGap(depth)
   const childDepth = depth + 1
+  const grid = leafGrid(children, childDepth, nodes, cols)
+  if (grid) {
+    // Column-major: read down column 1, then column 2
+    const top = centerY - grid.totalH / 2
+    children.forEach((child, i) => {
+      const col = Math.floor(i / grid.rows), row = i % grid.rows
+      const colX = goRight ? childAnchorX + col * (grid.colW + WRAP_COL_GAP) : childAnchorX - col * (grid.colW + WRAP_COL_GAP)
+      place(child.id, childDepth, colX, top + grid.h / 2 + row * grid.pitch + col * grid.pitch / 2, nodes, result, goRight)
+    })
+    return
+  }
   const totalH =
-    children.reduce((sum, c) => sum + subtreeH(c.id, childDepth, nodes), 0) +
+    children.reduce((sum, c) => sum + subtreeH(c.id, childDepth, nodes, cols), 0) +
     (children.length - 1) * V_GAP
 
   let curY = centerY - totalH / 2
   for (const child of children) {
-    const ch = subtreeH(child.id, childDepth, nodes)
-    place(child.id, childDepth, childAnchorX, curY + ch / 2, nodes, result, goRight)
+    const ch = subtreeH(child.id, childDepth, nodes, cols)
+    place(child.id, childDepth, childAnchorX, curY + ch / 2, nodes, result, goRight, cols)
     curY += ch + V_GAP
   }
 }

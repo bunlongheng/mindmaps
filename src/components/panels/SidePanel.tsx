@@ -9,7 +9,6 @@ import type { Theme } from '../../lib/themes'
 import { X, AlignLeft, AlignCenter, AlignRight, Copy, Check, FileDown, Trash2, Sparkles, Code2, Square, Squircle, Circle, Tag, Undo2, Redo2 } from 'lucide-react'
 import { getLucideIcon } from '../canvas/NodeIcon'
 import { showToast, dismissToast } from '../CuteToast'
-import { soundChaChing } from '../../lib/sounds'
 import { buildTagColorMap, tagColor } from '../../lib/tagColors'
 import { authHeaders } from '../../hooks/useDiagram'
 import { levelCounts } from '../../lib/nodeCounts'
@@ -17,6 +16,7 @@ import type { DiagramType, Diagram, DiagramMeta } from '../../types'
 import type { NodeShape } from '../../lib/nodeShape'
 import { rootIsPill } from '../../lib/rootPill'
 import { QRCodeSVG } from 'qrcode.react'
+import { renderMindmapSvg } from '../../lib/render-svg'
 import { LinePicker } from './LinePicker'
 
 interface SidePanelProps {
@@ -124,7 +124,7 @@ export function SidePanel({ nodeId, onClose, onDelete, onUpdateTags }: SidePanel
     activeMindmap, updateNode, batchUpdateNodes, selectedNodeIds, diagrams,
     lineStyle, setLineStyle, diagramType, setDiagramType, setShareEnabled, rerunLayout,
     themeId, setTheme, showOrderNumbers, setShowOrderNumbers, showChildCount, setShowChildCount, autoAssignIcons,
-    rootNode,
+    rootNode, hiddenFromDepth, setHiddenFromDepth,
   } = useMindmapStore(
     useShallow(s => ({
       activeMindmap: s.activeMindmap, updateNode: s.updateNode, batchUpdateNodes: s.batchUpdateNodes, selectedNodeIds: s.selectedNodeIds,
@@ -134,8 +134,21 @@ export function SidePanel({ nodeId, onClose, onDelete, onUpdateTags }: SidePanel
       themeId: s.themeId, setTheme: s.setTheme, showOrderNumbers: s.showOrderNumbers, setShowOrderNumbers: s.setShowOrderNumbers,
       showChildCount: s.showChildCount, setShowChildCount: s.setShowChildCount, autoAssignIcons: s.autoAssignIcons,
       rootNode: s.activeMindmap?.nodes.find(n => n.parentId === null) ?? null,
+      hiddenFromDepth: s.hiddenFromDepth, setHiddenFromDepth: s.setHiddenFromDepth,
     })),
   )
+  // A private map has no public card yet (the server serves the generic brand one),
+  // so preview the map itself, rendered locally from what is on the canvas.
+  const privatePreview = useMemo(() => {
+    if (!activeMindmap || activeMindmap.sharingEnabled) return ''
+    try {
+      const svg = renderMindmapSvg({
+        id: activeMindmap.id, name: activeMindmap.name, type: activeMindmap.type,
+        line_style: activeMindmap.lineStyle, theme_id: activeMindmap.themeId, nodes: activeMindmap.nodes,
+      })
+      return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
+    } catch { return '' }
+  }, [activeMindmap])
   const mapInfo = useMemo(() => levelCounts(activeMindmap?.nodes ?? []), [activeMindmap?.nodes])
   const themeColors = getTheme(themeId).colors
   const isMobile = useIsMobile()
@@ -165,11 +178,12 @@ export function SidePanel({ nodeId, onClose, onDelete, onUpdateTags }: SidePanel
 
   const runAIIcons = useCallback(async () => {
     if (!activeMindmap || iconLoading) return
-    const nodes = activeMindmap.nodes.filter(n => n.depth > 0)
+    // Icons go on level 1 topics only; deeper boxes stay text so the map reads clean
+    const nodes = activeMindmap.nodes.filter(n => n.depth === 1)
     // Only assign icons to nodes that don't already have one
     const nodesWithoutIcons = nodes.filter(n => !n.icon && !n.emoji)
     if (nodesWithoutIcons.length === 0) {
-      showToast('All nodes already have icons', { color: '#64748b', duration: 2000 })
+      showToast('All level 1 topics already have icons', { color: '#64748b', duration: 2000 })
       return
     }
     setIconLoading(true)
@@ -236,7 +250,6 @@ export function SidePanel({ nodeId, onClose, onDelete, onUpdateTags }: SidePanel
       })
       blinkStyle.remove()
       dismissToast()
-      soundChaChing()
       const tokLabel = tokenCount >= 1000 ? `${(tokenCount / 1000).toFixed(1)}k` : `${tokenCount}`
       const label = tokenCount > 0 ? `✦ ${tokLabel} tokens` : '✦ Icons ready!'
       showToast(label, { color: '#1a1d2e', confetti: true, duration: 3500 })
@@ -549,8 +562,8 @@ export function SidePanel({ nodeId, onClose, onDelete, onUpdateTags }: SidePanel
                 return (
                   <button key={value} onClick={() => setDiagramType(value)}
                     style={{
-                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5,
-                      padding: '10px 6px 8px', borderRadius: 10,
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+                      padding: '6px 4px 5px', borderRadius: 8,
                       border: `1.5px solid ${active ? '#3b82f6' : '#e0e2e7'}`,
                       background: active ? '#eff6ff' : '#fff', cursor: 'pointer', fontFamily: 'inherit',
                     }}>
@@ -626,7 +639,7 @@ export function SidePanel({ nodeId, onClose, onDelete, onUpdateTags }: SidePanel
           )}
           <HR />
           <SBlock title="Display">
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
               <span style={{ fontSize: 12, color: '#374151' }}>Show order #</span>
               <button
                 onClick={() => setShowOrderNumbers(!showOrderNumbers)}
@@ -643,7 +656,7 @@ export function SidePanel({ nodeId, onClose, onDelete, onUpdateTags }: SidePanel
                 }} />
               </button>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
               <span style={{ fontSize: 12, color: '#374151' }}>Show count</span>
               <button
                 onClick={() => setShowChildCount(!showChildCount)}
@@ -660,7 +673,7 @@ export function SidePanel({ nodeId, onClose, onDelete, onUpdateTags }: SidePanel
                 }} />
               </button>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
               <span style={{ fontSize: 12, color: '#374151' }}>Gloss</span>
               <button
                 onClick={() => rootNode && updateNode(rootNode.id, { gloss: !rootNode.gloss })}
@@ -694,6 +707,33 @@ export function SidePanel({ nodeId, onClose, onDelete, onUpdateTags }: SidePanel
                 ? <><span style={{ display: 'inline-flex', animation: '_aiSpin 1s linear infinite' }}><Sparkles size={13} /></span> Thinking…</>
                 : '✦ Auto Icons (AI)'}
             </button>
+          </SBlock>
+          <HR />
+          <SBlock title="Layers">
+            {/* Hiding a layer hides every deeper one with it; the canvas refits to what is left */}
+            {mapInfo.byDepth.map((count, depth) => {
+              if (depth === 0) return null
+              const on = hiddenFromDepth === null || depth < hiddenFromDepth
+              return (
+                <div key={depth} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: 12, color: on ? '#374151' : '#9ca3af' }}>{`Level ${depth} (${count})`}</span>
+                  <button aria-label={`${on ? 'Hide' : 'Show'} layer ${depth}`}
+                    onClick={() => setHiddenFromDepth(on ? depth : (depth + 1 < mapInfo.byDepth.length ? depth + 1 : null))}
+                    style={{
+                      width: 40, height: 22, borderRadius: 11, border: 'none', cursor: 'pointer', padding: 0,
+                      background: on ? '#1a1d2e' : '#d1d5db',
+                      position: 'relative', transition: 'background 0.2s', flexShrink: 0,
+                    }}
+                  >
+                    <span style={{
+                      position: 'absolute', top: 3, left: on ? 20 : 3,
+                      width: 16, height: 16, borderRadius: '50%', background: '#fff',
+                      transition: 'left 0.2s', display: 'block',
+                    }} />
+                  </button>
+                </div>
+              )
+            })}
           </SBlock>
           <HR />
           <SBlock title="Theme">
@@ -764,10 +804,12 @@ export function SidePanel({ nodeId, onClose, onDelete, onUpdateTags }: SidePanel
               <div style={{ margin: '12px 0 4px' }}>
                 <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#6b7280', marginBottom: 6 }}>Link preview</div>
                 <img
-                  src={`/api/og-image?id=${encodeURIComponent(activeMindmap.id)}&v=${activeMindmap.sharingEnabled ? 'public' : 'private'}`}
+                  src={activeMindmap.sharingEnabled
+                    ? `/api/og-image?id=${encodeURIComponent(activeMindmap.id)}&v=public`
+                    : privatePreview}
                   alt="Share card preview"
                   width={208} height={109}
-                  style={{ width: '100%', height: 'auto', display: 'block', borderRadius: 8, border: '1px solid #e0e2e7', background: '#fff' }}
+                  style={{ width: '100%', height: 109, objectFit: 'contain', display: 'block', borderRadius: 8, border: '1px solid #e0e2e7', background: '#fff' }}
                   onError={e => { e.currentTarget.style.display = 'none' }}
                 />
                 <div data-testid="share-url" style={{ fontSize: 10, color: '#6b7280', marginTop: 6, wordBreak: 'break-all', lineHeight: 1.4 }}>{shareUrl}</div>
@@ -881,9 +923,9 @@ export function SidePanel({ nodeId, onClose, onDelete, onUpdateTags }: SidePanel
 function SBlock({ title, children, defaultOpen = true }: { title: string; children: React.ReactNode; defaultOpen?: boolean }) {
   const [open, setOpen] = useState(defaultOpen)
   return (
-    <div style={{ padding: '12px 14px 8px' }}>
+    <div style={{ padding: '8px 12px 6px' }}>
       <button onClick={() => setOpen(o => !o)} style={{
-        display: 'flex', alignItems: 'center', gap: 5, marginBottom: open ? 10 : 0,
+        display: 'flex', alignItems: 'center', gap: 5, marginBottom: open ? 6 : 0,
         background: 'none', border: 'none', padding: 0, width: '100%', textAlign: 'left',
         cursor: 'pointer', fontFamily: 'inherit',
       }}>
@@ -893,7 +935,7 @@ function SBlock({ title, children, defaultOpen = true }: { title: string; childr
         }}>▼</span>
         <span style={{ fontSize: 11, fontWeight: 700, color: '#374151', letterSpacing: '0.04em', textTransform: 'uppercase' }}>{title}</span>
       </button>
-      {open && <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>{children}</div>}
+      {open && <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>{children}</div>}
     </div>
   )
 }

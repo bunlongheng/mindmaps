@@ -171,7 +171,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(429).json({ error: 'Too many generation requests, try again later' })
   }
 
-  const { prompt, userId = null, type = 'logic-chart', themeId = 'default', sharing = false, mode } = req.body || {}
+  const { prompt, userId = null, type = 'mindmap', themeId = 'default', sharing = false, mode } = req.body || {}
   // Admin-only endpoint (allowBearer:false above), so the map always belongs to the
   // configured owner. Fall back to a body userId only in local dev where MINDMAP_USER_ID
   // may be unset.

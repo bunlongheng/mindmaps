@@ -92,7 +92,7 @@ function rebalanceColors(nodes: MindmapNode[], palette: string[]): MindmapNode[]
   })
 }
 
-function runLayout(nodes: MindmapNode[], type: DiagramType): MindmapNode[] {
+export function runLayout(nodes: MindmapNode[], type: DiagramType): MindmapNode[] {
   switch (type) {
     case 'mindmap':     return computeMindmapLayout(nodes)
     case 'graph':     return computeGraphLayout(nodes)
@@ -129,6 +129,8 @@ interface MindmapStore {
   showOrderNumbers: boolean
   showChildCount: boolean
   hideDetails: boolean
+  hiddenFromDepth: number | null   // layers at this depth and deeper are hidden; null shows all
+  legendFocus: number[]            // legend rows the map is filtered to (view only); empty shows all
   isImporting: boolean
   resizePreview: { depth: number; width: number } | null
   // History
@@ -157,6 +159,8 @@ interface MindmapStore {
   setShowOrderNumbers: (v: boolean) => void
   setShowChildCount: (v: boolean) => void
   setHideDetails: (v: boolean) => void
+  setHiddenFromDepth: (d: number | null) => void
+  setLegendFocus: (rows: number[]) => void
   setIsImporting: (v: boolean) => void
   setResizePreview: (v: { depth: number; width: number } | null) => void
   undo: () => void
@@ -250,9 +254,11 @@ export const useMindmapStore = create<MindmapStore>()(
     diagramType: 'logic-chart',
     lineStyle: 'curved',
     themeId: localStorage.getItem('mindmaps:themeId') ?? 'default',
-    showOrderNumbers: true,
+    showOrderNumbers: false,
     showChildCount: false,
     hideDetails: false,
+    hiddenFromDepth: null,
+    legendFocus: [],
     isImporting: false,
     resizePreview: null,
     past: [],
@@ -265,6 +271,8 @@ export const useMindmapStore = create<MindmapStore>()(
       // Clearing the active map (e.g. after deleting the one being viewed): reset
       // cleanly instead of throwing on d.nodes of a null diagram.
       resetHistoryCoalesce()
+      // A legend filter belongs to the map it was set on
+      if (get().activeMindmap?.id !== d?.id) set({ legendFocus: [] })
       if (!d) { set({ activeMindmap: null, isDirty: false, past: [], future: [] }); return }
       // Re-run layout on load: reset widths → compute auto-widths → normalize per depth → final layout.
       // A manual width is the one thing worth keeping across the reset — it is the
@@ -292,7 +300,7 @@ export const useMindmapStore = create<MindmapStore>()(
         diagramType: d.type,
         lineStyle: d.lineStyle,
         themeId,
-        showOrderNumbers: d.showOrderNumbers ?? true,
+        showOrderNumbers: d.showOrderNumbers ?? false,
         past: [],
         future: [],
         isDirty: false,
@@ -649,6 +657,8 @@ export const useMindmapStore = create<MindmapStore>()(
     setShowChildCount: (v) => set({ showChildCount: v }),
 
     setHideDetails: (v) => set({ hideDetails: v }),
+    setHiddenFromDepth: (d) => set({ hiddenFromDepth: d }),
+    setLegendFocus: (rows) => set({ legendFocus: rows }),
 
     setIsImporting: (v) => set({ isImporting: v }),
     setResizePreview: (v) => set({ resizePreview: v }),
@@ -682,7 +692,7 @@ export const useMindmapStore = create<MindmapStore>()(
       if (!state.activeMindmap) return
       state.snapshotHistory('autoIcons')
       const nodes = state.activeMindmap.nodes.map(n =>
-        n.depth > 0 ? { ...n, icon: n.icon ?? guessIcon(n.title) } : n
+        n.depth === 1 ? { ...n, icon: n.icon ?? guessIcon(n.title) } : n
       )
       set({ activeMindmap: { ...state.activeMindmap, nodes }, isDirty: true })
     },

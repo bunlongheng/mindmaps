@@ -3,6 +3,8 @@
 * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
 input, textarea { user-select: text; -webkit-user-select: text; }
 body { font-family: 'Inter', system-ui, sans-serif; background: #ffffff; color: #1e293b; }
+/* 2-finger swipe pans the map; never let it trigger the browser's back/forward */
+html, body { overscroll-behavior-x: none; }
 
 @keyframes iconPop {
   0%   { transform: scale(0) rotate(-20deg); opacity: 0; }
@@ -10,3 +12,6 @@ body { font-family: 'Inter', system-ui, sans-serif; background: #ffffff; color: 
   100% { transform: scale(1) rotate(0deg); opacity: 1; }
 }
 @keyframes _aiSpin { to { transform: rotate(360deg); } }
+
+/* Mid zoom gesture: skip per-node shadows and glows so each frame is a cheap repaint */
+svg[data-zooming] * { filter: none !important; }

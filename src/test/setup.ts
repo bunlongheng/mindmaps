@@ -13,16 +13,6 @@ Object.defineProperty(globalThis, 'localStorage', {
   },
 })
 
-// Mock AudioContext for sounds
-class MockAudioContext {
-  createOscillator() { return { type: '', frequency: { setValueAtTime() {}, exponentialRampToValueAtTime() {} }, connect() {}, start() {}, stop() {} } }
-  createGain() { return { gain: { setValueAtTime() {}, linearRampToValueAtTime() {}, exponentialRampToValueAtTime() {} }, connect() {} } }
-  get destination() { return {} }
-  get currentTime() { return 0 }
-}
-Object.defineProperty(globalThis, 'AudioContext', { value: MockAudioContext })
-Object.defineProperty(globalThis, 'webkitAudioContext', { value: MockAudioContext })
-
 // ── Common DOM/SVG mocks jsdom lacks (needed for component tests) ──────────────
 class MockObserver {
   observe() {} unobserve() {} disconnect() {} takeRecords() { return [] }
