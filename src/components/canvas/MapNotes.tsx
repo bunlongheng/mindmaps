@@ -43,10 +43,10 @@ export function MapNotes({ top = 64 }: { top?: number }) {
       {legend.length > 0 && (
         <section data-testid="map-legend" style={{ ...card, bottom: 56, padding: '12px 16px' }}>
           <button onClick={() => setKeyOpen(o => !o)} aria-expanded={keyOpen} title={keyOpen ? 'Collapse' : 'Expand'} style={toggle}>
-            <span style={{ flex: 1, fontSize: 14, fontWeight: 700 }}>Legend</span>
+            <span style={{ flex: 1, fontSize: 13, fontWeight: 700 }}>Legend</span>
             {keyOpen ? <ChevronDown size={16} color="#94a3b8" /> : <ChevronUp size={16} color="#94a3b8" />}
           </button>
-          {keyOpen && <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 2, marginTop: 8, maxHeight: '40vh', overflowY: 'auto' }}>
+          {keyOpen && <ul style={{ listStyle: 'none', padding: 0, display: 'grid', gap: 2, margin: '8px -7px 0', maxHeight: '40vh', overflowY: 'auto', overflowX: 'hidden' }}>
             {legend.map((r, i) => {
               const on = focus.includes(i)
               return (
@@ -54,23 +54,21 @@ export function MapNotes({ top = 64 }: { top?: number }) {
                   {/* A row is a filter: click to show only its features, click more to add, again to drop */}
                   <button onClick={() => setFocus(on ? focus.filter(f => f !== i) : [...focus, i])} aria-pressed={on}
                     title={on ? 'Show all again' : `Show only: ${r.label}`} style={{
-                      ...toggle, alignItems: 'center', fontSize: 14, color: on ? '#111827' : '#334155', padding: '3px 0',
+                      ...toggle, alignItems: 'center', fontSize: 12, color: on ? '#0f172a' : '#475569',
+                      // The selected row gets an outline so it pops; off rows keep a clear border so nothing shifts
+                      padding: '3px 6px', borderRadius: 6,
+                      border: `1px solid ${on ? '#0f172a' : 'transparent'}`, background: on ? 'rgba(15,23,42,0.05)' : 'transparent',
                     }}>
                     {r.emoji
-                      ? <span aria-hidden="true" style={{ width: 16, textAlign: 'center', fontSize: 13 }}>{r.emoji}</span>
-                      : <span aria-hidden="true" style={{ width: 12, height: 12, margin: '0 2px', borderRadius: '50%', background: r.color ?? '#94a3b8' }} />}
+                      ? <span aria-hidden="true" style={{ width: 14, textAlign: 'center', fontSize: 11 }}>{r.emoji}</span>
+                      : <span aria-hidden="true" style={{ width: 10, height: 10, margin: '0 2px', borderRadius: '50%', background: r.color ?? '#94a3b8' }} />}
                     <span style={{ flex: 1, fontWeight: on ? 600 : 400 }}>{r.label}</span>
-                    {on && <Check size={15} color="#6366f1" strokeWidth={2.5} aria-hidden="true" />}
+                    {on && <Check size={13} color="#0f172a" strokeWidth={2.5} aria-hidden="true" />}
                   </button>
                 </li>
               )
             })}
           </ul>}
-          {keyOpen && focus.length > 0 && (
-            <button onClick={() => setFocus([])} style={{ ...toggle, marginTop: 8, fontSize: 13, fontWeight: 600, color: '#6366f1' }}>
-              Show all
-            </button>
-          )}
         </section>
       )}
     </>

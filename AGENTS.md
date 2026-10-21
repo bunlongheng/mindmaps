@@ -41,7 +41,8 @@ A node in the outline may carry `emoji`, `icon`, `shape` or `color`.
 - A legend row matches a node by `emoji`. A row with no `emoji` matches by `color`.
 - Use the same emoji on the nodes as on the row, or the filter finds nothing.
 - In the app, a click on a row shows only its nodes plus their parents, and the map
-  refits. Several rows can be on at once. "Show all" clears the filter.
+  refits. Several rows can be on at once. A second click drops a row; with none on, the
+  whole map shows.
 - Note, legend and `showLegend` live on the root node, so every load and share link
   carries them. Copy for AI puts them at the top of the outline.
 
