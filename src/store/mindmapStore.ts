@@ -130,6 +130,7 @@ interface MindmapStore {
   showChildCount: boolean
   hideDetails: boolean
   hiddenFromDepth: number | null   // layers at this depth and deeper are hidden; null shows all
+  legendFocus: number[]            // legend rows the map is filtered to (view only); empty shows all
   isImporting: boolean
   resizePreview: { depth: number; width: number } | null
   // History
@@ -159,6 +160,7 @@ interface MindmapStore {
   setShowChildCount: (v: boolean) => void
   setHideDetails: (v: boolean) => void
   setHiddenFromDepth: (d: number | null) => void
+  setLegendFocus: (rows: number[]) => void
   setIsImporting: (v: boolean) => void
   setResizePreview: (v: { depth: number; width: number } | null) => void
   undo: () => void
@@ -256,6 +258,7 @@ export const useMindmapStore = create<MindmapStore>()(
     showChildCount: false,
     hideDetails: false,
     hiddenFromDepth: null,
+    legendFocus: [],
     isImporting: false,
     resizePreview: null,
     past: [],
@@ -268,6 +271,8 @@ export const useMindmapStore = create<MindmapStore>()(
       // Clearing the active map (e.g. after deleting the one being viewed): reset
       // cleanly instead of throwing on d.nodes of a null diagram.
       resetHistoryCoalesce()
+      // A legend filter belongs to the map it was set on
+      if (get().activeMindmap?.id !== d?.id) set({ legendFocus: [] })
       if (!d) { set({ activeMindmap: null, isDirty: false, past: [], future: [] }); return }
       // Re-run layout on load: reset widths → compute auto-widths → normalize per depth → final layout.
       // A manual width is the one thing worth keeping across the reset — it is the
@@ -653,6 +658,7 @@ export const useMindmapStore = create<MindmapStore>()(
 
     setHideDetails: (v) => set({ hideDetails: v }),
     setHiddenFromDepth: (d) => set({ hiddenFromDepth: d }),
+    setLegendFocus: (rows) => set({ legendFocus: rows }),
 
     setIsImporting: (v) => set({ isImporting: v }),
     setResizePreview: (v) => set({ resizePreview: v }),

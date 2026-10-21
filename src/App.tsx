@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { CuteToast, showToast } from './components/CuteToast'
+import { MapNotes } from './components/canvas/MapNotes'
 import { DiagramCanvas } from './components/canvas/DiagramCanvas'
 import { SidePanel } from './components/panels/SidePanel'
 import { ImportModal } from './components/modals/ImportModal'
@@ -156,7 +157,8 @@ export default function App() {
   const [diagramLoading, setDiagramLoading] = useState(() => !!(getMapParam() || getShareParam()))
   const [view, setView] = useState<View>(() => {
     if (decodeShareURL()) return 'viewer'
-    if (getShareParam()) return 'viewer'
+    // The signed-in owner opening their own share link gets the editor, not the reader view
+    if (getShareParam()) return user ? 'editor' : 'viewer'
     if (getMapParam()) return 'editor'
     return 'home'
   })
@@ -214,8 +216,9 @@ export default function App() {
     const shared = decodeShareURL()
     if (shared) { setActiveMindmap(shared); return }
     const shareId = getShareParam()
-    if (shareId) { setDiagramLoading(true); loadDiagram(shareId).finally(() => setDiagramLoading(false)); return }
-    const mapId = getMapParam()
+    if (shareId && !user) { setDiagramLoading(true); loadDiagram(shareId).finally(() => setDiagramLoading(false)); return }
+    // Signed in: a share link is the owner's own map, so it opens like ?map= (and the URL says so)
+    const mapId = getMapParam() ?? shareId
     if (mapId) {
       // Normalize ?id= → ?map= in the URL, preserving ?imported
       if (!new URLSearchParams(window.location.search).has('map')) {
@@ -487,6 +490,7 @@ export default function App() {
           noInteract={isTouch}
           rightInset={showPanel ? Math.round(256 * 1.2) : 0}
         />
+        <MapNotes />
 
         {/* Back button — top left */}
         <button onClick={handleBack} title="All maps" style={{

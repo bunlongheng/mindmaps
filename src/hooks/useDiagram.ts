@@ -113,6 +113,9 @@ function rowToDiagram(row: Record<string, unknown>): Diagram {
     combStyle:          (n.combStyle ?? undefined) as MindmapNode['combStyle'],
     combSize:           (n.combSize ?? undefined) as MindmapNode['combSize'],
     ringSize:           (n.ringSize ?? undefined) as MindmapNode['ringSize'],
+    note:               (n.note ?? undefined) as MindmapNode['note'],
+    legend:             (n.legend ?? undefined) as MindmapNode['legend'],
+    showLegend:         (n.showLegend ?? undefined) as boolean | undefined,
   }))
   return {
     id:             row.id as string,

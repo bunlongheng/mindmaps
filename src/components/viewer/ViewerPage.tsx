@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Bot, Braces, Download } from 'lucide-react'
 import type { Diagram } from '../../types'
 import { DiagramCanvas } from '../canvas/DiagramCanvas'
+import { MapNotes } from '../canvas/MapNotes'
 import { downloadJSON } from '../../lib/export/json'
 import { toOutline } from '../../lib/export/outline'
 import { UnlockReveal } from './UnlockReveal'
@@ -86,6 +87,7 @@ export function ViewerPage({ diagram, id }: { diagram: Diagram | null; id: strin
           Cmd +/-/0) and node links work; nothing can be moved, edited or saved. */}
       <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
         <DiagramCanvas onNodeSelect={() => {}} readOnly />
+        <MapNotes top={16} />
       </div>
       <UnlockReveal />
     </main>
