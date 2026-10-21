@@ -89,3 +89,12 @@ describe('sliceSegments / lineRanges', () => {
     expect(lineRanges(text, ['alpha beta', 'gamma'])).toEqual([[0, 10], [11, 16]])
   })
 })
+
+describe('lineRanges edge cases', () => {
+  it('skips empty words and words that are not in the text', () => {
+    // double space gives an empty word; "zzz" is not in the text
+    expect(lineRanges('ab cd', ['ab  cd'])).toEqual([[0, 5]])
+    expect(lineRanges('ab cd', ['zzz'])).toEqual([[0, 0]])
+    expect(lineRanges('ab cd', ['ab', 'zzz', 'cd'])).toEqual([[0, 2], [2, 2], [3, 5]])
+  })
+})
