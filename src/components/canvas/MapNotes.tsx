@@ -54,16 +54,16 @@ export function MapNotes({ top = 64 }: { top?: number }) {
                   {/* A row is a filter: click to show only its features, click more to add, again to drop */}
                   <button onClick={() => setFocus(on ? focus.filter(f => f !== i) : [...focus, i])} aria-pressed={on}
                     title={on ? 'Show all again' : `Show only: ${r.label}`} style={{
-                      ...toggle, alignItems: 'center', fontSize: 12, color: on ? '#111827' : '#334155',
+                      ...toggle, alignItems: 'center', fontSize: 12, color: on ? '#0f172a' : '#475569',
                       // The selected row gets an outline so it pops; off rows keep a clear border so nothing shifts
                       padding: '3px 6px', borderRadius: 6,
-                      border: `1px solid ${on ? '#111827' : 'transparent'}`, background: on ? 'rgba(17,24,39,0.05)' : 'transparent',
+                      border: `1px solid ${on ? '#0f172a' : 'transparent'}`, background: on ? 'rgba(15,23,42,0.05)' : 'transparent',
                     }}>
                     {r.emoji
                       ? <span aria-hidden="true" style={{ width: 14, textAlign: 'center', fontSize: 11 }}>{r.emoji}</span>
                       : <span aria-hidden="true" style={{ width: 10, height: 10, margin: '0 2px', borderRadius: '50%', background: r.color ?? '#94a3b8' }} />}
                     <span style={{ flex: 1, fontWeight: on ? 600 : 400 }}>{r.label}</span>
-                    {on && <Check size={13} color="#111827" strokeWidth={2.5} aria-hidden="true" />}
+                    {on && <Check size={13} color="#0f172a" strokeWidth={2.5} aria-hidden="true" />}
                   </button>
                 </li>
               )
