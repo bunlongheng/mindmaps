@@ -2,7 +2,7 @@ import type { MindmapNode } from '../../types/index.js'
 import { nodeSize, place, subtreeH, V_GAP, H_GAPS } from './mindmaps-layout.js'
 
 // The Mind Map: the classic balanced tree. The central topic sits in the middle and
-// its topics spread BOTH ways - the first half to the right, the rest to the left -
+// its topics spread BOTH ways - the first ones to the right, the rest to the left -
 // with every subtree continuing outward on the side its topic started on.
 //
 // It is the logic chart's tree twice over: src/lib/layout/mindmaps-layout already
@@ -13,10 +13,21 @@ import { nodeSize, place, subtreeH, V_GAP, H_GAPS } from './mindmaps-layout.js'
 const ROOT_CX = 900
 const CENTER_Y = 340
 
-/** Right side first: topics 1..ceil(n/2) to the right, the rest to the left. */
-export function splitSides<T>(items: T[]): { right: T[]; left: T[] } {
-  const half = Math.ceil(items.length / 2)
-  return { right: items.slice(0, half), left: items.slice(half) }
+/** Right side first: the first topics go right, the rest left, cut where the 2
+ *  sides come out closest in height so one big branch can't tower over the other
+ *  side. Order is kept, and a tie gives the extra topic to the right, which is the
+ *  side that reads first. Without heights every topic counts as 1. */
+export function splitSides<T>(items: T[], heightOf: (item: T) => number = () => 1): { right: T[]; left: T[] } {
+  const hs = items.map(heightOf)
+  const total = hs.reduce((s, h) => s + h, 0)
+  let best = Math.min(1, items.length), bestDiff = Infinity, acc = 0
+  for (let k = 1; k <= items.length; k++) {
+    acc += hs[k - 1]
+    const diff = Math.abs(2 * acc - total)
+    if (diff <= bestDiff) { best = k; bestDiff = diff }
+    else break
+  }
+  return { right: items.slice(0, best), left: items.slice(best) }
 }
 
 /** Stack a side's subtrees vertically, centred on `centerY`. */
@@ -76,8 +87,8 @@ function layoutWithCols(nodes: MindmapNode[], cols: number): MindmapNode[] {
   const l1s = nodes.filter(n => n.parentId === root.id)
     .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
 
-  const { right, left } = splitSides(l1s)
   const nodesForLayout = nodes
+  const { right, left } = splitSides(l1s, l => subtreeH(l.id, 1, nodesForLayout, cols) + V_GAP)
 
   const { w: rw, h: rh } = nodeSize(root, 0)
   const rootX = root.manuallyPositioned ? root.x : ROOT_CX - rw / 2
