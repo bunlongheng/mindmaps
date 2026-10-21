@@ -57,13 +57,13 @@ export function MapNotes({ top = 64 }: { top?: number }) {
                       ...toggle, alignItems: 'center', fontSize: 12, color: on ? '#111827' : '#334155',
                       // The selected row gets an outline so it pops; off rows keep a clear border so nothing shifts
                       padding: '3px 6px', borderRadius: 6,
-                      border: `1px solid ${on ? '#6366f1' : 'transparent'}`, background: on ? 'rgba(99,102,241,0.08)' : 'transparent',
+                      border: `1px solid ${on ? '#111827' : 'transparent'}`, background: on ? 'rgba(17,24,39,0.05)' : 'transparent',
                     }}>
                     {r.emoji
                       ? <span aria-hidden="true" style={{ width: 14, textAlign: 'center', fontSize: 11 }}>{r.emoji}</span>
                       : <span aria-hidden="true" style={{ width: 10, height: 10, margin: '0 2px', borderRadius: '50%', background: r.color ?? '#94a3b8' }} />}
                     <span style={{ flex: 1, fontWeight: on ? 600 : 400 }}>{r.label}</span>
-                    {on && <Check size={13} color="#6366f1" strokeWidth={2.5} aria-hidden="true" />}
+                    {on && <Check size={13} color="#111827" strokeWidth={2.5} aria-hidden="true" />}
                   </button>
                 </li>
               )
