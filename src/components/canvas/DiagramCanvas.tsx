@@ -118,7 +118,6 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract, rightInset =
     [diagramType, canvasBg, activeMindmap?.nodes])
   const svgRef = useRef<SVGSVGElement>(null!)
   const gRef = useRef<SVGGElement>(null!)
-  const [, setPan] = useState({ x: 0, y: 0 })
   const panRef = useRef({ x: 0, y: 0 })
   const zoomCurrentRef = useRef(1)
   const [zoom, setZoom] = useState(1)
@@ -207,7 +206,6 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract, rightInset =
     setZoom(newZoom)  // badge only
     const p = { x: visW / 2 - cx * newZoom, y: svgH / 2 - cy * newZoom }
     panRef.current = p
-    setPan(p)         // keep pan state in sync for selBox coords
     applyTransform(p, newZoom)
   }, [visibleNodes, diagramType, applyTransform, rightInset])
 
@@ -269,7 +267,6 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract, rightInset =
   const touchPanRef = useRef<{ x: number; y: number } | null>(null)
 
   // Drag-reorder state: snap line between siblings
-  const [, setSnapLine] = useState<{ x1: number; x2: number; y: number } | null>(null)
   const snapTargetRef = useRef<{ insertBeforeId: string | null } | null>(null)
 
   useKeyboard()
@@ -468,29 +465,23 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract, rightInset =
     const siblings = activeMindmap.nodes
       .filter(n => n.parentId === node.parentId && n.id !== id)
       .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
-    if (siblings.length === 0) { setSnapLine(null); snapTargetRef.current = null; return }
+    if (siblings.length === 0) { snapTargetRef.current = null; return }
     // Find insertion point: which gap does cy fall into?
     let insertBefore: string | null = null
-    let snapY = siblings[siblings.length - 1].y + siblings[siblings.length - 1].height + 8
     for (let i = 0; i < siblings.length; i++) {
       const sib = siblings[i]
       const sibCY = sib.y + sib.height / 2
       if (cy < sibCY) {
         insertBefore = sib.id
-        snapY = i === 0 ? sib.y - 8 : (siblings[i - 1].y + siblings[i - 1].height + sib.y) / 2
         break
       }
     }
-    const minX = Math.min(...siblings.map(s => s.x))
-    const maxX = Math.max(...siblings.map(s => s.x + s.width))
     snapTargetRef.current = { insertBeforeId: insertBefore }
-    setSnapLine({ x1: minX - 6, x2: maxX + 6, y: snapY })
   }, [activeMindmap])
 
   const handleDragEnd = useCallback((id: string) => {
     const snap = snapTargetRef.current
     snapTargetRef.current = null
-    setSnapLine(null)
     if (!snap) return
     reorderNode(id, snap.insertBeforeId)
   }, [reorderNode])
@@ -522,7 +513,6 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract, rightInset =
       if (client.y < EDGE_ZONE) panDy = -MAX_SPEED * (1 - client.y / EDGE_ZONE)
       else if (client.y > vh - EDGE_ZONE) panDy = MAX_SPEED * (1 - (vh - client.y) / EDGE_ZONE)
       if (panDx !== 0 || panDy !== 0) {
-        setPan(p => ({ x: p.x + panDx, y: p.y + panDy }))
         const z = zoomCurrentRef.current
         const root = useMindmapStore.getState().activeMindmap?.nodes.find(n => n.depth === 0)
         if (root) {

@@ -9,7 +9,7 @@ interface MindmapsLogoProps {
 export function MindmapsLogo({ size = 32 }: MindmapsLogoProps) {
   return (
     <img
-      src="/icons/pwa-192x192.png"
+      src={size <= 32 ? '/icons/pwa-64x64.png' : '/icons/pwa-192x192.png'}
       width={size}
       height={size}
       alt="Mindmaps"
