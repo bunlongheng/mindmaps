@@ -123,17 +123,24 @@ function BracketConnector({ parent, children, goRight = true, showOrderNumbers =
 function EdgeLayerImpl({ nodes, lineStyle, diagramType, paletteColors }: EdgeLayerProps) {
   const showOrderNumbers = useMindmapStore(s => s.showOrderNumbers)
   const selectedNodeIds = useMindmapStore(s => s.selectedNodeIds)
+  const nodeMap = new Map(nodes.map(n => [n.id, n]))
+  // parentId -> children in node order, built once instead of a filter per parent
+  const childrenOf = new Map<string, MindmapNode[]>()
+  for (const n of nodes) {
+    if (!n.parentId) continue
+    const kids = childrenOf.get(n.parentId)
+    if (kids) kids.push(n); else childrenOf.set(n.parentId, [n])
+  }
   // Every stem from the root down to each selected node glows, so its branch reads at a glance
   const glow = new Set<string>()
   for (const id of selectedNodeIds) {
-    let cur = nodes.find(n => n.id === id)
-    while (cur && cur.parentId) { glow.add(cur.id); const pid = cur.parentId; cur = nodes.find(n => n.id === pid) }
+    let cur = nodeMap.get(id)
+    while (cur && cur.parentId) { glow.add(cur.id); cur = nodeMap.get(cur.parentId) }
   }
   const themeId = useMindmapStore(s => s.themeId)
   // On a dark canvas the radial branches are luminous tubes, not hairlines: a blurred
   // glow line under a crisp lightened core. Light themes keep the single thin line.
   const neon = diagramType === 'graph' && isDarkBg(getTheme(themeId).canvasBg)
-  const nodeMap = new Map(nodes.map(n => [n.id, n]))
   // Connector/badge colour from the 12-colour wheel, matching the node fills.
   const pc = (n: MindmapNode) => paletteColors?.get(n.id) ?? n.color
   // The root pill auto-sizes from its title, so measure what is drawn - a stored
@@ -245,11 +252,11 @@ function EdgeLayerImpl({ nodes, lineStyle, diagramType, paletteColors }: EdgeLay
 
     if (lineStyle === 'curved') {
       // Brace: BracketConnector from root down through every level
-      const allParents = nodes.filter(n => nodes.some(c => c.parentId === n.id))
+      const allParents = nodes.filter(n => childrenOf.has(n.id))
       return (
         <g>
           {allParents.map(parent => {
-            const children = nodes.filter(n => n.parentId === parent.id)
+            const children = childrenOf.get(parent.id) ?? []
             return <BracketConnector key={parent.id} parent={parent} children={children} showOrderNumbers={showOrderNumbers} colorOf={pc} glow={glow} />
           })}
         </g>
@@ -330,11 +337,11 @@ function EdgeLayerImpl({ nodes, lineStyle, diagramType, paletteColors }: EdgeLay
   // sitting left of its parent leaves the parent's LEFT face instead of reaching
   // around it (src/lib/layout/mindmap).
   if (diagramType === 'mindmap') {
-    const parents = nodes.filter(n => nodes.some(c => c.parentId === n.id))
+    const parents = nodes.filter(n => childrenOf.has(n.id))
     return (
       <g>
         {parents.map(parent => {
-          const kids = nodes.filter(n => n.parentId === parent.id)
+          const kids = childrenOf.get(parent.id) ?? []
           const cx = parent.x + (parent.depth === 0 ? rootDrawnWidth(parent, diagramType) : parent.width) / 2
           const onRight = kids.filter(k => k.x + k.width / 2 >= cx)
           const onLeft = kids.filter(k => k.x + k.width / 2 < cx)

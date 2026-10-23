@@ -46,10 +46,12 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract, rightInset =
   }, [activeMindmap?.nodes, diagramType])
   // "Outward" in a radial mind map is measured from the root, so every Node needs the
   // root's centre. Resolved once here rather than by an O(n) find inside each node.
-  const rootCenter = useMemo(() => {
-    const r = activeMindmap?.nodes.find(n => n.parentId === null)
-    return r ? { x: r.x + r.width / 2, y: r.y + r.height / 2 } : null
-  }, [activeMindmap?.nodes])
+  const rootNode = activeMindmap?.nodes.find(n => n.parentId === null)
+  const rcx = rootNode ? rootNode.x + rootNode.width / 2 : null
+  const rcy = rootNode ? rootNode.y + rootNode.height / 2 : null
+  // Keyed on the numbers so the object only changes when the root actually moves
+  const rootCenter = useMemo(() => rcx === null || rcy === null ? null : { x: rcx, y: rcy }, [rcx, rcy])
+  const selSet = useMemo(() => new Set(selectedNodeIds), [selectedNodeIds])
 
   const visibleNodes = useMemo(() => {
     const maxDepth = Math.min(hideDetails ? 2 : Infinity, hiddenFromDepth === null ? Infinity : hiddenFromDepth - 1)
@@ -428,7 +430,11 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract, rightInset =
         n.x < box.x + box.w && n.x + n.width > box.x &&
         n.y < box.y + box.h && n.y + n.height > box.y
       )
-      setSelectedNodeIds(hits.map(n => n.id))
+      const ids = hits.map(n => n.id)
+      const prev = useMindmapStore.getState().selectedNodeIds
+      // Skip the setters when the box still covers the same nodes
+      if (ids.length === prev.length && ids.every((id, i) => id === prev[i])) return
+      setSelectedNodeIds(ids)
       onNodeSelect(hits.length === 1 ? hits[0].id : null)
     }
   }, [activeMindmap, setSelectedNodeIds, onNodeSelect])
@@ -461,6 +467,8 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract, rightInset =
   }, [setSelectedNodeIds, onNodeSelect])
 
   const handleDragMove = useCallback((id: string, _cx: number, cy: number) => {
+    // Read from the store so this callback stays stable and memo(Node) holds during drags
+    const activeMindmap = useMindmapStore.getState().activeMindmap
     if (!activeMindmap) return
     const node = activeMindmap.nodes.find(n => n.id === id)
     if (!node) return
@@ -485,7 +493,7 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract, rightInset =
     const maxX = Math.max(...siblings.map(s => s.x + s.width))
     snapTargetRef.current = { insertBeforeId: insertBefore }
     setSnapLine({ x1: minX - 6, x2: maxX + 6, y: snapY })
-  }, [activeMindmap])
+  }, [])
 
   const handleDragEnd = useCallback((id: string) => {
     const snap = snapTargetRef.current
@@ -622,7 +630,7 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract, rightInset =
             <Node
               key={node.id}
               node={node}
-              isSelected={selectedNodeIds.includes(node.id)}
+              isSelected={selSet.has(node.id)}
               soloSelected={selectedNodeIds.length === 1 && selectedNodeIds[0] === node.id}
               onSelect={handleSelect}
               onDragEnd={handleDragEnd}
