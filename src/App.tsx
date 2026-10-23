@@ -153,7 +153,6 @@ export default function App() {
       selectedNodeIds: s.selectedNodeIds, setSelectedNodeIds: s.setSelectedNodeIds, setPasteImportFn: s.setPasteImportFn,
     })),
   )
-  const [flashDiagramId] = useState<string | null>(null)
   const [diagramLoading, setDiagramLoading] = useState(() => !!(getMapParam() || getShareParam()))
   const [view, setView] = useState<View>(() => {
     if (decodeShareURL()) return 'viewer'
@@ -435,7 +434,7 @@ export default function App() {
   if (view === 'home') return (
     <>
       <CuteToast />
-      <HomePage onOpen={handleOpenDiagram} user={user} onSignOut={handleSignOut} flashId={flashDiagramId} />
+      <HomePage onOpen={handleOpenDiagram} user={user} onSignOut={handleSignOut} />
     </>
   )
 
@@ -443,7 +442,7 @@ export default function App() {
   if (view === 'editor' && !activeMindmap) return (
     <>
       <CuteToast />
-      <HomePage onOpen={handleOpenDiagram} user={user} onSignOut={handleSignOut} flashId={flashDiagramId} />
+      <HomePage onOpen={handleOpenDiagram} user={user} onSignOut={handleSignOut} />
     </>
   )
 

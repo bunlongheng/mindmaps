@@ -47,27 +47,15 @@ write('public/icons/favicon-16x16.png', p16)
 write('public/icons/favicon-32x32.png', p32)
 write('public/icons/pwa-64x64.png', p64)
 write('public/icons/apple-touch-icon.png', p180)
-write('public/icons/apple-touch-icon-180x180.png', p180)
 write('public/icons/android-chrome-192x192.png', p192)
 write('public/icons/pwa-192x192.png', p192)
 write('public/icons/android-chrome-512x512.png', p512)
 write('public/icons/pwa-512x512.png', p512)
-write('public/icons/maskable-512x512.png', m512)
 write('public/icons/maskable-icon-512x512.png', m512)
 write('public/icons/favicon.ico', ico)
-// SVG favicon: wrap the raster so the svg <link> keeps working with the new art.
-write('public/icons/icon.svg',
-  Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><image width="512" height="512" href="data:image/png;base64,${p512.toString('base64')}"/></svg>`))
 
 // public/*  (root-level legacy icons)
-write('public/favicon-16x16.png', p16) // harmless extra alias
-write('public/icon-16.png', p16)
-write('public/icon-32.png', p32)
-write('public/favicon.png', p32)
-write('public/icon-180.png', p180)
 write('public/apple-touch-icon.png', p180)
-write('public/icon-192.png', p192)
-write('public/icon-512.png', p512)
 write('public/favicon.ico', ico)
 
 console.log('\nAll icons regenerated from scripts/icon-master.png')

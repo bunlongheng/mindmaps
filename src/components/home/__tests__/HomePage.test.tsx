@@ -1049,12 +1049,6 @@ describe('HomePage — no user', () => {
     render(<HomePage onOpen={vi.fn()} user={null} onSignOut={vi.fn()} />)
     expect(screen.getByText('No maps yet')).toBeInTheDocument()
   })
-
-  it('flashId highlights a matching card', () => {
-    seedDiagrams(SAMPLE)
-    render(<HomePage onOpen={vi.fn()} user={USER} onSignOut={vi.fn()} flashId="m1" />)
-    expect(screen.getByText('Project Plan')).toBeInTheDocument()
-  })
 })
 
 describe('HomePage — CachedNodeCount badge (grid card)', () => {
