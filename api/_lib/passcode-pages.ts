@@ -81,6 +81,14 @@ html,body{height:100%;background:linear-gradient(160deg,#f7f8fb 0%,#eceef5 100%)
    LastPass/1Password never attach their autofill icon. */
 .entry input{flex:1;min-width:0;background:transparent;border:0;outline:0;color:#1f2937;font-size:18px;font-weight:600;font-family:inherit;letter-spacing:0.18em;padding:0;-webkit-text-security:disc;text-security:disc}
 .entry input::placeholder{color:#7c8596;font-weight:400;letter-spacing:0.01em}
+.entry input.show{-webkit-text-security:none;text-security:none}
+/* eye: only once something is typed, flips the mask on and off */
+.eye{flex:none;width:36px;height:36px;border:0;border-radius:50%;background:transparent;color:#5b6475;cursor:pointer;display:grid;place-items:center;transition:background .12s,color .12s}
+.eye:hover{background:rgba(255,255,255,0.6);color:#1f2937}
+.eye:focus-visible{outline:2px solid rgba(129,140,248,0.6);outline-offset:1px}
+.eye svg{width:20px;height:20px}
+.eye .off,.eye.on .on{display:none}.eye.on .off{display:block}
+.entry input:placeholder-shown~.eye{display:none}
 /* glass bubble button */
 .go{flex:none;width:48px;height:48px;border:1px solid rgba(255,255,255,0.55);border-radius:50%;cursor:pointer;display:grid;place-items:center;color:#fff;position:relative;overflow:hidden;
   background:linear-gradient(150deg,#b4b2ff 0%,#8f8bf4 60%,#8580ee 100%);
@@ -112,9 +120,11 @@ ${bg ? `<div class="blur" aria-hidden="true"></div><div class="veil" aria-hidden
   <div class="entry">
     <svg class="lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2.5"/><path d="M8 11V7.5a4 4 0 0 1 8 0V11"/></svg>
     <input name="passcode" type="text" autofocus autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore data-bwignore data-form-type="other" required placeholder="Passcode" aria-label="Passcode">
+    <button class="eye" type="button" aria-label="Show passcode" aria-pressed="false"><svg class="on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg><svg class="off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.7 5.1A10 10 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-2.2 3.2M6.6 6.6A17 17 0 0 0 2 12s3.5 7 10 7a9.7 9.7 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/><path d="M2 2l20 20"/></svg></button>
     <button class="go" type="submit" aria-label="Open map"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
   </div>
 </form>
 </div>
+<script src="/passcode-eye.js" defer></script>
 </body></html>`;
 }
