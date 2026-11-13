@@ -455,7 +455,7 @@ export default function App() {
       <CuteToast />
       {savedAt > 0 && (
         <div key={savedAt} className="mm-save-check" role="status" aria-label="Saved" style={{
-          position: 'fixed', top: 18, left: '50%', marginLeft: -16, zIndex: 300, pointerEvents: 'none',
+          position: 'fixed', top: 'calc(env(safe-area-inset-top) + 18px)', left: '50%', marginLeft: -16, zIndex: 300, pointerEvents: 'none',
           width: 32, height: 32, borderRadius: '50%', background: '#16a34a',
           display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 14px rgba(22,163,74,0.35)',
         }}>
@@ -493,7 +493,7 @@ export default function App() {
 
         {/* Back button — top left */}
         <button onClick={handleBack} title="All maps" style={{
-          position: 'fixed', top: 14, left: 14, zIndex: 20,
+          position: 'fixed', top: 'calc(env(safe-area-inset-top) + 14px)', left: 14, zIndex: 20,
           width: isMobile ? 48 : 36, height: isMobile ? 48 : 36, borderRadius: isMobile ? 14 : 10,
           background: '#fff', border: '1px solid #e2e8f0',
           boxShadow: '0 2px 10px rgba(0,0,0,0.07)',
@@ -508,7 +508,7 @@ export default function App() {
 
         {/* Top right, only when a diagram is loaded: the owner's Lock (share
             passcode), then Settings. */}
-        {activeMindmap && <div style={{ position: 'fixed', top: 14, right: 14, zIndex: 20, display: 'flex', alignItems: 'center', gap: 8 }}>
+        {activeMindmap && <div style={{ position: 'fixed', top: 'calc(env(safe-area-inset-top) + 14px)', right: 14, zIndex: 20, display: 'flex', alignItems: 'center', gap: 8 }}>
         {effectiveUserId && <LockMenu hasPasscode={!!activeMindmap.hasPasscode} passcode={activeMindmap.passcode ?? ''} onSetPasscode={setPasscode} isMobile={isMobile} />}
         <button
           onClick={() => setShowPanel(p => !p)}

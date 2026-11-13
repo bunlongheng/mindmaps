@@ -744,7 +744,7 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract, rightInset =
         const trunkLen = Math.max(0, Math.round((l1.x - 60) - (root.x + root.width)))
         return (
           <div style={{
-            position: 'fixed', top: 16, left: '50%', transform: 'translateX(-50%)',
+            position: 'fixed', top: 'calc(env(safe-area-inset-top) + 16px)', left: '50%', transform: 'translateX(-50%)',
             background: 'rgba(15,20,40,0.78)', backdropFilter: 'blur(10px)',
             color: '#fff', fontFamily: 'Inter, system-ui, sans-serif',
             fontSize: 13, fontWeight: 700, letterSpacing: '0.04em',

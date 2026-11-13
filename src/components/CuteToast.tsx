@@ -98,7 +98,7 @@ export function CuteToast() {
       <div
         key={toast.id}
         style={{
-          position: 'fixed', left: '50%', top: 8, zIndex: 100002,
+          position: 'fixed', left: '50%', top: 'calc(env(safe-area-inset-top) + 8px)', zIndex: 100002,
           pointerEvents: 'none',
           animation: `cuteToastInOut ${toast.duration / 1000}s cubic-bezier(0.16, 1, 0.3, 1) forwards`,
         }}

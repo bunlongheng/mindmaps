@@ -58,7 +58,7 @@ export function ViewerPage({ diagram, id }: { diagram: Diagram | null; id: strin
       {/* Slim top bar - logo, map name and the reader's exports, no editing chrome. */}
       <header style={{
         height: 56, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
-        padding: '0 20px', background: '#fff', borderBottom: '1px solid #e5e7eb', zIndex: 10,
+        padding: 'env(safe-area-inset-top) 20px 0', boxSizing: 'content-box', background: '#fff', borderBottom: '1px solid #e5e7eb', zIndex: 10,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
           <a href="/" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none', flexShrink: 0 }}>

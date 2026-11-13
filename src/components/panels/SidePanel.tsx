@@ -287,7 +287,7 @@ export function SidePanel({ nodeId, onClose, onDelete, onUpdateTags }: SidePanel
 
   return (
     <div style={{
-      position: 'fixed', top: 0, right: 0, bottom: 0, width: isMobile ? 256 : Math.round(256 * 1.2),
+      position: 'fixed', top: 0, right: 0, bottom: 0, width: isMobile ? 256 : Math.round(256 * 1.2), paddingTop: 'env(safe-area-inset-top)',
       background: '#f8f9fb', borderLeft: '1px solid #e8eaed',
       display: 'flex', flexDirection: 'column',
       boxShadow: '-2px 0 16px rgba(0,0,0,0.07)', zIndex: 30,

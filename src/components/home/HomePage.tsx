@@ -289,7 +289,7 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
       <header style={{
         background: '#fff',
         borderBottom: `1px solid ${BORDER}`,
-        height: 56,
+        height: 56, paddingTop: 'env(safe-area-inset-top)', boxSizing: 'content-box',
         position: 'sticky', top: 0, zIndex: 10,
       }}>
       <div style={{ maxWidth: 1600, margin: '0 auto', height: '100%', display: 'flex', alignItems: 'center', gap: 16 }} className="home-header">
@@ -513,7 +513,7 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
 
         {filtered.length === 0 && (
           <div style={{
-            position: 'fixed', inset: 0, top: 56,
+            position: 'fixed', inset: 0, top: 'calc(env(safe-area-inset-top) + 56px)',
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
             pointerEvents: 'none',
           }}>
