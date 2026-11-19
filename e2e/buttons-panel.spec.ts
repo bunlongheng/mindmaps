@@ -12,7 +12,7 @@ function textCount(page: Page) {
 /** Open the editor with the Settings panel showing. */
 async function openEditorWithPanel(page: Page) {
   await createMap(page)
-  await page.click('[title="Settings"]')
+  await page.click('[title="Format"]')
   await page.waitForTimeout(300)
 }
 

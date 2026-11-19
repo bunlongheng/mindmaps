@@ -42,20 +42,20 @@ test.describe('Editor chrome — App.tsx', () => {
     // Panel not present initially
     await expect(page.getByText('Theme', { exact: true })).toHaveCount(0)
     // Open
-    await page.click('[title="Settings"]')
+    await page.click('[title="Format"]')
     await expect(page.getByText('Theme', { exact: true })).toBeVisible({ timeout: 3_000 })
     // Toggle button turns dark when active
-    const toggleBg = await page.locator('[title="Settings"]').evaluate(el => getComputedStyle(el).backgroundColor)
+    const toggleBg = await page.locator('[title="Format"]').evaluate(el => getComputedStyle(el).backgroundColor)
     expect(toggleBg).toBe('rgb(26, 29, 46)')
     // Close again with the same button. The panel overlaps the top-right
     // toggle, so force the click through to the button underneath.
-    await page.click('[title="Settings"]', { force: true })
+    await page.click('[title="Format"]', { force: true })
     await expect(page.getByText('Theme', { exact: true })).toHaveCount(0)
   })
 
   test('+ Tag picker in the settings panel adds a preset tag chip, and chip click removes it', async ({ page }) => {
     await createMap(page)
-    await page.click('[title="Settings"]')
+    await page.click('[title="Format"]')
     await expect(page.getByText('Theme', { exact: true })).toBeVisible({ timeout: 3_000 })
     // Open the tag picker (Map tab, the default tab)
     await page.getByRole('button', { name: '+ Tag' }).click()
@@ -75,7 +75,7 @@ test.describe('Editor chrome — App.tsx', () => {
 
   test('+ Tag picker in the settings panel adds a custom tag via the input + Add button', async ({ page }) => {
     await createMap(page)
-    await page.click('[title="Settings"]')
+    await page.click('[title="Format"]')
     await expect(page.getByText('Theme', { exact: true })).toBeVisible({ timeout: 3_000 })
     await page.getByRole('button', { name: '+ Tag' }).click()
     const input = page.getByPlaceholder('Custom tag…')
@@ -90,7 +90,7 @@ test.describe('Editor chrome — App.tsx', () => {
   test('Export PDF button in the settings panel Share tab does not crash the app', async ({ page }) => {
     await createMap(page)
     const before = await textCount(page)
-    await page.click('[title="Settings"]')
+    await page.click('[title="Format"]')
     await page.getByRole('button', { name: 'Share', exact: true }).click()
     await page.getByRole('button', { name: /Export PDF/ }).click()
     await page.waitForTimeout(1200)
@@ -102,7 +102,7 @@ test.describe('Editor chrome — App.tsx', () => {
   test('Copy SVG button in the settings panel Share tab puts the diagram SVG on the clipboard', async ({ page, context }) => {
     await context.grantPermissions(['clipboard-read', 'clipboard-write'])
     await createMap(page)
-    await page.click('[title="Settings"]')
+    await page.click('[title="Format"]')
     await page.getByRole('button', { name: 'Share', exact: true }).click()
     await page.getByRole('button', { name: 'Copy SVG', exact: true }).click()
     await expect(page.getByRole('button', { name: 'SVG copied!' })).toBeVisible({ timeout: 20_000 })
@@ -113,7 +113,7 @@ test.describe('Editor chrome — App.tsx', () => {
 
   test('Delete map button in the settings panel Share tab opens confirm modal; Cancel keeps the map', async ({ page }) => {
     await createMap(page)
-    await page.click('[title="Settings"]')
+    await page.click('[title="Format"]')
     await page.getByRole('button', { name: 'Share', exact: true }).click()
     await page.locator('[title="Delete map"]').click()
     // Confirm modal appears
@@ -131,7 +131,7 @@ test.describe('Editor chrome — App.tsx', () => {
       const root = document.querySelector('.diagram-canvas-root svg text')
       return root?.textContent ?? null
     })
-    await page.click('[title="Settings"]')
+    await page.click('[title="Format"]')
     await page.getByRole('button', { name: 'Share', exact: true }).click()
     await page.locator('[title="Delete map"]').click()
     await expect(page.getByRole('heading', { name: 'Delete map?' })).toBeVisible({ timeout: 3_000 })
@@ -149,7 +149,7 @@ test.describe('Editor chrome — App.tsx', () => {
 
   test('clicking the modal backdrop dismisses the delete confirm (keeps map)', async ({ page }) => {
     await createMap(page)
-    await page.click('[title="Settings"]')
+    await page.click('[title="Format"]')
     await page.getByRole('button', { name: 'Share', exact: true }).click()
     await page.locator('[title="Delete map"]').click()
     await expect(page.getByRole('heading', { name: 'Delete map?' })).toBeVisible({ timeout: 3_000 })
@@ -160,8 +160,8 @@ test.describe('Editor chrome — App.tsx', () => {
   })
   test('screen takes a red hit then the canvas comes apart, from the Settings panel delete', async ({ page }) => {
     await createMap(page)
-    await page.locator('[title="Settings"]').click()
-    await page.getByRole('button', { name: 'Share' }).click()
+    await page.locator('[title="Format"]').click()
+    await page.getByRole('button', { name: 'Share', exact: true }).click()
     await page.locator('[title="Delete map"]').first().click()
     await expect(page.getByText('Delete map?')).toBeVisible({ timeout: 5000 })
     await page.locator('button').filter({ hasText: /^Delete$/ }).last().click()

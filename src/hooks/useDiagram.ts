@@ -116,6 +116,7 @@ function rowToDiagram(row: Record<string, unknown>): Diagram {
     note:               (n.note ?? undefined) as MindmapNode['note'],
     legend:             (n.legend ?? undefined) as MindmapNode['legend'],
     showLegend:         (n.showLegend ?? undefined) as boolean | undefined,
+    floats:             (n.floats ?? undefined) as MindmapNode['floats'],
   }))
   return {
     id:             row.id as string,

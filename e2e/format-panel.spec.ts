@@ -5,7 +5,7 @@ import { L1_PALETTE } from '../src/lib/color'
 async function createMapAndOpenFormat(page: import('@playwright/test').Page) {
   await createMap(page)
   // Open Format panel
-  await page.click('[title="Settings"]')
+  await page.click('[title="Format"]')
   await page.waitForTimeout(300)
 }
 

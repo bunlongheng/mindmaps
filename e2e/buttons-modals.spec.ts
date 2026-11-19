@@ -197,7 +197,7 @@ test.describe('Viewer — decoded share (?d=) document page', () => {
     // No back/format chrome in the viewer. A ?d= decoded share carries no id, so
     // no Download SVG link either.
     await expect(page.locator('[title="All maps"]')).toHaveCount(0)
-    await expect(page.locator('[title="Settings"]')).toHaveCount(0)
+    await expect(page.locator('[title="Format"]')).toHaveCount(0)
     await expect(page.getByText('Download SVG')).toHaveCount(0)
   })
 

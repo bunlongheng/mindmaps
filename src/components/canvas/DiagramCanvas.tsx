@@ -1,4 +1,5 @@
 import { useRef, useState, useCallback, useEffect, useMemo } from 'react'
+import { AddMenu, FloatItems, TopToolbar } from './FloatLayer'
 import { useShallow } from 'zustand/react/shallow'
 import { useMindmapStore, runLayout } from '../../store/mindmapStore'
 import { getTheme } from '../../lib/themes'
@@ -562,6 +563,7 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract, rightInset =
   }
 
   return (
+    <>
     <div className="diagram-canvas-root" style={{ position: 'absolute', inset: 0, overflow: 'hidden', background: canvasBg, cursor: 'default' }}>
       <svg ref={svgRef} width="100%" height="100%"
         onPointerDown={handleBgPointerDown}
@@ -639,6 +641,7 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract, rightInset =
               nodeCount={activeMindmap.nodes.length}
             />
           ))}
+          <FloatItems toCanvas={screenToCanvas} readOnly={readOnly || noInteract} nodes={visibleNodes} />
           {meshDoors && meshDoors.length > 0 && (
             <g style={{ pointerEvents: 'none' }}>
               {meshDoors.map(d => <polyline key={`door-${d.id}`} points={d.door} fill="none" stroke={d.color} strokeWidth={5} strokeLinecap="butt" />)}
@@ -757,5 +760,9 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract, rightInset =
       })()}
 
     </div>
+    {/* Outside the canvas root so their icons never count as canvas svgs */}
+    {!readOnly && !noInteract && <AddMenu toCanvas={screenToCanvas} rightInset={rightInset} />}
+    {!readOnly && !noInteract && window.innerWidth >= 760 && <TopToolbar toCanvas={screenToCanvas} rightInset={rightInset} />}
+    </>
   )
 }

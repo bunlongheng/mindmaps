@@ -369,11 +369,12 @@ function NodeImpl({ node, isSelected, soloSelected = false, onSelect, onDragEnd,
   const resolvedIcon = isRoot ? undefined : (!hasEmoji ? node.icon : undefined)
   const hasIcon = !!resolvedIcon && !!getLucideIcon(resolvedIcon)
   // Root pill: always auto-size from title so it never relies on stale stored width.
-  const autoPillW = isRootPill ? rootDrawnWidth(node, diagramType) : null
+  // The root pill sizes to its text, so while typing it sizes to the draft
+  const autoPillW = isRootPill ? rootDrawnWidth(editing ? { ...node, title: draft } : node, diagramType) : null
   // Circles draw in a square box: force width = height so it's always round
   const circleW = (isRadial || drawCircle) ? Math.max(node.width, node.height) : null
   // While typing, a box node grows with the draft so the text never spills past its edge.
-  const editGrowW = editing && !isRoot && circleW === null
+  const editGrowW = editing && circleW === null
     ? Math.min(1100, Math.ceil(draft.length * fontSize * 0.6) + 24)
       + ((hasEmoji || hasIcon) && !isRadial && !drawCircle ? node.height + 4 : 10)
     : 0

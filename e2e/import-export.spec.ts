@@ -129,14 +129,14 @@ test.describe('Export — Keyboard Copy', () => {
 test.describe('Settings Panel', () => {
   test('Tag button exists in the settings panel Map tab', async ({ page }) => {
     await createMap(page)
-    await page.click('[title="Settings"]')
+    await page.click('[title="Format"]')
     const tagBtn = page.locator('text="+ Tag"').first()
     await expect(tagBtn).toBeVisible()
   })
 
   test('Export PDF button exists in the settings panel Share tab', async ({ page }) => {
     await createMap(page)
-    await page.click('[title="Settings"]')
+    await page.click('[title="Format"]')
     await page.getByRole('button', { name: 'Share', exact: true }).click()
     const pdfBtn = page.locator('text="Export PDF"').first()
     await expect(pdfBtn).toBeVisible()
@@ -144,7 +144,7 @@ test.describe('Settings Panel', () => {
 
   test('Delete button exists in the settings panel Share tab', async ({ page }) => {
     await createMap(page)
-    await page.click('[title="Settings"]')
+    await page.click('[title="Format"]')
     await page.getByRole('button', { name: 'Share', exact: true }).click()
     const deleteBtn = page.locator('[title="Delete map"]').first()
     await expect(deleteBtn).toBeVisible()
@@ -152,7 +152,7 @@ test.describe('Settings Panel', () => {
 
   test('Settings button exists', async ({ page }) => {
     await createMap(page)
-    const formatBtn = page.locator('[title="Settings"]')
+    const formatBtn = page.locator('[title="Format"]')
     await expect(formatBtn).toBeVisible()
   })
 
@@ -164,7 +164,7 @@ test.describe('Settings Panel', () => {
 
   test('PDF export does not crash', async ({ page }) => {
     await createMap(page)
-    await page.click('[title="Settings"]')
+    await page.click('[title="Format"]')
     await page.getByRole('button', { name: 'Share', exact: true }).click()
     const pdfBtn = page.locator('text="Export PDF"').first()
     if (await pdfBtn.isVisible()) {

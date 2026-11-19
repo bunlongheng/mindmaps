@@ -504,6 +504,29 @@ export default function App() {
           <ArrowLeft size={isMobile ? 22 : 16} />
         </button>
 
+        {/* Map name beside the back button, as in XMind; it is the root topic's title */}
+        {activeMindmap && !isMobile && (() => {
+          const root = activeMindmap.nodes.find(n => n.parentId === null)
+          if (!root) return null
+          return (
+            <input key={root.id + root.title} defaultValue={root.title} aria-label="Map name" title="Rename map"
+              onKeyDown={e => { if (e.key === 'Enter' || e.key === 'Escape') e.currentTarget.blur() }}
+              onFocus={e => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.borderColor = '#3b82f6' }}
+              onBlur={e => {
+                e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'transparent'
+                const t = e.target.value.trim()
+                if (t && t !== root.title) useMindmapStore.getState().updateNode(root.id, { title: t })
+              }}
+              style={{
+                position: 'fixed', top: 'calc(env(safe-area-inset-top) + 14px)', left: 60, zIndex: 20,
+                height: 36, width: Math.min(320, Math.max(120, root.title.length * 10 + 28)), boxSizing: 'border-box',
+                padding: '0 12px', borderRadius: 10, border: '1px solid transparent', background: 'transparent',
+                fontFamily: 'inherit', fontSize: 16, fontWeight: 700, color: '#1e293b', outline: 'none',
+                textOverflow: 'ellipsis',
+              }} />
+          )
+        })()}
+
 
 
         {/* Top right, only when a diagram is loaded: the owner's Lock (share
@@ -512,7 +535,7 @@ export default function App() {
         {effectiveUserId && <LockMenu hasPasscode={!!activeMindmap.hasPasscode} passcode={activeMindmap.passcode ?? ''} onSetPasscode={setPasscode} isMobile={isMobile} />}
         <button
           onClick={() => setShowPanel(p => !p)}
-          title="Settings"
+          title="Format"
           style={{
             width: isMobile ? 48 : undefined,
             height: isMobile ? 48 : 36,
@@ -529,7 +552,7 @@ export default function App() {
           onMouseLeave={e => { if (!showPanel) e.currentTarget.style.background = '#fff' }}
         >
           <SlidersHorizontal size={isMobile ? 22 : 15} />
-          {!isMobile && 'Settings'}
+          {!isMobile && 'Format'}
         </button>
         </div>}
       </div>

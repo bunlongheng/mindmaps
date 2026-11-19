@@ -307,14 +307,14 @@ describe('App — editor view, panel', () => {
     render(<App />)
     await waitFor(() => expect(screen.getByTestId('canvas')).toBeInTheDocument())
     expect(screen.getByTitle('All maps')).toBeInTheDocument()
-    expect(screen.getByTitle('Settings')).toBeInTheDocument()
+    expect(screen.getByTitle('Format')).toBeInTheDocument()
   })
 
   it('toggles the settings side panel and closes it', async () => {
     renderEditor()
     render(<App />)
     await waitFor(() => expect(screen.getByTestId('canvas')).toBeInTheDocument())
-    fireEvent.click(screen.getByTitle('Settings'))
+    fireEvent.click(screen.getByTitle('Format'))
     expect(screen.getByTestId('side-panel')).toBeInTheDocument()
     fireEvent.click(screen.getByTestId('panel-close'))
     expect(screen.queryByTestId('side-panel')).toBeNull()
@@ -324,7 +324,7 @@ describe('App — editor view, panel', () => {
     renderEditor()
     render(<App />)
     await waitFor(() => expect(screen.getByTestId('canvas')).toBeInTheDocument())
-    fireEvent.click(screen.getByTitle('Settings'))
+    fireEvent.click(screen.getByTitle('Format'))
     fireEvent.click(screen.getByTestId('select-node'))
     expect(screen.getByTestId('side-panel')).toBeInTheDocument()
   })
@@ -388,7 +388,7 @@ describe('App — delete confirm modal', () => {
     renderEditor()
     render(<App />)
     await waitFor(() => expect(screen.getByTestId('canvas')).toBeInTheDocument())
-    fireEvent.click(screen.getByTitle('Settings'))
+    fireEvent.click(screen.getByTitle('Format'))
     await act(async () => {
       fireEvent.click(screen.getByTestId('panel-delete'))
       await Promise.resolve()
@@ -638,7 +638,7 @@ describe('App — extra coverage', () => {
     await waitFor(() => expect(screen.getByTestId('canvas')).toBeInTheDocument())
     const back = screen.getByTitle('All maps')
     fireEvent.mouseEnter(back); fireEvent.mouseLeave(back)
-    const fmt = screen.getByTitle('Settings')
+    const fmt = screen.getByTitle('Format')
     fireEvent.mouseEnter(fmt); fireEvent.mouseLeave(fmt)
     fireEvent.click(fmt) // open panel
     fireEvent.mouseEnter(fmt); fireEvent.mouseLeave(fmt) // showPanel branch

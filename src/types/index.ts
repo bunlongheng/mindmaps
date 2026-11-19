@@ -35,9 +35,17 @@ export interface MindmapNode {
   note?: MapNote        // root node only: the card at the top left of the canvas
   legend?: LegendItem[] // root node only: the key at the bottom left of the canvas
   showLegend?: boolean  // root node only: false hides the legend card but keeps its rows
+  floats?: MapFloat[]   // root node only: sticky notes and text labels placed on the canvas
 }
 
 export interface MapNote { title?: string; body?: string }
+// A free item on the canvas, in canvas coordinates so it pans and zooms with the map
+export interface MapFloat {
+  id: string; kind: 'note' | 'text' | 'summary'; x: number; y: number; text: string
+  nodeIds?: string[]  // summary only: the topics its brace spans; it follows them, x/y unused
+  note?: string       // summary only: the small note under its label
+  branches?: string[] // summary only: child topics drawn off its label
+}
 // One key row: a dot (emoji, e.g. a status circle) or a colour swatch, then its meaning
 export interface LegendItem { label: string; emoji?: string; color?: string }
 
