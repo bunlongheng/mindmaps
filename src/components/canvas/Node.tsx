@@ -372,7 +372,12 @@ function NodeImpl({ node, isSelected, soloSelected = false, onSelect, onDragEnd,
   const autoPillW = isRootPill ? rootDrawnWidth(node, diagramType) : null
   // Circles draw in a square box: force width = height so it's always round
   const circleW = (isRadial || drawCircle) ? Math.max(node.width, node.height) : null
-  const displayW = previewW ?? (autoPillW ?? circleW ?? node.width)
+  // While typing, a box node grows with the draft so the text never spills past its edge.
+  const editGrowW = editing && !isRoot && circleW === null
+    ? Math.min(1100, Math.ceil(draft.length * fontSize * 0.6) + 24)
+      + ((hasEmoji || hasIcon) && !isRadial && !drawCircle ? node.height + 4 : 10)
+    : 0
+  const displayW = previewW ?? (autoPillW ?? circleW ?? Math.max(node.width, editGrowW))
   // The title is stored raw (markdown and all); everything drawn and measured uses
   // the display text, so a box never sizes to characters nobody sees.
   const parsedTitle = parseLinkedTitle(node.title)
