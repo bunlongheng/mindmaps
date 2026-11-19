@@ -489,7 +489,7 @@ export default function App() {
           noInteract={isTouch}
           rightInset={showPanel ? Math.round(256 * 1.2) : 0}
         />
-        <MapNotes />
+        <MapNotes canEdit={!isTouch} />
 
         {/* Back button — top left */}
         <button onClick={handleBack} title="All maps" style={{

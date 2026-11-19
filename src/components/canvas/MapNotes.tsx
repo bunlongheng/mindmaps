@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Check, ChevronDown, ChevronUp } from 'lucide-react'
+import { Check, ChevronDown, ChevronUp, EyeOff, Trash2 } from 'lucide-react'
 import { useMindmapStore } from '../../store/mindmapStore'
 
 const card: React.CSSProperties = {
@@ -13,9 +13,14 @@ const toggle: React.CSSProperties = {
   background: 'transparent', cursor: 'pointer', textAlign: 'left', font: 'inherit', color: 'inherit', outline: 'none',
 }
 
+const cornerBtn: React.CSSProperties = {
+  width: 22, height: 22, borderRadius: 11, padding: 0, border: '1px solid #e2e8f0', background: '#fff',
+  color: '#64748b', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+}
+
 // The map's note card (top left) and legend (bottom left), as Flows shows them. Both
 // live on the root node, so a payload sets them and every load and share carries them.
-export function MapNotes({ top = 64 }: { top?: number }) {
+export function MapNotes({ top = 64, canEdit = false }: { top?: number; canEdit?: boolean }) {
   const root = useMindmapStore(s => s.activeMindmap?.nodes.find(n => n.parentId === null))
   // Phones start with both cards folded so the map stays visible
   const wide = typeof window === 'undefined' || window.innerWidth >= 640
@@ -46,6 +51,20 @@ export function MapNotes({ top = 64 }: { top?: number }) {
             <span style={{ flex: 1, fontSize: 13, fontWeight: 700 }}>Legend</span>
             {keyOpen ? <ChevronDown size={16} color="#94a3b8" /> : <ChevronUp size={16} color="#94a3b8" />}
           </button>
+          {/* Hide keeps the rows (the toolbar's Legend button shows them again); delete drops
+              them, undo brings them back. Either way the filter goes, so no map stays filtered unseen. */}
+          {canEdit && root && (
+            <div style={{ position: 'absolute', top: -11, right: -11, display: 'flex', gap: 4 }}>
+              <button title="Hide legend" aria-label="Hide legend" style={cornerBtn} onClick={() => {
+                setFocus([])
+                useMindmapStore.getState().updateNode(root.id, { showLegend: false })
+              }}><EyeOff size={12} /></button>
+              <button title="Delete legend" aria-label="Delete legend" style={cornerBtn} onClick={() => {
+                setFocus([])
+                useMindmapStore.getState().updateNode(root.id, { legend: [] })
+              }}><Trash2 size={12} /></button>
+            </div>
+          )}
           {keyOpen && <ul style={{ listStyle: 'none', padding: 0, display: 'grid', gap: 2, margin: '8px -7px 0', maxHeight: '40vh', overflowY: 'auto', overflowX: 'hidden' }}>
             {legend.map((r, i) => {
               const on = focus.includes(i)

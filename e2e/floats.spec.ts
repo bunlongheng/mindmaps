@@ -31,7 +31,20 @@ test.describe('+ menu floating items', () => {
 
     await page.getByLabel('Add to map').click()
     await page.getByLabel('Add Legend').click()
-    await expect(page.getByTestId('map-legend')).toBeVisible()
+    const legend = page.getByTestId('map-legend')
+    await expect(legend).toBeVisible()
+    // Hide, then the toolbar shows it again; delete, then undo brings it back
+    await legend.getByLabel('Hide legend').click()
+    await expect(legend).toHaveCount(0)
+    await page.getByLabel('Toolbar Legend').click()
+    await expect(legend).toBeVisible()
+    await page.getByLabel('Toolbar Legend').click()
+    await expect(legend).toHaveCount(0)
+    await page.getByLabel('Toolbar Legend').click()
+    await legend.getByLabel('Delete legend').click()
+    await expect(legend).toHaveCount(0)
+    await page.keyboard.press('ControlOrMeta+z')
+    await expect(legend).toBeVisible()
 
     await note.hover()
     await note.getByLabel('Remove').click()

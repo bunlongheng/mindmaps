@@ -380,7 +380,10 @@ function addItem(kind: AddKind, toCanvas: ToCanvas, rightInset: number) {
   }
   if (kind === 'legend') {
     if (root.legend?.length) {
-      useMindmapStore.getState().updateNode(root.id, { showLegend: true })
+      // Toggles: a shown legend hides (dropping its filter), a hidden one comes back
+      const show = root.showLegend === false
+      if (!show) useMindmapStore.getState().setLegendFocus([])
+      useMindmapStore.getState().updateNode(root.id, { showLegend: show })
       return
     }
     // No rows yet: 1 per main branch colour, so a click filters to that branch
