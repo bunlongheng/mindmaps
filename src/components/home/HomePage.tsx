@@ -619,8 +619,8 @@ export function HomePage({ onOpen, user, onSignOut }: HomePageProps) {
         @media (max-width: 820px)  { .home-grid { grid-template-columns: repeat(2, 1fr); } }
         @media (max-width: 640px)  { .home-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; } }
         .home-list { display: flex; flex-direction: column; gap: 8px; }
-        .home-header { padding: 0 16px !important; }
-        @media (min-width: 640px) { .home-header { padding: 0 24px !important; } }
+        .home-header { padding: 0 calc(env(safe-area-inset-right) + 16px) 0 calc(env(safe-area-inset-left) + 16px) !important; }
+        @media (min-width: 640px) { .home-header { padding: 0 calc(env(safe-area-inset-right) + 24px) 0 calc(env(safe-area-inset-left) + 24px) !important; } }
         .home-search { width: 160px !important; }
         @media (min-width: 640px) { .home-search { width: 220px !important; } }
         .home-main { padding: 24px 16px !important; max-width: 1600px !important; margin: 0 auto !important; }
