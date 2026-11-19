@@ -167,7 +167,8 @@ interface MindmapStore {
   redo: () => void
   snapshotHistory: (key?: string) => void
   clearDiagram: () => void
-  loadFromOutline: (text: string) => void
+  /** With parentId, grafts the pasted tree under that node instead of replacing the map. */
+  loadFromOutline: (text: string, parentId?: string) => void
   autoAssignIcons: () => void
   pasteImportFn: ((name: string, nodes: MindmapNode[]) => void) | null
   setPasteImportFn: (fn: ((name: string, nodes: MindmapNode[]) => void) | null) => void
@@ -702,7 +703,7 @@ export const useMindmapStore = create<MindmapStore>()(
       set({ activeMindmap: null, selectedNodeIds: [], past: [], future: [], isDirty: false })
     },
 
-    loadFromOutline: (text: string) => {
+    loadFromOutline: (text: string, parentId?: string) => {
       const state = get()
       if (!state.activeMindmap && !state.pasteImportFn) return
 
@@ -816,6 +817,49 @@ export const useMindmapStore = create<MindmapStore>()(
       }
 
       if (parsed.length === 0) return
+
+      const target = parentId ? state.activeMindmap?.nodes.find(n => n.id === parentId) : undefined
+      if (target && state.activeMindmap) {
+        // Paste into the open map: every top-level line becomes a child of the target,
+        // one undo step, nothing else in the map changes.
+        const minIndent = Math.min(...parsed.map(p => p.indent))
+        const items = [{ title: target.title, indent: 0 }, ...parsed.map(p => ({ ...p, indent: p.indent - minIndent + 1 }))]
+        const { parentIndex, depths, sortOrders } = assembleOutlineTree(items)
+        const ids = items.map((_, i) => (i === 0 ? target.id : uuid()))
+        const existing = state.activeMindmap.nodes
+        const siblingBase = existing.filter(n => n.parentId === target.id).length
+        const added: MindmapNode[] = items.slice(1).map((p, j) => {
+          const i = j + 1
+          const depth = target.depth + depths[i]
+          const parent = parentIndex[i] === 0
+          const src = p as FlatItem
+          const icon = depth <= 2 ? src.icon : undefined
+          const emoji = depth <= 2 ? src.emoji : undefined
+          return {
+            id: ids[i],
+            title: p.title,
+            parentId: ids[parentIndex[i]!],
+            depth,
+            sortOrder: parent ? siblingBase + sortOrders[i] : sortOrders[i],
+            color: src.color ?? (target.depth === 0 ? getTheme(state.themeId).colors[0] : target.color),
+            x: target.x, y: target.y,
+            width: computeNodeWidth(p.title, depth, !!(icon || emoji)),
+            height: emoji ? Math.max(nodeHeight(depth), 48) : nodeHeight(depth),
+            icon,
+            emoji,
+          }
+        })
+        state.snapshotHistory()
+        const reset = [...existing, ...added].map(n => ({ ...n, manuallyPositioned: false }))
+        const laid = runLayout(normalizeWidthsPerDepth(reset, state.diagramType), state.diagramType)
+        const nodes = parsed.some(p => p.color) ? laid : rebalanceColors(laid, getTheme(state.themeId).colors)
+        set({
+          activeMindmap: { ...state.activeMindmap, nodes },
+          selectedNodeIds: added.filter(n => n.parentId === target.id).map(n => n.id),
+          isDirty: true,
+        })
+        return
+      }
 
       // Normalize indents and wrap multiple roots, then assemble the parent tree
       normalizeOutlineRoots(parsed)

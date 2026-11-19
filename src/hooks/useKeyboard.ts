@@ -1,7 +1,10 @@
 import { useEffect } from 'react'
 import { useMindmapStore } from '../store/mindmapStore'
 import { showToast } from '../components/CuteToast'
-import { exportToJSON } from '../lib/export/json'
+import { exportToJSON, exportBranchesToJSON } from '../lib/export/json'
+
+// Clipboard type for a copied branch, read back on paste so emoji and icons survive.
+const BRANCH_MIME = 'application/x-mindmaps-branch'
 
 // Input types that hold no text: the browser has no undo stack of its own for them,
 // so map shortcuts (Cmd+Z included) must keep working while one has focus.
@@ -44,11 +47,6 @@ export function useKeyboard() {
 
       const { deleteSelectedNodes, dissolveNode, dissolveSelectedNodes, setSelectedNodeIds, undo, redo, activeMindmap, selectedNodeIds } = useMindmapStore.getState()
 
-      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key === 'v') {
-        navigator.clipboard?.readText().then(tryLoad).catch(() => {})
-        return
-      }
-
       if ((e.metaKey || e.ctrlKey) && e.key === 'a') {
         e.preventDefault()
         if (activeMindmap) setSelectedNodeIds(activeMindmap.nodes.map(n => n.id))
@@ -67,15 +65,31 @@ export function useKeyboard() {
       if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo() }
       if ((e.metaKey || e.ctrlKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) { e.preventDefault(); redo() }
     }
-    function onCopy(e: ClipboardEvent) {
-      if (isTextEntry(e.target)) return
+    // Selected nodes whose ancestors are not also selected, so a branch copies once.
+    function topSelected(): string[] {
       const { activeMindmap, selectedNodeIds } = useMindmapStore.getState()
+      if (!activeMindmap) return []
+      const byId = new Map(activeMindmap.nodes.map(n => [n.id, n]))
+      const picked = new Set(selectedNodeIds)
+      return selectedNodeIds.filter(id => {
+        let p = byId.get(id)?.parentId
+        while (p) { if (picked.has(p)) return false; p = byId.get(p)?.parentId }
+        return byId.has(id)
+      })
+    }
+
+    // Copy (and cut) a branch: JSON in our own type keeps emoji and icons for a paste
+    // into any map; plain text gets the indented outline for other apps.
+    function copyBranches(e: ClipboardEvent, cut: boolean) {
+      if (isTextEntry(e.target)) return
+      const { activeMindmap, deleteSelectedNodes } = useMindmapStore.getState()
       if (!activeMindmap) return
       e.preventDefault()
       const rootId = activeMindmap.nodes.find(n => n.parentId === null)?.id
-      const startId = selectedNodeIds.length > 0 ? selectedNodeIds[0] : rootId
-      if (!startId) return
-      if (startId === rootId) {
+      const ids = topSelected()
+      if (!rootId && ids.length === 0) return
+      if (ids.length === 0 || ids.includes(rootId!)) {
+        if (cut) { showToast('The root cannot be cut', { color: '#ef4444' }); return }
         e.clipboardData!.setData('text/plain', exportToJSON(activeMindmap))
         showToast('Copied JSON', { color: '#1a1d2e' })
         return
@@ -88,21 +102,43 @@ export function useKeyboard() {
           .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
         return ['    '.repeat(indent) + node.title, ...children.map(c => buildText(c.id, indent + 1))].join('\n')
       }
-      e.clipboardData!.setData('text/plain', buildText(startId, 0))
+      e.clipboardData!.setData('text/plain', ids.map(id => buildText(id, 0)).join('\n'))
+      e.clipboardData!.setData(BRANCH_MIME, exportBranchesToJSON(activeMindmap.nodes, ids))
+      if (cut) {
+        useMindmapStore.getState().setSelectedNodeIds(ids)
+        deleteSelectedNodes()
+        showToast(ids.length === 1 ? 'Cut 1 branch' : `Cut ${ids.length} branches`, { color: '#1a1d2e' })
+      }
     }
+    const onCopy = (e: ClipboardEvent) => copyBranches(e, false)
+    const onCut = (e: ClipboardEvent) => copyBranches(e, true)
 
+    // In an open map, paste adds under the selected node (the root when none is), as
+    // one undo step. Only with no map open does a paste load a whole new diagram.
     function onPaste(e: ClipboardEvent) {
       if (isTextEntry(e.target)) return
-      const text = e.clipboardData?.getData('text/plain') ?? ''
-      if (text.trim()) { e.preventDefault(); tryLoad(text) }
+      const branch = e.clipboardData?.getData(BRANCH_MIME) ?? ''
+      const text = branch || (e.clipboardData?.getData('text/plain') ?? '')
+      if (!text.trim()) return
+      e.preventDefault()
+      const { activeMindmap, selectedNodeIds, loadFromOutline } = useMindmapStore.getState()
+      if (!activeMindmap) { tryLoad(text); return }
+      const targetId = selectedNodeIds[0] ?? activeMindmap.nodes.find(n => n.parentId === null)?.id
+      if (!targetId) return
+      const before = activeMindmap.nodes.length
+      loadFromOutline(text, targetId)
+      const added = (useMindmapStore.getState().activeMindmap?.nodes.length ?? before) - before
+      if (added > 0) showToast(`Pasted ${added} node${added === 1 ? '' : 's'}`, { color: '#22c55e' })
     }
 
     window.addEventListener('keydown', onKeyDown)
     window.addEventListener('copy', onCopy)
+    window.addEventListener('cut', onCut)
     window.addEventListener('paste', onPaste)
     return () => {
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('copy', onCopy)
+      window.removeEventListener('cut', onCut)
       window.removeEventListener('paste', onPaste)
     }
   }, [])

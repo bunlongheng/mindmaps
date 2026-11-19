@@ -223,66 +223,87 @@ describe('useKeyboard', () => {
     expect(useMindmapStore.getState().activeMindmap!.nodes.length).toBe(afterAdd)
   })
 
-  // ── Cmd+V (clipboard read → tryLoad) ───────────────────────────────────────
-  describe('Cmd+V paste-from-clipboard', () => {
-    it('loads a valid indented outline from the clipboard', async () => {
-      loadDiagram(makeDiagram([makeRoot()]))
-      const readText = vi.fn().mockResolvedValue('Root\n\tChild A\n\tChild B')
-      Object.defineProperty(navigator, 'clipboard', { value: { readText }, configurable: true })
+  // ── Cmd+V keydown leaves the work to the paste event ──────────────────────
+  it('Cmd+V keydown does not read the clipboard (the paste event handles it, once)', () => {
+    loadDiagram(makeDiagram([makeRoot()]))
+    const readText = vi.fn().mockResolvedValue('Root\n\tChild')
+    Object.defineProperty(navigator, 'clipboard', { value: { readText }, configurable: true })
+    renderHook(() => useKeyboard())
+    key({ key: 'v', metaKey: true })
+    expect(readText).not.toHaveBeenCalled()
+    expect(useMindmapStore.getState().activeMindmap!.nodes).toHaveLength(1)
+  })
+
+  // ── cut, then paste into another map ──────────────────────────────────────
+  describe('cut and paste between maps', () => {
+    function clip(type: 'cut' | 'paste', data: Record<string, string>) {
+      const store: Record<string, string> = { ...data }
+      const e = new Event(type, { bubbles: true, cancelable: true }) as ClipboardEvent
+      Object.defineProperty(e, 'clipboardData', {
+        value: { setData: (t: string, v: string) => { store[t] = v }, getData: (t: string) => store[t] ?? '' },
+        configurable: true,
+      })
+      Object.defineProperty(e, 'target', { value: document.createElement('div') })
+      window.dispatchEvent(e)
+      return { e, store }
+    }
+
+    it('cuts a branch from 1 map and pastes it, emoji kept, under the selected node of another', () => {
+      const gc = { ...makeChild('gc1', 'GC1', 'c1', 2, 0), emoji: '🔴' }
+      loadDiagram(makeDiagram([makeRoot(), makeChild('c1', 'C1', 'root', 1, 0), gc, makeChild('c2', 'C2', 'root', 1, 1)]))
+      useMindmapStore.getState().setSelectedNodeIds(['c1'])
       renderHook(() => useKeyboard())
-      key({ key: 'v', metaKey: true })
-      await vi.waitFor(() => expect(readText).toHaveBeenCalled())
-      await vi.waitFor(() =>
-        expect(useMindmapStore.getState().activeMindmap!.nodes.length).toBeGreaterThanOrEqual(3))
-      expect(showToast).toHaveBeenCalledWith('Loaded diagram', expect.objectContaining({ confetti: true }))
+      const { e, store } = clip('cut', {})
+      expect(e.defaultPrevented).toBe(true)
+      expect(store['text/plain']).toContain('    GC1')
+      const left = useMindmapStore.getState().activeMindmap!.nodes.map(n => n.id)
+      expect(left).toEqual(expect.arrayContaining(['root', 'c2']))
+      expect(left).not.toContain('c1')
+      expect(left).not.toContain('gc1')
+
+      loadDiagram({ ...makeDiagram([makeRoot(), makeChild('t1', 'Target', 'root', 1, 0)]), id: 'other' })
+      useMindmapStore.getState().setSelectedNodeIds(['t1'])
+      clip('paste', store)
+      const nodes = useMindmapStore.getState().activeMindmap!.nodes
+      const c1 = nodes.find(n => n.title === 'C1')!
+      expect(c1.parentId).toBe('t1')
+      expect(c1.depth).toBe(2)
+      const g = nodes.find(n => n.title === 'GC1')!
+      expect(g.parentId).toBe(c1.id)
+      expect(nodes.find(n => n.id === 't1')!.title).toBe('Target')
+      expect(nodes).toHaveLength(4)
     })
 
-    it('shows an error toast for incompatible clipboard text', async () => {
-      loadDiagram(makeDiagram([makeRoot()]))
-      const readText = vi.fn().mockResolvedValue('just one plain line')
-      Object.defineProperty(navigator, 'clipboard', { value: { readText }, configurable: true })
+    it('refuses to cut the root', () => {
+      loadDiagram()
+      useMindmapStore.getState().setSelectedNodeIds(['root'])
       renderHook(() => useKeyboard())
-      key({ key: 'v', metaKey: true })
-      await vi.waitFor(() => expect(readText).toHaveBeenCalled())
-      await vi.waitFor(() =>
-        expect(showToast).toHaveBeenCalledWith(
-          expect.stringContaining('Incompatible'), expect.objectContaining({ color: '#ef4444' })))
+      clip('cut', {})
+      expect(useMindmapStore.getState().activeMindmap!.nodes).toHaveLength(3)
+      expect(showToast).toHaveBeenCalledWith('The root cannot be cut', expect.anything())
     })
 
-    it('ignores empty clipboard text (tryLoad early return)', async () => {
-      loadDiagram(makeDiagram([makeRoot()]))
-      const readText = vi.fn().mockResolvedValue('   ')
-      Object.defineProperty(navigator, 'clipboard', { value: { readText }, configurable: true })
+    it('paste adds to the map instead of replacing it, and Cmd+Z takes it back', () => {
+      loadDiagram()
+      useMindmapStore.getState().setSelectedNodeIds(['c2'])
       renderHook(() => useKeyboard())
-      key({ key: 'v', metaKey: true })
-      await vi.waitFor(() => expect(readText).toHaveBeenCalled())
-      expect(showToast).not.toHaveBeenCalled()
+      clip('paste', { 'text/plain': 'New A\n    New B' })
+      const nodes = useMindmapStore.getState().activeMindmap!.nodes
+      expect(nodes).toHaveLength(5)
+      expect(nodes.find(n => n.title === 'New A')!.parentId).toBe('c2')
+      expect(nodes.find(n => n.title === 'C1')).toBeDefined()
+      key({ key: 'z', metaKey: true })
+      expect(useMindmapStore.getState().activeMindmap!.nodes.map(n => n.title).sort()).toEqual(['C1', 'C2', 'Root'])
     })
 
-    it('swallows a clipboard read rejection', async () => {
-      loadDiagram(makeDiagram([makeRoot()]))
-      const readText = vi.fn().mockRejectedValue(new Error('denied'))
-      Object.defineProperty(navigator, 'clipboard', { value: { readText }, configurable: true })
+    it('a single plain line pastes as a child of the root when nothing is selected', () => {
+      loadDiagram()
+      useMindmapStore.getState().setSelectedNodeIds([])
       renderHook(() => useKeyboard())
-      expect(() => key({ key: 'v', metaKey: true })).not.toThrow()
-      await vi.waitFor(() => expect(readText).toHaveBeenCalled())
-    })
-
-    it('does nothing when navigator.clipboard is undefined (optional chaining)', () => {
-      loadDiagram(makeDiagram([makeRoot()]))
-      Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true })
-      renderHook(() => useKeyboard())
-      expect(() => key({ key: 'v', metaKey: true })).not.toThrow()
-    })
-
-    it('loads JSON from the clipboard', async () => {
-      loadDiagram(makeDiagram([makeRoot()]))
-      const readText = vi.fn().mockResolvedValue('{"My Map": ["A", "B"]}')
-      Object.defineProperty(navigator, 'clipboard', { value: { readText }, configurable: true })
-      renderHook(() => useKeyboard())
-      key({ key: 'v', metaKey: true })
-      await vi.waitFor(() => expect(readText).toHaveBeenCalled())
-      await vi.waitFor(() => expect(showToast).toHaveBeenCalledWith('Loaded diagram', expect.anything()))
+      clip('paste', { 'text/plain': 'just one plain line' })
+      const added = useMindmapStore.getState().activeMindmap!.nodes.find(n => n.title === 'just one plain line')!
+      expect(added.parentId).toBe('root')
+      expect(added.depth).toBe(1)
     })
   })
 
