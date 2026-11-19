@@ -394,9 +394,10 @@ test.describe('SidePanel — Style tab', () => {
     await openEditorWithPanel(page)
     // logic-chart normalises L1 widths uniformly, so resize a depth-2 child instead.
     await clickNode(page, 'Main Topic 1')
+    // Tab adds the child and selects it. No click on it: it lands under the side panel,
+    // so a click there would hit the panel instead (and could fold its Shape section).
     await page.keyboard.press('Tab')
     await page.waitForTimeout(700)
-    await clickNode(page, 'New Node')
 
     const slider = page.locator('input[type="range"]').first()
     await expect(slider).toBeVisible({ timeout: 3_000 })

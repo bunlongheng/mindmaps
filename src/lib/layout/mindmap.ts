@@ -1,5 +1,5 @@
 import type { MindmapNode } from '../../types/index.js'
-import { nodeSize, place, subtreeH, V_GAP, H_GAPS } from './mindmaps-layout.js'
+import { gapAfter, nodeSize, place, stackH, subtreeH, V_GAP, H_GAPS } from './mindmaps-layout.js'
 
 // The Mind Map: the classic balanced tree. The central topic sits in the middle and
 // its topics spread BOTH ways - the first ones to the right, the rest to the left -
@@ -40,14 +40,13 @@ function placeSide(
   goRight: boolean,
   cols: number,
 ) {
-  const totalH = side.reduce((s, l) => s + subtreeH(l.id, 1, nodes, cols), 0)
-    + Math.max(0, side.length - 1) * V_GAP
+  const totalH = stackH(side, 1, nodes, cols)
   let curY = centerY - totalH / 2
-  for (const l1 of side) {
+  side.forEach((l1, i) => {
     const h = subtreeH(l1.id, 1, nodes, cols)
     place(l1.id, 1, anchorX, curY + h / 2, nodes, result, goRight, cols)
-    curY += h + V_GAP
-  }
+    if (i < side.length - 1) curY += h + gapAfter(side, i, nodes)
+  })
 }
 
 export function computeMindmapLayout(nodes: MindmapNode[]): MindmapNode[] {

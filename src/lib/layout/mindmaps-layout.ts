@@ -6,6 +6,17 @@ import { nodeFontSize, nodeHeight, nodeMinWidth, nodeWidth, estimateTextWidth } 
 const H_GAPS: Record<number, number> = { 0: 100, 1: 50 }
 const DEFAULT_H_GAP = 40
 export const V_GAP = 8
+// Between 2 siblings when either carries a subtree, so 1 group's children never butt up
+// against the next group's (Repo Template under AI right on Vaibhav under Testing)
+export const GROUP_GAP = 26
+const hasKids = (id: string, nodes: MindmapNode[]) => nodes.some(n => n.parentId === id)
+export function gapAfter(sibs: MindmapNode[], i: number, nodes: MindmapNode[]) {
+  return hasKids(sibs[i].id, nodes) || hasKids(sibs[i + 1].id, nodes) ? GROUP_GAP : V_GAP
+}
+/** Heights of the stacked subtrees plus the gaps between them */
+export function stackH(sibs: MindmapNode[], depth: number, nodes: MindmapNode[], cols = 1) {
+  return sibs.reduce((sum, c, i) => sum + subtreeH(c.id, depth, nodes, cols) + (i < sibs.length - 1 ? gapAfter(sibs, i, nodes) : 0), 0)
+}
 export { H_GAPS }
 
 function getHGap(depth: number) { return H_GAPS[depth] ?? DEFAULT_H_GAP }
@@ -67,8 +78,7 @@ export function subtreeH(nodeId: string, depth: number, nodes: MindmapNode[], co
   const childDepth = depth + 1
   const grid = leafGrid(children, childDepth, nodes, cols)
   if (grid) return Math.max(h, grid.totalH)
-  const childrenTotal = children.reduce((sum, c) => sum + subtreeH(c.id, childDepth, nodes, cols), 0)
-  return Math.max(h, childrenTotal + (children.length - 1) * V_GAP)
+  return Math.max(h, stackH(children, childDepth, nodes, cols))
 }
 
 /**
@@ -118,16 +128,14 @@ export function place(
     })
     return
   }
-  const totalH =
-    children.reduce((sum, c) => sum + subtreeH(c.id, childDepth, nodes, cols), 0) +
-    (children.length - 1) * V_GAP
+  const totalH = stackH(children, childDepth, nodes, cols)
 
   let curY = centerY - totalH / 2
-  for (const child of children) {
+  children.forEach((child, i) => {
     const ch = subtreeH(child.id, childDepth, nodes, cols)
     place(child.id, childDepth, childAnchorX, curY + ch / 2, nodes, result, goRight, cols)
-    curY += ch + V_GAP
-  }
+    if (i < children.length - 1) curY += ch + gapAfter(children, i, nodes)
+  })
 }
 
 export function computeMindmapsLayout(nodes: MindmapNode[]): MindmapNode[] {
@@ -157,13 +165,13 @@ export function computeMindmapsLayout(nodes: MindmapNode[]): MindmapNode[] {
 
   // anchorX stays at the original position so L1 column doesn't move
   const anchorX = 200 + rw + (root.branchGap ?? H_GAPS[0])
-  const totalH = l1s.reduce((s, l) => s + subtreeH(l.id, 1, nodesForLayout), 0) + Math.max(0, l1s.length - 1) * V_GAP
+  const totalH = stackH(l1s, 1, nodesForLayout)
   let curY = centerY - totalH / 2
-  for (const l1 of l1s) {
+  l1s.forEach((l1, i) => {
     const h = subtreeH(l1.id, 1, nodesForLayout)
     place(l1.id, 1, anchorX, curY + h / 2, nodesForLayout, result)
-    curY += h + V_GAP
-  }
+    if (i < l1s.length - 1) curY += h + gapAfter(l1s, i, nodesForLayout)
+  })
 
   // Root y always = vertical midpoint of L1 nodes so trunk connects cleanly
   const l1Results = result.filter(n => n.depth === 1)

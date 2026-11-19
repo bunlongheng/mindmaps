@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeMindmapsLayout } from '../mindmaps-layout'
+import { computeMindmapsLayout, GROUP_GAP, V_GAP } from '../mindmaps-layout'
 import { nodeHeight, nodeMinWidth } from '../../nodeMetrics'
 import { ROOT_PILL_MAX, ROOT_CIRCLE_MAX, rootPillWidth } from '../../rootPill'
 import type { MindmapNode } from '../../../types'
@@ -23,6 +23,20 @@ function byId(nodes: MindmapNode[], id: string) {
 }
 
 describe('computeMindmapsLayout', () => {
+  it('leaves more room between 2 groups than between leaves of 1 group', () => {
+    const out = computeMindmapsLayout([
+      node({ id: 'r' }),
+      node({ id: 'a', parentId: 'r', depth: 1, sortOrder: 0 }),
+      node({ id: 'b', parentId: 'r', depth: 1, sortOrder: 1 }),
+      node({ id: 'a1', parentId: 'a', depth: 2, sortOrder: 0 }),
+      node({ id: 'a2', parentId: 'a', depth: 2, sortOrder: 1 }),
+      node({ id: 'b1', parentId: 'b', depth: 2, sortOrder: 0 }),
+    ])
+    const a1 = byId(out, 'a1'), a2 = byId(out, 'a2'), b1 = byId(out, 'b1')
+    expect(a2.y - (a1.y + a1.height)).toBe(V_GAP)
+    expect(b1.y - (a2.y + a2.height)).toBeGreaterThanOrEqual(GROUP_GAP)
+  })
+
   it('returns input unchanged when there is no root', () => {
     const input = [node({ id: 'a', parentId: 'x', depth: 1 })]
     expect(computeMindmapsLayout(input)).toBe(input)
