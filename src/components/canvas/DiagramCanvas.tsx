@@ -13,6 +13,7 @@ import {
 } from '../../lib/color'
 import { computeSubtreeCounts } from '../../lib/nodeCounts'
 import { legendHidden } from '../../lib/legend'
+import { normalizeWidthsPerDepth } from '../../lib/widthNormalize'
 import { combSizeOf, combStyleOf, drawnCellRadius, hexDoorEdge, hexPoints, meshFillerCells, meshGroupOutlines, meshCellRadius, MESH_WALL_WIDTH } from '../../lib/hex'
 import { darken } from '../../lib/color'
 import { radialNodeExtent } from '../../lib/layout/graph'
@@ -29,11 +30,11 @@ interface DiagramCanvasProps {
 export function DiagramCanvas({ onNodeSelect, readOnly, noInteract, rightInset = 0 }: DiagramCanvasProps) {
   // Shallow-selected slice so the canvas only re-renders when one of these actually changes,
   // not on unrelated store writes (resizePreview, HUD flags, showChildCount, etc.).
-  const { activeMindmap, selectedNodeIds, setSelectedNodeIds, diagramType, lineStyle, themeId, addNode, reorderNode, isImporting, hideDetails, hiddenFromDepth, legendFocus } = useMindmapStore(
+  const { activeMindmap, selectedNodeIds, setSelectedNodeIds, diagramType, lineStyle, themeId, addNode, reorderNode, isImporting, hideDetails, hiddenFromDepth, legendFocus, rootDraft } = useMindmapStore(
     useShallow(s => ({
       activeMindmap: s.activeMindmap, selectedNodeIds: s.selectedNodeIds, setSelectedNodeIds: s.setSelectedNodeIds,
       diagramType: s.diagramType, lineStyle: s.lineStyle, themeId: s.themeId, addNode: s.addNode,
-      reorderNode: s.reorderNode, isImporting: s.isImporting, hideDetails: s.hideDetails, hiddenFromDepth: s.hiddenFromDepth, legendFocus: s.legendFocus,
+      reorderNode: s.reorderNode, isImporting: s.isImporting, hideDetails: s.hideDetails, hiddenFromDepth: s.hiddenFromDepth, legendFocus: s.legendFocus, rootDraft: s.rootDraft,
     })),
   )
   const counts = useMemo(() => computeSubtreeCounts(activeMindmap?.nodes ?? []), [activeMindmap?.nodes])
@@ -56,7 +57,14 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract, rightInset =
 
   const visibleNodes = useMemo(() => {
     const maxDepth = Math.min(hideDetails ? 2 : Infinity, hiddenFromDepth === null ? Infinity : hiddenFromDepth - 1)
-    const nodes = activeMindmap?.nodes ?? []
+    let nodes = activeMindmap?.nodes ?? []
+    // While the root is typed, lay the map out as if it were committed, so branches
+    // move live. Same steps as rerunLayout; display only, nothing is stored.
+    if (rootDraft) {
+      nodes = runLayout(normalizeWidthsPerDepth(nodes.map(n => ({
+        ...n, ...(n.parentId === null ? rootDraft : {}), manuallyPositioned: false,
+      })), diagramType), diagramType)
+    }
     // Focused legend rows (e.g. only the red dots) hide every other feature
     const hidden = legendHidden(nodes, nodes.find(n => n.parentId === null)?.legend ?? [], legendFocus)
     // A collapsed node hides its whole subtree
@@ -72,7 +80,7 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract, rightInset =
     if (!root || !laidRoot) return laid
     const dx = root.x - laidRoot.x, dy = root.y - laidRoot.y
     return laid.map(n => ({ ...n, x: n.x + dx, y: n.y + dy }))
-  }, [activeMindmap?.nodes, hideDetails, hiddenFromDepth, legendFocus, diagramType])
+  }, [activeMindmap?.nodes, hideDetails, hiddenFromDepth, legendFocus, diagramType, rootDraft])
   const paletteColors = useMemo(() => computeBranchColors(activeMindmap?.nodes ?? []), [activeMindmap?.nodes])
   // Mesh doorways: the wall a cell shares with its parent, painted in the branch colour.
   // Drawn as 1 layer above every cell, so no parent's own wall can paint over a door.

@@ -286,25 +286,30 @@ function NodeImpl({ node, isSelected, soloSelected = false, onSelect, onDragEnd,
     setTimeout(() => { inputRef.current?.select() }, 0)
   }
 
+  // The root's new title plus the size it draws at, shared by the commit and the live preview
+  function rootUpdates(val: string): Partial<MindmapNode> {
+    const updates: Partial<MindmapNode> = { title: val }
+    if (rootIsPill(node, diagramType)) {
+      // pill: auto width, fixed height
+      updates.width = rootPillWidth(val, baseFontSize)
+      updates.height = nodeMetrics(0).height
+    } else {
+      // circle: equal width and height, grown to fit the title
+      const diameter = rootCircleDiameter(val, baseFontSize)
+      updates.width = diameter
+      updates.height = diameter
+    }
+    return updates
+  }
+
   function commitEdit() {
     setEditing(false)
+    const st = useMindmapStore.getState()
     const val = draft.trim()
-    if (!val || val === node.title) return
-    const updates: Partial<MindmapNode> = { title: val }
-    if (isRoot) {
-      if (rootIsPill(node, diagramType)) {
-        // pill: auto width, fixed height
-        updates.width = rootPillWidth(val, baseFontSize)
-        updates.height = nodeMetrics(0).height
-      } else {
-        // circle: equal width and height, grown to fit the title
-        const diameter = rootCircleDiameter(val, baseFontSize)
-        updates.width = diameter
-        updates.height = diameter
-      }
-    }
-    useMindmapStore.getState().updateNode(node.id, updates)
-    if (isRoot) setTimeout(() => useMindmapStore.getState().rerunLayout(), 0)
+    if (!val || val === node.title) { if (isRoot) st.setRootDraft(null); return }
+    st.updateNode(node.id, isRoot ? rootUpdates(val) : { title: val })
+    // Drop the live preview only once the real layout is in, so the branches never jump back
+    if (isRoot) setTimeout(() => { st.rerunLayout(); st.setRootDraft(null) }, 0)
   }
 
   function onPointerDown(e: React.PointerEvent) {
@@ -664,7 +669,11 @@ function NodeImpl({ node, isSelected, soloSelected = false, onSelect, onDragEnd,
             ref={inputRef}
             value={draft}
             autoComplete="off"
-            onChange={e => setDraft(e.target.value)}
+            onChange={e => {
+              setDraft(e.target.value)
+              // The root re-lays out the map as it is typed, so the branches move with it
+              if (isRoot && e.target.value.trim()) useMindmapStore.getState().setRootDraft(rootUpdates(e.target.value.trim()))
+            }}
             // Keep clicks inside the field so they place the caret instead of panning/dragging the map
             onPointerDown={e => e.stopPropagation()}
             onPointerMove={e => e.stopPropagation()}
@@ -673,7 +682,7 @@ function NodeImpl({ node, isSelected, soloSelected = false, onSelect, onDragEnd,
             onBlur={commitEdit}
             onKeyDown={e => {
               if (e.key === 'Enter') { e.preventDefault(); commitEdit() }
-              if (e.key === 'Escape') setEditing(false)
+              if (e.key === 'Escape') { setEditing(false); if (isRoot) useMindmapStore.getState().setRootDraft(null) }
               e.stopPropagation()
             }}
             style={{

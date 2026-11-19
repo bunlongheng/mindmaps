@@ -88,12 +88,15 @@ test.describe('+ menu floating items', () => {
     expect(outer.x).toBeGreaterThanOrEqual(inner.x + inner.width)
   })
 
-  test('the root box grows while its title is typed', async ({ page }) => {
+  test('the root box grows while its title is typed, and the branches move with it', async ({ page }) => {
     // Pin the root by id: once editing starts its title lives in an input, not text
     const id = await page.locator('[data-node-id]', { hasText: 'Untitled' }).getAttribute('data-node-id')
     const root = page.locator(`[data-node-id="${id}"]`)
     const width = async () => (await root.boundingBox())!.width
     const before = await width()
+    const kid = page.locator('[data-node-id]', { hasText: 'Main Topic 1' })
+    const kidX = async () => (await kid.boundingBox())!.x
+    const kidBefore = await kidX()
     const c = await root.evaluate(g => {
       const r = [...g.querySelectorAll('rect')].map(e => e.getBoundingClientRect()).sort((a, b) => b.width - a.width)[0]
       return { x: r.x + r.width / 2, y: r.y + r.height / 2 }
@@ -102,6 +105,8 @@ test.describe('+ menu floating items', () => {
     await page.keyboard.press('End')
     await page.keyboard.type(' with a much longer title than before')
     await expect.poll(width).toBeGreaterThan(before + 100)
+    // Live, before Enter: the branch has already moved clear of the wider root
+    await expect.poll(kidX).toBeGreaterThan(kidBefore + 50)
     await page.keyboard.press('Enter')
   })
 

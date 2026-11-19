@@ -133,6 +133,7 @@ interface MindmapStore {
   legendFocus: number[]            // legend rows the map is filtered to (view only); empty shows all
   isImporting: boolean
   resizePreview: { depth: number; width: number } | null
+  rootDraft: Partial<MindmapNode> | null   // root title/size being typed, laid out live, never saved
   // History
   past: HistoryState[]
   future: HistoryState[]
@@ -163,6 +164,7 @@ interface MindmapStore {
   setLegendFocus: (rows: number[]) => void
   setIsImporting: (v: boolean) => void
   setResizePreview: (v: { depth: number; width: number } | null) => void
+  setRootDraft: (v: Partial<MindmapNode> | null) => void
   undo: () => void
   redo: () => void
   snapshotHistory: (key?: string) => void
@@ -262,6 +264,7 @@ export const useMindmapStore = create<MindmapStore>()(
     legendFocus: [],
     isImporting: false,
     resizePreview: null,
+    rootDraft: null,
     past: [],
     future: [],
     pasteImportFn: null,
@@ -663,6 +666,7 @@ export const useMindmapStore = create<MindmapStore>()(
 
     setIsImporting: (v) => set({ isImporting: v }),
     setResizePreview: (v) => set({ resizePreview: v }),
+    setRootDraft: (v) => set({ rootDraft: v }),
 
     undo: () => {
       const state = get()
