@@ -146,4 +146,20 @@ test.describe('+ menu floating items', () => {
       boxes.forEach((b, j) => { if (i !== j) expect(hit(a, b)).toBe(false) })
     })
   })
+
+  test('text that grows while typed moves off the topics it would cover', async ({ page }) => {
+    await page.getByLabel('Toolbar Text').click()
+    const t = page.getByTestId('float-text')
+    await t.locator('input').fill('A much longer line of text that would run across the topics')
+    await t.locator('input').press('Enter')
+    const a = (await t.boundingBox())!
+    const topics = await page.locator('[data-node-id]').evaluateAll(gs => gs.map(g => {
+      const r = [...g.querySelectorAll('rect')].map(e => e.getBoundingClientRect())
+        .sort((p, q) => q.width * q.height - p.width * p.height)[0]
+      return { x: r.x, y: r.y, width: r.width, height: r.height }
+    }))
+    for (const b of topics) {
+      expect(a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y).toBe(false)
+    }
+  })
 })

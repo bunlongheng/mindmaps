@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Braces, CornerDownRight, List, Plus, RectangleHorizontal, StickyNote, Type, X } from 'lucide-react'
+import { Braces, CornerDownRight, List, Plus, RectangleHorizontal, StickyNote, Type } from 'lucide-react'
 import { useMindmapStore } from '../../store/mindmapStore'
 import { showToast } from '../CuteToast'
 import type { LegendItem, MapFloat, MindmapNode } from '../../types'
@@ -9,12 +9,12 @@ type ToCanvas = (screenX: number, screenY: number) => { x: number; y: number }
 const NOTE_W = 220
 const NOTE_H = 150
 const GAP = 12
-// Text labels are big hand-drawn marker writing, like a scribble on a whiteboard
-const SCRIBBLE_FONT = "'Permanent Marker', 'Comic Sans MS', cursive"
+// Text labels are big italic serif, like a quote written on the board
+const SCRIBBLE_FONT = "'Source Serif 4', Georgia, serif"
 const SCRIBBLE_SIZE = 64
 
 const floatSize = (f: Pick<MapFloat, 'kind' | 'text'>) =>
-  f.kind === 'note' ? { w: NOTE_W, h: NOTE_H } : { w: Math.min(1600, Math.max(140, f.text.length * 38 + 60)), h: 100 }
+  f.kind === 'note' ? { w: NOTE_W, h: NOTE_H } : { w: Math.min(1600, Math.max(140, f.text.length * 32 + 60)), h: 100 }
 
 type Box = { id: string; x: number; y: number; width: number; height: number }
 
@@ -62,8 +62,17 @@ export function FloatItems({ toCanvas, readOnly, nodes }: { toCanvas: ToCanvas; 
   const [hover, setHover] = useState<string | null>(null)
   if (!floats?.length) return null
 
-  const update = (id: string, patch: Partial<MapFloat>) =>
-    saveFloats((rootOf()?.floats ?? []).map(f => (f.id === id ? { ...f, ...patch } : f)))
+  const update = (id: string, patch: Partial<MapFloat>) => {
+    const all = rootOf()?.floats ?? []
+    saveFloats(all.map(f => {
+      if (f.id !== id) return f
+      const next = { ...f, ...patch }
+      // Longer text makes a wider box: move it off anything it now covers
+      if (patch.text === undefined || f.kind === 'summary') return next
+      const { w, h } = floatSize(next)
+      return { ...next, ...freeSpot(next.x, next.y, w, h, obstacles(nodes, all, id)) }
+    }))
+  }
   const remove = (id: string) => saveFloats((rootOf()?.floats ?? []).filter(f => f.id !== id))
 
   function startDrag(e: React.PointerEvent, f: MapFloat) {
@@ -112,17 +121,16 @@ export function FloatItems({ toCanvas, readOnly, nodes }: { toCanvas: ToCanvas; 
         const { w, h } = floatSize(f)
         const showX = !readOnly && hover === f.id
         return (
-          <foreignObject key={f.id} x={x} y={y} width={w} height={h} style={{ overflow: 'visible' }}>
+          <g key={f.id} data-testid={`float-${f.kind}`}
+            onMouseEnter={() => setHover(f.id)} onMouseLeave={() => setHover(h => (h === f.id ? null : h))}>
+          <foreignObject x={x} y={y} width={w} height={h} style={{ overflow: 'visible' }}>
             <div
-              data-testid={`float-${f.kind}`}
               onPointerDown={e => startDrag(e, f)}
               onPointerMove={moveDrag}
               onPointerUp={endDrag}
               onPointerCancel={endDrag}
-              onMouseEnter={() => setHover(f.id)}
-              onMouseLeave={() => setHover(h => (h === f.id ? null : h))}
               style={{
-                position: 'relative', width: '100%', height: '100%', boxSizing: 'border-box',
+                width: '100%', height: '100%', boxSizing: 'border-box',
                 cursor: readOnly ? 'default' : drag?.id === f.id ? 'grabbing' : 'grab',
                 fontFamily: 'Inter, system-ui, sans-serif',
                 // Blue like a selected node while it moves, a faint blue on hover so it reads as grabbable
@@ -138,7 +146,7 @@ export function FloatItems({ toCanvas, readOnly, nodes }: { toCanvas: ToCanvas; 
                 <div style={{
                   whiteSpace: 'pre-wrap', overflow: 'hidden', height: '100%',
                   color: isNote ? '#422006' : '#0f172a', fontSize: isNote ? 15 : SCRIBBLE_SIZE, fontWeight: 400,
-                  ...(isNote ? {} : { fontFamily: SCRIBBLE_FONT, lineHeight: 1.1 }),
+                  ...(isNote ? {} : { fontFamily: SCRIBBLE_FONT, fontStyle: 'italic', lineHeight: 1.1 }),
                   lineHeight: 1.4,
                 }}>{f.text}</div>
               ) : isNote ? (
@@ -163,25 +171,14 @@ export function FloatItems({ toCanvas, readOnly, nodes }: { toCanvas: ToCanvas; 
                   onBlur={e => { if (e.target.value !== f.text) update(f.id, { text: e.target.value }) }}
                   style={{
                     width: '100%', border: 0, outline: 'none', padding: 0, background: 'transparent',
-                    color: '#0f172a', fontSize: SCRIBBLE_SIZE, fontWeight: 400, fontFamily: SCRIBBLE_FONT, lineHeight: 1.1, cursor: 'text',
+                    color: '#0f172a', fontSize: SCRIBBLE_SIZE, fontWeight: 400, fontFamily: SCRIBBLE_FONT, fontStyle: 'italic', lineHeight: 1.1, cursor: 'text',
                   }}
                 />
               )}
-              {showX && (
-                <button
-                  title="Remove"
-                  aria-label="Remove"
-                  onPointerDown={e => e.stopPropagation()}
-                  onClick={() => remove(f.id)}
-                  style={{
-                    position: 'absolute', top: isNote ? 3 : -10, right: isNote ? 3 : -10, width: 20, height: 20,
-                    borderRadius: 10, border: '1px solid #e2e8f0', background: '#fff', color: '#64748b',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, cursor: 'pointer',
-                  }}
-                ><X size={12} /></button>
-              )}
             </div>
           </foreignObject>
+          {showX && <SvgButton x={isNote ? x + w - 13 : x + w} y={isNote ? y + 13 : y} label="Remove" onClick={() => remove(f.id)} />}
+          </g>
         )
       })}
     </g>
@@ -281,7 +278,7 @@ function SummaryBrace({ f, nodes, edge, readOnly, hovered, onHover, onText, onNo
         return (
           <foreignObject key={i} x={onLeft ? kidEdge - w : kidEdge} y={kidYs[i] - 15} width={w} height={30} style={{ overflow: 'visible' }}>
             <div data-testid="summary-branch" onPointerDown={e => e.stopPropagation()} style={{
-              position: 'relative', height: 30, boxSizing: 'border-box', display: 'flex', alignItems: 'center',
+              height: 30, boxSizing: 'border-box', display: 'flex', alignItems: 'center',
               padding: '0 10px', borderRadius: 6, background: '#f1f5f9',
               fontFamily: 'Inter, system-ui, sans-serif', fontSize: 13, color: '#0f172a',
             }}>
@@ -291,20 +288,13 @@ function SummaryBrace({ f, nodes, edge, readOnly, hovered, onHover, onText, onNo
                   onBlur={e => { if (e.target.value !== b) setBranch(i, e.target.value) }}
                   style={{ width: '100%', border: 0, outline: 'none', padding: 0, background: 'transparent', font: 'inherit', color: 'inherit' }} />
               )}
-              {hovered && !readOnly && (
-                <button title="Remove branch" aria-label="Remove branch" onClick={() => onBranches(branches.filter((_, j) => j !== i))} style={{
-                  position: 'absolute', top: -8, right: -8, width: 18, height: 18, borderRadius: 9,
-                  border: '1px solid #e2e8f0', background: '#fff', color: '#64748b', padding: 0, cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}><X size={11} /></button>
-              )}
             </div>
           </foreignObject>
         )
       })}
       <foreignObject x={lx} y={mid - 18} width={labelW} height={90} style={{ overflow: 'visible' }}>
         <div onPointerDown={e => e.stopPropagation()} style={{
-          position: 'relative', height: 36, boxSizing: 'border-box', display: 'flex', alignItems: 'center',
+          height: 36, boxSizing: 'border-box', display: 'flex', alignItems: 'center',
           padding: '0 10px', borderRadius: 8, background: '#fff', border: `1.5px solid ${color}`,
           outline: hovered && !readOnly ? '2px solid rgba(59,130,246,0.45)' : 'none', outlineOffset: 3,
           fontFamily: 'Inter, system-ui, sans-serif', fontSize: 14, fontWeight: 600, color: '#0f172a',
@@ -314,20 +304,6 @@ function SummaryBrace({ f, nodes, edge, readOnly, hovered, onHover, onText, onNo
               onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
               onBlur={e => { if (e.target.value !== f.text) onText(e.target.value) }}
               style={{ width: '100%', border: 0, outline: 'none', padding: 0, background: 'transparent', font: 'inherit', color: 'inherit' }} />
-          )}
-          {hovered && !readOnly && (
-            <button title="Add branch" aria-label="Add branch" onClick={() => onBranches([...branches, 'Topic'])} style={{
-              position: 'absolute', top: 7, [onLeft ? 'left' : 'right']: -30, width: 22, height: 22, borderRadius: 11,
-              border: 0, background: '#3b82f6', color: '#fff', padding: 0, cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}><Plus size={14} /></button>
-          )}
-          {hovered && !readOnly && (
-            <button title="Remove" aria-label="Remove" onClick={onRemove} style={{
-              position: 'absolute', top: -10, right: -10, width: 20, height: 20, borderRadius: 10,
-              border: '1px solid #e2e8f0', background: '#fff', color: '#64748b', padding: 0, cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}><X size={12} /></button>
           )}
         </div>
         {/* Small note under the summary: shown when it has text, or on hover to add one */}
@@ -347,6 +323,35 @@ function SummaryBrace({ f, nodes, edge, readOnly, hovered, onHover, onText, onNo
           )
         )}
       </foreignObject>
+      {/* Buttons are SVG, not positioned HTML: Safari draws positioned HTML in a
+          foreignObject at full size, ignoring the map's zoom */}
+      {hovered && !readOnly && branches.map((_, i) => {
+        const w = branchWidth(branches[i])
+        return <SvgButton key={i} x={onLeft ? kidEdge - w : kidEdge + w} y={kidYs[i] - 15} r={9} label="Remove branch"
+          onClick={() => onBranches(branches.filter((_, j) => j !== i))} />
+      })}
+      {hovered && !readOnly && (
+        <SvgButton x={onLeft ? lx - 19 : lx + labelW + 19} y={mid} r={11} label="Add branch" kind="plus"
+          onClick={() => onBranches([...branches, 'Topic'])} />
+      )}
+      {hovered && !readOnly && <SvgButton x={lx + labelW} y={mid - 18} label="Remove" onClick={onRemove} />}
+    </g>
+  )
+}
+
+// A small round button drawn in SVG, so it scales with the map like everything else
+function SvgButton({ x, y, r = 10, label, onClick, kind = 'x' }: {
+  x: number; y: number; r?: number; label: string; onClick: () => void; kind?: 'x' | 'plus'
+}) {
+  const plus = kind === 'plus'
+  const d = plus ? r * 0.45 : r * 0.35
+  return (
+    <g role="button" aria-label={label} style={{ cursor: 'pointer' }}
+      onPointerDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onClick() }}>
+      <title>{label}</title>
+      <circle cx={x} cy={y} r={r} fill={plus ? '#3b82f6' : '#fff'} stroke={plus ? 'none' : '#e2e8f0'} />
+      <path d={plus ? `M ${x - d} ${y} H ${x + d} M ${x} ${y - d} V ${y + d}` : `M ${x - d} ${y - d} L ${x + d} ${y + d} M ${x + d} ${y - d} L ${x - d} ${y + d}`}
+        stroke={plus ? '#fff' : '#64748b'} strokeWidth={plus ? 2 : 1.6} strokeLinecap="round" />
     </g>
   )
 }
