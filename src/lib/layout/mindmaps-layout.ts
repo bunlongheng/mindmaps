@@ -100,7 +100,9 @@ export function place(
   if (!node) return
 
   const { w, h } = nodeSize(node, depth)
-  const nodeX = goRight ? x : x - w
+  // A topic dropped by hand stays put, and its children hang off where it now sits
+  const nodeX = node.manuallyPositioned ? node.x : goRight ? x : x - w
+  if (node.manuallyPositioned) centerY = node.y + h / 2
 
   if (!node.manuallyPositioned) {
     result.push({ ...node, x: nodeX, y: centerY - h / 2, width: w, height: h })

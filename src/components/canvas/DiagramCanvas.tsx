@@ -500,6 +500,19 @@ export function DiagramCanvas({ onNodeSelect, readOnly, noInteract, rightInset =
     const snap = snapTargetRef.current
     snapTargetRef.current = null
     if (!snap) return
+    // Dropped without changing the order (e.g. the top topic dragged higher): keep it
+    // where it was dropped and bring its children along, instead of snapping it back
+    const st = useMindmapStore.getState()
+    const map = st.activeMindmap
+    const node = map?.nodes.find(n => n.id === id)
+    if (map && node) {
+      const sibs = map.nodes.filter(n => n.parentId === node.parentId).sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+      const next = sibs[sibs.findIndex(n => n.id === id) + 1]?.id ?? null
+      if (snap.insertBeforeId === next) {
+        useMindmapStore.setState({ activeMindmap: { ...map, nodes: runLayout(map.nodes, st.diagramType) }, isDirty: true })
+        return
+      }
+    }
     reorderNode(id, snap.insertBeforeId)
   }, [reorderNode])
 
